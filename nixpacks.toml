@@ -1,8 +1,7 @@
-# Force Nixpacks to use Python for the backend service.
-# Without this, Nixpacks detects frontend/package.json and sets up Node instead,
-# which means pip is never installed and the build fails.
-
 providers = ["python"]
+
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip"]
 
 [phases.install]
 cmds = []
