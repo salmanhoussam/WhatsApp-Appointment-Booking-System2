@@ -125,7 +125,7 @@ model Price {
   @@index([date])
   @@index([clientId])
   @@map("prices")
-  @@schemas("public")
+  @@schema("public")
 }
 
 model Service {
