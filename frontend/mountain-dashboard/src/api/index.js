@@ -1,8 +1,12 @@
 // src/api/index.js
 import axios from 'axios';
 
-// ✅ تأكد أن baseURL يشير إلى الباك إند (وليس إلى فرونت إند)
-const API = axios.create({ baseURL: 'http://127.0.0.1:8000/api/v1' });
+// ✅ في الإنتاج: VITE_API_URL=https://my-backend.up.railway.app
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/v1`
+  : 'http://127.0.0.1:8000/api/v1';
+
+const API = axios.create({ baseURL: BASE_URL });
 
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem('token');

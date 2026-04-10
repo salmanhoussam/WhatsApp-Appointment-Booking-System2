@@ -5,7 +5,7 @@
     "buildCommand": "npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "npx serve dist -p $PORT --no-clipboard",
+    "startCommand": "npx serve dist -s -p $PORT --no-clipboard",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }

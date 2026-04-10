@@ -1,5 +1,7 @@
 // الرابط الأساسي للباك إند (قسم الإدارة)
-const BASE_URL = "http://127.0.0.1:8000/api/v1/admin";
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/v1/admin`
+  : "http://127.0.0.1:8000/api/v1/admin";
 
 /**
  * دالة لجلب جميع الشاليهات (Units) من الباك إند
