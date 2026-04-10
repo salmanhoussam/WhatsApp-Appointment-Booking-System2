@@ -1,0 +1,3 @@
+name: deploy
+description: Run pre-flight checks and deploy to Railway/Production.
+disable-model-invocation: trueDeploy the SaaS platform to production:Pre-flight checks`git status` -- Ensure no uncommitted changes.`ruff check .` -- Python linting passes (if applicable).`prisma format` -- DB schema is clean.`npm run build` -- React frontend builds successfully.Deploy`git push origin main`Explain to the user: "Deployment triggered on Railway via Git push. Railway will run the Procfile (`gunicorn app.main:app...`) automatically."If anything failsDo NOT force push.Fix the issue, re-run all checks.

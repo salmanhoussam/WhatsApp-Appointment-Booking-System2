@@ -1,0 +1,618 @@
+project: Smar 3D Scrollytelling Experience
+tenant: smar
+last_updated: 2026-04-10  # Phase 17 done: Fix 404 API Routing Mismatch (frontend ↔ backend)
+
+phases:
+
+  - id: 1
+    name: "State Management — The Bridge"
+    description: "Global state layer that connects the WebGL canvas to the HTML UI without prop drilling."
+    tasks:
+      - id: 1.1
+        name: "Create Zustand store"
+        file: "src/pages/smar/store/useSmarStore.js"
+        details: |
+          Define global states:
+            - scrollProgress (float 0→1): raw scroll position normalized
+            - activeSection (string): 'hero' | 'architecture' | 'gardens' | 'pool' | 'cta'
+            - isCanvasLoaded (boolean): true once R3F useProgress hits 100%
+          Define actions:
+            - setScrollProgress(v)
+            - setActiveSection(name)
+            - setCanvasLoaded()
+        status: done
+
+  - id: 2
+    name: "Canvas & 3D Foundation"
+    description: "Fixed WebGL layer (z-index: -1) with basic scene, lighting, and visual feedback elements."
+    tasks:
+      - id: 2.1
+        name: "Setup base Canvas in SmarPage.jsx"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          - R3F <Canvas> with position: fixed, inset: 0, z-index: -1
+          - pointer-events: none so scroll passes through
+          - Wrap in <Suspense> with preloader fallback
+          - Render <Scene3D /> inside the canvas
+        status: done
+
+      - id: 2.2
+        name: "Create Scene3D.jsx"
+        file: "src/pages/smar/canvas/Scene3D.jsx"
+        details: |
+          - ambientLight + pointLight (gold #d4a853)
+          - <Environment preset="city" /> from Drei
+          - Render <FloatingRings /> as placeholder visual
+          - Render <CameraManager /> (Phase 3)
+          - Post-processing: Bloom + Vignette
+        status: done
+
+      - id: 2.3
+        name: "Create FloatingRings.jsx"
+        file: "src/pages/smar/canvas/FloatingRings.jsx"
+        details: |
+          - 3 torus meshes at different scales and rotations
+          - meshStandardMaterial with gold color, metalness: 1, roughness: 0.05
+          - Idle rotation via useFrame
+          - Scale and opacity driven by scrollProgress from useSmarStore
+        status: done
+
+  - id: 3
+    name: "Scrollytelling & GSAP Integration"
+    description: "Map native browser scroll to scrollProgress in Zustand, then drive the 3D camera from it."
+    tasks:
+      - id: 3.1
+        name: "Setup GSAP ScrollTrigger"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          - gsap.registerPlugin(ScrollTrigger)
+          - Create a ScrollTrigger that covers the full scroll height (e.g., 500vh)
+          - On update: setScrollProgress(self.progress) into Zustand
+          - Teardown on unmount (ScrollTrigger.kill())
+        status: done
+
+      - id: 3.2
+        name: "Create CameraManager.jsx"
+        file: "src/pages/smar/canvas/CameraManager.jsx"
+        details: |
+          - useFrame reads scrollProgress from useSmarStore (no re-renders)
+          - Camera path: defined as a set of keyframes per section
+            (e.g., hero: z=10, architecture: z=4 + x offset, pool: top-down)
+          - Use THREE.MathUtils.lerp for smooth interpolation each frame
+          - camera.lookAt(0, 0, 0) or a moving target point
+          - Also updates activeSection based on scroll thresholds
+        status: done
+
+  - id: 4
+    name: "HTML UI Overlay & Sections"
+    description: "Scrollable HTML layer (z-index: 1) with section components animated by Zustand state."
+    tasks:
+      - id: 4.1
+        name: "Build scrollable UI shell in SmarPage.jsx"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          - Outer div: position: relative, z-index: 1, pointer-events: none
+          - Inner scroll container: height 500vh (matches ScrollTrigger range)
+          - Fixed overlay div for section components (absolute inset-0)
+          - pointer-events: auto only on interactive elements (buttons, links)
+        status: done
+
+      - id: 4.2
+        name: "Create HeroSection.jsx"
+        file: "src/pages/smar/sections/HeroSection.jsx"
+        details: |
+          - Reads scrollProgress from useSmarStore via Zustand selector
+          - Framer Motion useTransform: opacity fades out 0→0.18
+          - Logo image + scroll hint (matching existing ShowcaseCards HeroText style)
+          - Activates when activeSection === 'hero'
+        status: done
+
+      - id: 4.3
+        name: "Create ShowcaseCards.jsx"
+        file: "src/pages/smar/sections/ShowcaseCards.jsx"
+        details: |
+          - 3 property cards (Architecture, Gardens, Pool)
+          - Each reads scrollProgress from Zustand (not MotionValue context)
+          - Slide-in from left/right using Framer Motion useTransform
+          - GS MAR glassmorphism styling (backdrop-blur, gold border)
+          - Supabase amenity images: amenity1.jpg, amenity2.jpg, amenity3.jpg
+        status: done
+
+  - id: 5
+    name: "Polish & Preloading"
+    description: "Loading screen driven by R3F asset progress, then graceful reveal."
+    tasks:
+      - id: 5.1
+        name: "Implement WebGL Preloader"
+        file: "src/pages/smar/ui/Preloader.jsx"
+        details: |
+          - Use useProgress() from @react-three/drei inside a <Canvas> child
+          - Display: gold progress bar + percentage counter
+          - When progress === 100: call setCanvasLoaded() in Zustand
+          - SmarPage reads isCanvasLoaded → AnimatePresence exit animation
+            fades the preloader out (opacity 1→0, scale 1→1.05)
+          - Minimum display time: 800ms to avoid flash on fast connections
+        status: done
+
+  - id: 6
+    name: "Admin Dashboard Data Maximization"
+    description: "Enhance SmarAdminDashboard to handle CRM and WhatsApp integration effectively."
+    tasks:
+      - id: 6.1
+        name: "Implement WhatsApp & Web Source Tracking"
+        file: "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        details: |
+          - Add 'Source' column to Bookings table (Web vs WhatsApp).
+          - Add Analytics breakdown (Web vs WhatsApp KPIs) in OverviewTab.
+        status: done
+
+      - id: 6.2
+        name: "Add Phone Filtering & Action Inbox"
+        file: "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        details: |
+          - Add a Phone / Name search input filter in BookingsTab.
+          - Add a 'Pending Actions' Inbox toggle to filter pending requests needing immediate attention.
+        status: done
+
+      - id: 6.3
+        name: "Implement 15-Min Soft-Lock Countdown"
+        file: "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        details: |
+          - Enhance StatusBadge to show an active 15-minute countdown for 'pending' status.
+          - Calculate time remaining based on the booking's createdAt timestamp.
+        status: done
+
+  - id: 7
+    name: "Mountain Scrollytelling — Visual Rebuild"
+    description: |
+      إعادة بناء SmarPage كتجربة جبل cinematic.
+      المستخدم ينزل الجبل: اللوجو في الوسط → يصغر للأعلى → تظهر الفيلا → طبقات أسفل.
+      كل section = layer مستقل يدخل من الأسفل ويثبت.
+
+    tasks:
+      - id: 7.1
+        name: "Hero — SMAR Logo Entrance & Shrink to Nav"
+        file: "src/pages/smar/sections/HeroSection.jsx"
+        details: |
+          scrollProgress 0:
+            - "SMAR" نص ذهبي في مركز الشاشة (font-size كبير)
+            - "Mountain Residence" subtitle تحته
+            - scroll hint (خط ذهبي متحرك)
+          scrollProgress 0 → 0.18:
+            - النص يصعد من المركز → نصف الشاشة العلوي (top: 50% → top: 8%)
+            - font-size يصغر من 6rem → 1.6rem
+            - subtitle تختفي تدريجياً
+          scrollProgress > 0.18:
+            - "SMAR" ثابت كـ sticky header في الأعلى
+        status: done
+
+      - id: 7.2
+        name: "Villa Layer — Full Bleed Image + Heritage Text"
+        file: "src/pages/smar/sections/VillaSection.jsx"
+        details: |
+          يدخل عند scrollProgress 0.18 → 0.30 (يصعد من الأسفل ويثبت)
+
+          Layout: شاشة كاملة مقسومة نصفين أفقياً:
+            LEFT  (55%): صورة frontveiwvilla.png — full bleed, object-cover
+            RIGHT (45%): نص عربي/إنجليزي عن التصميم
+
+          النص (يمكن تعديله لاحقاً):
+            - Subtitle: "STONE & WOOD HERITAGE"
+            - Title: "التصميم الأصيل" / "Authentic Architecture"
+            - Body: وصف قصير عن المواد الحجرية والخشبية التراثية
+            - CTA button: "اكتشف الفيلا" / "Explore Villa"
+
+          Image URL:
+            https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/frontveiwvilla.png
+
+          Visual style:
+            - خلفية: #0a0a0f مع gradient overlay على الصورة
+            - حد علوي: خط ذهبي رفيع
+            - النص: GS MAR glassmorphism panel على اليمين
+        status: done
+
+      - id: 7.3
+        name: "SmarPage — Scroll Orchestration Rebuild"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          - ScrollTrigger يغطي 500vh (كل layer = 100vh من الـ scroll)
+          - كل section مستقل (HeroSection, VillaSection) يقرأ scrollProgress من Zustand
+          - لا يوجد canvas في هذه المرحلة — pure HTML/CSS
+          - R3F Canvas + Scene3D + Preloader + isCanvasLoaded أُزيلوا
+          - GSAP ScrollTrigger → setScrollProgress + setActiveSection في Zustand
+          - activeSection thresholds: hero<0.15 | villas<0.38 | chalets<0.62 | amenities<0.82 | cta
+        status: done
+
+      - id: 7.4
+        name: "Cafeteria & Pool Layers"
+        file: "src/pages/smar/sections/AmenitiesSection.jsx"
+        details: |
+          Enter: scrollProgress 0.62→0.74. Exit: 0.88→0.96.
+          LEFT  50%: amenity2.jpg — "MOUNTAIN DINING" glass panel — WhatsApp reserve CTA.
+          RIGHT 50%: amenity3.jpg — "HORIZON WATERS" glass panel — /smar/listings CTA.
+          Gold skewed diagonal divider between panels.
+          Full bilingual (AR/EN) text in GS MAR glassmorphism cards.
+        status: done
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 8: Photorealistic Collage Scrollytelling (PIVOT — 2026-04-10)
+  # Client rejected abstract SVG ridges. Rebuilt with real building photos.
+  #
+  # New scroll map (600vh):
+  #   0.00 → 0.10  HERO        SMAR logo entrance
+  #   0.10 → 0.28  VILLA       slides in from right → pins upper-right
+  #   0.28 → 0.48  RESTAURANT  slides in from left  → pins mid-left
+  #   0.48 → 0.70  CHALETS     slides in from bottom → pins lower-center
+  #   0.70 → 1.00  CTA         all pinned, CTA strip fades in
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 8
+    name: "Photorealistic Collage + Inline Booking"
+    description: "Real photos PIN into a mountain scene. Click to expand inline booking widget."
+    tasks:
+      - id: 8.1
+        name: "MountainBackground.jsx — simplified gradient"
+        file: "src/pages/smar/canvas/MountainBackground.jsx"
+        details: |
+          SVG ridges removed. position:absolute (inside sticky stage).
+          Sky→forest→earth gradient (radial highlight at horizon).
+          Gold horizon glow strip at 18%.
+          Bottom fog 20vh + top vignette 18vh.
+          No RAF — purely static gradient, real photos do the visual work.
+        status: done
+
+      - id: 8.2
+        name: "CollageScene.jsx — pinned collage + booking"
+        file: "src/pages/smar/canvas/CollageScene.jsx"
+        details: |
+          3 tiles: Villa (right), Restaurant (left), Chalets (bottom).
+          RAF loop: easeOutQuart entrance → pin (no exit).
+          Hover: gold border glow via React state (onMouseEnter/Leave).
+          Click bookable tile → Framer Motion glass bottom-sheet slides up.
+          Booking panel: check-in/out date inputs + guests counter.
+          Night count hint calculated from dates.
+          Proceed → navigate('/smar/payment', {state: {formData, unit, ...}}).
+          Restaurant tile → WhatsApp link instead.
+          body.overflow locked while panel is open.
+        status: done
+
+      - id: 8.3
+        name: "SmarPage.jsx — sticky container architecture"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          Outer: 600vh relative container (GSAP trigger).
+          Inner: sticky top:0, height:100vh, overflow:hidden.
+          MountainBackground (z:0) + CollageScene (z:1) inside sticky.
+          HeroSection rendered outside sticky (position:fixed, z:10 above).
+          VillaSection.jsx and AmenitiesSection.jsx no longer imported.
+        status: done
+
+  - id: 9
+    name: "Zustand Store Expansion"
+    description: "Add activeCategory and expandedUnit to useSmarStore for Mountain Pyramid interactions."
+    tasks:
+      - id: 9.1
+        name: "Expand useSmarStore"
+        file: "src/pages/smar/store/useSmarStore.js"
+        details: |
+          Add state:
+            - activeCategory: null | 'villas' | 'chalets' | 'restaurant' | 'pool'
+            - expandedUnit: null | { type: string, id: string }
+          Add actions:
+            - setActiveCategory(name)
+            - openUnit(type, id)
+            - closeUnit()
+          Update activeSection values to match pyramid:
+            'hero' | 'villas' | 'chalets' | 'amenities' | 'cta'
+        status: todo
+
+  - id: 10
+    name: "Villa Peak Layer"
+    description: "Top-of-mountain layer. Full-screen split: image left + heritage text right. 3 villa cards on expand."
+    tasks:
+      - id: 10.1
+        name: "Create VillaSection.jsx — base layer"
+        file: "src/pages/smar/sections/VillaSection.jsx"
+        details: |
+          Enters at scrollProgress 0.15 → 0.28.
+          LEFT 55%: frontveiwvilla.png full-bleed, right-side gradient overlay.
+          RIGHT 45%: GS MAR glass panel — eyebrow, title, body, CTA "Explore Villas →".
+          Image URL: properties/beitsmar/homepage/frontveiwvilla.png (Supabase)
+        status: todo
+
+      - id: 10.2
+        name: "Villa Cards — 3-unit expansion"
+        file: "src/pages/smar/sections/VillaSection.jsx"
+        details: |
+          Triggered by setActiveCategory('villas').
+          3 glass cards (30vw × 220px) slide up from bottom with stagger 0/80/160ms.
+          Each card: image, name, price/night, "Book →" CTA.
+          Click "Book →" → navigate('/smar/listings?type=villa').
+        status: todo
+
+  - id: 11
+    name: "Chalets Mid-Mountain Layer"
+    description: "Middle elevation. 12-chalet grid. Enters at scrollProgress 0.38."
+    tasks:
+      - id: 11.1
+        name: "Create ChaletsSection.jsx"
+        file: "src/pages/smar/sections/ChaletsSection.jsx"
+        details: |
+          Enters at scrollProgress 0.38 → 0.50.
+          Header strip: "12 CHALETS" large gold typography + separator.
+          4-column × 3-row glass card grid (180×220px each).
+          Click any card → navigate('/smar/listings?type=chalet').
+        status: todo
+
+      - id: 11.2
+        name: "Chalets data — live Supabase fetch"
+        file: "src/pages/smar/sections/ChaletsSection.jsx"
+        details: |
+          useEffect on mount: GET /client/smar/units?type=chalet&limit=12.
+          Show 12 shimmer skeleton cards while loading.
+          On error: "Discover our chalets" placeholder with WhatsApp CTA.
+        status: todo
+
+  - id: 12
+    name: "Amenities Valley Layer"
+    description: "Lower elevation. Restaurant + Pool side-by-side. Enters at scrollProgress 0.62."
+    tasks:
+      - id: 12.1
+        name: "Create AmenitiesSection.jsx — Restaurant + Pool"
+        file: "src/pages/smar/sections/AmenitiesSection.jsx"
+        details: |
+          Enters at scrollProgress 0.62 → 0.74.
+          LEFT 50%: Restaurant — amenity2.jpg, "MOUNTAIN DINING" glass panel, Reserve via WhatsApp.
+          RIGHT 50%: Pool — amenity3.jpg, "HORIZON WATERS" glass panel, View Details.
+          Gold diagonal divider between panels.
+          Supabase: properties/beitsmar/amenities/amenity2.jpg + amenity3.jpg
+        status: todo
+
+  - id: 13
+    name: "CTA Base Camp Layer"
+    description: "Final elevation. Full-width call-to-action. Enters at scrollProgress 0.82."
+    tasks:
+      - id: 13.1
+        name: "Create CTASection.jsx"
+        file: "src/pages/smar/sections/CTASection.jsx"
+        details: |
+          Enters at scrollProgress 0.82 → 0.92.
+          Centered column: eyebrow, headline "ابدأ رحلتك", property summary line.
+          2 CTAs: "Book via WhatsApp" (green tint) + "Explore Properties" → /smar/listings.
+          Footer: address, email, social icons.
+        status: todo
+
+  - id: 14
+    name: "Unit Detail Modal (Mountain Pyramid)"
+    description: "Shared full-screen slide-up modal for any unit type. Triggered by openUnit() in Zustand."
+    tasks:
+      - id: 14.1
+        name: "Create UnitModal.jsx"
+        file: "src/pages/smar/ui/UnitModal.jsx"
+        details: |
+          AnimatePresence in SmarPage.jsx: y '100vh' → 0, spring {stiffness:60, damping:20}.
+          Top 50%: horizontal image gallery strip.
+          Bottom 50%: price, beds, baths, capacity, amenity icons, description.
+          CTAs: "Book via WhatsApp" + "Request Viewing".
+          Data: GET /smar/listings/:id on expandedUnit change.
+        status: todo
+
+  - id: 15
+    name: "SmarPage Orchestration — Mountain Pyramid"
+    description: "Final assembly. Remove R3F Canvas. Wire all pyramid layers. 600vh scroll spacer."
+    tasks:
+      - id: 15.1
+        name: "Rebuild SmarPage.jsx — pure HTML mountain"
+        file: "src/pages/smar/SmarPage.jsx"
+        details: |
+          REMOVE: R3F Canvas, Scene3D, CanvasFallback, Preloader, isCanvasLoaded.
+          ADD: MountainBackground (z:-1), HeroSection, VillaSection,
+               ChaletsSection, AmenitiesSection, CTASection, UnitModal.
+          Scroll spacer: 600vh (increased from 500vh).
+          activeSection updated in ScrollTrigger onUpdate:
+            p < 0.15 → 'hero' | p < 0.38 → 'villas' | p < 0.62 → 'chalets'
+            p < 0.82 → 'amenities' | else → 'cta'
+          Z-index stack: -1 bg / 10 hero / 20 villa / 30 chalets / 40 amenities / 50 cta / 100 modal
+        status: todo
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 16: Booking Funnel — Dark GS MAR (COMPLETED 2026-04-09)
+  # Full customer flow: /smar/listings → UnitModal → BookingDrawer → /smar/payment
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 16
+    name: "Booking Funnel — Dark GS MAR"
+    description: |
+      Complete customer booking funnel. Dark #050508 backgrounds, glassmorphism cards,
+      gold #d4a853 accents throughout. Adapted from V1 flow with premium Smar aesthetic.
+      Flow: /smar/listings → SmarUnitModal → SmarBookingDrawer → /smar/payment → success.
+
+    tasks:
+      - id: 16.1
+        name: "Create SmarWhatsAppButton"
+        file: "src/pages/smar/ui/SmarWhatsAppButton.jsx"
+        details: |
+          Fixed float z:300, bottom-right.
+          Green (#25D366) with glassmorphism container (rgba(37,211,102,0.12) bg).
+          Animated tooltip (Framer Motion slide-in from right).
+          Spring entrance animation: delay 0.8s.
+          Used on both /smar/listings and /smar/payment.
+        status: done
+
+      - id: 16.2
+        name: "Create SmarUnitModal"
+        file: "src/pages/smar/ui/SmarUnitModal.jsx"
+        details: |
+          Full-screen slide-up: y '100%' → 0, spring {stiffness:60, damping:20}.
+          Height: 92vh, border-radius top corners.
+          LEFT 60%: 5-image gallery with animated thumbnail strip (gold border on active).
+          RIGHT 40%: category badge, unit name, price/night, description, 4 spec chips.
+          "Book this Unit →" gold gradient CTA → triggers SmarBookingDrawer.
+          WhatsApp fallback link below CTA.
+          ESC key closes. Backdrop click closes.
+        status: done
+
+      - id: 16.3
+        name: "Create SmarBookingDrawer"
+        file: "src/pages/smar/ui/SmarBookingDrawer.jsx"
+        details: |
+          Slides from right (LTR) or left (RTL): x '100%' → 0, spring {stiffness:70, damping:20}.
+          Width: min(480px, 100vw). Height: 100dvh.
+          Fields: Full Name, WhatsApp number, Guests (number), Arrival Time.
+          Dates summary strip (gold bg) when searchDates available.
+          Payment method grid (2×2): Cash 💵, Whish 📱, OMT 💸, Card 💳.
+          Whish/OMT: shows transfer number + receipt reference input.
+          Cash/Whish/OMT: POST /client/{slug}/book → inline success banner.
+          Card: GET /units/{id}/price + /units/{id}/services → navigate(/{slug}/payment, state).
+          Success banner: gold checkmark, confirmation message, close button.
+        status: done
+
+      - id: 16.4
+        name: "Create SmarListingsPage"
+        file: "src/pages/smar/normal/SmarListingsPage.jsx"
+        details: |
+          Route: /smar/listings
+          Reads ?type=villa|chalet|all from URL params (pre-selects filter).
+          Sticky dark nav: back arrow → /smar/home, SMAR gold logo, lang toggle.
+          Hero heading: "اكتشف إقامتك" / "Discover Your Stay".
+          Glass search bar: check-in date, check-out date, Search button (gold gradient).
+          Type filter pills: الكل / الفيلات / الشاليهات.
+          Results: 3-col auto-fill grid (minmax 300px).
+          Unit cards: image (220px) + type badge + name + capacity + price + "View Details" strip.
+          Loading: 6 shimmer skeleton cards.
+          Empty state: 🏔️ + "No units" + WhatsApp CTA button.
+          Opens SmarUnitModal on card click.
+          AnimatePresence for modal + drawer.
+        status: done
+
+      - id: 16.5
+        name: "Create SmarPaymentPage"
+        file: "src/pages/smar/normal/SmarPaymentPage.jsx"
+        details: |
+          Route: /smar/payment
+          Guard: no location.state → redirect to /smar/listings.
+          LEFT panel: order summary (unit name, dates, nights, guests, services add-on, total SAR).
+          Services add-on: gold "+ Add" button → ServicesModal (dark, qty +/− controls).
+          RIGHT panel: card form with 3D flip preview.
+            Front: card number (monospace), holder name, expiry.
+            Back: CVC field (flips on CVV onFocus, unflips onBlur).
+            Card flip CSS inlined as <style> tag (smar-flip-wrap/inner/front/back classes).
+          Validation: 16-digit number, name required, MM/YY format, 3-4 digit CVC.
+          POST /client/{slug}/book with services payload.
+          Success state: gold ✓, progress bar 3.5s, auto-redirect to /{slug}/home.
+          SmarWhatsAppButton present.
+        status: done
+
+      - id: 16.6
+        name: "Register listings + payment routes"
+        file: "src/router/tenants/smar.routes.jsx"
+        details: |
+          Added direct imports (not lazy — no WebGL weight):
+            import SmarListingsPage from '../../pages/smar/normal/SmarListingsPage';
+            import SmarPaymentPage  from '../../pages/smar/normal/SmarPaymentPage';
+          Added under "Booking funnel" comment block:
+            <Route path="listings" element={<SmarListingsPage />} />
+            <Route path="payment"  element={<SmarPaymentPage />} />
+        status: done
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 17: Fix 404 API Routing Mismatch (2026-04-10)
+  #
+  # ROOT CAUSE:
+  #   Two competing "public" route systems existed in the backend:
+  #     - app/api/v1/public.py   (old, DEAD CODE — shadowed by package)
+  #     - app/api/v1/public/     (new enterprise package — ACTIVE)
+  #   Python imports the directory over the .py file, so all old routes
+  #   (/client/{slug}/units, /client/{slug}/book) were unreachable.
+  #
+  #   Additionally, public/listings.py existed but was NEVER mounted
+  #   in public/__init__.py, AND it imported a non-existent
+  #   ListingRepository class.
+  #
+  # FIX SUMMARY:
+  #   Backend: Mount listings router + rewrite to use existing public_service
+  #   Frontend: Replace all /client/{slug}/... calls with new route pattern
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 17
+    name: "Fix 404 API Routing Mismatch (Frontend ↔ Backend)"
+    description: |
+      Frontend was calling dead routes from the old public.py file which Python
+      can never import because the public/ directory takes priority. The listings
+      router existed but was never mounted. All frontend API calls updated to use
+      the new enterprise-style query-parameter pattern.
+
+    tasks:
+      - id: 17.1
+        name: "Mount listings router in backend"
+        file: "app/api/v1/public/__init__.py"
+        details: |
+          Added 'listings' to the import and registered the router:
+            from . import properties, units, bookings, listings
+            router.include_router(listings.router, prefix="/listings", tags=["Public Listings"])
+          This makes GET /api/v1/public/listings/?client_slug=smar available.
+        status: done
+
+      - id: 17.2
+        name: "Rewrite listings.py — use existing public_service"
+        file: "app/api/v1/public/listings.py"
+        details: |
+          Old code imported non-existent ListingRepository and ListingService.
+          Rewrote to use the battle-tested public_service.get_client_catalog().
+          Endpoint: GET /listings/?client_slug=slug&type=type&check_in=date&check_out=date&guests=n
+          Added date validation (check_out after check_in, no past dates).
+          Returns full tenant catalog (units + services) via existing public_service.
+        status: done
+
+      - id: 17.3
+        name: "Fix SmarListingsPage API calls"
+        file: "src/pages/smar/normal/SmarListingsPage.jsx"
+        details: |
+          Changed 2 API calls (initial load + search):
+            BEFORE: publicApi.get(/client/slug/units)
+            AFTER:  publicApi.get(/listings/, { params: { client_slug: slug } })
+          client_slug is now a query parameter, not a URL path segment.
+        status: done
+
+      - id: 17.4
+        name: "Fix SmarPaymentPage booking POST"
+        file: "src/pages/smar/normal/SmarPaymentPage.jsx"
+        details: |
+          Changed booking POST call:
+            BEFORE: publicApi.post(/client/slug/book, { ... })
+            AFTER:  publicApi.post(/bookings/, { ..., client_slug: slug })
+          client_slug is now included in the request body.
+        status: done
+
+      - id: 17.5
+        name: "Fix SmarBookingDrawer booking POST"
+        file: "src/pages/smar/ui/SmarBookingDrawer.jsx"
+        details: |
+          Same fix as 17.4 for the Cash/Whish/OMT direct booking flow:
+            BEFORE: publicApi.post(/client/slug/book, { ... })
+            AFTER:  publicApi.post(/bookings/, { ..., client_slug: slug })
+        status: done
+
+      - id: 17.6
+        name: "Fix legacy PaymentCardDetails booking POST"
+        file: "src/components/PaymentCardDetails.jsx"
+        details: |
+          Legacy component (not used in smar routes but fixed for safety):
+            BEFORE: publicApi.post(/client/slug/book, payload)
+            AFTER:  publicApi.post(/bookings/, { ...payload, client_slug: slug })
+        status: done
+
+      - id: 17.7
+        name: "Audit — verified clean files"
+        details: |
+          Files confirmed to have NO broken API calls:
+            - CollageScene.jsx: No publicApi calls (hardcoded tiles, navigate only)
+            - SmarUnitModal.jsx: No API calls (UI only, delegates to onBook prop)
+            - BookingModal.jsx: No API calls (delegates to onSubmit prop)
+            - MountainMap.jsx: No API calls (render-only component)
+            - tenant.config.js: Slug utility only, no API calls
+            - smar.routes.jsx: Route definitions only, no API calls
+          Legacy files identified (outside smar flow):
+            - src/api.js: Old fetch-based admin API (uses /api/v1/admin, not public)
+            - src/api/index.js: Old axios admin API (uses /api/v1, not public)
+        status: done
