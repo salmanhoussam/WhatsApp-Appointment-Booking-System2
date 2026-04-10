@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 ساعة
     
     # 🌐 إعدادات CORS
-    # في الإنتاج: ضع رابط الفرونت اند في متغير FRONTEND_URL على Railway
+    # في الإنتاج: ضع روابط الفرونت اند في متغير FRONTEND_URL على Railway
+    # يدعم عدة روابط مفصولة بفاصلة: "https://smar.salmansaas.com,https://dashboard.salmansaas.com"
     FRONTEND_URL: Optional[str] = os.getenv("FRONTEND_URL")
 
     @property
@@ -40,7 +41,11 @@ class Settings(BaseSettings):
             "http://localhost:8000",
         ]
         if self.FRONTEND_URL:
-            origins.append(self.FRONTEND_URL)
+            # دعم عدة روابط مفصولة بفاصلة
+            for url in self.FRONTEND_URL.split(","):
+                url = url.strip()
+                if url and url not in origins:
+                    origins.append(url)
         return origins
     
     # 📁 إعدادات رفع الملفات (إذا احتجنا لاحقاً)
