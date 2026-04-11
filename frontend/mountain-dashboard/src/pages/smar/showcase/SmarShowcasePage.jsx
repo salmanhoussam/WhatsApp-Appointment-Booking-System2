@@ -28,7 +28,6 @@ import { useMotionValue, motionValue }           from 'framer-motion';
 import Scene3D       from './Scene3D';
 import ShowcaseCards from './ShowcaseCards';
 import ShowcaseHUD   from './ShowcaseHUD';
-import { translations } from '../spatial/i18n';
 
 // ─── Shared context ───────────────────────────────────────────────────────────
 // motionValue(0) is NOT a hook — safe to call at module level.
@@ -38,19 +37,12 @@ const _fallbackProgress = motionValue(0);
 
 export const ShowcaseContext = createContext({
   scrollProgress: _fallbackProgress,
-  lang:           'ar',
-  toggleLang:     () => {},
-  t:              translations.ar,
 });
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SmarShowcasePage() {
   // MotionValue: updated every rAF by Scene3D, never triggers a re-render
   const scrollProgress = useMotionValue(0);
-
-  const [lang, setLang] = useState('ar');
-  const toggleLang      = useCallback(() => setLang(p => p === 'ar' ? 'en' : 'ar'), []);
-  const t               = translations[lang];
 
   // Called inside useFrame — must stay a stable ref (useCallback)
   const handleProgress = useCallback(
@@ -59,7 +51,7 @@ export default function SmarShowcasePage() {
   );
 
   return (
-    <ShowcaseContext.Provider value={{ scrollProgress, lang, toggleLang, t }}>
+    <ShowcaseContext.Provider value={{ scrollProgress }}>
       {/*
         The outer div clips overflow so the WebGL canvas never bleeds
         on narrow viewports.  Background #0a0a0f is visible while the

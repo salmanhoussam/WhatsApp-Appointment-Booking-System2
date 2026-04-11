@@ -10,11 +10,11 @@
 
 import { useState, useContext } from 'react';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import { LanguageContext } from './SpatialHomePage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function SmarHeader() {
   const [hidden, setHidden] = useState(false);
-  const { t, toggleLang } = useContext(LanguageContext);
+  const { t, toggleLang } = useLanguage();
   const { scrollY } = useScroll();
 
   useMotionValueEvent(scrollY, 'change', (latest) => {

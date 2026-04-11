@@ -51,7 +51,21 @@ export const translations = {
     bookingConfirmed: "تم تأكيد حجزك. سنعود بك للرئيسية...",
     securedPayments: "مدفوعات آمنة ومشفرة بالكامل",
     payDescription: "قم بالدفع لتأكيد حجزك في",
-    validThru: "صالح حتى"
+    validThru: "صالح حتى",
+    // Spatial Hero
+    eyebrow: "اكتشف بيت سمار",
+    title: "ملاذك بين الغيوم",
+    description: "في قلب جبال لبنان، يندمج التراث المعماري الأصيل مع الرفاهية المطلقة لنقدم لك تجربة إقامة تفوق الخيال. استمتع بإطلالات بانورامية تأسر الأنفاس، ومسابح تعانق الأفق، ومساحات تنبض بالحياة والدفء.",
+    // Spatial Timeline
+    timeline_sub: "اكتشف المساحات",
+    timeline_title: "تصميم يلهم الحواس",
+    // Spatial CTA
+    cta_eyebrow: "استمتع بالرفاهية",
+    cta_title: "ابدأ رحلتك",
+    cta_body: "هل أنت مستعد لتجربة استثنائية تجمع بين سحر الطبيعة وراحة لا تضاهى؟ اختر وحدتك الآن واستعد لصناعة ذكريات تدوم.",
+    cta_button: "اكتشف الوحدات",
+    // HUD & Common
+    langToggle: "EN",
   },
   en: {
     checkIn: "Check In",
@@ -104,6 +118,20 @@ export const translations = {
     bookingConfirmed: "Your booking is confirmed. Returning to home...",
     securedPayments: "Secured and Encrypted Payments",
     payDescription: "Pay to confirm your booking for",
-    validThru: "VALID THRU"
+    validThru: "VALID THRU",
+    // Spatial Hero
+    eyebrow: "DISCOVER BEIT SMAR",
+    title: "Your Haven in the Clouds",
+    description: "In the heart of the Lebanese mountains, authentic architectural heritage merges with absolute luxury to offer you an imaginative stay. Enjoy panoramic views, infinity pools, and spaces that pulsate with life.",
+    // Spatial Timeline
+    timeline_sub: "EXPLORE SPACES",
+    timeline_title: "Design that Inspires",
+    // Spatial CTA
+    cta_eyebrow: "EXPERIENCE LUXURY",
+    cta_title: "Begin Your Journey",
+    cta_body: "Are you ready for an exceptional experience that combines the magic of nature with unmatched comfort? Choose your unit now and create lasting memories.",
+    cta_button: "Explore Units",
+    // HUD & Common
+    langToggle: "AR",
   }
 };

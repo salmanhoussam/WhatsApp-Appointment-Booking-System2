@@ -15,6 +15,7 @@ import { useContext, useState }             from 'react';
 import { motion, useTransform,
          useMotionValueEvent }              from 'framer-motion';
 import { ShowcaseContext }                  from './SmarShowcasePage';
+import { useLanguage }                      from '../../context/LanguageContext';
 
 // ─── Section labels per language ──────────────────────────────────────────────
 const SECTIONS = {
@@ -53,7 +54,8 @@ function ProgressDots({ active }) {
 
 // ─── HUD ──────────────────────────────────────────────────────────────────────
 export default function ShowcaseHUD() {
-  const { scrollProgress, lang, toggleLang, t } = useContext(ShowcaseContext);
+  const { scrollProgress } = useContext(ShowcaseContext);
+  const { lang, toggleLang, t } = useLanguage();
   const [active, setActive] = useState(0);
 
   // Derive active section from scroll — useState OK here (only 5 values)
@@ -66,7 +68,7 @@ export default function ShowcaseHUD() {
   const hudOpacity = useTransform(scrollProgress, [0, 0.025], [0, 1]);
 
   const sectionLabel = SECTIONS[lang][active];
-  const bookLabel    = lang === 'ar' ? 'احجز الآن' : 'Book Now';
+  const bookLabel    = t.bookNow || (lang === 'ar' ? 'احجز الآن' : 'Book Now');
 
   return (
     <motion.div

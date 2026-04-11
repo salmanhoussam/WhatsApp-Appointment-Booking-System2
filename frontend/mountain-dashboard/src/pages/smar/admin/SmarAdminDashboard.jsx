@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
 import UnitCalendar from '../../../components/UnitCalendar';
+import UnitFormModal from './UnitFormModal';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -212,7 +213,7 @@ function GardensTab() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ activeTab, setActiveTab, onLogout }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded }) {
   const navItems = [
     { id: 'bookings',     icon: '📋', label: 'Reservations'  },
     { id: 'units',        icon: '🏠', label: 'الوحدات'       },
@@ -223,7 +224,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout }) {
   ];
   return (
     <div style={{
-      width:          220,
+      width:          isExpanded ? 220 : 80,
       minHeight:      '100vh',
       background:     C.surface,
       borderRight:    `1px solid ${C.border}`,
@@ -231,15 +232,35 @@ function Sidebar({ activeTab, setActiveTab, onLogout }) {
       flexDirection:  'column',
       padding:        '28px 0',
       flexShrink:     0,
+      transition:     'width 0.3s ease-in-out',
+      overflow:       'hidden',
     }}>
+      {/* Collapse Toggle */}
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer',
+          padding: '0 24px', textAlign: isExpanded ? 'right' : 'center', marginBottom: 16, fontSize: 18,
+          transition: 'color 0.2s'
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = C.gold}
+        onMouseLeave={e => e.currentTarget.style.color = C.textMuted}
+      >
+        {isExpanded ? '◀' : '▶'}
+      </button>
+
       {/* Logo */}
-      <div style={{ padding: '0 24px 32px' }}>
-        <div style={{ fontSize: 11, letterSpacing: '0.18em', color: C.textMuted, marginBottom: 4 }}>
-          GS MAR ADMIN
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: C.gold, letterSpacing: '0.06em' }}>
-          بيت سمار
-        </div>
+      <div style={{ padding: '0 24px 32px', whiteSpace: 'nowrap', opacity: isExpanded ? 1 : 0, transition: 'opacity 0.2s', height: 60 }}>
+        {isExpanded && (
+          <>
+            <div style={{ fontSize: 11, letterSpacing: '0.18em', color: C.textMuted, marginBottom: 4 }}>
+              GS MAR ADMIN
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.gold, letterSpacing: '0.06em' }}>
+              بيت سمار
+            </div>
+          </>
+        )}
       </div>
 
       {/* Nav */}
@@ -265,8 +286,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout }) {
               transition:     'all 0.18s',
             }}
           >
-            <span>{item.icon}</span>
-            {item.label}
+            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{item.icon}</span>
+            {isExpanded && <span style={{ transition: 'opacity 0.2s', opacity: 1 }}>{item.label}</span>}
           </button>
         ))}
       </nav>
@@ -291,7 +312,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout }) {
         onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}
       >
-        ↩ Logout
+        <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>↩</span>
+        {isExpanded && <span>Logout</span>}
       </button>
     </div>
   );
@@ -1297,17 +1319,44 @@ function UnitsTab() {
   const [showModal,    setShowModal]   = useState(false);
   const [calendarUnit, setCalendarUnit] = useState(null); // unit whose calendar is open
   const [toast,        setToast]       = useState(null);
+  
+  // Unit Editor Modal (Phase 24)
+  const [isModalOpen,    setIsModalOpen] = useState(false);
+  const [selectedUnit,   setSelectedUnit] = useState(null);
+
+  const handleSaveUnit = async (data) => {
+    try {
+      if (selectedUnit && selectedUnit.id) {
+        // Edit existing unit
+        await adminApi.patch(`/units/${selectedUnit.id}`, data);
+      } else {
+        // Add new unit (if applicable)
+        await adminApi.post('/units/', data);
+      }
+      setIsModalOpen(false);
+      showToast('تم الحفظ بنجاح', true);
+      loadUnits();
+    } catch (error) {
+      console.error("Failed to save unit:", error);
+      showToast(error.response?.data?.detail || 'فشل الحفظ', false);
+    }
+  };
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
+  const loadUnits = () => {
+    setLoading(true);
     adminApi.get('/units/')
       .then(r => setUnits(r.data || []))
       .catch(() => setError('Failed to load units.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadUnits();
   }, []);
 
   const toggleField = async (unitId, field, newValue) => {
@@ -1421,12 +1470,16 @@ function UnitsTab() {
                   return (
                     <tr
                       key={u.id}
+                      onClick={() => { setSelectedUnit(u); setIsModalOpen(true); }}
                       style={{
                         background:   rowBg,
                         borderBottom: `1px solid ${C.border}`,
                         opacity:      u.is_active ? 1 : 0.45,
-                        transition:   'opacity 0.2s',
+                        transition:   'opacity 0.2s, background 0.15s',
+                        cursor:       'pointer',
                       }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = rowBg}
                     >
                       {/* Thumbnail */}
                       <td style={tdStyle}>
@@ -1521,6 +1574,14 @@ function UnitsTab() {
       {/* Calendar manager modal */}
       {calendarUnit && <CalendarManagerModal unit={calendarUnit} onClose={() => setCalendarUnit(null)} />}
 
+      {/* Unit Edit Modal (Phase 24) */}
+      <UnitFormModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        unit={selectedUnit} 
+        onSave={handleSaveUnit} 
+      />
+
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -1546,6 +1607,7 @@ function UnitsTab() {
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 export default function SmarAdminDashboard() {
   const [activeTab, setActiveTab] = useState('bookings');
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const navigate = useNavigate();
 
   // Guard: if no token, redirect to login
@@ -1567,7 +1629,7 @@ export default function SmarAdminDashboard() {
       fontFamily:     "'Inter', 'Segoe UI', sans-serif",
       color:          C.textPri,
     }}>
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} />
 
       {/* Main content */}
       <div style={{ flex: 1, padding: '40px 48px', overflowY: 'auto' }}>

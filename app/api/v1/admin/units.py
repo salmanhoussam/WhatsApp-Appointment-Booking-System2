@@ -19,8 +19,19 @@ router = APIRouter(prefix="/units", tags=["Admin Units"])
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
-class UnitToggle(BaseModel):
+class UnitUpdate(BaseModel):
     """PATCH body — send only the field(s) you want to change."""
+    name:         Optional[str] = None
+    name_ar:      Optional[str] = None
+    name_en:      Optional[str] = None
+    type:         Optional[str] = None
+    unit_type:    Optional[str] = None
+    capacity:     Optional[int] = None
+    beds:         Optional[int] = None
+    bedrooms:     Optional[int] = None
+    baths:        Optional[int] = None
+    bathrooms:    Optional[int] = None
+    images:       Optional[List[str]] = None
     is_available: Optional[bool] = None
     is_active:    Optional[bool] = None
 
@@ -91,15 +102,12 @@ async def list_units(tenant: dict = Depends(get_current_tenant)):
 
 
 @router.patch("/{unit_id}")
-async def toggle_unit(
+async def update_unit(
     unit_id: str,
-    body: UnitToggle,
+    body: UnitUpdate,
     tenant: dict = Depends(get_current_tenant),
 ):
-    """Toggle isAvailable and/or isActive for a single unit."""
-    if body.is_available is None and body.is_active is None:
-        raise HTTPException(status_code=400, detail="No fields to update.")
-
+    """Update unit details (toggles, names, capacity, amenities, images)."""
     # Verify ownership before updating
     existing = await prisma_client.unit.find_first(
         where={"id": unit_id, "clientId": tenant["id"]}
@@ -112,6 +120,39 @@ async def toggle_unit(
         patch["isAvailable"] = body.is_available
     if body.is_active is not None:
         patch["isActive"] = body.is_active
+    
+    name_ar = body.name_ar or body.name
+    if name_ar is not None:
+        patch["name_ar"] = name_ar
+    if body.name_en is not None:
+        patch["name_en"] = body.name_en
+        
+    unit_type = body.unit_type or body.type
+    if unit_type is not None:
+        patch["unit_type"] = unit_type
+        
+    if body.capacity is not None:
+        patch["capacity"] = body.capacity
+        
+    beds = body.bedrooms if body.bedrooms is not None else body.beds
+    if beds is not None:
+        patch["bedrooms"] = beds
+        
+    baths = body.bathrooms if body.bathrooms is not None else body.baths
+    if baths is not None:
+        patch["bathrooms"] = baths
+        
+    if body.images is not None:
+        # Prisma schema has image_url, image_url1..5
+        if len(body.images) > 0: patch["image_url"]  = body.images[0]
+        if len(body.images) > 1: patch["image_url1"] = body.images[1]
+        if len(body.images) > 2: patch["image_url2"] = body.images[2]
+        if len(body.images) > 3: patch["image_url3"] = body.images[3]
+        if len(body.images) > 4: patch["image_url4"] = body.images[4]
+        if len(body.images) > 5: patch["image_url5"] = body.images[5]
+
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update.")
 
     updated = await prisma_client.unit.update(
         where={"id": unit_id},

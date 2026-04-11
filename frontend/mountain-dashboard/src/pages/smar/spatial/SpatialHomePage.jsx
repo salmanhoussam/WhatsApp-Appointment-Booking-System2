@@ -13,19 +13,14 @@
  * Smooth scroll: vanilla `lenis` (React 19 compatible).
  */
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Lenis from 'lenis';
 import { motion } from 'framer-motion';
 
 import SmarHeader          from './SmarHeader';
 import SmarTimelineGallery from './SmarTimelineGallery';
-import { translations }    from './i18n';
 
-// ─── Language context (exported — consumed by SmarHeader, SmarHero, SmarTimelineGallery) ──
-export const LanguageContext = createContext({
-  t:          translations.ar,
-  toggleLang: () => {},
-});
+import { useLanguage } from '../../context/LanguageContext';
 
 // ─── Supabase base ─────────────────────────────────────────────────────────────
 const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage';
@@ -65,7 +60,7 @@ const VIDEO_URL =
 // Full-screen muted autoplay video with a dark gradient + centered text.
 // No shaders, no WebGL — crystal clear, buttery smooth.
 function VideoHero() {
-  const { t } = useContext(LanguageContext);
+  const { t } = useLanguage();
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
@@ -191,7 +186,7 @@ function useSmoothScroll() {
 
 // ─── CTA footer ───────────────────────────────────────────────────────────────
 function CtaFooter() {
-  const { t } = useContext(LanguageContext);
+  const { t } = useLanguage();
   return (
     <section style={{
       background:   '#0a0a0f',
@@ -266,14 +261,10 @@ function CtaFooter() {
 
 // ─── Page compositor ──────────────────────────────────────────────────────────
 export default function SpatialHomePage() {
-  const [lang, setLang] = useState('ar');
   useSmoothScroll();
 
-  const toggleLang = () => setLang(prev => prev === 'ar' ? 'en' : 'ar');
-  const t = translations[lang];
-
   return (
-    <LanguageContext.Provider value={{ t, toggleLang }}>
+    <>
       {/*
         Outer shell: black bg, no overflow-x bleed.
         SmarHeader is position:fixed so it overlays the hero without
@@ -298,6 +289,6 @@ export default function SpatialHomePage() {
         <CtaFooter />
 
       </div>
-    </LanguageContext.Provider>
+    </>
   );
 }

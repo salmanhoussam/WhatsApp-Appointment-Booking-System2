@@ -22,13 +22,13 @@
  *   • Tailwind for layout, Framer Motion for animation
  */
 
-import { useRef, useContext }                             from 'react';
+import { useRef }                                        from 'react';
 import { motion, useScroll, useTransform, useSpring }    from 'framer-motion';
-import { LanguageContext }                               from './SpatialHomePage';
+import { useLanguage }                                   from '../../context/LanguageContext';
 
 // ─── Single timeline item ─────────────────────────────────────────────────────
 function TimelineItem({ item, index }) {
-  const { t } = useContext(LanguageContext);
+  const { t } = useLanguage();
   const itemRef  = useRef(null);
 
   const { scrollYProgress } = useScroll({
@@ -129,7 +129,7 @@ function TimelineItem({ item, index }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function SmarTimelineGallery({ items = [] }) {
-  const { t } = useContext(LanguageContext);
+  const { t } = useLanguage();
   const containerRef = useRef(null);
 
   const { scrollYProgress } = useScroll({

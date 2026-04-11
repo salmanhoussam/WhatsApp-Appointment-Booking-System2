@@ -18,6 +18,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SmarAdminDashboard from './pages/smar/admin/SmarAdminDashboard';
 import Login              from './pages/mountain_dashboard/Login';
 import TenantPages        from './router/TenantPages';
+import { LanguageProvider } from './context/LanguageContext';
 
 function NotFound() {
   return (
@@ -42,22 +43,24 @@ function NotFound() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* ── Root redirect ── */}
-        <Route path="/" element={<Navigate to="/smar" replace />} />
+    <LanguageProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* ── Root redirect ── */}
+          <Route path="/" element={<Navigate to="/smar" replace />} />
 
-        {/* ── Static admin routes ── */}
-        <Route path="/login"                 element={<Login />} />
-        <Route path="/dashboard/:slug/*"     element={<SmarAdminDashboard />} />
+          {/* ── Static admin routes ── */}
+          <Route path="/login"                 element={<Login />} />
+          <Route path="/dashboard/:slug/*"     element={<SmarAdminDashboard />} />
 
-        {/* ── 404 ── */}
-        <Route path="/404" element={<NotFound />} />
+          {/* ── 404 ── */}
+          <Route path="/404" element={<NotFound />} />
 
-        {/* ── Dynamic tenant routes (must be last) ── */}
-        <Route path="/:slug/*" element={<TenantPages />} />
-      </Routes>
-    </BrowserRouter>
+          {/* ── Dynamic tenant routes (must be last) ── */}
+          <Route path="/:slug/*" element={<TenantPages />} />
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }
 

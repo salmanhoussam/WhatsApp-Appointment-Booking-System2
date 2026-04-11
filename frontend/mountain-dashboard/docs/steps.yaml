@@ -1082,6 +1082,97 @@ phases:
           - Calendar يُعاد تحميله تلقائياً بعد النجاح (key bump)
 
   # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 24: RBAC, Sidebar & Core Editability
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 24
+    name: "RBAC, Sidebar & Core Editability"
+    description: "Implement Role-Based Access Control, expandable/collapsible sidebar, and interactive tables with UnitFormModal."
+    tasks:
+      - id: 24.1
+        name: "Layout Update — Collapsible Sidebar"
+        status: TODO
+        details: |
+          Implement Expandable/Collapsible Sidebar in Admin layout to maximize screen real estate.
+      - id: 24.2
+        name: "Backend Auth & managerId constraints"
+        status: TODO
+        details: |
+          Upgrade endpoints to decode JWT role and inject managerId constraints for non-super admins.
+      - id: 24.3
+        name: "Team UI — Staff Management"
+        status: TODO
+        details: |
+          Build "Staff Management" page to invite and assign managers to properties.
+      - id: 24.4
+        name: "Interactive Tables & UnitFormModal"
+        status: TODO
+        details: |
+          Implement UnitFormModal for editing units. Clicking a row opens a pre-filled Drawer/Modal to quickly update details and sync via PATCH.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 25: Dashboard Analytics
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 25
+    name: "Dashboard Analytics & Command Center"
+    description: "The 'Wow Factor': Transitioning from raw data to actionable intelligence, visual KPIs, and heatmaps."
+    tasks:
+      - id: 25.1
+        name: "Aggregation Endpoints"
+        status: TODO
+        details: |
+          Construct fast read-only Prisma aggregate endpoints for KPI data.
+      - id: 25.2
+        name: "UI Overhaul & Recharts"
+        status: TODO
+        details: |
+          Rebuild the Overview tab using Recharts for visual KPIs (Revenue Trajectory, Occupancy Heatmap, Booking Source Doughnut).
+      - id: 25.3
+        name: "The 'Command Center' Inbox"
+        status: TODO
+        details: |
+          Priority queue showing "Check-ins Today", "Pending Approvals", etc.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 26: CRM & Customer Portal
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 26
+    name: "CRM & Customer Portal"
+    description: "Admin Customers Tab (CRM) and a Public Guest Login portal."
+    tasks:
+      - id: 26.1
+        name: "Customers Data Table (CRM)"
+        status: TODO
+        details: |
+          Build the CRM tab in the Admin Dashboard grouping bookings by guest contact info. Shows Lifetime Value (Total Bookings/Revenue).
+      - id: 26.2
+        name: "Public Login UI"
+        status: TODO
+        details: |
+          Scaffold the customer login page and guest booking history dashboard on the public site allowing guests to sign in.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 27: Multi-Language Support (i18n)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 27
+    name: "Global Internationalization (i18n)"
+    description: "Expanding reach through multi-language support (AR/EN)."
+    tasks:
+      - id: 27.1
+        name: "Context & Dictionary Setup"
+        status: TODO
+        details: |
+          Create LanguageContext.jsx to manage currentLanguage. Create translate.js for text mapping.
+      - id: 27.2
+        name: "UI Integration — Language Toggle"
+        status: TODO
+        details: |
+          Add Language Toggle Button to all Navigation headers and update text elements. Support dynamic RTL/LTR body directions.
+
+  # ══════════════════════════════════════════════════════════════════════════
   # ملاحظات تقنية عامة
   # ══════════════════════════════════════════════════════════════════════════
 
