@@ -1,6 +1,6 @@
 project: Smar 3D Scrollytelling Experience
 tenant: smar
-last_updated: 2026-04-11  # Phase 23 complete: Dynamic pricing engine + drag-to-select calendar
+last_updated: 2026-04-11  # Phase 22 & Phase 23 are 100% DONE. System stable for Phase 19.
 
 phases:
 
@@ -736,16 +736,14 @@ phases:
           UnitCard click → SmarUnitModal → SmarBookingDrawer (كما هو الآن)
 
       - id: 19.2
-        name: "حذف SmarClassicPage"
+        name: "SmarClassicPage - API & UI Fixes"
         files:
           - "src/pages/smar/normal/SmarClassicPage.jsx"
-          - "src/router/tenants/smar.routes.jsx"
-        status: TODO
+        status: done
         details: |
-          احذف الملف SmarClassicPage.jsx
-          احذف من smar.routes.jsx:
-            import SmarClassicPage ...
-            <Route path="classic" element={<SmarClassicPage />} />
+          WARNING: DO NOT DELETE - KEEP AS OPTION B
+          - Fixed API 404 routing by switching to slug-in-path URLs.
+          - Polished Search Bar UI for responsive mobile layout (flex-col md:flex-row).
 
       - id: 19.3
         name: "CollageScene — CTA tiles ترتبط بـ listings الصحيح"
@@ -756,6 +754,24 @@ phases:
           Chalets tile CTA → navigate('/smar/listings?type=chalet')
           Restaurant tile  → wa.me/[REAL_NUMBER]  ← استبدل 9611234567 بالرقم الحقيقي
           SmarListingsPage تقرأ ?type من URL وتضعه كـ default للـ filter pills
+
+      - id: 19.4
+        name: "Global Navigation"
+        status: TODO
+        details: |
+          Add a robust Navbar/Header with working links to all major pages (Home `/smar/`, Listings `/smar/listings`, Admin `/smar/admin`).
+
+      - id: 19.5
+        name: "Home Page Redesign"
+        status: TODO
+        details: |
+          Redesign the Home Page (`SmarLandingPage.jsx` / `CollageScene.jsx`) to fetch and display real high-quality images from the database (via the `/listings` API) instead of static placeholders.
+
+      - id: 19.6
+        name: "CTA Routing Updates"
+        status: TODO
+        details: |
+          Ensure Home Page buttons route correctly: "احجز فيلا" -> `/smar/listings?type=villa`, "شاليهات" -> `/smar/listings?type=chalet`, and Cafe -> WhatsApp link.
 
   # ══════════════════════════════════════════════════════════════════════════
   # PHASE 20: لوحة الادمن (Manager) — تحكم كامل بالحجوزات

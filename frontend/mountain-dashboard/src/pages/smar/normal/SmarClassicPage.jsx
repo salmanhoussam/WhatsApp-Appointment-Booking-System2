@@ -255,23 +255,26 @@ function SearchBar({ lang, onSearch, isLoading }) {
 
   return (
     <div className="relative w-full px-4">
-      <div className={`bg-white rounded-full shadow-lg border p-2 flex items-center justify-between max-w-4xl mx-auto transform -translate-y-6 relative z-20 transition-all duration-300 ${lang === 'ar' ? 'flex-row' : 'flex-row-reverse'} ${borderCls}`}>
-        <div className={`flex-1 px-4 md:px-6 py-2 ${lang === 'ar' ? 'border-l' : 'border-r'} ${shake ? 'border-red-200' : 'border-gray-200'}`}>
+      <div className={`bg-white rounded-2xl md:rounded-full shadow-lg border p-2 flex flex-col md:flex-row items-center justify-between max-w-4xl mx-auto transform -translate-y-6 relative z-20 transition-all duration-300 ${lang === 'ar' ? 'md:flex-row' : 'md:flex-row-reverse'} ${borderCls}`}>
+        <div className={`w-full md:flex-1 px-4 md:px-6 py-3 md:py-2 border-b md:border-b-0 ${lang === 'ar' ? 'md:border-l' : 'md:border-r'} ${shake ? 'border-red-200' : 'border-gray-200'}`}>
           <label className={`block text-xs font-bold ${shake ? 'text-red-500' : 'text-gray-800'}`}>{t.checkIn}</label>
           <input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); setError(''); }} min={new Date().toISOString().split('T')[0]} className={`w-full focus:outline-none text-sm mt-1 bg-transparent cursor-pointer font-bold ${shake ? 'text-red-600' : 'text-gray-600'}`} />
         </div>
-        <div className={`flex-1 px-4 md:px-6 py-2 ${lang === 'ar' ? 'border-l' : 'border-r'} ${shake ? 'border-red-200' : 'border-gray-200'}`}>
+        <div className={`w-full md:flex-1 px-4 md:px-6 py-3 md:py-2 border-b md:border-b-0 ${lang === 'ar' ? 'md:border-l' : 'md:border-r'} ${shake ? 'border-red-200' : 'border-gray-200'}`}>
           <label className={`block text-xs font-bold ${shake ? 'text-red-500' : 'text-gray-800'}`}>{t.checkOut}</label>
           <input type="date" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); setError(''); }} min={checkIn || new Date().toISOString().split('T')[0]} className={`w-full focus:outline-none text-sm mt-1 bg-transparent cursor-pointer font-bold ${shake ? 'text-red-600' : 'text-gray-600'}`} />
         </div>
-        <div className="flex-1 px-4 md:px-6 py-2">
+        <div className="w-full md:flex-1 px-4 md:px-6 py-3 md:py-2">
           <label className="block text-xs font-bold text-gray-800">{t.guests}</label>
           <input type="number" min="1" value={guests} onChange={(e) => setGuests(e.target.value)} className="w-full focus:outline-none text-sm mt-1 bg-transparent font-bold text-gray-600" />
         </div>
-        <button onClick={handleClick} disabled={isLoading} className={`bg-[#FFD700] hover:bg-yellow-500 text-black font-bold p-4 rounded-full transition w-14 h-14 flex items-center justify-center shadow-md ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105'}`}>
+        <button onClick={handleClick} disabled={isLoading} className={`mt-2 md:mt-0 bg-[#FFD700] hover:bg-yellow-500 text-black font-bold p-4 rounded-xl md:rounded-full transition w-full md:w-14 h-12 md:h-14 flex items-center justify-center shadow-md ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105'}`}>
           {isLoading
-            ? <div className="w-6 h-6 border-4 border-black border-t-transparent rounded-full animate-spin" />
-            : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+            ? <div className="w-5 h-5 border-4 border-black border-t-transparent rounded-full animate-spin" />
+            : <span className="flex items-center gap-2">
+                <span className="md:hidden text-sm uppercase tracking-wider">{t.search}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+              </span>
           }
         </button>
       </div>
@@ -537,7 +540,7 @@ export default function SmarClassicPage() {
 
   // Initial load — all units
   useEffect(() => {
-    publicApi.get('/listings/', { params: { client_slug: 'smar' } })
+    publicApi.get('/smar/listings')
       .then((r) => setUnits(r.data?.units || r.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -547,7 +550,7 @@ export default function SmarClassicPage() {
     setSearching(true);
     setDates({ checkIn, checkOut, guests });
     try {
-      const r = await publicApi.get('/listings/', { params: { client_slug: 'smar', check_in: checkIn, check_out: checkOut, guests } });
+      const r = await publicApi.get('/smar/listings', { params: { check_in: checkIn, check_out: checkOut, guests } });
       setUnits(r.data?.units || r.data || []);
       setSearched(true);
       setTimeout(() => {
@@ -563,9 +566,8 @@ export default function SmarClassicPage() {
 
   const handleBookingSubmit = async (formData) => {
     try {
-      await publicApi.post('/bookings/', {
+      await publicApi.post('/smar/bookings', {
         unit_id:        selectedUnit.id,
-        client_slug:    'smar',
         customer_name:  formData.name,
         customer_phone: formData.phone,
         check_in:       searchDates.checkIn,
