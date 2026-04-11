@@ -78,7 +78,7 @@ model Unit {
   propertyId  String    @map("property_id") @db.Uuid
   clientId    String    @map("client_id") @db.Uuid
   unitNumber  String?   @map("unit_number")
-  unit_type   String?   @default("chalet") @map("unit_type")  // villa | chalet | restaurant | pool
+  unit_type   String?   @default("chalet") @map("unit_type") // villa | chalet | restaurant | pool
   name_ar     String?   @map("name_ar")
   name_en     String?   @map("name_en")
   description String?   @map("description")
@@ -93,11 +93,7 @@ model Unit {
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   position_x  Float?    @map("position_x")
   position_y  Float?    @map("position_y")
-  image_url1  String?   @map("image_url1")
-  image_url2  String?   @map("image_url2")
-  image_url3  String?   @map("image_url3")
-  image_url4  String?   @map("image_url4")
-  image_url5  String?   @map("image_url5")
+  images      String[]  @default([]) @map("images")
   bookings    Booking[]
   prices      Price[]
   client      Client    @relation(fields: [clientId], references: [id])
@@ -171,28 +167,28 @@ model Customer {
 }
 
 model Booking {
-  id         String           @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  clientId   String           @map("client_id") @db.Uuid
-  unitId     String           @map("unit_id") @db.Uuid
-  customerId String           @map("customer_id") @db.Uuid
-  checkIn    DateTime         @map("check_in") @db.Date
-  checkOut   DateTime         @map("check_out") @db.Date
-  guests     Int              @map("guests")
-  totalPrice Decimal          @map("total_price") @db.Decimal(10, 2)
-  currency   String           @default("SAR") @map("currency")
-  status     String           @default("pending") @map("status")
-  source     String?          @map("source")
-  bookingRef String?          @unique @map("booking_reference")
-  notes             String?          @map("notes")
-  paymentMethod     String?          @default("cash") @map("payment_method")
-  paymentReference  String?          @map("payment_reference")
-  arrivalTime       String?          @map("arrival_time")
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  services   BookingService[]
-  client     Client           @relation(fields: [clientId], references: [id])
-  customer   Customer         @relation(fields: [customerId], references: [id])
-  unit       Unit             @relation(fields: [unitId], references: [id])
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  clientId         String           @map("client_id") @db.Uuid
+  unitId           String           @map("unit_id") @db.Uuid
+  customerId       String           @map("customer_id") @db.Uuid
+  checkIn          DateTime         @map("check_in") @db.Date
+  checkOut         DateTime         @map("check_out") @db.Date
+  guests           Int              @map("guests")
+  totalPrice       Decimal          @map("total_price") @db.Decimal(10, 2)
+  currency         String           @default("SAR") @map("currency")
+  status           String           @default("pending") @map("status")
+  source           String?          @map("source")
+  bookingRef       String?          @unique @map("booking_reference")
+  notes            String?          @map("notes")
+  paymentMethod    String?          @default("cash") @map("payment_method")
+  paymentReference String?          @map("payment_reference")
+  arrivalTime      String?          @map("arrival_time")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  services         BookingService[]
+  client           Client           @relation(fields: [clientId], references: [id])
+  customer         Customer         @relation(fields: [customerId], references: [id])
+  unit             Unit             @relation(fields: [unitId], references: [id])
 
   @@index([clientId])
   @@index([unitId])

@@ -65,6 +65,7 @@ class UnitCreate(BaseModel):
     bedrooms:   Optional[int]  = None
     bathrooms:  Optional[int]  = None
     image_url:  Optional[str]  = None
+    images:     Optional[List[str]] = None
     sort_order: Optional[int]  = 0
 
 
@@ -86,6 +87,7 @@ def _fmt(unit) -> dict:
         "is_available": unit.isAvailable,
         "position_x":  getattr(unit, "position_x", None),
         "position_y":  getattr(unit, "position_y", None),
+        "images":      getattr(unit, "images", []),
     }
 
 
@@ -143,13 +145,11 @@ async def update_unit(
         patch["bathrooms"] = baths
         
     if body.images is not None:
-        # Prisma schema has image_url, image_url1..5
-        if len(body.images) > 0: patch["image_url"]  = body.images[0]
-        if len(body.images) > 1: patch["image_url1"] = body.images[1]
-        if len(body.images) > 2: patch["image_url2"] = body.images[2]
-        if len(body.images) > 3: patch["image_url3"] = body.images[3]
-        if len(body.images) > 4: patch["image_url4"] = body.images[4]
-        if len(body.images) > 5: patch["image_url5"] = body.images[5]
+        patch["images"] = body.images
+        if len(body.images) > 0:
+            patch["image_url"] = body.images[0]
+        else:
+            patch["image_url"] = None
 
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
@@ -316,7 +316,8 @@ async def create_unit(
             "capacity":   body.capacity,
             "bedrooms":   body.bedrooms,
             "bathrooms":  body.bathrooms,
-            "image_url":  body.image_url,
+            "image_url":  body.images[0] if body.images and len(body.images) > 0 else body.image_url,
+            "images":     body.images if body.images else [],
             "sort_order": body.sort_order,
             "isActive":    True,
             "isAvailable": True,

@@ -8,6 +8,7 @@ class UnitBase(BaseModel):
     name_en: Optional[str] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
+    images: Optional[List[str]] = []
     capacity: int
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
