@@ -1,6 +1,6 @@
 project: Smar 3D Scrollytelling Experience
 tenant: smar
-last_updated: 2026-04-10  # Phase 17 done: Fix 404 API Routing Mismatch (frontend ↔ backend)
+last_updated: 2026-04-11  # Phase 23 complete: Dynamic pricing engine + drag-to-select calendar
 
 phases:
 
@@ -616,3 +616,487 @@ phases:
             - src/api.js: Old fetch-based admin API (uses /api/v1/admin, not public)
             - src/api/index.js: Old axios admin API (uses /api/v1, not public)
         status: done
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 18: إصلاح Endpoints — السلوغ في الـ path + حقول الدفع
+  # الحالة الحالية:
+  #   - /listings/ و /bookings/ كـ query param (client_slug=smar) — يسبب CORS
+  #   - Booking لا يحفظ payment_method, payment_reference, arrival_time
+  #   - BookingResponse لا يُعيد هذه الحقول للادمن
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 18
+    name: "Backend — Endpoints بالسلوغ في الـ path + حفظ بيانات الدفع"
+    description: |
+      السلوغ موجود دائماً في أول الـ URL كـ prefix — لا نكرره كـ query param.
+      الحجوزات تُحفظ بدون طريقة الدفع حالياً — الادمن لا يعرف كيف سيدفع الزبون.
+    tasks:
+      - id: 18.1
+        name: "إضافة endpoints جديدة بالسلوغ في الـ path"
+        file: "app/api/v1/public.py"
+        status: done
+        details: |
+          أضف 4 routes جديدة (الـ slug في الـ path):
+            GET  /{slug}/listings   ← يستدعي get_client_catalog مباشرة
+            POST /{slug}/bookings   ← يستدعي create_public_booking
+            GET  /{slug}/price      ← يقبل ?unit_id=...&check_in=...&check_out=...
+            GET  /{slug}/services   ← يقبل ?unit_id=...
+          الـ endpoints القديمة (/listings/ كـ query param) تبقى مؤقتاً حتى يتحدث الفرونت.
+
+      - id: 18.2
+        name: "توسيع BookingRequest — إضافة حقول الدفع"
+        file: "app/api/v1/public.py"
+        status: done
+        details: |
+          class BookingRequest(BaseModel):
+            ... (الحقول الموجودة)
+            payment_method:    Optional[str] = "cash"   # cash|whish|omt|card
+            payment_reference: Optional[str] = None      # رقم إيصال Whish/OMT
+            arrival_time:      Optional[str] = "14:00"   # وقت الوصول المتوقع
+            client_slug:       Optional[str] = None      # للـ /bookings/ القديم فقط
+
+      - id: 18.3
+        name: "Schema — إضافة حقول الدفع لـ Booking"
+        file: "prisma/schema.prisma"
+        status: done
+        details: |
+          في model Booking أضف:
+            paymentMethod    String?  @default("cash") @map("payment_method")
+            paymentReference String?  @map("payment_reference")
+            arrivalTime      String?  @map("arrival_time")
+          بعد التعديل: شغّل  prisma db push  من Railway Console
+
+      - id: 18.4
+        name: "Service — حفظ حقول الدفع عند إنشاء الحجز"
+        file: "app/services/public_service.py"
+        status: done
+        details: |
+          في create_public_booking أضف للـ booking_data:
+            "paymentMethod":    data.get("payment_method", "cash"),
+            "paymentReference": data.get("payment_reference"),
+            "arrivalTime":      data.get("arrival_time"),
+
+      - id: 18.5
+        name: "BookingResponse — يُعيد حقول الدفع"
+        file: "app/schemas/booking.py"
+        status: done
+        details: |
+          في BookingResponse أضف:
+            payment_method:    Optional[str] = None
+            payment_reference: Optional[str] = None
+            arrival_time:      Optional[str] = None
+
+      - id: 18.6
+        name: "Frontend — تحديث API calls للـ endpoints الجديدة"
+        files:
+          - "src/pages/smar/ui/SmarBookingDrawer.jsx"
+          - "src/pages/smar/normal/SmarPaymentPage.jsx"
+          - "src/pages/smar/normal/SmarListingsPage.jsx"
+        status: done
+        details: |
+          SmarBookingDrawer:
+            POST /bookings/         → POST /{slug}/bookings
+            GET  /units/{id}/price  → GET  /{slug}/price?unit_id={id}&...
+            GET  /units/{id}/services → GET /{slug}/services?unit_id={id}
+          SmarPaymentPage:
+            POST /bookings/         → POST /{slug}/bookings
+          SmarListingsPage:
+            GET  /listings/         → GET  /{slug}/listings
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 19: Listings Page — دمج المكونات + lazy search
+  # حالياً: 3 صفحات مكررة (SmarListingsPage, SmarClassicPage, PublicBooking)
+  # الهدف: صفحة واحدة تعيد استخدام /components الموجودة
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 19
+    name: "Listings Page موحدة — lazy search + shared components"
+    description: |
+      الوحدات لا تظهر عند فتح الصفحة. تظهر فقط بعد الضغط على Search.
+      المطعم والمسبح = مكون PoolAndCafe فقط (WhatsApp CTA، لا حجز).
+      نستخدم DateSearchBar من /components بدلاً من إعادة الكتابة.
+    tasks:
+      - id: 19.1
+        name: "إعادة بناء SmarListingsPage"
+        file: "src/pages/smar/normal/SmarListingsPage.jsx"
+        status: TODO
+        details: |
+          هيكل الصفحة بالترتيب:
+            1. Nav  (sticky, موجود ✓)
+            2. Hero Header — "اكتشف إقامتك" (موجود ✓)
+            3. <DateSearchBar lang onSearch isLoading />  ← من src/components/
+            4. Type Filter Pills (فيلات / شاليهات / الكل)
+            5. [قبل البحث — hasSearched=false]:
+                 <AboutResort lang />    ← من src/components/
+                 <PoolAndCafe lang />    ← من src/components/ (مطعم+مسبح → WhatsApp)
+            6. [بعد البحث — hasSearched=true]:
+                 AnimatePresence → Grid of UnitCards
+                 Empty state إذا لم تكن نتائج
+          DateSearchBar يرجع { checkIn, checkOut, guests } عند onSearch
+          UnitCard click → SmarUnitModal → SmarBookingDrawer (كما هو الآن)
+
+      - id: 19.2
+        name: "حذف SmarClassicPage"
+        files:
+          - "src/pages/smar/normal/SmarClassicPage.jsx"
+          - "src/router/tenants/smar.routes.jsx"
+        status: TODO
+        details: |
+          احذف الملف SmarClassicPage.jsx
+          احذف من smar.routes.jsx:
+            import SmarClassicPage ...
+            <Route path="classic" element={<SmarClassicPage />} />
+
+      - id: 19.3
+        name: "CollageScene — CTA tiles ترتبط بـ listings الصحيح"
+        file: "src/pages/smar/canvas/CollageScene.jsx"
+        status: TODO
+        details: |
+          Villa tile CTA  → navigate('/smar/listings?type=villa')
+          Chalets tile CTA → navigate('/smar/listings?type=chalet')
+          Restaurant tile  → wa.me/[REAL_NUMBER]  ← استبدل 9611234567 بالرقم الحقيقي
+          SmarListingsPage تقرأ ?type من URL وتضعه كـ default للـ filter pills
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 20: لوحة الادمن (Manager) — تحكم كامل بالحجوزات
+  # الحالة الحالية:
+  #   - SmarAdminDashboard.jsx يعرض الحجوزات ويغير الـ status ✓
+  #   - لكن لا يعرض payment_method أو arrival_time
+  #   - لا يوجد فلترة بالـ status أو التاريخ
+  #   - لا توجد KPI cards للإحصائيات
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 20
+    name: "Admin Dashboard — عرض كامل للحجوزات + تحكم"
+    description: |
+      المانجر يرى كل حجز بالتفصيل: من حجز، متى يصل، كيف سيدفع.
+      يستطيع تأكيد أو رفض أي حجز — WhatsApp يُرسل تلقائياً عند التأكيد.
+    tasks:
+      - id: 20.1
+        name: "عرض payment_method و arrival_time في جدول الحجوزات"
+        file: "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          أضف عمودين جديدين في جدول الحجوزات:
+            - "طريقة الدفع": badge ملون
+                نقد     = أخضر  (#3ecf8e)
+                Whish   = أزرق  (#60a5fa)
+                OMT     = برتقالي (#fb923c)
+                بطاقة   = بنفسجي (#a78bfa)
+            - "وقت الوصول": نص بسيط (مثل "14:00")
+          في booking detail popup أضف:
+            - payment_reference (رقم الإيصال إذا كان موجوداً)
+
+      - id: 20.2
+        name: "فلترة الحجوزات بالـ status والتاريخ"
+        files:
+          - "src/pages/smar/admin/SmarAdminDashboard.jsx"
+          - "app/api/v1/admin/bookings.py"
+        status: done
+        details: |
+          Frontend: شريط فلترة فوق الجدول:
+            - Pills: الكل / معلق / مؤكد / ملغى / مكتمل
+            - Date range picker: من / إلى
+          Backend: أضف query params لـ GET /admin/bookings/:
+            status:    Optional[str]  → فلتر بالـ status
+            date_from: Optional[date] → حجوزات من هذا التاريخ
+            date_to:   Optional[date] → حجوزات حتى هذا التاريخ
+
+      - id: 20.3
+        name: "KPI Cards — إحصائيات سريعة في أعلى الداشبورد"
+        files:
+          - "src/pages/smar/admin/SmarAdminDashboard.jsx"
+          - "app/api/v1/admin/dashboard.py"
+        status: done
+        details: |
+          4 cards في صف واحد:
+            1. "حجوزات اليوم"        → count من DB
+            2. "معلقة — تحتاج تأكيد" → count status=pending (أصفر)
+            3. "الإيرادات هذا الشهر"  → sum totalPrice status=confirmed
+            4. "وحدات متاحة الآن"     → count isAvailable=true, isActive=true
+          Backend: GET /admin/dashboard/stats يُعيد هذه الأرقام دفعة واحدة
+
+      - id: 20.4
+        name: "إضافة وحدة / إغلاق وحدة من الداشبورد"
+        files:
+          - "src/pages/smar/admin/SmarAdminDashboard.jsx"
+          - "app/api/v1/admin/units.py"
+        status: done
+        details: |
+          Tab جديد "الوحدات" في الداشبورد:
+            - جدول بكل الوحدات (name, type, capacity, isAvailable)
+            - Toggle لكل وحدة: متاحة ↔ مغلقة → PATCH /admin/units/{id}
+            - زر "إضافة وحدة" → form modal (name_ar, name_en, unit_type, capacity, image_url)
+          الموقع يعكس التغيير فوراً (isAvailable=false → تختفي من /smar/listings)
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 21: أدوار الموظفين — تنظيف / كافيتريا / صيانة
+  # بعد استقرار Phases 18-20
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 21
+    name: "نظام أدوار الموظفين (Staff Roles)"
+    description: |
+      صفحات منفصلة لكل دور — نفس الـ JWT لكن role مختلف.
+      المانجر يرى كل شيء. الموظف يرى مهامه فقط.
+      الزبون يطلب من الموقع → المهمة تظهر عند الموظف المختص.
+    depends_on: [18, 19, 20]
+    tasks:
+      - id: 21.1
+        name: "Schema — إضافة جدول StaffTask"
+        file: "prisma/schema.prisma"
+        status: PLANNED
+        details: |
+          model StaffTask {
+            id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            clientId   String   @map("client_id") @db.Uuid
+            type       String                         # housekeeping | cafeteria | maintenance
+            unitId     String?  @map("unit_id") @db.Uuid
+            bookingId  String?  @map("booking_id") @db.Uuid
+            title      String                         # "تنظيف شاليه 7" / "طلب قهوة"
+            notes      String?
+            status     String   @default("pending")  # pending | in_progress | done
+            assignedTo String?  @map("assigned_to")  # اسم الموظف أو رقمه
+            createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+            updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+            client     Client   @relation(fields: [clientId], references: [id])
+            @@map("staff_tasks")
+            @@schema("public")
+          }
+
+      - id: 21.2
+        name: "Backend — Staff endpoints"
+        file: "app/api/v1/staff/  (مجلد جديد)"
+        status: PLANNED
+        details: |
+          GET    /staff/tasks?type=housekeeping&status=pending
+          POST   /staff/tasks   ← المانجر أو الموقع ينشئ مهمة
+          PATCH  /staff/tasks/{id}/status  ← الموظف يحدّث الحالة
+          Auth: JWT role=staff — يصل لـ /staff/* فقط، لا يصل لـ /admin/*
+
+      - id: 21.3
+        name: "Frontend — صفحة التنظيف (Housekeeping)"
+        file: "src/pages/smar/staff/HousekeepingPage.jsx"
+        status: PLANNED
+        details: |
+          Route: /smar/staff/housekeeping
+          Auth guard: role=staff
+          يعرض: الوحدات التي check-out تاريخها اليوم
+          Actions على كل وحدة:
+            - "قيد التنظيف" (أصفر)
+            - "جاهزة" (أخضر) → تغير isAvailable=true في DB → تظهر في الموقع
+
+      - id: 21.4
+        name: "Frontend — صفحة الكافيتريا"
+        file: "src/pages/smar/staff/CafeteriaPage.jsx"
+        status: PLANNED
+        details: |
+          Route: /smar/staff/cafeteria
+          يعرض: طلبات الطعام من الزبائن (StaffTask type=cafeteria)
+          Actions:
+            - "استلمت الطلب"
+            - "جاهز للتسليم"
+            - "تم التسليم"
+          الزبون يستطيع إنشاء طلب من صفحة /smar/listings أو موقعه
+
+      - id: 21.5
+        name: "Frontend — صفحة الصيانة"
+        file: "src/pages/smar/staff/MaintenancePage.jsx"
+        status: PLANNED
+        details: |
+          Route: /smar/staff/maintenance
+          يعرض: بلاغات الصيانة من الزبائن أو المانجر
+          Actions: "قيد الإصلاح" / "تم الإصلاح"
+
+      - id: 21.6
+        name: "Auth — JWT منفصل لـ staff"
+        files:
+          - "app/api/v1/staff/auth.py  (جديد)"
+          - "app/db/dependencies.py"
+        status: PLANNED
+        details: |
+          POST /api/v1/staff/login ← يقبل phone + pin بدلاً من email + password
+          JWT payload: { role: "staff", clientId, staffType: "housekeeping|cafeteria" }
+          get_current_staff dependency: تتحقق من role=staff في الـ token
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 22: Virtual Calendar Engine — حجب التواريخ + التقويم التفاعلي
+  # يتيح للزبون رؤية التواريخ المتاحة/المحجوزة قبل الاختيار
+  # ويتيح للمانجر حجب أي تواريخ يدوياً (صيانة، حجز مسبق، إلخ)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 22
+    name: "Virtual Calendar Engine — تقويم التوافر التفاعلي"
+    description: |
+      محرك تقويم متكامل: الزبون يرى التواريخ المتاحة والمحجوزة في لحظة الاختيار.
+      المانجر يستطيع حجب تواريخ يدوياً (صيانة، إغلاق موسمي، إلخ).
+      يُدمج في SmarBookingDrawer للزبون وفي SmarAdminDashboard للمانجر.
+    depends_on: [18, 20]
+    tasks:
+      - id: 22.A
+        name: "Backend — Calendar API: تقويم الوحدة + حجب التواريخ"
+        files:
+          - "prisma/schema.prisma"
+          - "app/api/v1/public.py"
+          - "app/api/v1/admin/units.py"
+        status: done
+        details: |
+          1. Schema — أضف status جديد للحجوزات:
+               حجب التواريخ يُخزَّن كـ Booking عادية بـ status="blocked"
+               لا يحتاج model جديد — نفس جدول booking مع حقل موجود
+             (لا حاجة لـ prisma db push — status عمود نصي حر)
+
+          2. Public API — تقويم الوحدة:
+               GET /api/v1/public/{slug}/units/{unit_id}/calendar
+               Query params: ?year=2025&month=6  (اختياري — default: الشهر الحالي + التالي)
+               يُعيد: [ { date: "2025-06-15", status: "booked" | "blocked" | "available" } ]
+               فلتر في DB: bookings لهذه الوحدة بحالة confirmed|pending|blocked في النطاق الزمني
+               Multi-tenancy: تحقق أن unit.clientId == client.id (من slug)
+
+          3. Admin API — حجب تواريخ:
+               POST /api/v1/admin/units/{unit_id}/block-dates
+               Body: { dates: ["2025-06-20", "2025-06-21"], reason: "صيانة" }
+               يُنشئ Booking واحدة بـ status="blocked", checkIn=first, checkOut=last+1
+               Auth: get_current_tenant — يتحقق من ملكية الوحدة
+               يُعيد: { blocked_dates: [...], booking_id: "..." }
+
+      - id: 22.B
+        name: "Frontend Component — UnitCalendar.jsx مكوّن مشترك"
+        file: "src/components/UnitCalendar.jsx"
+        status: done
+        details: |
+          مكوّن React خفيف (بدون مكتبات ثقيلة — vanilla JS Date فقط).
+          Props:
+            - unitId: string
+            - slug: string
+            - onDateSelect(checkIn, checkOut): callback
+            - blockedDates: string[] (لوضع Admin)
+            - readOnly: bool (default false)
+
+          Rendering:
+            - شبكة أيام الشهر (7 أعمدة × 6 صفوف)
+            - اليوم المحجوز: خلفية حمراء شفافة + strikethrough
+            - اليوم المحجوب (blocked): خلفية رمادية + أيقونة 🔒
+            - اليوم المختار (check-in): حدود ذهبية + نقطة خضراء
+            - اليوم المختار (check-out): حدود ذهبية + نقطة برتقالية
+            - النطاق المختار (بين check-in وcheck-out): ظل ذهبي فاتح
+            - Framer Motion: slide بين الأشهر (x: ±50px, opacity: 0→1)
+            - GS MAR glassmorphism card للحاوية الخارجية
+
+          Data fetching:
+            - useEffect على [unitId, month]: GET /{slug}/units/{unitId}/calendar
+            - Skeleton شبكة أيام أثناء التحميل
+
+      - id: 22.C
+        name: "Frontend Integration — دمج التقويم في الحجز والداشبورد"
+        files:
+          - "src/pages/smar/ui/SmarBookingDrawer.jsx"
+          - "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          SmarBookingDrawer (تجربة الزبون):
+            - استبدال date inputs النصية بـ <UnitCalendar> تفاعلي
+            - Framer Motion AnimatePresence: التقويم يظهر عند focus على حقل التاريخ
+            - onDateSelect → يملأ checkIn / checkOut تلقائياً
+            - بعد الاختيار: يُعيد حساب السعر عبر GET /{slug}/price تلقائياً
+            - لا يسمح باختيار تواريخ محجوزة أو محجوبة
+
+          SmarAdminDashboard — UnitsTab:
+            - زر "إدارة التقويم 📅" بجانب كل وحدة في الجدول
+            - يفتح Modal مع <UnitCalendar readOnly={false} />
+            - Admin يستطيع النقر لتحديد نطاق تواريخ → "حجب النطاق" CTA
+            - يُرسل POST /admin/units/{id}/block-dates
+            - رسالة نجاح toast + تحديث التقويم فوراً
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 23: Dynamic Pricing Engine + Drag-to-Select Calendar
+  # لا migration جديدة — يستخدم نموذج Price الموجود (available + price)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 23
+    name: "Dynamic Pricing Engine — أسعار مخصصة لكل يوم + تقويم تفاعلي للادمن"
+    description: |
+      الادمن يسحب على التقويم لتحديد نطاق ← يضبط سعراً مخصصاً أو يحجب الأيام.
+      يستخدم نموذج Price الموجود: available=false = محجوب، price = سعر مخصص.
+      لا يحتاج prisma db push — الـ schema لم يتغير.
+    tasks:
+      - id: 23.A
+        name: "Backend — calendar endpoint يُعيد disabled_dates + price_overrides"
+        file: "app/api/v1/public.py"
+        status: done
+        details: |
+          GET /{slug}/units/{unit_id}/calendar يُعيد الآن:
+            { disabled_dates: [...], price_overrides: { "2026-06-15": 350.0 } }
+          المصادر:
+            1. Booking (status != cancelled) → disabled_dates
+            2. Price (available=False) → disabled_dates
+            3. Price (available=True)  → price_overrides
+
+      - id: 23.B
+        name: "Backend — date-overrides endpoint للادمن"
+        file: "app/api/v1/admin/units.py"
+        status: done
+        details: |
+          POST /admin/units/{unit_id}/date-overrides
+          Body: { start_date, end_date, custom_price?, is_blocked, reason? }
+          Logic: delete_many ثم create_many لسجلات Price في النطاق
+          يُستخدم لكل من الحجب والتسعير المخصص
+
+      - id: 23.C
+        name: "Frontend — UnitCalendar.jsx: price chips + admin drag-to-select"
+        file: "src/components/UnitCalendar.jsx"
+        status: done
+        details: |
+          - يقبل الآن { disabled_dates, price_overrides } من الـ API
+          - Backward compatible مع flat array (Phase 22)
+          - price chips: سعر صغير أسفل كل خلية عندها override
+          - adminMode=true: drag-to-select بـ mousedown/mouseover/mouseup
+            السحب يضبط checkIn/checkOut ويُطلق onChange للـ parent
+          - public mode: نفس السلوك القديم (click start/end)
+
+      - id: 23.D
+        name: "Frontend — CalendarManagerModal: drag-driven form"
+        file: "src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          - حذف manual date inputs — التقويم نفسه هو الـ input
+          - Available / Blocked toggle
+          - Custom Price input (يختفي عند Blocked)
+          - "Apply" يُرسل POST /admin/units/{id}/date-overrides
+          - Calendar يُعاد تحميله تلقائياً بعد النجاح (key bump)
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # ملاحظات تقنية عامة
+  # ══════════════════════════════════════════════════════════════════════════
+
+execution_order:
+  immediate:
+    - "18.3 → prisma db push (أضف payment_method, reference, arrival_time)"
+    - "18.4 → public_service.py يحفظها"
+    - "18.1 + 18.2 → endpoints جديدة بالسلوغ في الـ path"
+    - "18.5 → BookingResponse يُعيدها"
+    - "18.6 → Frontend يستخدم الـ endpoints الجديدة"
+  next:
+    - "20.1 → الادمن يرى payment_method في الجدول"
+    - "20.2 → فلترة الحجوزات"
+    - "19.1 → Listings page موحدة بـ lazy search"
+    - "19.2 → حذف SmarClassicPage"
+    - "20.3 → KPI cards"
+    - "20.4 → إدارة الوحدات من الداشبورد"
+  planned:
+    - "21 كاملة → أدوار الموظفين بعد استقرار Phases 18-20"
+
+technical_decisions:
+  slug_in_path:
+    rule: "السلوغ دائماً في الـ URL path — لا يتكرر كـ query param أو request body"
+    example: "GET /api/v1/public/smar/listings  ✓"
+    not:     "GET /api/v1/public/listings/?client_slug=smar  ✗"
+  roles:
+    manager: "JWT role=manager → /admin/* كامل"
+    staff:   "JWT role=staff   → /staff/* فقط"
+    public:  "لا JWT            → /public/* فقط"
+  db_sync:
+    rule: "كل تغيير في schema.prisma يتبعه prisma db push من Railway Console"
+  whatsapp:
+    placeholder: "9611234567 في CollageScene — يحتاج الرقم الحقيقي قبل production"
+    auto_send:   "BackgroundTask يُرسل تأكيد WhatsApp بعد كل حجز ناجح"

@@ -15,9 +15,10 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState }                from 'react';
+import { useState, useEffect }     from 'react';
 import { useNavigate }             from 'react-router-dom';
 import publicApi                   from '../../../utils/publicApi';
+import UnitCalendar                from '../../../components/UnitCalendar';
 
 // ── Tokens — Sunlit Heritage Light Theme ─────────────────────────────────────
 const G = {
@@ -180,9 +181,33 @@ function SuccessBanner({ lang, onClose }) {
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function nightsBetween(a, b) {
+  if (!a || !b) return 0;
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, lang = 'ar' }) {
   const navigate = useNavigate();
+
+  // Date state — seeded from searchDates prop if provided, otherwise user picks via calendar
+  const [dates, setDates] = useState({
+    checkIn:  searchDates?.checkIn  ? new Date(searchDates.checkIn)  : null,
+    checkOut: searchDates?.checkOut ? new Date(searchDates.checkOut) : null,
+  });
+
+  // Live price state
+  const [livePrice,    setLivePrice]    = useState(null);   // null = not yet loaded
+  const [priceLoading, setPriceLoading] = useState(false);
 
   const [form, setForm] = useState({
     name:          '',
@@ -198,12 +223,35 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
 
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
 
+  // Recalculate price whenever dates or guests change
+  useEffect(() => {
+    const { checkIn, checkOut } = dates;
+    if (!checkIn || !checkOut || !unit?.id) return;
+    const ci = fmtDate(checkIn);
+    const co = fmtDate(checkOut);
+    setPriceLoading(true);
+    setLivePrice(null);
+    publicApi.get(`/${slug}/price`, {
+      params: { unit_id: unit.id, check_in: ci, check_out: co, guests: form.guests || 1 },
+    })
+      .then(r => setLivePrice(r.data))
+      .catch(() => setLivePrice(null))
+      .finally(() => setPriceLoading(false));
+  }, [dates.checkIn, dates.checkOut, form.guests, unit?.id, slug]);
+
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
 
+  const handleCalendarChange = ({ checkIn, checkOut }) => {
+    setDates({ checkIn, checkOut });
+    setError('');
+  };
+
   const validate = () => {
+    if (!dates.checkIn || !dates.checkOut)
+      return lang === 'ar' ? 'يرجى تحديد تواريخ الإقامة من التقويم' : 'Please select your dates from the calendar';
     if (!form.name.trim()) return lang === 'ar' ? 'يرجى إدخال الاسم الكامل' : 'Please enter your full name';
     if (!form.phone.trim()) return lang === 'ar' ? 'يرجى إدخال رقم الواتساب' : 'Please enter your WhatsApp number';
     if (!form.paymentMethod) return lang === 'ar' ? 'يرجى اختيار طريقة الدفع' : 'Please select a payment method';
@@ -214,23 +262,24 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
     const err = validate();
     if (err) { setError(err); return; }
 
+    const ci = fmtDate(dates.checkIn);
+    const co = fmtDate(dates.checkOut);
+
     // Card → navigate to payment page
     if (form.paymentMethod === 'card') {
-      if (!searchDates?.checkIn || !searchDates?.checkOut) {
-        setError(lang === 'ar' ? 'يرجى تحديد تواريخ الإقامة أولاً' : 'Please select booking dates first');
-        return;
-      }
       try {
         setIsSubmitting(true);
-        const priceResp = await publicApi.get(`/units/${unit.id}/price`, {
-          params: { check_in: searchDates.checkIn, check_out: searchDates.checkOut, guests: form.guests || 1 },
-        });
-        const servicesResp = await publicApi.get(`/units/${unit.id}/services`);
+        const [priceResp, servicesResp] = await Promise.all([
+          livePrice
+            ? Promise.resolve({ data: livePrice })
+            : publicApi.get(`/${slug}/price`, { params: { unit_id: unit.id, check_in: ci, check_out: co, guests: form.guests || 1 } }),
+          publicApi.get(`/${slug}/services`, { params: { unit_id: unit.id } }),
+        ]);
 
         onClose();
         navigate(`/${slug}/payment`, {
           state: {
-            formData:          { ...form, check_in: searchDates.checkIn, check_out: searchDates.checkOut, unit_id: unit.id },
+            formData:          { ...form, check_in: ci, check_out: co, unit_id: unit.id },
             unit,
             totalPrice:        priceResp.data.total_price,
             availableServices: servicesResp.data,
@@ -249,17 +298,16 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
     // Cash / Whish / OMT → POST booking directly
     try {
       setIsSubmitting(true);
-      await publicApi.post(`/bookings/`, {
+      await publicApi.post(`/${slug}/bookings`, {
         unit_id:           unit.id,
-        client_slug:       slug,
         customer_name:     form.name,
         customer_phone:    form.phone,
         guests:            form.guests,
         arrival_time:      form.arrivalTime,
         payment_method:    form.paymentMethod,
         payment_reference: form.paymentReference,
-        check_in:          searchDates?.checkIn,
-        check_out:         searchDates?.checkOut,
+        check_in:          ci,
+        check_out:         co,
       });
       setIsSuccess(true);
     } catch {
@@ -270,6 +318,7 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
   };
 
   const unitName = lang === 'ar' ? (unit?.name_ar || unit?.name_en) : (unit?.name_en || unit?.name_ar);
+  const nights   = nightsBetween(dates.checkIn, dates.checkOut);
 
   return (
     <AnimatePresence>
@@ -364,32 +413,68 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Dates summary */}
-              {searchDates?.checkIn && (
-                <div style={{
-                  background:   G.goldDim,
-                  border:       `1px solid rgba(212,168,83,0.2)`,
-                  borderRadius: 12,
-                  padding:      '12px 16px',
-                  display:      'flex',
-                  gap:          16,
-                  flexWrap:     'wrap',
-                }}>
-                  <div>
-                    <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
-                      {lang === 'ar' ? 'الدخول' : 'Check-in'}
-                    </span>
-                    <span style={{ color: G.gold, fontSize: '0.88rem', fontWeight: 600 }}>{searchDates.checkIn}</span>
-                  </div>
-                  <div style={{ width: 1, background: G.border, alignSelf: 'stretch' }} />
-                  <div>
-                    <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
-                      {lang === 'ar' ? 'الخروج' : 'Check-out'}
-                    </span>
-                    <span style={{ color: G.gold, fontSize: '0.88rem', fontWeight: 600 }}>{searchDates.checkOut}</span>
-                  </div>
-                </div>
-              )}
+              {/* ── Visual Calendar date picker ── */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: G.textMuted, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 10 }}>
+                  {lang === 'ar' ? 'اختر تواريخ الإقامة' : 'Select Your Dates'}
+                </label>
+                <UnitCalendar
+                  unitId={unit?.id}
+                  slug={slug}
+                  onChange={handleCalendarChange}
+                  value={dates}
+                />
+              </div>
+
+              {/* ── Nights + price summary strip (shown after date selection) ── */}
+              <AnimatePresence>
+                {nights > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    style={{
+                      background:   G.goldDim,
+                      border:       `1px solid rgba(212,168,83,0.2)`,
+                      borderRadius: 12,
+                      padding:      '12px 16px',
+                      display:      'flex',
+                      alignItems:   'center',
+                      gap:          16,
+                      flexWrap:     'wrap',
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+                        {lang === 'ar' ? 'الدخول' : 'Check-in'}
+                      </span>
+                      <span style={{ color: G.gold, fontSize: '0.88rem', fontWeight: 600 }}>{fmtDate(dates.checkIn)}</span>
+                    </div>
+                    <div style={{ width: 1, background: G.border, alignSelf: 'stretch' }} />
+                    <div>
+                      <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+                        {lang === 'ar' ? 'الخروج' : 'Check-out'}
+                      </span>
+                      <span style={{ color: G.gold, fontSize: '0.88rem', fontWeight: 600 }}>{fmtDate(dates.checkOut)}</span>
+                    </div>
+                    <div style={{ width: 1, background: G.border, alignSelf: 'stretch' }} />
+                    <div>
+                      <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+                        {lang === 'ar' ? 'الليالي' : 'Nights'}
+                      </span>
+                      <span style={{ color: G.text, fontSize: '0.88rem', fontWeight: 700 }}>{nights}</span>
+                    </div>
+                    <div style={{ marginRight: 'auto' }}>
+                      <span style={{ color: G.textMuted, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+                        {lang === 'ar' ? 'الإجمالي' : 'Total'}
+                      </span>
+                      <span style={{ color: G.gold, fontSize: '0.95rem', fontWeight: 700 }}>
+                        {priceLoading ? '...' : livePrice ? `${livePrice.total_price} ${livePrice.currency}` : '—'}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Personal info */}
               <GlassInput label={lang === 'ar' ? 'الاسم الكامل' : 'Full Name'} name="name" value={form.name} onChange={handleChange} placeholder={lang === 'ar' ? 'سلمان...' : 'Your name...'} />

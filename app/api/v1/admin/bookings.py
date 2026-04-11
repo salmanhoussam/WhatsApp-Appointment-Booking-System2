@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
+from datetime import date, datetime
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.repositories import BookingRepository, CustomerRepository
@@ -32,13 +33,21 @@ class AdminBookingCreate(BaseModel):
 
 @router.get("/", response_model=PaginatedResponse[BookingResponse])
 async def list_bookings(
-    page:  int = Query(1,  ge=1,         description="Page number (1-indexed)"),
-    limit: int = Query(20, ge=1, le=100, description="Items per page"),
+    page:      int            = Query(1,    ge=1,         description="Page number (1-indexed)"),
+    limit:     int            = Query(20,   ge=1, le=100, description="Items per page"),
+    status:    Optional[str]  = Query(None, description="Filter by status: pending|confirmed|cancelled|completed"),
+    date_from: Optional[date] = Query(None, description="Check-in from (YYYY-MM-DD)"),
+    date_to:   Optional[date] = Query(None, description="Check-in to (YYYY-MM-DD)"),
     current_client: dict = Depends(get_current_tenant),
     service: BookingService = Depends(get_booking_service),
 ):
-    """Paginated admin view of all reservations."""
-    return await service.get_client_bookings(current_client["id"], page=page, limit=limit)
+    """Paginated admin view of all reservations, optionally filtered by status and check-in range."""
+    df = datetime.combine(date_from, datetime.min.time()) if date_from else None
+    dt = datetime.combine(date_to,   datetime.max.time()) if date_to   else None
+    return await service.get_client_bookings(
+        current_client["id"], page=page, limit=limit,
+        status=status, date_from=df, date_to=dt,
+    )
 
 
 @router.post("/", response_model=BookingResponse, status_code=201)

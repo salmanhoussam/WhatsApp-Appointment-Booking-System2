@@ -20,9 +20,10 @@ Response shape:
 }
 """
 
+import asyncio
 import calendar
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -132,4 +133,53 @@ async def get_dashboard(
         "bookings": booking_stats,
         "upcoming_checkins": upcoming_formatted,
         "occupancy": occupancy_report,
+    }
+
+
+@router.get("/dashboard/stats")
+async def get_quick_stats(tenant: dict = Depends(get_current_tenant)):
+    """
+    4 KPI numbers for the top of the Bookings tab.
+    Returns: today_bookings, pending_count, monthly_revenue, available_units.
+    """
+    today     = date.today()
+    tomorrow  = today + timedelta(days=1)
+    month_start = date(today.year, today.month, 1)
+
+    today_start    = datetime.combine(today,       datetime.min.time())
+    tomorrow_start = datetime.combine(tomorrow,    datetime.min.time())
+    month_start_dt = datetime.combine(month_start, datetime.min.time())
+
+    client_id = tenant["id"]
+
+    today_bookings_task = prisma_client.booking.count(where={
+        "clientId": client_id,
+        "checkIn":  {"gte": today_start, "lt": tomorrow_start},
+    })
+    pending_task = prisma_client.booking.count(where={
+        "clientId": client_id,
+        "status":   "pending",
+    })
+    revenue_task = prisma_client.booking.find_many(where={
+        "clientId": client_id,
+        "status":   "confirmed",
+        "checkIn":  {"gte": month_start_dt},
+    })
+    units_task = prisma_client.unit.count(where={
+        "clientId":    client_id,
+        "isAvailable": True,
+        "isActive":    True,
+    })
+
+    today_count, pending_count, revenue_bookings, available_units = await asyncio.gather(
+        today_bookings_task, pending_task, revenue_task, units_task
+    )
+
+    monthly_revenue = round(sum(float(b.totalPrice) for b in revenue_bookings), 2)
+
+    return {
+        "today_bookings":  today_count,
+        "pending_count":   pending_count,
+        "monthly_revenue": monthly_revenue,
+        "available_units": available_units,
     }

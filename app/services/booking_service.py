@@ -41,12 +41,17 @@ class BookingService:
             client_id, unit_id, customer.id, booking_data
         )
 
-    async def get_client_bookings(self, client_id: str, page: int = 1, limit: int = 20) -> PaginatedResponse:
-        """Admin view of all reservations for the enterprise — paginated."""
+    async def get_client_bookings(
+        self, client_id: str, page: int = 1, limit: int = 20,
+        status: Optional[str] = None,
+        date_from=None,
+        date_to=None,
+    ) -> PaginatedResponse:
+        """Admin view of all reservations — paginated, filterable by status and check-in range."""
         skip = (page - 1) * limit
         total, items = await asyncio.gather(
-            self.booking_repo.count_by_client(client_id),
-            self.booking_repo.get_all_by_client(client_id, skip=skip, take=limit),
+            self.booking_repo.count_by_client(client_id, status=status, date_from=date_from, date_to=date_to),
+            self.booking_repo.get_all_by_client(client_id, skip=skip, take=limit, status=status, date_from=date_from, date_to=date_to),
         )
         return PaginatedResponse.build(data=items, total=total, page=page, limit=limit)
 

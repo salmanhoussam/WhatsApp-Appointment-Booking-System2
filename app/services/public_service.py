@@ -165,8 +165,11 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             "checkOut": check_out_date,
             "guests": data.get("guests", 1),
             "totalPrice": final_total_price,
-            "status": "pending", 
-            "source": "website" 
+            "status": "pending",
+            "source": "website",
+            "paymentMethod": data.get("payment_method", "cash"),
+            "paymentReference": data.get("payment_reference"),
+            "arrivalTime": data.get("arrival_time"),
         }
 
         if valid_services:

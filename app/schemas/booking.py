@@ -31,5 +31,8 @@ class BookingResponse(BookingBase):
     unit_id: str
     customer_id: str
     booking_reference: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
+    arrival_time: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -240,9 +240,9 @@ export default function SmarListingsPage() {
 
   // Initial load — all units (no date filter)
   useEffect(() => {
-    const params = { client_slug: slug };
+    const params = {};
     if (typeFilter !== 'all') params.type = typeFilter;
-    publicApi.get(`/listings/`, { params })
+    publicApi.get(`/${slug}/listings`, { params })
       .then((r) => setUnits(r.data?.units || r.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -252,11 +252,11 @@ export default function SmarListingsPage() {
     setLoading(true);
     setSearched(true);
     try {
-      const params = { client_slug: slug };
+      const params = {};
       if (checkIn)  params.check_in  = checkIn;
       if (checkOut) params.check_out = checkOut;
       if (typeFilter !== 'all') params.type = typeFilter;
-      const r = await publicApi.get(`/listings/`, { params });
+      const r = await publicApi.get(`/${slug}/listings`, { params });
       setUnits(r.data?.units || r.data || []);
     } catch (err) {
       console.error(err);

@@ -6,14 +6,40 @@ class BookingRepository:
     def __init__(self, db: Prisma):
         self.db = db
 
-    async def count_by_client(self, client_id: str) -> int:
-        """Count all bookings for a client (used for pagination)."""
-        return await self.db.booking.count(where={"clientId": client_id})
+    async def count_by_client(
+        self, client_id: str,
+        status: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ) -> int:
+        """Count bookings for a client, optionally filtered by status and check-in date range."""
+        where = {"clientId": client_id}
+        if status:
+            where["status"] = status
+        if date_from or date_to:
+            ci: dict = {}
+            if date_from: ci["gte"] = date_from
+            if date_to:   ci["lte"] = date_to
+            where["checkIn"] = ci
+        return await self.db.booking.count(where=where)
 
-    async def get_all_by_client(self, client_id: str, skip: int = 0, take: int = 20):
-        """Fetch a page of bookings for a specific client UUID."""
+    async def get_all_by_client(
+        self, client_id: str, skip: int = 0, take: int = 20,
+        status: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ):
+        """Fetch a page of bookings for a specific client UUID, with optional filters."""
+        where = {"clientId": client_id}
+        if status:
+            where["status"] = status
+        if date_from or date_to:
+            ci: dict = {}
+            if date_from: ci["gte"] = date_from
+            if date_to:   ci["lte"] = date_to
+            where["checkIn"] = ci
         return await self.db.booking.find_many(
-            where={"clientId": client_id},
+            where=where,
             include={"unit": True, "customer": True},
             order={"createdAt": "desc"},
             skip=skip,

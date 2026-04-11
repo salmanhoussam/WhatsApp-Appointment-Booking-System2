@@ -13,6 +13,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
+import UnitCalendar from '../../../components/UnitCalendar';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -90,12 +91,135 @@ function StatusBadge({ status, createdAt }) {
   );
 }
 
+// ─── Placeholder tab shared layout ────────────────────────────────────────────
+function ComingSoonTab({ icon, titleAr, titleEn, descAr, descEn, items }) {
+  return (
+    <div style={{ padding: '60px 0', textAlign: 'center' }}>
+      <div style={{ fontSize: 56, marginBottom: 20 }}>{icon}</div>
+      <h2 style={{ color: C.textPri, fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+        {titleAr} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 18 }}>/ {titleEn}</span>
+      </h2>
+      <p style={{ color: C.textMuted, fontSize: 14, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
+        {descAr}
+      </p>
+
+      {/* Planned features list */}
+      <div style={{
+        display:       'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+        gap:           16,
+        maxWidth:      760,
+        margin:        '0 auto',
+        textAlign:     'left',
+      }}>
+        {items.map((item, i) => (
+          <div key={i} style={{
+            background:   C.surface,
+            border:       `1px solid ${C.border}`,
+            borderRadius: 12,
+            padding:      '16px 20px',
+            display:      'flex',
+            alignItems:   'flex-start',
+            gap:          12,
+          }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+            <div>
+              <div style={{ color: C.textPri, fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{item.ar}</div>
+              <div style={{ color: C.textMuted, fontSize: 12 }}>{item.en}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        display:      'inline-flex',
+        alignItems:   'center',
+        gap:          8,
+        marginTop:    40,
+        padding:      '8px 20px',
+        borderRadius: 20,
+        background:   C.goldDim,
+        border:       `1px solid ${C.gold}33`,
+        color:        C.gold,
+        fontSize:     12,
+        fontWeight:   600,
+        letterSpacing:'0.08em',
+      }}>
+        ⏳ قيد التطوير — Phase 21
+      </div>
+    </div>
+  );
+}
+
+// ─── Housekeeping Tab ─────────────────────────────────────────────────────────
+function HousekeepingTab() {
+  return (
+    <ComingSoonTab
+      icon="🧹"
+      titleAr="إدارة التنظيف"
+      titleEn="Housekeeping"
+      descAr="متابعة حالة تنظيف كل شاليه وفيلا — من لحظة المغادرة حتى الاستعداد للضيف القادم."
+      items={[
+        { icon: '🏠', ar: 'قائمة الوحدات التي تحتاج تنظيف اليوم', en: 'Units due for cleaning today' },
+        { icon: '✅', ar: 'تحديث الحالة: تحت التنظيف / جاهزة', en: 'Update status: cleaning / ready' },
+        { icon: '👤', ar: 'تعيين موظف تنظيف لكل وحدة', en: 'Assign staff to each unit' },
+        { icon: '📸', ar: 'رفع صور ما بعد التنظيف للمراجعة', en: 'Upload post-clean photos' },
+        { icon: '⏰', ar: 'تتبع وقت الانتهاء من كل وحدة', en: 'Track completion time per unit' },
+        { icon: '🔔', ar: 'تنبيه تلقائي عند استعداد الوحدة', en: 'Auto-notify when unit is ready' },
+      ]}
+    />
+  );
+}
+
+// ─── Maintenance Tab ──────────────────────────────────────────────────────────
+function MaintenanceTab() {
+  return (
+    <ComingSoonTab
+      icon="🔧"
+      titleAr="إدارة الصيانة"
+      titleEn="Maintenance"
+      descAr="تتبع بلاغات الصيانة وإصلاح الأعطال — من الإبلاغ حتى الإغلاق."
+      items={[
+        { icon: '🚨', ar: 'استقبال بلاغات الأعطال من الزبائن', en: 'Receive fault reports from guests' },
+        { icon: '🔧', ar: 'تعيين فني صيانة لكل بلاغ', en: 'Assign maintenance tech to each report' },
+        { icon: '📊', ar: 'تصنيف الأعطال: كهرباء / سباكة / أجهزة', en: 'Classify faults: electrical / plumbing / appliances' },
+        { icon: '⚡', ar: 'تحديد الأولوية: عاجل / روتيني', en: 'Set priority: urgent / routine' },
+        { icon: '📋', ar: 'سجل تاريخي لكل بلاغ وإصلاح', en: 'Historical log per report and fix' },
+        { icon: '🔒', ar: 'إغلاق وحدة تلقائياً عند عطل كبير', en: 'Auto-close unit on major fault' },
+      ]}
+    />
+  );
+}
+
+// ─── Gardens Tab ──────────────────────────────────────────────────────────────
+function GardensTab() {
+  return (
+    <ComingSoonTab
+      icon="🌿"
+      titleAr="إدارة الحدائق والمساحات الخضراء"
+      titleEn="Gardens & Landscaping"
+      descAr="جدولة أعمال الحديقة والعشب والري — للحفاظ على المنظر الطبيعي الجميل للمنتجع."
+      items={[
+        { icon: '🌱', ar: 'جدولة قص العشب الأسبوعي', en: 'Schedule weekly lawn mowing' },
+        { icon: '💧', ar: 'إدارة نظام الري التلقائي', en: 'Manage automatic irrigation system' },
+        { icon: '🌸', ar: 'متابعة زراعة الأزهار والنباتات الموسمية', en: 'Track seasonal flowers & plants' },
+        { icon: '🌳', ar: 'صيانة وتشذيب الأشجار', en: 'Tree trimming and maintenance' },
+        { icon: '🗓️', ar: 'تقويم أعمال الحديقة الشهري', en: 'Monthly garden work calendar' },
+        { icon: '📦', ar: 'طلب مستلزمات: بذور، أسمدة، أدوات', en: 'Order supplies: seeds, fertilizers, tools' },
+      ]}
+    />
+  );
+}
+
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ activeTab, setActiveTab, onLogout }) {
   const navItems = [
-    { id: 'bookings',  icon: '📋', label: 'Reservations' },
-    { id: 'units',     icon: '🗺️', label: 'Map & Chalets' },
-    { id: 'dashboard', icon: '📊', label: 'Overview'     },
+    { id: 'bookings',     icon: '📋', label: 'Reservations'  },
+    { id: 'units',        icon: '🏠', label: 'الوحدات'       },
+    { id: 'dashboard',    icon: '📊', label: 'Overview'      },
+    { id: 'housekeeping', icon: '🧹', label: 'Housekeeping'  },
+    { id: 'maintenance',  icon: '🔧', label: 'Maintenance'   },
+    { id: 'gardens',      icon: '🌿', label: 'Gardens'       },
   ];
   return (
     <div style={{
@@ -250,27 +374,110 @@ function OverviewTab() {
   );
 }
 
+// ─── Payment Method Badge ──────────────────────────────────────────────────────
+const PAYMENT_META = {
+  cash:  { fg: '#3ecf8e', bg: 'rgba(62,207,142,0.12)',   label: '💵 Cash'  },
+  whish: { fg: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   label: '📱 Whish' },
+  omt:   { fg: '#fb923c', bg: 'rgba(251,146,60,0.12)',   label: '💸 OMT'   },
+  card:  { fg: '#a78bfa', bg: 'rgba(167,139,250,0.12)',  label: '💳 Card'  },
+};
+function PaymentBadge({ method }) {
+  const m = PAYMENT_META[method?.toLowerCase()];
+  if (!m) return <span style={{ color: C.textMuted, fontSize: 12 }}>{method || '—'}</span>;
+  return (
+    <span style={{
+      display:      'inline-block',
+      padding:      '3px 9px',
+      borderRadius: 6,
+      fontSize:     11,
+      fontWeight:   600,
+      background:   m.bg,
+      color:        m.fg,
+      border:       `1px solid ${m.fg}33`,
+      whiteSpace:   'nowrap',
+    }}>
+      {m.label}
+    </span>
+  );
+}
+
+// ─── KPI Strip (top of Bookings tab) ──────────────────────────────────────────
+function KpiStrip() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    adminApi.get('/dashboard/stats')
+      .then(r => setStats(r.data))
+      .catch(() => {});
+  }, []);
+
+  const cards = [
+    { labelEn: "Today's Check-ins", labelAr: 'حجوزات اليوم',         value: stats?.today_bookings  ?? '…', color: C.gold,    top: C.gold    },
+    { labelEn: 'Pending Approval',  labelAr: 'معلقة — تحتاج تأكيد', value: stats?.pending_count   ?? '…', color: C.amber,   top: C.amber   },
+    { labelEn: 'Monthly Revenue',   labelAr: 'إيرادات هذا الشهر',    value: stats ? `${stats.monthly_revenue} SAR` : '…', color: C.green, top: C.green },
+    { labelEn: 'Available Units',   labelAr: 'وحدات متاحة الآن',     value: stats?.available_units ?? '…', color: '#60a5fa', top: '#60a5fa' },
+  ];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 28 }}>
+      {cards.map(k => (
+        <div key={k.labelEn} style={{
+          background:   C.surface,
+          border:       `1px solid ${C.border}`,
+          borderTop:    `2px solid ${k.top}`,
+          borderRadius: 12,
+          padding:      '18px 20px',
+        }}>
+          <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: '0.04em', marginBottom: 8 }}>
+            {k.labelEn}
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: k.color, letterSpacing: '-0.02em', lineHeight: 1 }}>
+            {k.value}
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>{k.labelAr}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Bookings Tab ──────────────────────────────────────────────────────────────
+const STATUS_PILLS = [
+  { id: 'all',       label: 'All',       color: C.textPri, bg: C.borderHi  },
+  { id: 'pending',   label: '🛎 Pending',  color: C.amber,  bg: C.amberDim  },
+  { id: 'confirmed', label: '✓ Confirmed',color: C.green,  bg: C.greenDim  },
+  { id: 'cancelled', label: '✕ Cancelled',color: C.red,    bg: C.redDim    },
+  { id: 'completed', label: '◎ Completed',color: C.textMuted, bg: 'rgba(107,107,128,0.10)' },
+];
+
 function BookingsTab() {
-  const [bookings, setBookings] = useState([]);
-  const [total,    setTotal]    = useState(0);
-  const [page,     setPage]     = useState(1);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
-  const [updating, setUpdating] = useState(null); // booking id currently being updated
-  const [toast,    setToast]    = useState(null);  // { msg, ok }
-  
-  // New Filter States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all'); // 'all', 'pending'
+  const [bookings,      setBookings]     = useState([]);
+  const [total,         setTotal]        = useState(0);
+  const [page,          setPage]         = useState(1);
+  const [loading,       setLoading]      = useState(true);
+  const [error,         setError]        = useState(null);
+  const [updating,      setUpdating]     = useState(null);
+  const [toast,         setToast]        = useState(null);
+  const [searchQuery,   setSearchQuery]  = useState('');
+  const [statusFilter,  setStatusFilter] = useState('all');
+  const [dateFrom,      setDateFrom]     = useState('');
+  const [dateTo,        setDateTo]       = useState('');
+  const [expandedRow,   setExpandedRow]  = useState(null); // booking id for detail row
 
   const LIMIT = 20;
 
-  const fetchPage = useCallback(async (p) => {
+  const fetchPage = useCallback(async (p, opts = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await adminApi.get('/bookings/', { params: { page: p, limit: LIMIT } });
+      const params = { page: p, limit: LIMIT };
+      const sf = opts.statusFilter ?? statusFilter;
+      const df = opts.dateFrom     ?? dateFrom;
+      const dt = opts.dateTo       ?? dateTo;
+      if (sf && sf !== 'all') params.status    = sf;
+      if (df)                  params.date_from = df;
+      if (dt)                  params.date_to   = dt;
+      const { data } = await adminApi.get('/bookings/', { params });
       setBookings(data.data ?? data.items ?? []);
       setTotal(data.total ?? 0);
       setPage(p);
@@ -279,9 +486,22 @@ function BookingsTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter, dateFrom, dateTo]);
 
   useEffect(() => { fetchPage(1); }, [fetchPage]);
+
+  const applyStatusFilter = (sf) => {
+    setStatusFilter(sf);
+    fetchPage(1, { statusFilter: sf });
+  };
+
+  const applyDateFilter = () => fetchPage(1);
+
+  const clearDates = () => {
+    setDateFrom('');
+    setDateTo('');
+    fetchPage(1, { dateFrom: '', dateTo: '' });
+  };
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -293,7 +513,7 @@ function BookingsTab() {
     try {
       await adminApi.patch(`/bookings/${bookingId}/status`, { status });
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status } : b));
-      showToast(`Booking ${status === 'confirmed' ? 'confirmed' : 'cancelled'} successfully.`, true);
+      showToast(`Booking ${status}.`, true);
     } catch (e) {
       showToast(e.response?.data?.detail || 'Update failed.', false);
     } finally {
@@ -303,122 +523,115 @@ function BookingsTab() {
 
   const totalPages = Math.ceil(total / LIMIT);
 
-  // Client-side filtering
-  const filteredBookings = bookings.filter(b => {
-    // 1. Search Query (Name or Phone)
-    const searchMatch = !searchQuery || 
-      (b.customer?.phone?.includes(searchQuery)) ||
-      (b.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-    // 2. Filter Type (Action Inbox)
-    const typeMatch = filterType === 'all' || (filterType === 'pending' && b.status === 'pending');
-    
-    return searchMatch && typeMatch;
-  });
+  // Client-side search only (status/date are server-side)
+  const visibleBookings = bookings.filter(b =>
+    !searchQuery ||
+    b.customer?.phone?.includes(searchQuery) ||
+    b.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const inputStyle = {
+    padding: '8px 12px', borderRadius: 8,
+    background: C.surface, border: `1px solid ${C.border}`,
+    color: C.textPri, fontSize: 13, outline: 'none',
+  };
 
   return (
     <div>
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-        <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700 }}>
+      {/* ── KPI Strip ─────────────────────────────────────────────── */}
+      <KpiStrip />
+
+      {/* ── Header ────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700, margin: 0 }}>
           Reservations
           <span style={{ color: C.textMuted, fontSize: 14, fontWeight: 400, marginLeft: 10 }}>
             {total} total
           </span>
         </h2>
-        
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {/* Action Inbox Filter */}
-          <div style={{ display: 'flex', background: C.surface, borderRadius: 8, padding: 4, border: `1px solid ${C.border}` }}>
-            <button
-              onClick={() => setFilterType('all')}
-              style={{
-                padding: '6px 14px', borderRadius: 6, fontSize: 13, border: 'none', cursor: 'pointer',
-                background: filterType === 'all' ? C.borderHi : 'transparent',
-                color: filterType === 'all' ? C.textPri : C.textMuted,
-                fontWeight: filterType === 'all' ? 600 : 400,
-              }}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilterType('pending')}
-              style={{
-                padding: '6px 14px', borderRadius: 6, fontSize: 13, border: 'none', cursor: 'pointer',
-                background: filterType === 'pending' ? C.amberDim : 'transparent',
-                color: filterType === 'pending' ? C.amber : C.textMuted,
-                fontWeight: filterType === 'pending' ? 600 : 400,
-              }}
-            >
-              <span style={{ marginRight: 6 }}>🛎️</span> Action Inbox
-            </button>
-          </div>
-
-          {/* Search Phone/Name */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Search */}
           <input
             type="text"
-            placeholder="Search phone or name..."
+            placeholder="Search name or phone…"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              color: C.textPri,
-              fontSize: 13,
-              outline: 'none',
-              minWidth: 220,
-            }}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ ...inputStyle, minWidth: 200 }}
           />
-
+          {/* Refresh */}
           <button
             onClick={() => fetchPage(page)}
-            style={{
-              padding:      '8px 16px',
-              borderRadius: 8,
-              background:   C.goldDim,
-              border:       `1px solid ${C.gold}33`,
-              color:        C.gold,
-              fontSize:     13,
-              cursor:       'pointer',
-              display:      'flex',
-              alignItems:   'center',
-              gap:          6,
-            }}
+            style={{ ...inputStyle, color: C.gold, border: `1px solid ${C.gold}33`, background: C.goldDim, cursor: 'pointer' }}
           >
             ↻ Refresh
           </button>
         </div>
       </div>
 
-      {/* Error */}
+      {/* ── Filters row ───────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Status pills */}
+        <div style={{ display: 'flex', background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, gap: 2 }}>
+          {STATUS_PILLS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => applyStatusFilter(p.id)}
+              style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 12, border: 'none', cursor: 'pointer',
+                background: statusFilter === p.id ? p.bg : 'transparent',
+                color:      statusFilter === p.id ? p.color : C.textMuted,
+                fontWeight: statusFilter === p.id ? 600 : 400,
+                transition: 'all 0.15s',
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Date range */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ color: C.textMuted, fontSize: 12 }}>Check-in</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            style={{ ...inputStyle, colorScheme: 'dark' }} />
+          <span style={{ color: C.textMuted, fontSize: 12 }}>→</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            style={{ ...inputStyle, colorScheme: 'dark' }} />
+          <button onClick={applyDateFilter}
+            style={{ ...inputStyle, cursor: 'pointer', background: C.goldDim, color: C.gold, border: `1px solid ${C.gold}33` }}>
+            Filter
+          </button>
+          {(dateFrom || dateTo) && (
+            <button onClick={clearDates}
+              style={{ ...inputStyle, cursor: 'pointer', background: 'transparent', color: C.textMuted }}>
+              ✕ Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Error ─────────────────────────────────────────────────── */}
       {error && (
         <div style={{ background: C.redDim, border: `1px solid ${C.red}44`, borderRadius: 8, padding: '12px 16px', color: C.red, marginBottom: 20 }}>
           {error}
         </div>
       )}
 
-      {/* Table */}
+      {/* ── Table ─────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ color: C.textMuted, padding: 40, textAlign: 'center' }}>Loading reservations…</div>
-      ) : filteredBookings.length === 0 ? (
+      ) : visibleBookings.length === 0 ? (
         <div style={{ color: C.textMuted, padding: 40, textAlign: 'center' }}>No reservations found.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.borderHi}` }}>
-                {['Customer', 'Phone', 'Unit', 'Source', 'Check-in', 'Check-out', 'Guests', 'Total', 'Status', 'Actions'].map(h => (
+                {['Customer', 'Phone', 'Unit', 'Check-in', 'Check-out', 'Arrival', 'Payment', 'Total', 'Status', 'Actions'].map(h => (
                   <th key={h} style={{
-                    padding:       '10px 14px',
-                    textAlign:     'left',
-                    color:         C.textMuted,
-                    fontWeight:    600,
-                    letterSpacing: '0.05em',
-                    fontSize:      11,
-                    textTransform: 'uppercase',
-                    whiteSpace:    'nowrap',
+                    padding: '10px 14px', textAlign: 'left', color: C.textMuted,
+                    fontWeight: 600, letterSpacing: '0.05em', fontSize: 11,
+                    textTransform: 'uppercase', whiteSpace: 'nowrap',
                   }}>
                     {h}
                   </th>
@@ -426,70 +639,88 @@ function BookingsTab() {
               </tr>
             </thead>
             <tbody>
-              {filteredBookings.map((b, i) => {
+              {visibleBookings.map((b, i) => {
                 const customerName  = b.customer?.name  || '—';
                 const customerPhone = b.customer?.phone || '—';
                 const unitName      = b.unit?.name_ar   || b.unit?.unitNumber || b.unit_id || '—';
-                const checkIn       = b.check_in  ? b.check_in.slice(0,10)  : (b.checkIn  ? String(b.checkIn).slice(0,10)  : '—');
-                const checkOut      = b.check_out ? b.check_out.slice(0,10) : (b.checkOut ? String(b.checkOut).slice(0,10) : '—');
-                const total_price   = b.total_price ?? b.totalPrice ?? '—';
+                const checkIn       = (b.check_in  || b.checkIn  || '').toString().slice(0, 10) || '—';
+                const checkOut      = (b.check_out || b.checkOut || '').toString().slice(0, 10) || '—';
+                const totalPrice    = b.total_price ?? b.totalPrice ?? '—';
                 const currency      = b.currency ?? 'SAR';
-                const sourceBadge   = b.source === 'whatsapp' ? '🟢 WhatsApp' : (b.source === 'web' ? '🌐 Web' : '—');
+                const arrivalTime   = b.arrival_time   ?? b.arrivalTime   ?? '—';
+                const paymentMethod = b.payment_method ?? b.paymentMethod ?? null;
+                const paymentRef    = b.payment_reference ?? b.paymentReference ?? null;
                 const isUpdating    = updating === b.id;
                 const rowBg         = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)';
+                const isExpanded    = expandedRow === b.id;
 
                 return (
-                  <tr
-                    key={b.id}
-                    style={{
-                      background:    rowBg,
-                      borderBottom:  `1px solid ${C.border}`,
-                      transition:    'background 0.15s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,168,83,0.04)'}
-                    onMouseLeave={e => e.currentTarget.style.background = rowBg}
-                  >
-                    <td style={{ padding: '12px 14px', color: C.textPri, fontWeight: 500 }}>{customerName}</td>
-                    <td style={{ padding: '12px 14px', color: C.textMuted }}>{customerPhone}</td>
-                    <td style={{ padding: '12px 14px', color: C.textPri }}>{unitName}</td>
-                    <td style={{ padding: '12px 14px', color: b.source === 'whatsapp' ? C.green : C.textMuted, fontSize: 12 }}>{sourceBadge}</td>
-                    <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{checkIn}</td>
-                    <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{checkOut}</td>
-                    <td style={{ padding: '12px 14px', color: C.textMuted, textAlign: 'center' }}>{b.guests}</td>
-                    <td style={{ padding: '12px 14px', color: C.gold, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {total_price} {currency}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <StatusBadge status={b.status} createdAt={b.created_at ?? b.createdAt} />
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {/* Confirm */}
-                        {b.status !== 'confirmed' && b.status !== 'cancelled' && (
-                          <ActionButton
-                            label="Confirm"
-                            color={C.green}
-                            dimColor={C.greenDim}
-                            disabled={isUpdating}
-                            onClick={() => updateStatus(b.id, 'confirmed')}
-                          />
-                        )}
-                        {/* Cancel */}
-                        {b.status !== 'cancelled' && b.status !== 'completed' && (
-                          <ActionButton
-                            label="Cancel"
-                            color={C.red}
-                            dimColor={C.redDim}
-                            disabled={isUpdating}
-                            onClick={() => updateStatus(b.id, 'cancelled')}
-                          />
-                        )}
-                        {isUpdating && (
-                          <span style={{ color: C.textMuted, fontSize: 11 }}>…</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <React.Fragment key={b.id}>
+                    <tr
+                      style={{ background: rowBg, borderBottom: `1px solid ${C.border}`, transition: 'background 0.15s', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(212,168,83,0.04)'}
+                      onMouseLeave={e => e.currentTarget.style.background = isExpanded ? 'rgba(212,168,83,0.04)' : rowBg}
+                      onClick={() => setExpandedRow(isExpanded ? null : b.id)}
+                    >
+                      <td style={{ padding: '12px 14px', color: C.textPri, fontWeight: 500 }}>{customerName}</td>
+                      <td style={{ padding: '12px 14px', color: C.textMuted }}>{customerPhone}</td>
+                      <td style={{ padding: '12px 14px', color: C.textPri }}>{unitName}</td>
+                      <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{checkIn}</td>
+                      <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{checkOut}</td>
+                      <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{arrivalTime}</td>
+                      <td style={{ padding: '12px 14px' }}><PaymentBadge method={paymentMethod} /></td>
+                      <td style={{ padding: '12px 14px', color: C.gold, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {totalPrice} {currency}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <StatusBadge status={b.status} createdAt={b.created_at ?? b.createdAt} />
+                      </td>
+                      <td style={{ padding: '12px 14px' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {b.status !== 'confirmed' && b.status !== 'cancelled' && (
+                            <ActionButton label="Confirm" color={C.green} dimColor={C.greenDim}
+                              disabled={isUpdating} onClick={() => updateStatus(b.id, 'confirmed')} />
+                          )}
+                          {b.status !== 'cancelled' && b.status !== 'completed' && (
+                            <ActionButton label="Cancel" color={C.red} dimColor={C.redDim}
+                              disabled={isUpdating} onClick={() => updateStatus(b.id, 'cancelled')} />
+                          )}
+                          {isUpdating && <span style={{ color: C.textMuted, fontSize: 11 }}>…</span>}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* ── Expanded detail row ── */}
+                    {isExpanded && (
+                      <tr style={{ background: 'rgba(212,168,83,0.03)', borderBottom: `1px solid ${C.border}` }}>
+                        <td colSpan={10} style={{ padding: '12px 24px' }}>
+                          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', fontSize: 12 }}>
+                            <div>
+                              <span style={{ color: C.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Booking ID</span>
+                              <div style={{ color: C.textPri, fontFamily: 'monospace', marginTop: 4 }}>{b.id}</div>
+                            </div>
+                            {paymentRef && (
+                              <div>
+                                <span style={{ color: C.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Receipt Ref</span>
+                                <div style={{ color: C.gold, fontFamily: 'monospace', marginTop: 4 }}>{paymentRef}</div>
+                              </div>
+                            )}
+                            {b.notes && (
+                              <div>
+                                <span style={{ color: C.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Notes</span>
+                                <div style={{ color: C.textPri, marginTop: 4 }}>{b.notes}</div>
+                              </div>
+                            )}
+                            <div>
+                              <span style={{ color: C.textMuted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Source</span>
+                              <div style={{ color: b.source === 'whatsapp' ? C.green : C.textPri, marginTop: 4 }}>
+                                {b.source === 'whatsapp' ? '🟢 WhatsApp' : b.source === 'web' ? '🌐 Web' : b.source || '—'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -497,50 +728,34 @@ function BookingsTab() {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* ── Pagination ────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 28 }}>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-            <button
-              key={p}
-              onClick={() => fetchPage(p)}
-              style={{
-                width:        34,
-                height:       34,
-                borderRadius: 6,
-                border:       `1px solid ${p === page ? C.gold : C.border}`,
-                background:   p === page ? C.goldDim : 'transparent',
-                color:        p === page ? C.gold : C.textMuted,
-                fontSize:     13,
-                cursor:       'pointer',
-              }}
-            >
+            <button key={p} onClick={() => fetchPage(p)} style={{
+              width: 34, height: 34, borderRadius: 6, fontSize: 13, cursor: 'pointer',
+              border:     `1px solid ${p === page ? C.gold : C.border}`,
+              background: p === page ? C.goldDim : 'transparent',
+              color:      p === page ? C.gold : C.textMuted,
+            }}>
               {p}
             </button>
           ))}
         </div>
       )}
 
-      {/* Toast */}
+      {/* ── Toast ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
             style={{
-              position:     'fixed',
-              bottom:       28,
-              right:        28,
-              padding:      '12px 20px',
-              borderRadius: 10,
-              background:   toast.ok ? C.greenDim : C.redDim,
-              border:       `1px solid ${toast.ok ? C.green : C.red}44`,
-              color:        toast.ok ? C.green : C.red,
-              fontSize:     14,
-              fontWeight:   600,
-              zIndex:       9999,
-              backdropFilter: 'blur(12px)',
+              position: 'fixed', bottom: 28, right: 28, padding: '12px 20px',
+              borderRadius: 10, zIndex: 9999, backdropFilter: 'blur(12px)',
+              background: toast.ok ? C.greenDim : C.redDim,
+              border:     `1px solid ${toast.ok ? C.green : C.red}44`,
+              color:      toast.ok ? C.green : C.red,
+              fontSize: 14, fontWeight: 600,
             }}
           >
             {toast.ok ? '✓' : '✗'} {toast.msg}
@@ -578,140 +793,753 @@ function ActionButton({ label, color, dimColor, disabled, onClick }) {
   );
 }
 
-// ─── Units Tab (Map & Chalets) ───────────────────────────────────────────────────
-function UnitsTab() {
-  const [isAdding, setIsAdding] = useState(false);
+// ─── Toggle Switch ─────────────────────────────────────────────────────────────
+function Toggle({ on, onChange, disabled }) {
+  return (
+    <button
+      onClick={() => !disabled && onChange(!on)}
+      style={{
+        position:        'relative',
+        width:           42,
+        height:          22,
+        borderRadius:    11,
+        border:          'none',
+        background:      on ? 'rgba(62,207,142,0.35)' : 'rgba(107,107,128,0.25)',
+        cursor:          disabled ? 'not-allowed' : 'pointer',
+        transition:      'background 0.2s',
+        flexShrink:      0,
+        outline:         'none',
+        padding:         0,
+      }}
+    >
+      <span style={{
+        position:    'absolute',
+        top:         3,
+        left:        on ? 22 : 3,
+        width:       16,
+        height:      16,
+        borderRadius:'50%',
+        background:  on ? C.green : C.textMuted,
+        transition:  'left 0.2s, background 0.2s',
+        display:     'block',
+      }} />
+    </button>
+  );
+}
+
+// ─── Add Unit Modal ────────────────────────────────────────────────────────────
+const UNIT_TYPES = [
+  { id: 'chalet',     label: 'Chalet شاليه'       },
+  { id: 'villa',      label: 'Villa فيلا'          },
+  { id: 'restaurant', label: 'Restaurant مطعم'    },
+  { id: 'pool',       label: 'Pool مسبح'           },
+];
+
+const EMPTY_FORM = {
+  name_ar: '', name_en: '', unit_type: 'chalet',
+  capacity: 2, bedrooms: 1, bathrooms: 1, image_url: '',
+};
+
+function AddUnitModal({ onClose, onCreated }) {
+  const [form,   setForm]   = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [units, setUnits] = useState([
-    { id: 1, name: 'سويت الكهف', capacity: 2, status: 'active', x: 12.5, y: -4.2 }
-  ]);
-
-  const [formData, setFormData] = useState({
-    name_ar: '', name_en: '', description: '',
-    capacity: 2, bedrooms: 1, bathrooms: 1,
-    position_x: 0, position_y: 0,
-  });
-
-  const handleSave = () => {
-    setSaving(true);
-    // Simulate API Call
-    setTimeout(() => {
-      setSaving(false);
-      setIsAdding(false);
-      setUnits([...units, { id: Date.now(), name: formData.name_ar || 'شاليه جديد', capacity: formData.capacity, status: 'active', x: formData.position_x, y: formData.position_y }]);
-    }, 1200);
-  };
+  const [error,  setError]  = useState('');
 
   const inputStyle = {
-    width: '100%', padding: '12px 16px', borderRadius: 8, background: C.bg,
-    border: `1px solid ${C.border}`, color: C.textPri, fontSize: 14, outline: 'none',
-    boxSizing: 'border-box'
+    width: '100%', padding: '11px 14px', borderRadius: 8,
+    background: C.bg, border: `1px solid ${C.border}`,
+    color: C.textPri, fontSize: 13, outline: 'none', boxSizing: 'border-box',
   };
-  const labelStyle = { display: 'block', color: C.textMuted, fontSize: 12, marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' };
+  const labelStyle = {
+    display: 'block', color: C.textMuted, fontSize: 11,
+    marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+  };
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  if (isAdding) {
-    return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <button onClick={() => setIsAdding(false)} style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', marginBottom: 24, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-          ← Back to Map & Chalets
-        </button>
-        
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '32px 40px' }}>
-          <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700, marginBottom: 32 }}>Add New Chalet / Villa</h2>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
-            {/* Left Col - Details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div>
-                <label style={labelStyle}>Chalet Name (Arabic)</label>
-                <input style={inputStyle} value={formData.name_ar} onChange={e => setFormData({...formData, name_ar: e.target.value})} placeholder="مثال: سويت الكهف" />
-              </div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Capacity</label>
-                  <input type="number" style={inputStyle} value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Bedrooms</label>
-                  <input type="number" style={inputStyle} value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Description</label>
-                <textarea style={{...inputStyle, height: 100, resize: 'none'}} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="وصف مميزات الشاليه..."></textarea>
-              </div>
+  const handleCreate = async () => {
+    if (!form.name_ar.trim()) { setError('الاسم بالعربي مطلوب'); return; }
+    if (form.capacity < 1)    { setError('السعة يجب أن تكون 1 أو أكثر'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await adminApi.post('/units/', {
+        name_ar:   form.name_ar,
+        name_en:   form.name_en || null,
+        unit_type: form.unit_type,
+        capacity:  Number(form.capacity),
+        bedrooms:  form.bedrooms ? Number(form.bedrooms) : null,
+        bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
+        image_url: form.image_url || null,
+      });
+      onCreated(data);
+      onClose();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'فشل الحفظ، حاول مجدداً');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {/* Backdrop */}
+      <motion.div
+        key="modal-bg"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)',
+        }}
+      />
+
+      {/* Panel */}
+      <motion.div
+        key="modal-panel"
+        initial={{ opacity: 0, scale: 0.96, y: 20 }}
+        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        exit={{   opacity: 0, scale: 0.96, y: 20  }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'fixed', top: '50%', left: '50%',
+          transform: 'translate(-50%,-50%)',
+          zIndex: 201, width: 520, maxHeight: '90vh', overflowY: 'auto',
+          background: C.surface, border: `1px solid ${C.borderHi}`,
+          borderRadius: 16, padding: '32px 36px',
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+          <div>
+            <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: '0.1em', marginBottom: 4 }}>ADD UNIT</div>
+            <h3 style={{ color: C.textPri, fontSize: 18, fontWeight: 700, margin: 0 }}>إضافة وحدة جديدة</h3>
+          </div>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: '50%', border: `1px solid ${C.border}`,
+            background: 'transparent', color: C.textMuted, cursor: 'pointer', fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>✕</button>
+        </div>
+
+        {/* Fields */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Name row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>الاسم بالعربي *</label>
+              <input style={inputStyle} value={form.name_ar} onChange={e => set('name_ar', e.target.value)}
+                placeholder="مثال: شاليه الصنوبر" dir="rtl" />
             </div>
-
-            {/* Right Col - Spatial & Media */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-                <label style={{...labelStyle, color: C.gold}}>📍 Spatial Coordinates (3D Map)</label>
-                <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{...labelStyle, fontSize: 10}}>Position X</label>
-                    <input type="number" style={inputStyle} value={formData.position_x} onChange={e => setFormData({...formData, position_x: e.target.value})} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{...labelStyle, fontSize: 10}}>Position Y</label>
-                    <input type="number" style={inputStyle} value={formData.position_y} onChange={e => setFormData({...formData, position_y: e.target.value})} />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: C.bg, border: `1px dashed ${C.borderHi}`, borderRadius: 12, padding: 24, textAlign: 'center' }}>
-                <label style={{...labelStyle, color: C.textPri, marginBottom: 4}}>📷 Upload Media</label>
-                <span style={{ color: C.textMuted, fontSize: 12 }}>Drag & drop high-res photos & showcase video here</span>
-                <input type="file" multiple accept="image/*,video/*" style={{ display: 'block', margin: '16px auto 0', color: C.textMuted, fontSize: 12 }} />
-              </div>
+            <div>
+              <label style={labelStyle}>Name in English</label>
+              <input style={inputStyle} value={form.name_en} onChange={e => set('name_en', e.target.value)}
+                placeholder="e.g. Pine Chalet" />
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 40, paddingTop: 24, borderTop: `1px solid ${C.border}` }}>
+          {/* Type */}
+          <div>
+            <label style={labelStyle}>نوع الوحدة</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+              {UNIT_TYPES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => set('unit_type', t.id)}
+                  style={{
+                    padding: '8px 4px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                    background: form.unit_type === t.id ? C.goldDim : C.bg,
+                    color:      form.unit_type === t.id ? C.gold : C.textMuted,
+                    border:     `1px solid ${form.unit_type === t.id ? C.gold + '44' : C.border}`,
+                    fontWeight: form.unit_type === t.id ? 600 : 400,
+                    transition: 'all 0.15s',
+                    textAlign:  'center', lineHeight: 1.4,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Numbers row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>السعة *</label>
+              <input type="number" min={1} style={inputStyle} value={form.capacity}
+                onChange={e => set('capacity', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>غرف النوم</label>
+              <input type="number" min={0} style={inputStyle} value={form.bedrooms}
+                onChange={e => set('bedrooms', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>الحمامات</label>
+              <input type="number" min={0} style={inputStyle} value={form.bathrooms}
+                onChange={e => set('bathrooms', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Image URL */}
+          <div>
+            <label style={labelStyle}>Image URL (Supabase)</label>
+            <input style={inputStyle} value={form.image_url}
+              onChange={e => set('image_url', e.target.value)}
+              placeholder="https://…supabase.co/storage/…/chalet.jpg" dir="ltr" />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              background: C.redDim, border: `1px solid ${C.red}44`,
+              borderRadius: 8, padding: '10px 14px', color: C.red, fontSize: 13,
+            }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 28, paddingTop: 20, borderTop: `1px solid ${C.border}` }}>
+          <button onClick={onClose} style={{
+            padding: '10px 20px', borderRadius: 8, border: `1px solid ${C.border}`,
+            background: 'transparent', color: C.textMuted, fontSize: 13, cursor: 'pointer',
+          }}>
+            إلغاء
+          </button>
+          <button onClick={handleCreate} disabled={saving} style={{
+            padding: '10px 28px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700,
+            background: saving ? 'rgba(212,168,83,0.4)' : 'linear-gradient(135deg,#d4a853,#b8892a)',
+            color: '#000', cursor: saving ? 'wait' : 'pointer', transition: 'all 0.2s',
+          }}>
+            {saving ? 'جاري الحفظ…' : '+ إضافة الوحدة'}
+          </button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Units Tab ─────────────────────────────────────────────────────────────────
+const TYPE_ICON = { villa: '🏡', chalet: '🏕️', restaurant: '🍽️', pool: '🏊', };
+
+// ─── CalendarManagerModal (Phase 23) ─────────────────────────────────────────
+// Admin drags on the calendar to select a range, then sets price/block status.
+// No manual date inputs — the calendar IS the input.
+function CalendarManagerModal({ unit, onClose }) {
+  const [calKey,       setCalKey]      = useState(0);
+  const [selection,    setSelection]   = useState({ checkIn: null, checkOut: null });
+  const [customPrice,  setCustomPrice] = useState('');
+  const [isBlocked,    setIsBlocked]   = useState(false);
+  const [applying,     setApplying]    = useState(false);
+  const [result,       setResult]      = useState(null); // { ok, msg }
+
+  const fmtDateStr = d => {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const nights = selection.checkIn && selection.checkOut
+    ? Math.round((selection.checkOut - selection.checkIn) / 86400000) + 1
+    : 0;
+
+  const handleApply = async () => {
+    if (!selection.checkIn) {
+      setResult({ ok: false, msg: 'اسحب على التقويم لتحديد نطاق أولاً' });
+      return;
+    }
+    setApplying(true);
+    setResult(null);
+    const startStr = fmtDateStr(selection.checkIn);
+    const endStr   = fmtDateStr(selection.checkOut || selection.checkIn);
+    try {
+      const res = await adminApi.post(`/units/${unit.id}/date-overrides`, {
+        start_date:   startStr,
+        end_date:     endStr,
+        custom_price: customPrice !== '' ? parseFloat(customPrice) : null,
+        is_blocked:   isBlocked,
+      });
+      const days = res.data.days_updated ?? nights;
+      setResult({
+        ok:  true,
+        msg: isBlocked
+          ? `تم حجب ${days} يوم بنجاح`
+          : `تم تحديث ${days} يوم — السعر: ${customPrice || '—'} SAR`,
+      });
+      setSelection({ checkIn: null, checkOut: null });
+      setCustomPrice('');
+      setCalKey(k => k + 1); // re-fetch calendar data
+    } catch (e) {
+      setResult({ ok: false, msg: e.response?.data?.detail ?? 'فشل التحديث' });
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%', background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.borderHi}`,
+    borderRadius: 8, padding: '10px 12px', color: C.textPri, fontSize: 13,
+    outline: 'none', boxSizing: 'border-box',
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="cal-backdrop"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(0,0,0,0.72)', backdropFilter:'blur(4px)' }}
+      />
+      <motion.div
+        key="cal-panel"
+        initial={{ opacity:0, scale:0.94, y:24 }}
+        animate={{ opacity:1, scale:1,    y:0  }}
+        exit={{    opacity:0, scale:0.94, y:24 }}
+        transition={{ type:'spring', stiffness:280, damping:26 }}
+        onClick={e => e.stopPropagation()}
+        style={{ position:'fixed', inset:0, zIndex:401, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}
+      >
+        <div style={{
+          pointerEvents:'all', background:C.surface, border:`1px solid ${C.borderHi}`,
+          borderRadius:20, width:'min(500px,94vw)', maxHeight:'92vh', overflowY:'auto',
+          boxShadow:'0 24px 80px rgba(0,0,0,0.6)', padding:28,
+          display:'flex', flexDirection:'column', gap:18,
+        }}>
+
+          {/* ── Header ── */}
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+            <div>
+              <p style={{ color:C.textMuted, fontSize:11, letterSpacing:'0.12em', textTransform:'uppercase', margin:0 }}>
+                إدارة التقويم — Dynamic Pricing
+              </p>
+              <h3 style={{ color:C.textPri, fontSize:17, fontWeight:700, margin:'4px 0 0' }}>
+                {unit.name_ar || unit.name_en}
+              </h3>
+            </div>
+            <button onClick={onClose} style={{
+              width:32, height:32, borderRadius:'50%', border:`1px solid ${C.border}`,
+              background:'transparent', color:C.textMuted, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0,
+            }}>✕</button>
+          </div>
+
+          {/* ── Instruction banner ── */}
+          <div style={{
+            background: C.goldDim, border:`1px solid ${C.gold}33`, borderRadius:10,
+            padding:'10px 14px', fontSize:12, color:C.gold, display:'flex', gap:8, alignItems:'center',
+          }}>
+            <span>👆</span>
+            <span>اسحب فوق الأيام لتحديد نطاق، ثم اضبط السعر أو الحجب أدناه</span>
+          </div>
+
+          {/* ── Calendar ── */}
+          <div style={{ display:'flex', justifyContent:'center' }}>
+            <UnitCalendar
+              key={calKey}
+              unitId={unit.id}
+              slug="smar"
+              adminMode={true}
+              onChange={setSelection}
+              value={selection}
+            />
+          </div>
+
+          {/* ── Selected range pill ── */}
+          <AnimatePresence>
+            {selection.checkIn && (
+              <motion.div
+                initial={{ opacity:0, y:-6 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-6 }}
+                style={{
+                  background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.28)',
+                  borderRadius:10, padding:'10px 14px', display:'flex', alignItems:'center',
+                  justifyContent:'space-between', flexWrap:'wrap', gap:8,
+                }}
+              >
+                <span style={{ color:'#93c5fd', fontSize:13, fontWeight:600 }}>
+                  📅 {fmtDateStr(selection.checkIn)}
+                  {selection.checkOut && selection.checkOut > selection.checkIn
+                    ? ` ← ${fmtDateStr(selection.checkOut)}`
+                    : ''}
+                </span>
+                <span style={{ color:C.textMuted, fontSize:12 }}>
+                  {nights > 0 ? `${nights} يوم محدد` : '1 يوم'}
+                </span>
+                <button
+                  onClick={() => setSelection({ checkIn:null, checkOut:null })}
+                  style={{ background:'transparent', border:'none', color:C.textMuted, cursor:'pointer', fontSize:13 }}
+                >
+                  ✕ مسح
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div style={{ borderTop:`1px solid ${C.border}` }} />
+
+          {/* ── Controls ── */}
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+            {/* Block / Available toggle */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <p style={{ color:C.textPri, fontSize:13, fontWeight:600, margin:0 }}>الحالة</p>
+                <p style={{ color:C.textMuted, fontSize:11, margin:'3px 0 0' }}>
+                  {isBlocked ? 'مغلق — لا يمكن الحجز' : 'متاح — يمكن الحجز'}
+                </p>
+              </div>
+              <div style={{ display:'flex', gap:0, border:`1px solid ${C.borderHi}`, borderRadius:8, overflow:'hidden' }}>
+                {[
+                  { label:'متاح ✓', val:false, activeColor:C.green,  activeBg:'rgba(62,207,142,0.15)' },
+                  { label:'مغلق 🔒', val:true,  activeColor:C.red,   activeBg:'rgba(248,113,113,0.15)' },
+                ].map(opt => (
+                  <button
+                    key={String(opt.val)}
+                    onClick={() => setIsBlocked(opt.val)}
+                    style={{
+                      padding:'7px 16px', border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                      background: isBlocked === opt.val ? opt.activeBg : 'transparent',
+                      color: isBlocked === opt.val ? opt.activeColor : C.textMuted,
+                      transition:'all 0.15s',
+                    }}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom price — only shown when not blocked */}
+            <AnimatePresence>
+              {!isBlocked && (
+                <motion.div
+                  initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                  style={{ overflow:'hidden' }}
+                >
+                  <label style={{ display:'block', fontSize:11, color:C.textMuted, marginBottom:6 }}>
+                    سعر مخصص بالـ SAR (اتركه فارغاً للإبقاء على السعر الحالي)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={customPrice}
+                    onChange={e => setCustomPrice(e.target.value)}
+                    placeholder="مثال: 350"
+                    style={inputStyle}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Result */}
+            <AnimatePresence>
+              {result && (
+                <motion.p
+                  initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                  style={{
+                    background: result.ok ? C.greenDim : C.redDim,
+                    border:`1px solid ${result.ok ? C.green : C.red}44`,
+                    borderRadius:8, padding:'8px 12px',
+                    color: result.ok ? C.green : C.red,
+                    fontSize:13, margin:0,
+                  }}
+                >
+                  {result.ok ? '✓' : '✗'} {result.msg}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            {/* Apply button */}
             <button
-              onClick={handleSave}
-              disabled={saving}
+              onClick={handleApply}
+              disabled={applying || !selection.checkIn}
               style={{
-                padding: '12px 32px', borderRadius: 8, background: C.gold, color: '#000',
-                fontSize: 14, fontWeight: 700, border: 'none', cursor: saving ? 'wait' : 'pointer',
-                opacity: saving ? 0.7 : 1, transition: 'all 0.2s'
+                width:'100%', padding:'12px 20px', borderRadius:8, border:'none',
+                background: applying || !selection.checkIn
+                  ? 'rgba(212,168,83,0.25)'
+                  : isBlocked
+                    ? 'linear-gradient(135deg,#ef4444,#b91c1c)'
+                    : 'linear-gradient(135deg,#d4a853,#b8892a)',
+                color: applying || !selection.checkIn ? C.textMuted : '#fff',
+                fontWeight:700, fontSize:13,
+                cursor: applying || !selection.checkIn ? 'not-allowed' : 'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                transition:'background 0.2s',
               }}
             >
-              {saving ? 'Saving to Database...' : '+ Publish Chalet'}
+              {applying ? (
+                <>
+                  <span style={{ width:13, height:13, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block' }} />
+                  جاري التطبيق...
+                </>
+              ) : !selection.checkIn ? (
+                'حدد نطاقاً من التقويم أعلاه'
+              ) : isBlocked ? (
+                `🔒 حجب ${nights || 1} يوم`
+              ) : (
+                `✓ تطبيق على ${nights || 1} يوم${customPrice ? ` — ${customPrice} SAR` : ''}`
+              )}
             </button>
           </div>
         </div>
       </motion.div>
-    );
-  }
+    </AnimatePresence>
+  );
+}
+
+function UnitsTab() {
+  const [units,        setUnits]       = useState([]);
+  const [loading,      setLoading]     = useState(true);
+  const [error,        setError]       = useState(null);
+  const [toggling,     setToggling]    = useState(null); // unit id being toggled
+  const [showModal,    setShowModal]   = useState(false);
+  const [calendarUnit, setCalendarUnit] = useState(null); // unit whose calendar is open
+  const [toast,        setToast]       = useState(null);
+
+  const showToast = (msg, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => {
+    adminApi.get('/units/')
+      .then(r => setUnits(r.data || []))
+      .catch(() => setError('Failed to load units.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const toggleField = async (unitId, field, newValue) => {
+    setToggling(unitId);
+    const prev = units.find(u => u.id === unitId);
+    // Optimistic update
+    setUnits(us => us.map(u => u.id === unitId ? { ...u, [field]: newValue } : u));
+    try {
+      await adminApi.patch(`/units/${unitId}`, { [field]: newValue });
+      showToast(
+        field === 'is_available'
+          ? (newValue ? 'الوحدة متاحة الآن' : 'الوحدة مغلقة للحجز')
+          : (newValue ? 'الوحدة مفعّلة' : 'الوحدة معطّلة'),
+        true
+      );
+    } catch {
+      // Revert on failure
+      setUnits(us => us.map(u => u.id === unitId ? prev : u));
+      showToast('فشل التحديث، حاول مجدداً', false);
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const handleCreated = (newUnit) => {
+    setUnits(us => [...us, newUnit]);
+    showToast(`تمت إضافة "${newUnit.name_ar}" بنجاح`, true);
+  };
+
+  // Group by type for display
+  const grouped = units.reduce((acc, u) => {
+    const t = u.unit_type || 'chalet';
+    if (!acc[t]) acc[t] = [];
+    acc[t].push(u);
+    return acc;
+  }, {});
+
+  const thStyle = {
+    padding: '10px 14px', textAlign: 'left', color: C.textMuted,
+    fontWeight: 600, fontSize: 11, textTransform: 'uppercase',
+    letterSpacing: '0.05em', whiteSpace: 'nowrap',
+  };
+  const tdStyle = { padding: '12px 14px', color: C.textPri, fontSize: 13 };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700 }}>Map & Chalets Directory</h2>
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div>
+          <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700, margin: 0 }}>
+            الوحدات
+            <span style={{ color: C.textMuted, fontSize: 14, fontWeight: 400, marginLeft: 10 }}>
+              {units.length} total
+            </span>
+          </h2>
+          <p style={{ color: C.textMuted, fontSize: 13, margin: '6px 0 0' }}>
+            Toggle availability instantly — changes reflect on /smar/listings in real time.
+          </p>
+        </div>
         <button
-          onClick={() => setIsAdding(true)}
-          style={{ padding: '8px 16px', borderRadius: 8, background: C.goldDim, border: `1px solid ${C.gold}33`, color: C.gold, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+          onClick={() => setShowModal(true)}
+          style={{
+            padding: '10px 20px', borderRadius: 8, border: 'none', fontWeight: 700,
+            background: 'linear-gradient(135deg,#d4a853,#b8892a)', color: '#000',
+            fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+          }}
         >
-          + Add New Chalet
+          + إضافة وحدة
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-        {units.map(u => (
-          <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, position: 'relative' }}>
-            <div style={{ width: '100%', height: 160, background: C.bg, borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.borderHi }}>
-              [ Image Placeholder ]
-            </div>
-            <h3 style={{ margin: 0, color: C.textPri, fontSize: 16, marginBottom: 8 }}>{u.name}</h3>
-            <div style={{ display: 'flex', gap: 12, color: C.textMuted, fontSize: 12 }}>
-              <span>👥 {u.capacity} Guests</span>
-              <span>📍 X:{u.x} Y:{u.y}</span>
-            </div>
+      {loading && <div style={{ color: C.textMuted, padding: 40, textAlign: 'center' }}>Loading units…</div>}
+      {error   && <div style={{ color: C.red, padding: 20 }}>{error}</div>}
+
+      {!loading && !error && Object.keys(grouped).length === 0 && (
+        <div style={{ color: C.textMuted, padding: 40, textAlign: 'center' }}>
+          No units yet. Add your first unit above.
+        </div>
+      )}
+
+      {/* One table per type group */}
+      {Object.entries(grouped).map(([type, rows]) => (
+        <div key={type} style={{ marginBottom: 36 }}>
+          {/* Group heading */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <span style={{ fontSize: 18 }}>{TYPE_ICON[type] || '🏠'}</span>
+            <span style={{ color: C.gold, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              {type}
+            </span>
+            <span style={{
+              padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: C.goldDim, color: C.gold, border: `1px solid ${C.gold}33`,
+            }}>
+              {rows.length}
+            </span>
           </div>
-        ))}
-      </div>
-    </motion.div>
+
+          <div style={{ overflowX: 'auto', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.borderHi}` }}>
+                  {['Image', 'Name', 'Capacity', 'Beds / Baths', 'Available', 'Active', 'Calendar'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((u, i) => {
+                  const rowBg  = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)';
+                  const isBusy = toggling === u.id;
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{
+                        background:   rowBg,
+                        borderBottom: `1px solid ${C.border}`,
+                        opacity:      u.is_active ? 1 : 0.45,
+                        transition:   'opacity 0.2s',
+                      }}
+                    >
+                      {/* Thumbnail */}
+                      <td style={tdStyle}>
+                        {u.image_url ? (
+                          <img src={u.image_url} alt="" style={{
+                            width: 52, height: 40, objectFit: 'cover',
+                            borderRadius: 6, border: `1px solid ${C.border}`,
+                          }} />
+                        ) : (
+                          <div style={{
+                            width: 52, height: 40, borderRadius: 6,
+                            background: C.bg, border: `1px solid ${C.border}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 18,
+                          }}>
+                            {TYPE_ICON[u.unit_type] || '🏠'}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Name */}
+                      <td style={tdStyle}>
+                        <div style={{ fontWeight: 600 }}>{u.name_ar || '—'}</div>
+                        {u.name_en && <div style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>{u.name_en}</div>}
+                      </td>
+
+                      {/* Capacity */}
+                      <td style={{ ...tdStyle, color: C.textMuted }}>
+                        👥 {u.capacity}
+                      </td>
+
+                      {/* Beds / Baths */}
+                      <td style={{ ...tdStyle, color: C.textMuted, whiteSpace: 'nowrap' }}>
+                        {u.bedrooms != null ? `🛏 ${u.bedrooms}` : '—'}
+                        {u.bathrooms != null ? `  🚿 ${u.bathrooms}` : ''}
+                      </td>
+
+                      {/* Available toggle */}
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Toggle
+                            on={u.is_available}
+                            disabled={isBusy || !u.is_active}
+                            onChange={v => toggleField(u.id, 'is_available', v)}
+                          />
+                          <span style={{ color: u.is_available ? C.green : C.textMuted, fontSize: 11, fontWeight: 600 }}>
+                            {u.is_available ? 'Open' : 'Closed'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Active toggle */}
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Toggle
+                            on={u.is_active}
+                            disabled={isBusy}
+                            onChange={v => toggleField(u.id, 'is_active', v)}
+                          />
+                          <span style={{ color: u.is_active ? C.textMuted : C.red, fontSize: 11 }}>
+                            {u.is_active ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Calendar action */}
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => setCalendarUnit(u)}
+                          style={{
+                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.gold}44`,
+                            background: C.goldDim, color: C.gold,
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+                          }}
+                        >
+                          📅 إدارة
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      {/* Add unit modal */}
+      {showModal && <AddUnitModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
+
+      {/* Calendar manager modal */}
+      {calendarUnit && <CalendarManagerModal unit={calendarUnit} onClose={() => setCalendarUnit(null)} />}
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+            style={{
+              position: 'fixed', bottom: 28, right: 28, padding: '12px 20px',
+              borderRadius: 10, zIndex: 9999, backdropFilter: 'blur(12px)',
+              background: toast.ok ? C.greenDim : C.redDim,
+              border: `1px solid ${toast.ok ? C.green : C.red}44`,
+              color: toast.ok ? C.green : C.red,
+              fontSize: 14, fontWeight: 600,
+            }}
+          >
+            {toast.ok ? '✓' : '✗'} {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -757,7 +1585,14 @@ export default function SmarAdminDashboard() {
               SMAR TENANT · ADMIN PORTAL
             </div>
             <h1 style={{ fontSize: 28, fontWeight: 800, color: C.textPri, letterSpacing: '-0.02em' }}>
-              {activeTab === 'bookings' ? 'Reservations' : activeTab === 'units' ? 'Manage Chalets & Map' : 'Overview'}
+              {{
+                bookings:     'Reservations',
+                units:        'الوحدات — Unit Management',
+                dashboard:    'Overview',
+                housekeeping: 'Housekeeping',
+                maintenance:  'Maintenance',
+                gardens:      'Gardens & Landscaping',
+              }[activeTab] || 'Dashboard'}
             </h1>
           </div>
           <div style={{
@@ -782,9 +1617,12 @@ export default function SmarAdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.18 }}
           >
-            {activeTab === 'bookings'  && <BookingsTab  />}
-            {activeTab === 'units'     && <UnitsTab     />}
-            {activeTab === 'dashboard' && <OverviewTab  />}
+            {activeTab === 'bookings'     && <BookingsTab     />}
+            {activeTab === 'units'        && <UnitsTab        />}
+            {activeTab === 'dashboard'    && <OverviewTab     />}
+            {activeTab === 'housekeeping' && <HousekeepingTab />}
+            {activeTab === 'maintenance'  && <MaintenanceTab  />}
+            {activeTab === 'gardens'      && <GardensTab      />}
           </motion.div>
         </AnimatePresence>
       </div>

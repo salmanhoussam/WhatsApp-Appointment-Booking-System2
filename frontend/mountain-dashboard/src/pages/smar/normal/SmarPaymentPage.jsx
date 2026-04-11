@@ -286,9 +286,8 @@ export default function SmarPaymentPage() {
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => ({ service_id: id, quantity: qty }));
 
-      await publicApi.post(`/bookings/`, {
+      await publicApi.post(`/${slug}/bookings`, {
         unit_id:        formData.unit_id || unit.id,
-        client_slug:    slug,
         customer_name:  formData.name || formData.customer_name,
         customer_phone: formData.phone || formData.customer_phone,
         check_in:       formData.check_in,
