@@ -10,7 +10,7 @@
 
 import { useState, useContext } from 'react';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../../context/LanguageContext';
 
 export default function SmarHeader() {
   const [hidden, setHidden] = useState(false);

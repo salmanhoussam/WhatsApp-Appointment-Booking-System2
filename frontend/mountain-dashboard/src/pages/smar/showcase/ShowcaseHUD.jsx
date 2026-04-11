@@ -15,7 +15,7 @@ import { useContext, useState }             from 'react';
 import { motion, useTransform,
          useMotionValueEvent }              from 'framer-motion';
 import { ShowcaseContext }                  from './SmarShowcasePage';
-import { useLanguage }                      from '../../context/LanguageContext';
+import { useLanguage }                      from '../../../context/LanguageContext';
 
 // ─── Section labels per language ──────────────────────────────────────────────
 const SECTIONS = {

@@ -20,7 +20,7 @@ import { motion } from 'framer-motion';
 import SmarHeader          from './SmarHeader';
 import SmarTimelineGallery from './SmarTimelineGallery';
 
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../../context/LanguageContext';
 
 // ─── Supabase base ─────────────────────────────────────────────────────────────
 const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage';

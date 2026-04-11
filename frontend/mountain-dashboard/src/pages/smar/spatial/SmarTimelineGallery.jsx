@@ -24,7 +24,7 @@
 
 import { useRef }                                        from 'react';
 import { motion, useScroll, useTransform, useSpring }    from 'framer-motion';
-import { useLanguage }                                   from '../../context/LanguageContext';
+import { useLanguage }                                   from '../../../context/LanguageContext';
 
 // ─── Single timeline item ─────────────────────────────────────────────────────
 function TimelineItem({ item, index }) {
