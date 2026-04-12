@@ -31,23 +31,20 @@ class AdminBookingCreate(BaseModel):
     notes: Optional[str] = None
 
 
-@router.get("/", response_model=PaginatedResponse[BookingResponse])
+@router.get("/")
 async def list_bookings(
-    page:      int            = Query(1,    ge=1,         description="Page number (1-indexed)"),
-    limit:     int            = Query(20,   ge=1, le=100, description="Items per page"),
-    status:    Optional[str]  = Query(None, description="Filter by status: pending|confirmed|cancelled|completed"),
-    date_from: Optional[date] = Query(None, description="Check-in from (YYYY-MM-DD)"),
-    date_to:   Optional[date] = Query(None, description="Check-in to (YYYY-MM-DD)"),
     current_client: dict = Depends(get_current_tenant),
-    service: BookingService = Depends(get_booking_service),
 ):
-    """Paginated admin view of all reservations, optionally filtered by status and check-in range."""
-    df = datetime.combine(date_from, datetime.min.time()) if date_from else None
-    dt = datetime.combine(date_to,   datetime.max.time()) if date_to   else None
-    return await service.get_client_bookings(
-        current_client["id"], page=page, limit=limit,
-        status=status, date_from=df, date_to=dt,
+    """Admin view of all reservations."""
+    bookings = await prisma_client.booking.find_many(
+        where={"clientId": current_client["id"]},
+        include={
+            "unit": True,
+            "customer": True
+        },
+        order=[{"createdAt": "desc"}]
     )
+    return bookings
 
 
 @router.post("/", response_model=BookingResponse, status_code=201)
@@ -98,26 +95,35 @@ async def create_booking(
     return booking
 
 
-class BookingStatusUpdate(BaseModel):
-    status: str   # "pending" | "confirmed" | "cancelled" | "completed"
+class AdminBookingUpdate(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = None
 
-
-@router.patch("/{booking_id}/status", response_model=BookingResponse)
-async def update_booking_status(
+@router.patch("/{booking_id}")
+async def update_booking(
     booking_id: str,
-    body: BookingStatusUpdate,
+    body: AdminBookingUpdate,
     current_client: dict = Depends(get_current_tenant),
-    service: BookingService = Depends(get_booking_service),
 ):
-    """Update the status of a single booking (Confirm / Cancel / etc.)."""
-    try:
-        booking = await service.update_booking_status(
-            booking_id=booking_id,
-            client_id=current_client["id"],
-            status=body.status,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    if not booking:
+    """Update a booking's status or notes."""
+    existing = await prisma_client.booking.find_first(
+        where={"id": booking_id, "clientId": current_client["id"]}
+    )
+    if not existing:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    return booking
+
+    patch = {}
+    if body.status is not None:
+        patch["status"] = body.status
+    if body.notes is not None:
+        patch["notes"] = body.notes
+
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    updated = await prisma_client.booking.update(
+        where={"id": booking_id},
+        data=patch,
+        include={"unit": True, "customer": True}
+    )
+    return updated

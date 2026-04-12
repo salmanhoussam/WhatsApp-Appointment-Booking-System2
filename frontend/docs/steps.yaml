@@ -1173,6 +1173,30 @@ phases:
           Add Language Toggle Button to all Navigation headers and update text elements. Support dynamic RTL/LTR body directions.
 
   # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 28: Backend Payment Logic & Services
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 28
+    name: "Backend Payment Logic & Services"
+    description: "Implement payment state logic, manage services, and connect them to bookings."
+    tasks:
+      - id: 28.1
+        name: "Task A: Payment State Machine"
+        status: TODO
+        details: |
+          Modify booking creation: if payment_method == 'cash', set status to 'confirmed'. Otherwise, set to 'pending'.
+      - id: 28.2
+        name: "Task B: Admin Services CRUD"
+        status: TODO
+        details: |
+          Build API routes and Pydantic schemas to manage the services table.
+      - id: 28.3
+        name: "Task C: Booking Services Junction"
+        status: TODO
+        details: |
+          Update public booking logic to accept an array of services, calculate their fetched base_price, and save them to booking_services within a transaction.
+
+  # ══════════════════════════════════════════════════════════════════════════
   # ملاحظات تقنية عامة
   # ══════════════════════════════════════════════════════════════════════════
 

@@ -61,6 +61,12 @@ class DashboardRepository:
         today = date.today()
         until = today + timedelta(days=days_ahead)
 
+        from datetime import datetime, timezone
+        if isinstance(today, date) and not isinstance(today, datetime):
+            today = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+        if isinstance(until, date) and not isinstance(until, datetime):
+            until = datetime.combine(until, datetime.min.time()).replace(tzinfo=timezone.utc)
+
         return await self.db.booking.find_many(
             where={
                 "clientId": client_id,
@@ -80,6 +86,12 @@ class DashboardRepository:
         Returns all active bookings (pending/confirmed) in the period,
         with their unit+property included. Used to compute occupancy.
         """
+        from datetime import datetime, timezone
+        if isinstance(start, date) and not isinstance(start, datetime):
+            start = datetime.combine(start, datetime.min.time()).replace(tzinfo=timezone.utc)
+        if isinstance(end, date) and not isinstance(end, datetime):
+            end = datetime.combine(end, datetime.min.time()).replace(tzinfo=timezone.utc)
+
         return await self.db.booking.find_many(
             where={
                 "clientId": client_id,

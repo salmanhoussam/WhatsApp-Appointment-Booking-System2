@@ -157,6 +157,9 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
         
         final_total_price = unit_price + total_service_price
 
+        payment_method = data.get("payment_method", "cash")
+        status = "confirmed" if payment_method == "cash" else "pending"
+
         booking_data = {
             "unitId": data.get("unit_id"),
             "clientId": client.id,
@@ -165,9 +168,9 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             "checkOut": check_out_date,
             "guests": data.get("guests", 1),
             "totalPrice": final_total_price,
-            "status": "pending",
+            "status": status,
             "source": "website",
-            "paymentMethod": data.get("payment_method", "cash"),
+            "paymentMethod": payment_method,
             "paymentReference": data.get("payment_reference"),
             "arrivalTime": data.get("arrival_time"),
         }

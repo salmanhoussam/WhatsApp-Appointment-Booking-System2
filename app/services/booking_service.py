@@ -35,6 +35,9 @@ class BookingService:
         
         if not is_available:
             raise ValueError("This unit is already booked for the selected dates.")
+        # Ensure status is properly applied based on payment method
+        payment_method = booking_data.get("payment_method", "cash")
+        booking_data["status"] = "confirmed" if payment_method == "cash" else "pending"
             
         # 3. Create Booking
         return await self.booking_repo.create(

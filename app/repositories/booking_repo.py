@@ -1,6 +1,6 @@
 from prisma import Prisma
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, date
 
 class BookingRepository:
     def __init__(self, db: Prisma):
@@ -68,6 +68,11 @@ class BookingRepository:
 
     async def check_availability(self, unit_id: str, check_in: datetime, check_out: datetime):
         """Check if a unit is available for the given dates (Overlapping check)."""
+        if isinstance(check_in, date) and not isinstance(check_in, datetime):
+            check_in = datetime.combine(check_in, datetime.min.time()).replace(tzinfo=timezone.utc)
+        if isinstance(check_out, date) and not isinstance(check_out, datetime):
+            check_out = datetime.combine(check_out, datetime.min.time()).replace(tzinfo=timezone.utc)
+
         conflicting_bookings = await self.db.booking.find_many(
             where={
                 "unitId": unit_id,
