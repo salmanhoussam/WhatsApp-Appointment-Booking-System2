@@ -1,190 +1,89 @@
 /**
- * Scene3D.jsx  —  WebGL Background Layer
+ * Scene3D.jsx  —  Phase 30: Z-Axis Cinematic Flight
  *
- * Changes from v1:
- *   ✓ InnerRing removed (المربعات)
- *   ✓ LogoInRing  — logo image centered inside the metallic ring using Drei <Html>
- *                   (avoids PNG-transparency issues; CSS clip-path keeps it circular)
- *   ✓ BackgroundSphere — full-sky sphere (BackSide) with Supabase image texture
- *                        + dark overlay sphere so scene elements stay readable
+ * Step 1: Camera Rig — z=5 → z=-35 via scroll.
+ * Step 2: Supabase image planes placed along the Z corridor.
+ *
+ * Scene layout:
+ *   z:  0   Ring portal (4×4, transparent PNG)
+ *   z: -10  Chalets top view (8×5, offset left)
+ *   z: -20  Pool & terrace (8×5, offset right)
+ *   z: -32  Grand finale sea view (20×12, centered)
+ *
+ * FogExp2 hides far planes until the camera approaches.
  */
 
-import { useRef, useMemo }                                           from 'react';
-import { useFrame }                                                  from '@react-three/fiber';
-import { useScroll, Html }                                           from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, ChromaticAberration }      from '@react-three/postprocessing';
-import { BlendFunction }                                             from 'postprocessing';
-import * as THREE                                                    from 'three';
+import { useRef, useMemo, useEffect }  from 'react';
+import { useFrame, useThree }          from '@react-three/fiber';
+import { useScroll, Image }            from '@react-three/drei';
+import * as THREE                      from 'three';
 
-// ─── Assets ───────────────────────────────────────────────────────────────────
-const RING_URL =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/smar_ring.png';
+// ─── Camera Rig ───────────────────────────────────────────────────────────────
+// Drives camera.position.z from +5 to -35 based on scroll offset.
+// Also reports progress back to the parent via onProgress callback.
+function CameraRig({ onProgress }) {
+  const scroll = useScroll();
 
+  useFrame(({ camera }) => {
+    const s = scroll.offset; // 0 → 1
+    onProgress(s);
 
-// ─── Smar Ring image — spins inside the metallic torus ───────────────────────
-// Uses Drei <Html center> projected at world origin.
-// The image spins via CSS animation (no rAF overhead).
-// On scroll it scales up and fades out in sync with the camera fly-in.
-function SmarRingImage() {
-  const scroll  = useScroll();
-  const wrapRef = useRef(null);
+    // Z-axis flight path: 5 → -35
+    camera.position.z = THREE.MathUtils.lerp(5, -35, s);
 
-  useFrame(() => {
-    if (!wrapRef.current) return;
-    const s = scroll.offset;
+    // Gentle X/Y sway for cinematic feel
+    camera.position.x = Math.sin(s * Math.PI * 0.8) * 0.6;
+    camera.position.y = Math.sin(s * Math.PI * 0.5) * 0.3;
 
-    // Fade out between scroll 0 → 0.30
-    wrapRef.current.style.opacity = Math.max(0, 1 - s * 3.3);
-
-    // Scale with the outer ring (1 → 4 over scroll 0 → 1)
-    const scale = THREE.MathUtils.lerp(1, 4, s);
-    // We only drive the scale via JS; CSS @keyframes handles the spin
-    wrapRef.current.style.setProperty('--ring-scale', scale);
+    // Always look slightly ahead of current position
+    camera.lookAt(camera.position.x * 0.3, 0, camera.position.z - 8);
   });
 
-  return (
-    <Html center position={[0, 0, 0.4]}>
-      <style>{`
-        @keyframes smar-spin {
-          from { transform: scale(var(--ring-scale,1)) rotate(0deg); }
-          to   { transform: scale(var(--ring-scale,1)) rotate(360deg); }
-        }
-        .smar-ring-img {
-          --ring-scale: 1;
-          width: 148px;
-          height: 148px;
-          border-radius: 50%;
-          display: block;
-          pointer-events: none;
-          user-select: none;
-          animation: smar-spin 18s linear infinite;
-          filter: drop-shadow(0 0 22px rgba(212,168,83,0.60));
-          transform-origin: center center;
-        }
-      `}</style>
-      <div ref={wrapRef} style={{ transformOrigin: 'center center' }}>
-        <img
-          src={RING_URL}
-          alt="Beit Smar Ring"
-          className="smar-ring-img"
-        />
-      </div>
-    </Html>
-  );
+  return null;
 }
 
-// ─── Inner counter-rotating ring (perpendicular axis) ────────────────────────
-function InnerRing() {
-  const meshRef = useRef();
-  const scroll  = useScroll();
+// ─── Fog injector ─────────────────────────────────────────────────────────────
+// Sets FogExp2 on the scene so distant planes fade to black naturally.
+function SceneFog() {
+  const { scene } = useThree();
 
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const s = scroll.offset;
-    const t = clock.getElapsedTime();
+  useEffect(() => {
+    scene.fog = new THREE.FogExp2('#0a0a0f', 0.045);
+    scene.background = new THREE.Color('#0a0a0f');
+    return () => {
+      scene.fog = null;
+      scene.background = null;
+    };
+  }, [scene]);
 
-    meshRef.current.rotation.x = t * -0.09 + Math.PI / 2;
-    meshRef.current.rotation.y = t *  0.13;
-    meshRef.current.scale.setScalar(THREE.MathUtils.lerp(0.55, 2.5, s));
-    meshRef.current.material.opacity = THREE.MathUtils.lerp(0.45, 0.08, s);
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <torusGeometry args={[1.3, 0.045, 32, 64]} />
-      <meshStandardMaterial
-        color="#ffffff"
-        metalness={0.9}
-        roughness={0.1}
-        transparent
-        opacity={0.45}
-      />
-    </mesh>
-  );
+  return null;
 }
 
-// ─── Outer metallic ring ──────────────────────────────────────────────────────
-function MetallicRing() {
-  const meshRef = useRef();
-  const scroll  = useScroll();
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const s = scroll.offset;
-    const t = clock.getElapsedTime();
-
-    meshRef.current.rotation.x += 0.0025;
-    meshRef.current.rotation.z += 0.001;
-    meshRef.current.scale.setScalar(THREE.MathUtils.lerp(1.0, 4.0, s));
-
-    const pulse = Math.sin(t * 1.8) * 0.12 + 0.88;
-    meshRef.current.material.emissiveIntensity =
-      THREE.MathUtils.lerp(0.35, 2.5, s) * pulse;
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <torusGeometry args={[2, 0.22, 64, 128]} />
-      <meshStandardMaterial
-        color="#d4a853"
-        metalness={1}
-        roughness={0.06}
-        emissive="#d4a853"
-        emissiveIntensity={0.35}
-      />
-    </mesh>
-  );
-}
-
-// ─── Glow core ────────────────────────────────────────────────────────────────
-function GlowCore() {
-  const meshRef = useRef();
-  const scroll  = useScroll();
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const s = scroll.offset;
-    const t = clock.getElapsedTime();
-    const pulse = Math.sin(t * 1.3) * 0.06 + 0.94;
-    meshRef.current.material.opacity = THREE.MathUtils.lerp(0.07, 0.02, s) * pulse;
-    meshRef.current.scale.setScalar(pulse * THREE.MathUtils.lerp(1, 2.8, s));
-  });
-
-  return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[1.9, 32, 32]} />
-      <meshBasicMaterial color="#d4a853" transparent opacity={0.07} side={THREE.BackSide} />
-    </mesh>
-  );
-}
-
-// ─── Particle field ───────────────────────────────────────────────────────────
-function ParticleField() {
-  const COUNT     = 3000;
-  const pointsRef = useRef();
+// ─── Gold particle corridor ──────────────────────────────────────────────────
+// Particles distributed along Z=-5 to Z=-40 so they stream past during flight.
+function ParticleCorridor() {
+  const COUNT = 2500;
+  const ref   = useRef();
 
   const positions = useMemo(() => {
     const pos = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
-      const r     = 3 + Math.random() * 14;
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 24;
+      // Spread in a wide tunnel around the flight path
+      pos[i * 3]     = (Math.random() - 0.5) * 16;   // X: ±8
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 12;   // Y: ±6
+      pos[i * 3 + 2] = 5 - Math.random() * 50;        // Z: +5 → -45
     }
     return pos;
   }, []);
 
   useFrame(({ clock }) => {
-    if (!pointsRef.current) return;
-    const t = clock.getElapsedTime();
-    pointsRef.current.rotation.y = t * 0.032;
-    pointsRef.current.rotation.x = t * 0.014;
+    if (!ref.current) return;
+    // Very slow rotation so particles feel alive but not distracting
+    ref.current.rotation.z = clock.getElapsedTime() * 0.008;
   });
 
   return (
-    <points ref={pointsRef}>
+    <points ref={ref}>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
@@ -193,62 +92,77 @@ function ParticleField() {
           itemSize={3}
         />
       </bufferGeometry>
-      <pointsMaterial size={0.045} color="#d4a853" transparent opacity={0.42} sizeAttenuation />
+      <pointsMaterial
+        size={0.035}
+        color="#d4a853"
+        transparent
+        opacity={0.38}
+        sizeAttenuation
+        depthWrite={false}
+      />
     </points>
   );
 }
 
-// ─── Camera rig ───────────────────────────────────────────────────────────────
-function CameraRig({ onProgress }) {
-  const scroll = useScroll();
-
-  useFrame(({ camera }) => {
-    const s = scroll.offset;
-    onProgress(s);
-    camera.position.z = THREE.MathUtils.lerp(10, -4, s);
-    camera.position.x = Math.sin(s * Math.PI * 2) * 1.8;
-    camera.position.y = Math.sin(s * Math.PI) * 1.4;
-    camera.lookAt(0, 0, 0);
-  });
-
-  return null;
-}
+// ─── Supabase asset URLs ──────────────────────────────────────────────────────
+const ASSETS = {
+  ring:    'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/smar_ring.png',
+  chalets: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/smar-showcase/chalet-top-view.jpeg',
+  pool:    'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/pool.png',
+  finale:  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar3.jpg',
+};
 
 // ─── Default export ───────────────────────────────────────────────────────────
 export default function Scene3D({ onProgress }) {
   return (
     <>
       <CameraRig onProgress={onProgress} />
+      <SceneFog />
 
-      {/* Lighting */}
-      <ambientLight intensity={0.08} />
-      <pointLight position={[0, 0,  7]} color="#d4a853" intensity={5}   />
-      <pointLight position={[0, 0, -7]} color="#6688ff" intensity={1.8} />
-      <pointLight position={[4, 3,  0]} color="#ffffff"  intensity={0.9} />
+      {/* Lighting — warm gold front, cool blue back, soft ambient */}
+      <ambientLight intensity={0.15} />
+      <pointLight position={[0, 0, 6]}   color="#d4a853" intensity={3}   />
+      <pointLight position={[0, 0, -20]} color="#6688ff" intensity={1.5} />
+      <pointLight position={[0, 0, -34]} color="#d4a853" intensity={4}   />
 
-      {/* Only the spinning smar ring image — no metallic torus, no inner ring */}
-      <SmarRingImage />
-      <GlowCore />
-      <ParticleField />
+      {/* ── Plane 1: The Portal — Smar Ring (z: 0) ── */}
+      <Image
+        url={ASSETS.ring}
+        position={[0, 0, 0]}
+        scale={[4, 4]}
+        transparent
+        toneMapped={false}
+      />
 
-      {/* Post-processing */}
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.25}
-          luminanceSmoothing={0.9}
-          intensity={2.2}
-          blendFunction={BlendFunction.ADD}
-        />
-        <ChromaticAberration
-          offset={new THREE.Vector2(0.0006, 0.0006)}
-          blendFunction={BlendFunction.NORMAL}
-        />
-        <Vignette
-          offset={0.12}
-          darkness={0.9}
-          blendFunction={BlendFunction.NORMAL}
-        />
-      </EffectComposer>
+      {/* ── Plane 2: The Chalets — top view (z: -10, offset left) ── */}
+      <Image
+        url={ASSETS.chalets}
+        position={[-3.5, 0.5, -10]}
+        scale={[8, 5]}
+        transparent
+        toneMapped={false}
+      />
+
+      {/* ── Plane 3: The Pool & Terrace (z: -20, offset right) ── */}
+      <Image
+        url={ASSETS.pool}
+        position={[3.5, -0.5, -20]}
+        scale={[8, 5]}
+        transparent
+        toneMapped={false}
+      />
+
+      {/* ── Plane 4: Grand Finale — Sea & Mountains (z: -32, massive) ── */}
+      <Image
+        url={ASSETS.finale}
+        position={[0, 0, -32]}
+        scale={[20, 12]}
+        transparent
+        toneMapped={false}
+      />
+
+      {/* Gold dust corridor — spatial depth cues */}
+      <ParticleCorridor />
     </>
   );
 }

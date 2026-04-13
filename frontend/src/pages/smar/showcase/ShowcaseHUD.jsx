@@ -19,17 +19,16 @@ import { useLanguage }                      from '../../../context/LanguageConte
 
 // ─── Section labels per language ──────────────────────────────────────────────
 const SECTIONS = {
-  ar: ['البداية', 'العمارة', 'الحدائق', 'المسبح', 'الحجز'],
-  en: ['Intro',  'Architecture', 'Gardens', 'The Pool', 'Reserve'],
+  ar: ['البداية', 'الشاليهات', 'المسبح', 'الحجز'],
+  en: ['Intro',  'Chalets',   'The Pool', 'Reserve'],
 };
 
 // Map scroll offset → active section index (0-4)
 function offsetToSection(v) {
-  if (v < 0.20) return 0;
-  if (v < 0.40) return 1;
-  if (v < 0.60) return 2;
-  if (v < 0.80) return 3;
-  return 4;
+  if (v < 0.22) return 0;
+  if (v < 0.48) return 1;
+  if (v < 0.78) return 2;
+  return 3;
 }
 
 // ─── Vertical progress dots ───────────────────────────────────────────────────

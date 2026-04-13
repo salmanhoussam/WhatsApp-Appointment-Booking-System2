@@ -1,201 +1,150 @@
 /**
- * ShowcaseCards.jsx  —  HTML Content Overlay
+ * ShowcaseCards.jsx  —  Phase 30: Cinematic HTML Text Overlay
  *
  * Sits in a fixed z-10 layer above the WebGL canvas.
  * ALL animation is driven by `scrollProgress` (a Framer Motion MotionValue
  * updated every frame by Scene3D's CameraRig — zero React state re-renders).
  *
- * Sections (offset 0→1 over 5 scroll pages):
- *   0.00 → 0.18  HERO       — "بيت سمار" stagger entrance
- *   0.18 → 0.38  CARD 1     — العمارة / Architecture  (slides from right)
- *   0.38 → 0.58  CARD 2     — الحدائق / Gardens       (slides from left)
- *   0.58 → 0.78  CARD 3     — المسبح  / Pool & Terrace (slides from right)
- *   0.80 → 1.00  CTA        — fade in, gold button
+ * 4 text blocks synced to the Z-axis image corridor:
+ *   0.00 → 0.18  TEXT 1 — Hero / Ring portal
+ *   0.22 → 0.42  TEXT 2 — Chalets (right-aligned)
+ *   0.48 → 0.68  TEXT 3 — Pool (left-aligned)
+ *   0.78 → 1.00  TEXT 4 — Grand Finale + CTA
  *
  * Styling: GS MAR Glassmorphism (backdrop-blur + bg-white/5 + gold border)
  */
 
-import { useContext }                               from 'react';
-import { motion, useTransform }                     from 'framer-motion';
-import { ShowcaseContext }                          from './SmarShowcasePage';
+import { useContext } from 'react';
+import { motion, useTransform } from 'framer-motion';
+import { ShowcaseContext } from './SmarShowcasePage';
 
-const BASE =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage';
+// ─── Shared glass panel style ─────────────────────────────────────────────────
+const GLASS = {
+  backdropFilter: 'blur(24px)',
+  WebkitBackdropFilter: 'blur(24px)',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(212,168,83,0.18)',
+  boxShadow:
+    '0 8px 48px rgba(212,168,83,0.08), inset 0 1px 0 rgba(255,255,255,0.07)',
+  borderRadius: 20,
+  padding: '32px 40px',
+};
 
-const CARDS = [
-  {
-    id:      '01',
-    img:     `${BASE}/amenity1.jpg`,
-    titleAr: 'العمارة والتصميم',
-    titleEn: 'Architecture & Design',
-    bodyAr:  'حجر لبناني تقليدي يعانق التصميم العصري. قناطر هندسية وأسقف قرميدية تروي قصة أجيال من حياة الجبل.',
-    bodyEn:  'Traditional Lebanese stone meets contemporary design. Geometric arches and terracotta roofs that tell a generations-long story.',
-    fromRight: true,
-  },
-  {
-    id:      '02',
-    img:     `${BASE}/amenity2.jpg`,
-    titleAr: 'الحدائق المعلقة',
-    titleEn: 'The Hanging Gardens',
-    bodyAr:  'حدائق متدرجة تنساب على سفح الجبل، تفوح منها روائح الياسمين والمريمية مع إطلالة بحرية لا تُنسى.',
-    bodyEn:  'Terraced gardens cascading down the hillside, fragrant with jasmine and sage — with an unforgettable view of the sea.',
-    fromRight: false,
-  },
-  {
-    id:      '03',
-    img:     `${BASE}/amenity3.jpg`,
-    titleAr: 'المسبح والتراس',
-    titleEn: 'The Pool & Terrace',
-    bodyAr:  'مسبح لا متناهي يندمج مع الأفق. كل لحظة هنا — قهوة الصباح أو غروب الشمس — لوحة سينمائية خالصة.',
-    bodyEn:  'An infinity pool that merges with the horizon. Every moment here — morning coffee or sunset — is a cinematic frame.',
-    fromRight: true,
-  },
-];
+// ─── Text 1: Hero / Ring Portal (scroll 0.00 → 0.18) ─────────────────────────
+function HeroBlock() {
+  const { scrollProgress } = useContext(ShowcaseContext);
 
-// ─── Scroll timing table ──────────────────────────────────────────────────────
-// Each card: fade-in over 0.06, hold for 0.10, fade-out over 0.06
-const TIMINGS = [
-  { in: 0.18, peak: 0.24, hold: 0.32, out: 0.40 }, // Card 1
-  { in: 0.38, peak: 0.44, hold: 0.52, out: 0.60 }, // Card 2
-  { in: 0.58, peak: 0.64, hold: 0.72, out: 0.80 }, // Card 3
-];
-
-// ─── Single property card ─────────────────────────────────────────────────────
-function PropertyCard({ card, timing }) {
-  const { scrollProgress, lang } = useContext(ShowcaseContext);
-
-  const title = lang === 'ar' ? card.titleAr : card.titleEn;
-  const body  = lang === 'ar' ? card.bodyAr  : card.bodyEn;
-  const dir   = lang === 'ar' ? 'rtl' : 'ltr';
-
-  const { in: tIn, peak, hold, out: tOut } = timing;
-  const offset = card.fromRight ? '72px' : '-72px';
-
-  const opacity = useTransform(scrollProgress, [tIn, peak, hold, tOut], [0, 1, 1, 0]);
-  const x       = useTransform(scrollProgress, [tIn, peak],             [offset, '0px']);
-
-  // Text block slides in from the opposite side
-  const textX   = useTransform(scrollProgress, [tIn, peak], [card.fromRight ? '-50px' : '50px', '0px']);
+  const opacity = useTransform(scrollProgress, [0, 0.04, 0.12, 0.20], [0, 1, 1, 0]);
+  const y       = useTransform(scrollProgress, [0, 0.06], ['24px', '0px']);
+  const scale   = useTransform(scrollProgress, [0.12, 0.20], [1, 0.92]);
 
   return (
     <motion.div
-      style={{ opacity, pointerEvents: 'none' }}
-      className="absolute inset-0 flex items-center justify-center px-6 md:px-16"
-    >
-      <div
-        className={`w-full max-w-5xl flex flex-col md:flex-row items-center gap-6 md:gap-10 ${
-          card.fromRight ? '' : 'md:flex-row-reverse'
-        }`}
-        dir={dir}
-      >
-        {/* ── Image panel ── */}
-        <motion.div
-          style={{ x }}
-          className="w-full md:w-[52%] h-[44vh] md:h-[62vh] relative overflow-hidden rounded-2xl flex-shrink-0"
-        >
-          <img
-            src={card.img}
-            alt={title}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-          />
-          {/* Bottom gradient so card number reads cleanly */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-          {/* Badge */}
-          <span className="absolute bottom-4 left-4 text-[10px] tracking-[0.3em] text-[#d4a853] font-semibold uppercase">
-            {card.id} — BEIT SMAR
-          </span>
-        </motion.div>
-
-        {/* ── Text panel (GS MAR glass) ── */}
-        <motion.div
-          className="w-full md:flex-1 rounded-2xl p-6 md:p-10"
-          style={{
-            x:               textX,
-            backdropFilter:  'blur(20px)',
-            background:      'rgba(255,255,255,0.04)',
-            border:          '1px solid rgba(212,168,83,0.18)',
-            boxShadow:       '0 8px 48px rgba(212,168,83,0.08), inset 0 1px 0 rgba(255,255,255,0.07)',
-          }}
-        >
-          <p className="text-[10px] tracking-[0.32em] text-[#d4a853] uppercase mb-4 font-semibold">
-            {card.id} — BEIT SMAR
-          </p>
-          <h3 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-5">
-            {title}
-          </h3>
-          <p className="text-white/55 text-sm md:text-[15px] leading-relaxed md:leading-loose max-w-sm">
-            {body}
-          </p>
-        </motion.div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Hero section — logo image replaces text ─────────────────────────────────
-const LOGO_URL =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/smar_ring.png';
-
-function HeroText() {
-  const { scrollProgress, lang } = useContext(ShowcaseContext);
-
-  const opacity  = useTransform(scrollProgress, [0, 0.04, 0.13, 0.20], [0, 1, 1, 0]);
-  const y        = useTransform(scrollProgress, [0, 0.06], ['18px', '0px']);
-  const dotScale = useTransform(scrollProgress, [0.06, 0.18], [1, 0]);
-  const hint     = lang === 'ar' ? 'مرر للاستكشاف' : 'Scroll to explore';
-
-  return (
-    <motion.div
-      style={{ opacity, y, pointerEvents: 'none' }}
+      style={{ opacity, y, scale, pointerEvents: 'none' }}
       className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
     >
-      {/* Logo replaces title text */}
-      <motion.img
-        src={LOGO_URL}
-        alt="Beit Smar"
-        initial={{ opacity: 0, scale: 0.88 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.3, type: 'spring', stiffness: 60, damping: 18 }}
+      {/* Eyebrow */}
+      <p className="text-[10px] tracking-[0.35em] text-[#d4a853] uppercase mb-5 font-semibold">
+        BEIT SMAR · MOUNTAIN RESIDENCE
+      </p>
+
+      {/* Main title */}
+      <h1
+        className="text-[clamp(28px,6vw,72px)] font-black text-white leading-tight tracking-tight mb-6"
         style={{
-          width:          'clamp(160px, 28vw, 260px)',
-          height:         'auto',
-          filter:         'drop-shadow(0 0 28px rgba(212,168,83,0.55))',
-          marginBottom:   32,
-          pointerEvents:  'none',
-          userSelect:     'none',
+          textShadow: '0 4px 60px rgba(212,168,83,0.30)',
+          direction: 'rtl',
         }}
-      />
+      >
+        ملاذك السري بين الجبل والبحر
+      </h1>
+
+      {/* English subtitle */}
+      <p className="text-white/40 text-sm md:text-base max-w-md mb-10">
+        Your secret retreat between mountain and sea
+      </p>
 
       {/* Scroll hint */}
       <motion.div
-        style={{ scale: dotScale }}
+        animate={{ y: [0, 8, 0] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
         className="flex flex-col items-center gap-2"
       >
-        <span className="text-[9px] tracking-[0.28em] text-white/30 uppercase">{hint}</span>
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-0.5 h-8 bg-gradient-to-b from-[#d4a853] to-transparent rounded-full"
-        />
+        <span className="text-[9px] tracking-[0.28em] text-white/25 uppercase">
+          مرر للاستكشاف
+        </span>
+        <div className="w-0.5 h-8 bg-gradient-to-b from-[#d4a853] to-transparent rounded-full" />
       </motion.div>
     </motion.div>
   );
 }
 
-// ─── CTA section (visible at offset 0.80 → 1.00) ─────────────────────────────
-function CtaSection() {
-  const { scrollProgress, lang } = useContext(ShowcaseContext);
+// ─── Text 2: Chalets (scroll 0.22 → 0.42, right-aligned) ─────────────────────
+function ChaletBlock() {
+  const { scrollProgress } = useContext(ShowcaseContext);
 
-  const opacity = useTransform(scrollProgress, [0.80, 0.87, 1.0], [0, 1, 1]);
-  const y       = useTransform(scrollProgress, [0.80, 0.87], ['24px', '0px']);
+  const opacity = useTransform(scrollProgress, [0.22, 0.28, 0.36, 0.44], [0, 1, 1, 0]);
+  const x       = useTransform(scrollProgress, [0.22, 0.28], ['60px', '0px']);
 
-  const title  = lang === 'ar' ? 'إقامتك تنتظرك'     : 'Your Escape Awaits';
-  const sub    = lang === 'ar'
-    ? 'حجز خاص، تجربة حصرية، لحظات لا تُنسى في لبنان'
-    : 'Private reservations, exclusive access, unforgettable moments in Lebanon';
-  const btn    = lang === 'ar' ? 'احجز إقامتك' : 'Book Your Stay';
+  return (
+    <motion.div
+      style={{ opacity, pointerEvents: 'none' }}
+      className="absolute inset-0 flex items-center justify-end px-6 md:px-16"
+    >
+      <motion.div style={{ x, ...GLASS, maxWidth: 420 }}>
+        <p className="text-[10px] tracking-[0.32em] text-[#d4a853] uppercase mb-4 font-semibold">
+          01 — THE CHALETS
+        </p>
+        <h2
+          className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-5"
+          style={{ direction: 'rtl' }}
+        >
+          فخامة الحجر اللبناني الأصيل
+        </h2>
+        <p className="text-white/45 text-sm md:text-[15px] leading-relaxed max-w-sm" style={{ direction: 'rtl' }}>
+          شاليهات من الحجر الطبيعي تطل على البحر الأبيض المتوسط، حيث تراث الجبل يعانق الحداثة.
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Text 3: Pool (scroll 0.48 → 0.68, left-aligned) ─────────────────────────
+function PoolBlock() {
+  const { scrollProgress } = useContext(ShowcaseContext);
+
+  const opacity = useTransform(scrollProgress, [0.48, 0.54, 0.62, 0.70], [0, 1, 1, 0]);
+  const x       = useTransform(scrollProgress, [0.48, 0.54], ['-60px', '0px']);
+
+  return (
+    <motion.div
+      style={{ opacity, pointerEvents: 'none' }}
+      className="absolute inset-0 flex items-center justify-start px-6 md:px-16"
+    >
+      <motion.div style={{ x, ...GLASS, maxWidth: 420 }}>
+        <p className="text-[10px] tracking-[0.32em] text-[#d4a853] uppercase mb-4 font-semibold">
+          02 — POOL & TERRACE
+        </p>
+        <h2
+          className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-5"
+          style={{ direction: 'rtl' }}
+        >
+          استرخاء بلا حدود
+        </h2>
+        <p className="text-white/45 text-sm md:text-[15px] leading-relaxed max-w-sm" style={{ direction: 'rtl' }}>
+          مسبح لا متناهي يندمج مع الأفق. كل لحظة هنا — قهوة الصباح أو غروب الشمس — لوحة سينمائية خالصة.
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Text 4: Grand Finale + CTA (scroll 0.78 → 1.00, centered) ───────────────
+function FinaleBlock() {
+  const { scrollProgress } = useContext(ShowcaseContext);
+
+  const opacity = useTransform(scrollProgress, [0.78, 0.86, 1.0], [0, 1, 1]);
+  const y       = useTransform(scrollProgress, [0.78, 0.86], ['32px', '0px']);
 
   return (
     <motion.div
@@ -207,43 +156,60 @@ function CtaSection() {
       </p>
 
       <h2
-        className="text-[clamp(40px,8vw,100px)] font-black text-white leading-none tracking-tight mb-6"
+        className="text-[clamp(36px,7vw,88px)] font-black text-white leading-none tracking-tight mb-6"
         style={{
           textShadow: '0 4px 60px rgba(212,168,83,0.30)',
-          direction: lang === 'ar' ? 'rtl' : 'ltr',
+          direction: 'rtl',
         }}
       >
-        {title}
+        وجهتك القادمة بانتظارك
       </h2>
 
       <p
-        className="text-white/45 text-sm md:text-base mb-12 max-w-md"
-        style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
+        className="text-white/40 text-sm md:text-base mb-12 max-w-lg"
+        style={{ direction: 'rtl' }}
       >
-        {sub}
+        حجز خاص، تجربة حصرية، لحظات لا تُنسى في قلب جبل لبنان
       </p>
 
+      {/* ── CTA Button — navigates to /smar/listings ── */}
       <motion.a
-        href="/smar/normal"
+        href="/smar/listings"
         whileHover={{ scale: 1.06, boxShadow: '0 14px 60px rgba(212,168,83,0.50)' }}
         whileTap={{ scale: 0.97 }}
         style={{
-          background:     'linear-gradient(135deg, #d4a853 0%, #b8893a 100%)',
-          boxShadow:      '0 8px 40px rgba(212,168,83,0.32)',
-          pointerEvents:  'auto',
-          letterSpacing:  '0.10em',
+          pointerEvents: 'auto',
+          background: 'linear-gradient(135deg, #d4a853 0%, #b8893a 100%)',
+          boxShadow: '0 8px 40px rgba(212,168,83,0.32)',
+          letterSpacing: '0.12em',
           textDecoration: 'none',
-          display:        'inline-block',
-          padding:        '16px 48px',
-          borderRadius:   '50px',
-          fontWeight:     700,
-          fontSize:       13,
-          color:          '#fff',
-          textTransform:  'uppercase',
+          display: 'inline-block',
+          padding: '18px 56px',
+          borderRadius: '50px',
+          fontWeight: 700,
+          fontSize: 15,
+          color: '#fff',
+          textTransform: 'uppercase',
         }}
       >
-        {btn}
+        استكشف الشاليهات
       </motion.a>
+
+      {/* Secondary subtle link */}
+      <a
+        href="/smar/normal"
+        style={{
+          pointerEvents: 'auto',
+          color: 'rgba(212,168,83,0.5)',
+          fontSize: 11,
+          marginTop: 20,
+          letterSpacing: '0.15em',
+          textDecoration: 'none',
+          textTransform: 'uppercase',
+        }}
+      >
+        أو احجز مباشرة ←
+      </a>
     </motion.div>
   );
 }
@@ -251,15 +217,11 @@ function CtaSection() {
 // ─── Default export ───────────────────────────────────────────────────────────
 export default function ShowcaseCards() {
   return (
-    // Fills the fixed overlay — pointer-events managed per child
     <div className="absolute inset-0">
-      <HeroText />
-
-      {CARDS.map((card, i) => (
-        <PropertyCard key={card.id} card={card} timing={TIMINGS[i]} />
-      ))}
-
-      <CtaSection />
+      <HeroBlock />
+      <ChaletBlock />
+      <PoolBlock />
+      <FinaleBlock />
     </div>
   );
 }
