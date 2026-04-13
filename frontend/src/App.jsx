@@ -17,7 +17,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SmarAdminDashboard from './pages/smar/admin/SmarAdminDashboard';
 import Login from './pages/admin/Login';
-import TenantPages from './router/TenantPages';
+import TenantResolver from './router/TenantResolver';
 import { LanguageProvider } from './context/LanguageContext';
 
 function NotFound() {
@@ -65,7 +65,7 @@ function App() {
           <Route path="/404" element={<NotFound />} />
 
           {/* ── Dynamic tenant routes (must be last) ── */}
-          <Route path="/:slug/*" element={<TenantPages />} />
+          <Route path="/:slug/*" element={<TenantResolver />} />
         </Routes>
       </BrowserRouter>
     </LanguageProvider>

@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
 import UnitCalendar from '../../../components/UnitCalendar';
 import UnitFormModal from './UnitFormModal';
+import ActionInbox from './components/ActionInbox';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -215,6 +216,7 @@ function GardensTab() {
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded }) {
   const navItems = [
+    { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'  },
     { id: 'bookings',     icon: '📋', label: 'Reservations'  },
     { id: 'units',        icon: '🏠', label: 'الوحدات'       },
     { id: 'dashboard',    icon: '📊', label: 'Overview'      },
@@ -1648,6 +1650,7 @@ export default function SmarAdminDashboard() {
             </div>
             <h1 style={{ fontSize: 28, fontWeight: 800, color: C.textPri, letterSpacing: '-0.02em' }}>
               {{
+                inbox:        '🛎️ Action Inbox',
                 bookings:     'Reservations',
                 units:        'الوحدات — Unit Management',
                 dashboard:    'Overview',
@@ -1679,6 +1682,7 @@ export default function SmarAdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.18 }}
           >
+            {activeTab === 'inbox'        && <ActionInbox     />}
             {activeTab === 'bookings'     && <BookingsTab     />}
             {activeTab === 'units'        && <UnitsTab        />}
             {activeTab === 'dashboard'    && <OverviewTab     />}
