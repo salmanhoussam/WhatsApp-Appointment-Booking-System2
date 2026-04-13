@@ -14,9 +14,8 @@
  *   /smar  (empty / catch-all)   →  redirect → spatial
  */
 
-import React, { lazy, Suspense }   from 'react';
+import { lazy, Suspense }          from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import SmarPage                    from '../../pages/smar/SmarPage';
 import SpatialHomePage             from '../../pages/smar/spatial/SpatialHomePage';
 import SpatialPropertyDetails      from '../../pages/smar/spatial/SpatialPropertyDetails';
 import SmarAdminDashboard          from '../../pages/smar/admin/SmarAdminDashboard';
@@ -46,9 +45,6 @@ function WebGLFallback() {
 export default function SmarRoutes() {
   return (
     <Routes>
-      {/* ── 3D Scrollytelling home ── */}
-      <Route path="home" element={<SmarPage />} />
-
       {/* ── Cinematic spatial experience ── */}
       <Route path="spatial"               element={<SpatialHomePage />} />
       <Route path="spatial/property/:id"  element={<SpatialPropertyDetails />} />
@@ -81,9 +77,9 @@ export default function SmarRoutes() {
       {/* ── Admin portal ── */}
       <Route path="admin" element={<SmarAdminDashboard />} />
 
-      {/* ── Default & catch-all → home ── */}
-      <Route path=""  element={<Navigate to="home" replace />} />
-      <Route path="*" element={<Navigate to="home" replace />} />
+      {/* ── Default & catch-all → showcase (WebGL gallery entry point) ── */}
+      <Route path=""  element={<Navigate to="showcase" replace />} />
+      <Route path="*" element={<Navigate to="showcase" replace />} />
     </Routes>
   );
 }

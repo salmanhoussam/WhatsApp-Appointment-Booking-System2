@@ -64,7 +64,7 @@ export default function SmarShowcasePage() {
           }}
           dpr={[1, 1.5]}
         >
-          <ScrollControls pages={4} damping={0.2} distance={1.2}>
+          <ScrollControls pages={5} damping={0.18} distance={1.0}>
             <Scene3D onProgress={handleProgress} />
           </ScrollControls>
         </Canvas>
