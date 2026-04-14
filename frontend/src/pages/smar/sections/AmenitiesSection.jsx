@@ -76,7 +76,7 @@ export default function AmenitiesSection() {
         bodyAr="مسبح infinity بلا حدود بصرية، معلّق فوق الوادي. الحرارة المثالية — الصمت المطلق."
         bodyEn="An edge-to-void infinity pool suspended over the valley. Perfect temperature, absolute silence."
         ctaLabel="اكتشف الإقامة — Explore Stays"
-        onCta={() => navigate('/smar/listings')}
+        onCta={() => navigate('/listings')}
         imagePosition="right"
       />
     </div>

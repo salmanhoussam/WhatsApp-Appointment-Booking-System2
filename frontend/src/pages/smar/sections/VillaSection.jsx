@@ -162,7 +162,7 @@ export default function VillaSection() {
 
           {/* CTA button */}
           <button
-            onClick={() => navigate('/smar/listings?type=villa')}
+            onClick={() => navigate('/listings?type=villa')}
             style={{
               background:    'linear-gradient(135deg, #d4a853 0%, #b8892e 100%)',
               border:        'none',

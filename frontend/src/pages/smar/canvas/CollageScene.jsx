@@ -152,7 +152,7 @@ export default function CollageScene() {
 
   const handleBook = () => {
     if (!expanded || !checkIn || !checkOut) return;
-    navigate('/smar/payment', {
+    navigate('/payment', {
       state: {
         formData: { unit_id: expanded.id, check_in: checkIn, check_out: checkOut, guests },
         unit: {
@@ -290,7 +290,7 @@ export default function CollageScene() {
         }}
       >
         <a
-          href="/smar/listings"
+          href="/listings"
           style={{
             fontFamily:     "'Inter', sans-serif",
             fontSize:       '0.6rem',

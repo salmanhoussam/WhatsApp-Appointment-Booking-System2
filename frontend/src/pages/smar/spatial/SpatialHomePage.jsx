@@ -294,7 +294,7 @@ function KineticStation({ imageSrc, flip, label, titleAr, titleEn, bodyAr, bodyE
 
               {/* Explore link */}
               <motion.a
-                href="/smar/listings"
+                href="/listings"
                 whileHover={{ x: 4, color: '#d4a853' }}
                 transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 style={{
@@ -399,7 +399,7 @@ function CtaFooter() {
         </p>
 
         <motion.a
-          href="/smar/listings"
+          href="/listings"
           whileHover={{ scale: 1.06, boxShadow: '0 14px 50px rgba(212,168,83,0.42)' }}
           whileTap={{ scale: 0.97 }}
           style={{

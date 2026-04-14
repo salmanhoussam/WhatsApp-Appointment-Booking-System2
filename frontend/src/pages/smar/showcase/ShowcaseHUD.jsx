@@ -97,8 +97,8 @@ export default function ShowcaseHUD() {
 
   const sectionLabel = SECTIONS[lang][active];
   const loginLabel   = lang === 'ar' ? 'تسجيل الدخول' : 'Login';
-  const listingsHref = '/smar/listings';
-  const categoriesHref = '/smar/listings';
+  const listingsHref   = '/listings';
+  const categoriesHref = '/listings';
 
   return (
     // Outer: pointer-events none so WebGL scroll/drag passes through

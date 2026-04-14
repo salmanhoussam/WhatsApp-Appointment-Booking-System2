@@ -293,7 +293,7 @@ function SeaFinaleBlock() {
 
       {/* ── Primary CTA ── */}
       <motion.a
-        href="/smar/listings"
+        href="/listings"
         whileHover={{ scale: 1.07, boxShadow: '0 16px 64px rgba(212,168,83,0.60)' }}
         whileTap={{ scale: 0.96 }}
         style={{
@@ -316,7 +316,7 @@ function SeaFinaleBlock() {
 
       {/* ── Secondary ── */}
       <a
-        href="/smar/listings"
+        href="/listings"
         style={{
           pointerEvents: 'auto', color: 'rgba(212,168,83,0.45)',
           fontSize: 11, marginTop: 20, letterSpacing: '0.18em',

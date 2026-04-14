@@ -592,7 +592,7 @@ export default function SmarClassicPage() {
       return;
     }
     setModalOpen(false);
-    navigate('/smar/payment', {
+    navigate('/payment', {
       state: {
         formData: { ...formData, check_in: searchDates.checkIn, check_out: searchDates.checkOut, unit_id: selectedUnit.id },
         unit:     selectedUnit,
@@ -618,7 +618,7 @@ export default function SmarClassicPage() {
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <a href="/smar/home" className="text-gray-500 hover:text-gray-900 text-sm font-medium flex items-center gap-1 transition">
+            <a href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium flex items-center gap-1 transition">
               <span className={lang === 'ar' ? 'rotate-180 inline-block' : ''}>←</span>
               {lang === 'ar' ? 'العرض السينمائي' : 'Cinematic View'}
             </a>
@@ -627,7 +627,7 @@ export default function SmarClassicPage() {
             <span className="hidden md:inline text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">Batroun, Lebanon</span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/smar/listings" className="hidden md:inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition font-medium">
+            <a href="/listings" className="hidden md:inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition font-medium">
               {lang === 'ar' ? 'صفحة الشاليهات المتقدمة' : 'Advanced Listings'}
             </a>
             <button onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')} className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full text-sm font-bold transition">
@@ -716,8 +716,8 @@ export default function SmarClassicPage() {
         <footer className="border-t border-gray-100 py-10 mt-10 text-center">
           <p className="text-gray-400 text-sm">© {new Date().getFullYear()} Beit Smar · Batroun, Lebanon</p>
           <div className="flex justify-center gap-6 mt-4">
-            <a href="/smar/home"     className="text-blue-600 text-sm hover:underline">{lang === 'ar' ? 'الرئيسية' : 'Home'}</a>
-            <a href="/smar/listings" className="text-blue-600 text-sm hover:underline">{lang === 'ar' ? 'الوحدات' : 'Listings'}</a>
+            <a href="/"          className="text-blue-600 text-sm hover:underline">{lang === 'ar' ? 'الرئيسية' : 'Home'}</a>
+            <a href="/listings"  className="text-blue-600 text-sm hover:underline">{lang === 'ar' ? 'الوحدات' : 'Listings'}</a>
             <a href={`https://wa.me/96178727986?text=${whatsappMsg}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline">{t.contactUs}</a>
           </div>
         </footer>
