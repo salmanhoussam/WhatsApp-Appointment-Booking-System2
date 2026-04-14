@@ -77,9 +77,11 @@ export default function SmarRoutes() {
       {/* ── Admin portal ── */}
       <Route path="admin" element={<SmarAdminDashboard />} />
 
-      {/* ── Default & catch-all → showcase (WebGL gallery entry point) ── */}
-      <Route path=""  element={<Navigate to="showcase" replace />} />
-      <Route path="*" element={<Navigate to="showcase" replace />} />
+      {/* ── Default & catch-all → showcase (WebGL gallery entry point) ──
+          MUST use absolute path /smar/showcase — relative "showcase" resolves
+          against the current URL and causes an infinite append loop on typos. ── */}
+      <Route path=""  element={<Navigate to="/smar/showcase" replace />} />
+      <Route path="*" element={<Navigate to="/smar/showcase" replace />} />
     </Routes>
   );
 }
