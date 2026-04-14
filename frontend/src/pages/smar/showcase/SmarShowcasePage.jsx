@@ -1,58 +1,51 @@
 /**
- * SmarShowcasePage.jsx  —  DOM-based Cinematic Parallax (v3 — FM12 Safe)
+ * SmarShowcasePage.jsx  —  DOM-based Cinematic Parallax  (v4 — React 19 / FM12 Safe)
  *
- * NO React Three Fiber. NO WebGL. NO custom shaders.
- * Pure Framer Motion + HTML + CSS mask-image feathering.
+ * ─── ARCHITECTURE CHANGE (v4) ───────────────────────────────────────────────────
+ * v3 used Framer Motion MotionValues bound directly to motion.div style props
+ * (e.g. style={{ x: imageX, y: bgY, opacity: contentOpacity }}). In FM 12 +
+ * React 19, FM internally uses useLayoutEffect to subscribe to those values.
+ * React 19's StrictMode double-mount tears those subscriptions down and throws
+ * BEFORE the ErrorBoundary can catch them → white screen.
  *
- * Key fixes over v2:
- *   ● Replaced useScroll({ target, offset }) with useContext(ShowcaseContext)
- *     + pre-calculated scroll fractions — avoids FM 12.x internal scheduler
- *     bug that throws when sectionRef.current is null on first render.
- *   ● Replaced all 'vw' string values in useTransform with numeric px —
- *     FM 12's rewritten mixComplex parser is strict about CSS unit types.
- *   ● Added class-based ErrorBoundary — prevents any child crash from
- *     white-screening the entire app (no ErrorBoundary exists in App.jsx).
+ * v4 removes every MotionValue-driven style binding:
+ *   ● Scroll-driven transforms use useRef + direct DOM mutations (ref.style.X = ...)
+ *     in a passive scroll listener — zero React re-renders, zero FM layout effects.
+ *   ● motion.* is kept ONLY for keyframe animations (animate=) and gesture props
+ *     (whileHover / whileTap) which are safe in React 19.
  *
- * Scroll architecture (500vh total document height, 400vh scrollable):
- *   Section 1  (0vh   → 100vh)  Hero Video      scrollProgress: 0.00 → 0.25
- *   Section 2  (100vh → 300vh)  Villa Station   scrollProgress: 0.25 → 0.50
- *   Section 3  (300vh → 500vh)  Chalet Station  scrollProgress: 0.75 → 1.00
- *
- * Section fractions derived as:
- *   scrollStart = (section_top)              / (docHeight - vpHeight)
- *   scrollEnd   = (section_bottom - vpHeight)/ (docHeight - vpHeight)
- *   Villa:  100/400 = 0.25  →  200/400 = 0.50
- *   Chalet: 300/400 = 0.75  →  400/400 = 1.00
+ * Scroll architecture (500vh total, 400vh scrollable):
+ *   Section 1  Hero Video      0vh  → 100vh   (always visible)
+ *   Section 2  Villa Station   100vh → 300vh   scrollFrac: 0.25 → 0.50
+ *   Section 3  Chalet Station  300vh → 500vh   scrollFrac: 0.75 → 1.00
  */
 
-import React, { useContext, useEffect } from 'react';
-import { useTransform, useMotionValue, motion } from 'framer-motion';
+import React, { useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import ShowcaseHUD from './ShowcaseHUD';
 
-import ShowcaseHUD         from './ShowcaseHUD';
-import { ShowcaseContext } from './ShowcaseContext';
-
-// Re-export for any legacy import still referencing this file
-export { ShowcaseContext };
-
-const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
-
+const BASE      = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
 const VIDEO_URL  = `${BASE}/homepage/Logo_Formation_Video_Ready.mp4`;
 const BG_URL     = `${BASE}/homepage/beitsmar7.jpg`;
 const VILLA_URL  = `${BASE}/homepage/frontveiwvilla.png`;
 const CHALET_URL = `${BASE}/homepage/beitsmar3.jpg`;
 
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
 // ─── Error Boundary ───────────────────────────────────────────────────────────
-// Class component required — React has no hook equivalent for error boundaries.
-// Catches any render error in the showcase tree and shows a graceful fallback
-// instead of white-screening the entire app.
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, message: '' };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(err) {
+    return { hasError: true, message: err?.message || 'unknown error' };
+  }
+
+  componentDidCatch(err, info) {
+    // Visible in the browser console so the exact throw location is clear
+    console.error('[ShowcaseErrorBoundary] caught:', err, info?.componentStack);
   }
 
   render() {
@@ -87,14 +80,14 @@ class ErrorBoundary extends React.Component {
           <a
             href="/listings"
             style={{
-              marginTop:     16,
-              color:         '#d4a853',
-              fontSize:      12,
-              letterSpacing: '0.12em',
-              textDecoration:'none',
-              textTransform: 'uppercase',
-              opacity:       0.65,
-              fontFamily:    "'Inter', sans-serif",
+              marginTop:      16,
+              color:          '#d4a853',
+              fontSize:       12,
+              letterSpacing:  '0.12em',
+              textDecoration: 'none',
+              textTransform:  'uppercase',
+              opacity:        0.65,
+              fontFamily:     "'Inter', sans-serif",
             }}
           >
             Discover Properties →
@@ -108,90 +101,69 @@ class ErrorBoundary extends React.Component {
 
 // ─── Page root ────────────────────────────────────────────────────────────────
 export default function SmarShowcasePage() {
-  const scrollProgress = useMotionValue(0);
-
-  // Drive scrollProgress 0 → 1 over the full scrollable document distance.
-  // 500vh total − 100vh viewport = 400vh scrollable.
-  useEffect(() => {
-    function onScroll() {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      if (max > 0) scrollProgress.set(window.scrollY / max);
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    // Fire once immediately so initial value is correct
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [scrollProgress]);
-
   return (
     <ErrorBoundary>
-      <ShowcaseContext.Provider value={{ scrollProgress }}>
-        <div style={{ background: '#0a0a0f' }}>
+      <div style={{ background: '#0a0a0f' }}>
 
-          {/* ── Fixed HUD: navbar + progress dots ── */}
-          <div style={{
-            position:      'fixed',
-            top:           0,
-            left:          0,
-            right:         0,
-            bottom:        0,
-            zIndex:        50,
-            pointerEvents: 'none',
-          }}>
-            <ShowcaseHUD />
-          </div>
-
-          {/* ── Section 1: Hero Video (0vh → 100vh) ── */}
-          <HeroSection videoUrl={VIDEO_URL} />
-
-          {/* ── Section 2: Villa (100vh → 300vh) — image RIGHT, text LEFT ── */}
-          <KineticStation
-            bgUrl={BG_URL}
-            imageUrl={VILLA_URL}
-            imageAlt="Beit Smar Villa"
-            flip={false}
-            scrollStart={0.25}
-            scrollEnd={0.50}
-            eyebrow="STONE & WOOD HERITAGE"
-            titleAr="التصميم الأصيل"
-            titleEn="Authentic Architecture"
-            bodyAr="مبنية من الحجر البلدي والخشب الأصيل، تجسّد فيلات بيت سمر إرثاً معمارياً عريقاً يمتد عبر الأجيال — حيث تلتقي الطبيعة بأرقى معايير الراحة الحديثة."
-            bodyEn="Built from local stone and aged timber, each villa carries the craftsmanship of mountain heritage — brought to life with contemporary luxury."
-            ctaLabel="اكتشف الفيلا / Explore Villa"
-            ctaHref="/listings?type=villa"
-          />
-
-          {/* ── Section 3: Chalets (300vh → 500vh) — image LEFT, text RIGHT ── */}
-          <KineticStation
-            bgUrl={BG_URL}
-            imageUrl={CHALET_URL}
-            imageAlt="Beit Smar Chalets"
-            flip={true}
-            scrollStart={0.75}
-            scrollEnd={1.00}
-            eyebrow="MOUNTAIN RETREAT"
-            titleAr="الشاليهات الجبلية"
-            titleEn="Mountain Chalets"
-            bodyAr="شاليهات حديثة مستوحاة من روح الجبل — حيث تلتقي الطبيعة بأرقى معايير الراحة والخصوصية الكاملة."
-            bodyEn="Modern chalets inspired by the mountain spirit — where nature meets the finest standards of comfort and absolute privacy."
-            ctaLabel="اكتشف الشاليهات / Explore Chalets"
-            ctaHref="/listings?type=chalet"
-          />
-
+        {/* Fixed HUD — navbar + progress dots (self-contained scroll listener) */}
+        <div style={{
+          position:      'fixed',
+          top:           0,
+          left:          0,
+          right:         0,
+          bottom:        0,
+          zIndex:        50,
+          pointerEvents: 'none',
+        }}>
+          <ShowcaseHUD />
         </div>
-      </ShowcaseContext.Provider>
+
+        {/* Section 1: Hero Video */}
+        <HeroSection videoUrl={VIDEO_URL} />
+
+        {/* Section 2: Villa — image enters from RIGHT, text from LEFT */}
+        <KineticStation
+          bgUrl={BG_URL}
+          imageUrl={VILLA_URL}
+          imageAlt="Beit Smar Villa"
+          flip={false}
+          scrollStart={0.25}
+          scrollEnd={0.50}
+          eyebrow="STONE & WOOD HERITAGE"
+          titleAr="التصميم الأصيل"
+          titleEn="Authentic Architecture"
+          bodyAr="مبنية من الحجر البلدي والخشب الأصيل، تجسّد فيلات بيت سمر إرثاً معمارياً عريقاً يمتد عبر الأجيال — حيث تلتقي الطبيعة بأرقى معايير الراحة الحديثة."
+          bodyEn="Built from local stone and aged timber, each villa carries the craftsmanship of mountain heritage — brought to life with contemporary luxury."
+          ctaLabel="اكتشف الفيلا / Explore Villa"
+          ctaHref="/listings?type=villa"
+        />
+
+        {/* Section 3: Chalets — image enters from LEFT, text from RIGHT */}
+        <KineticStation
+          bgUrl={BG_URL}
+          imageUrl={CHALET_URL}
+          imageAlt="Beit Smar Chalets"
+          flip={true}
+          scrollStart={0.75}
+          scrollEnd={1.00}
+          eyebrow="MOUNTAIN RETREAT"
+          titleAr="الشاليهات الجبلية"
+          titleEn="Mountain Chalets"
+          bodyAr="شاليهات حديثة مستوحاة من روح الجبل — حيث تلتقي الطبيعة بأرقى معايير الراحة والخصوصية الكاملة."
+          bodyEn="Modern chalets inspired by the mountain spirit — where nature meets the finest standards of comfort and absolute privacy."
+          ctaLabel="اكتشف الشاليهات / Explore Chalets"
+          ctaHref="/listings?type=chalet"
+        />
+
+      </div>
     </ErrorBoundary>
   );
 }
 
-// ─────────────────────────────────────────────────────── Section 1: Hero Video
+// ─────────────────────────────────────────────── Section 1 : Hero Video (100vh)
 function HeroSection({ videoUrl }) {
   return (
-    <section style={{
-      position: 'relative',
-      height:   '100vh',
-      overflow: 'hidden',
-    }}>
+    <section style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
       <video
         src={videoUrl}
         autoPlay
@@ -219,7 +191,7 @@ function HeroSection({ videoUrl }) {
         pointerEvents: 'none',
       }} />
 
-      {/* Scroll hint */}
+      {/* Scroll hint — motion.div with animate prop only (safe in React 19) */}
       <div style={{
         position:       'absolute',
         bottom:         32,
@@ -240,6 +212,7 @@ function HeroSection({ videoUrl }) {
         }}>
           Scroll
         </span>
+        {/* animate= keyframe animation — no MotionValue binding, safe in React 19 */}
         <motion.div
           animate={{ y: [0, 9, 0] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -254,22 +227,21 @@ function HeroSection({ videoUrl }) {
   );
 }
 
-// ───────────────────────────────── Section 2 & 3: Kinetic Station (200vh each)
+// ─────────────────────────────────────────── Sections 2 & 3 : Kinetic Station
 /**
- * No useScroll, no useRef, no vw strings.
- * Reads the page-level scrollProgress MotionValue directly from ShowcaseContext.
- * Uses pre-calculated scroll fractions (scrollStart/scrollEnd props) to derive
- * a normalised 0→1 progress for this section.
+ * Scroll-driven parallax using direct DOM mutation (ref.current.style.transform).
  *
- * All translateX values are NUMBERS (px) — FM 12.x handles these perfectly.
+ * NO Framer Motion MotionValues in style props.
+ * NO useLayoutEffect from FM.
+ * Safe with React 19 + StrictMode + FM 12.
  *
- * flip=false → Villa:   image enters from RIGHT (+), text from LEFT (−)
- * flip=true  → Chalet:  image enters from LEFT  (−), text from RIGHT (+)
+ * Each instance attaches its own passive scroll listener which runs outside
+ * React's render cycle — zero state updates on scroll, zero re-renders.
  *
- * "Organic meeting" timing:
- *   Text arrives fully at sp=0.55 (faster)
- *   Image arrives fully at sp=0.85 (slower)
- *   → Text waits in center while image slowly drifts in to meet it.
+ * Timing (same as v3):
+ *   Image  : fully arrived at sectionProgress 0.85 (slower, deliberate)
+ *   Text   : fully arrived at sectionProgress 0.55 (faster, meets image)
+ *   Content: fades in over sectionProgress 0.00 → 0.14
  */
 function KineticStation({
   bgUrl, imageUrl, imageAlt, flip,
@@ -277,37 +249,51 @@ function KineticStation({
   eyebrow, titleAr, titleEn, bodyAr, bodyEn,
   ctaLabel, ctaHref,
 }) {
-  const { scrollProgress } = useContext(ShowcaseContext);
+  const bgRef      = useRef(null);
+  const contentRef = useRef(null);
+  const imageRef   = useRef(null);
+  const textRef    = useRef(null);
 
-  // Normalise page scroll to [0,1] within this section's window.
-  // FM 12 useTransform clamps by default — values outside [scrollStart, scrollEnd]
-  // produce 0 or 1. No { clamp: true } option needed.
-  const sp = useTransform(scrollProgress, [scrollStart, scrollEnd], [0, 1]);
+  useEffect(() => {
+    // Capture viewport width once — parallax is allowed to be slightly off on resize
+    const vpW = window.innerWidth;
 
-  // Capture viewport width once at render time — acceptable for a parallax effect.
-  // window is always defined in Vite (no SSR). Fallback to 1440 for safety.
-  const vpW = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    function tick() {
+      const max  = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const rawSP = window.scrollY / max;
 
-  // ── Image: slow entry (arrives fully at sp=0.85) ──
-  // Numeric px values — FM 12.x handles numbers flawlessly, unlike CSS strings.
-  const imageX = useTransform(
-    sp,
-    [0, 0.85],
-    flip ? [-vpW * 0.92, 0] : [vpW * 0.92, 0],
-  );
+      // Normalise to [0,1] within this section's scroll window
+      const sp = clamp((rawSP - scrollStart) / (scrollEnd - scrollStart), 0, 1);
 
-  // ── Text: fast entry (arrives fully at sp=0.55) ──
-  const textX = useTransform(
-    sp,
-    [0, 0.55],
-    flip ? [vpW * 0.80, 0] : [-vpW * 0.80, 0],
-  );
+      // Derived progress values — clamped sub-ranges
+      const imgProg = clamp(sp / 0.85, 0, 1);  // image: slower
+      const txtProg = clamp(sp / 0.55, 0, 1);  // text:  faster
+      const fadeProg = clamp(sp / 0.14, 0, 1); // fade-in
 
-  // ── Background parallax drift (numeric px) ──
-  const bgY = useTransform(sp, [0, 1], [0, -80]);
+      // X offsets in px (positive = right, negative = left)
+      const imageX = (1 - imgProg) * (flip ? -vpW * 0.92 : vpW * 0.92);
+      const textX  = (1 - txtProg) * (flip ? vpW * 0.80 : -vpW * 0.80);
+      // Background slow parallax in px
+      const bgY    = sp * -80;
 
-  // ── Fade in content ──
-  const contentOpacity = useTransform(sp, [0, 0.14], [0, 1]);
+      if (bgRef.current) {
+        bgRef.current.style.transform = `translateY(${bgY}px)`;
+      }
+      if (contentRef.current) {
+        contentRef.current.style.opacity = String(fadeProg);
+      }
+      if (imageRef.current) {
+        imageRef.current.style.transform = `translateX(${imageX}px)`;
+      }
+      if (textRef.current) {
+        textRef.current.style.transform = `translateX(${textX}px)`;
+      }
+    }
+
+    window.addEventListener('scroll', tick, { passive: true });
+    tick(); // set initial positions synchronously before first paint of this section
+    return () => window.removeEventListener('scroll', tick);
+  }, [scrollStart, scrollEnd, flip]); // stable values — effect runs once
 
   return (
     <section style={{ height: '200vh', position: 'relative' }}>
@@ -318,8 +304,9 @@ function KineticStation({
         overflow: 'hidden',
       }}>
 
-        {/* ── Parallax background ── */}
-        <motion.div
+        {/* ── Parallax background (direct DOM mutation via ref) ── */}
+        <div
+          ref={bgRef}
           style={{
             position:           'absolute',
             top:                '-18%',
@@ -329,7 +316,6 @@ function KineticStation({
             backgroundImage:    `url(${bgUrl})`,
             backgroundSize:     'cover',
             backgroundPosition: 'center',
-            y:                  bgY,
             willChange:         'transform',
           }}
         />
@@ -355,8 +341,9 @@ function KineticStation({
           pointerEvents: 'none',
         }} />
 
-        {/* ── Content layer ── */}
-        <motion.div
+        {/* ── Content wrapper — opacity driven by scroll (starts hidden) ── */}
+        <div
+          ref={contentRef}
           style={{
             position:       'absolute',
             top:            0,
@@ -368,18 +355,18 @@ function KineticStation({
             justifyContent: 'center',
             gap:            'clamp(24px, 5vw, 72px)',
             padding:        '0 clamp(24px, 6vw, 80px)',
-            opacity:        contentOpacity,
+            opacity:        0, // updated by scroll listener
           }}
         >
 
-          {/* Image with CSS mask soft-edge feathering */}
-          <motion.div
+          {/* Image — slide in, soft radial mask */}
+          <div
+            ref={imageRef}
             style={{
               flex:            flip ? '0 0 48%' : '0 0 46%',
               maxHeight:       '72vh',
               aspectRatio:     '4/3',
               order:           flip ? 1 : 2,
-              x:               imageX,
               willChange:      'transform',
               borderRadius:    14,
               overflow:        'hidden',
@@ -397,15 +384,15 @@ function KineticStation({
                 display:   'block',
               }}
             />
-          </motion.div>
+          </div>
 
           {/* Text panel */}
-          <motion.div
+          <div
+            ref={textRef}
             style={{
               flex:       '0 0 38%',
               minWidth:   0,
               order:      flip ? 2 : 1,
-              x:          textX,
               willChange: 'transform',
             }}
           >
@@ -479,7 +466,10 @@ function KineticStation({
               {bodyEn}
             </p>
 
-            {/* CTA */}
+            {/*
+              CTA — whileHover / whileTap use FM gesture state,
+              NOT MotionValue style bindings. Safe in React 19.
+            */}
             <motion.a
               href={ctaHref}
               whileHover={{
@@ -507,9 +497,9 @@ function KineticStation({
             >
               {ctaLabel}
             </motion.a>
-          </motion.div>
+          </div>
 
-        </motion.div>
+        </div>
       </div>
     </section>
   );
