@@ -7,9 +7,10 @@
  */
 
 import { useState, useEffect }              from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence }          from 'framer-motion';
 import publicApi                            from '../../../utils/publicApi';
+import useTenantSlug                        from '../../../utils/useTenantSlug';
 import SmarWhatsAppButton                   from '../ui/SmarWhatsAppButton';
 
 // ── Tokens — Sunlit Heritage Light Theme ─────────────────────────────────────
@@ -212,7 +213,7 @@ function SuccessScreen({ lang, slug, navigate }) {
 export default function SmarPaymentPage() {
   const location   = useLocation();
   const navigate   = useNavigate();
-  const { slug }   = useParams();
+  const slug       = useTenantSlug();
 
   const {
     formData         = {},

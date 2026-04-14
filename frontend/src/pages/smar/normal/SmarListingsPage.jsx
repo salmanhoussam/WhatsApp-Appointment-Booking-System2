@@ -8,10 +8,11 @@
  */
 
 import { useState, useEffect }       from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion }   from 'framer-motion';
 
 import publicApi          from '../../../utils/publicApi';
+import useTenantSlug      from '../../../utils/useTenantSlug';
 import SmarUnitModal      from '../ui/SmarUnitModal';
 import SmarBookingDrawer  from '../ui/SmarBookingDrawer';
 import SmarWhatsAppButton from '../ui/SmarWhatsAppButton';
@@ -219,7 +220,7 @@ function TypePill({ filter, active, onClick, lang }) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function SmarListingsPage() {
-  const { slug }                   = useParams();
+  const slug                       = useTenantSlug();
   const navigate                   = useNavigate();
   const [searchParams]             = useSearchParams();
 
