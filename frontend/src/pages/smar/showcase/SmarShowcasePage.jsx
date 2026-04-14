@@ -13,13 +13,17 @@
  *   → consumed by ShowcaseHUD for progress dots + section label
  */
 
-import { createContext, useRef, useEffect } from 'react';
+import { useRef, useEffect }  from 'react';
 import {
   useScroll, useTransform,
-  useMotionValue, motion, motionValue,
+  useMotionValue, motion,
 } from 'framer-motion';
 
-import ShowcaseHUD from './ShowcaseHUD';
+import ShowcaseHUD          from './ShowcaseHUD';
+import { ShowcaseContext }  from './ShowcaseContext';
+
+// Re-export so any legacy import from this file still resolves
+export { ShowcaseContext };
 
 const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
 
@@ -27,10 +31,6 @@ const VIDEO_URL  = `${BASE}/homepage/Logo_Formation_Video_Ready.mp4`;
 const BG_URL     = `${BASE}/homepage/beitsmar7.jpg`;
 const VILLA_URL  = `${BASE}/homepage/frontveiwvilla.png`;
 const CHALET_URL = `${BASE}/homepage/beitsmar3.jpg`;
-
-// ─── Shared context (ShowcaseHUD reads this) ─────────────────────────────────
-const _fallback = motionValue(0);
-export const ShowcaseContext = createContext({ scrollProgress: _fallback });
 
 // ─── Page root ────────────────────────────────────────────────────────────────
 export default function SmarShowcasePage() {
@@ -211,7 +211,10 @@ function KineticStation({
         <motion.div
           style={{
             position:           'absolute',
-            inset:              '-18%',   // extra bleed prevents white edge during drift
+            top:                '-18%',   // explicit props — avoids CSS shorthand
+            right:              '-18%',   // parsing issues in some bundler configs
+            bottom:             '-18%',
+            left:               '-18%',
             backgroundImage:    `url(${bgUrl})`,
             backgroundSize:     'cover',
             backgroundPosition: 'center',

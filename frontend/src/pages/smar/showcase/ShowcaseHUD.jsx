@@ -19,7 +19,7 @@
 import { useContext, useState }        from 'react';
 import { motion, useTransform,
          useMotionValueEvent }         from 'framer-motion';
-import { ShowcaseContext }             from './SmarShowcasePage';
+import { ShowcaseContext }             from './ShowcaseContext';
 import { useLanguage }                 from '../../../context/LanguageContext';
 
 // ─── Section metadata ─────────────────────────────────────────────────────────

@@ -1293,74 +1293,84 @@ phases:
           All animation via Framer Motion + CSS. No external timer libraries.
 
   # ══════════════════════════════════════════════════════════════════════════
-  # PHASE 30: Cinematic WebGL Homepage (Z-Axis Scrolling)
-  # The immersive "Beit Smar" landing — scroll drives the camera through
-  # a Z-axis corridor of scenes. R3F + Drei ScrollControls + Fog.
+  # PHASE 30: Showcase Page (WebGL → DOM Cinematic Pivot)
+  #
+  # ORIGINAL PLAN: R3F Z-axis drone corridor + ParticleCorridor + shaders
+  # OUTCOME: Visually disastrous on deployed build
+  #   - Yellow circle in viewport center (ParticleCorridor pointsMaterial)
+  #   - Flying gold squares (2500 WebGL <points> with sizeAttenuation)
+  #   - GLSL soft-edge shaders produced dirty black smudges (not transparency)
+  #   - White screen crash after DOM refactor (circular import bug)
+  #
+  # PIVOT (2026-04-15 — Phase 30.1): Scrapped ALL R3F/drei/Three.js code.
+  # Rebuilt as pure DOM + Framer Motion + CSS mask-image.
   # ══════════════════════════════════════════════════════════════════════════
 
   - id: 30
-    name: "Cinematic WebGL Homepage (Z-Axis Scrolling)"
+    name: "Showcase Page — Cinematic DOM Parallax (Post-WebGL Pivot)"
     description: |
-      Awwwards-level immersive homepage for the smar tenant.
-      The camera moves along the negative Z-axis as the user scrolls (0→500vh).
-      Each "scene" is a large plane positioned at a different Z depth, so the user
-      flies through a corridor of cinematic imagery — mountain → chalets → pool → sea.
-      React Three Fiber <Canvas> with Drei <ScrollControls pages={5} damping={0.15}>.
-      THREE.Fog fades far planes to black; each scene materialises as the camera approaches.
+      Pure DOM-based cinematic parallax. No WebGL. No canvas. No particles.
+      500vh scroll space: 100vh hero video + 2× 200vh KineticStation sections.
+      CSS mask-image for soft-edge feathering (zero shader overhead).
+      Framer Motion useScroll + useTransform for all animations.
     depends_on: [8]
     tasks:
-      - id: 30.1
-        name: "Z-Axis Scene Corridor — Architecture & Asset Placement"
-        file: "src/pages/smar/showcase/SmarShowcasePage.jsx"
-        status: TODO
+      - id: 30.0
+        name: "[SCRAPPED] Z-Axis WebGL Corridor — R3F + Drei + Particles"
+        file: "src/pages/smar/showcase/Scene3D.jsx (DELETED)"
+        status: SCRAPPED
         details: |
-          Tech stack:
-            - React Three Fiber (<Canvas>)
-            - @react-three/drei: ScrollControls, useScroll, useTexture, Html
-            - THREE.Fog(#0a0a0f, near, far) — fades distant planes to black
-            - @react-three/postprocessing: Bloom + Vignette + ChromaticAberration
+          Originally planned R3F approach. Failures encountered on deploy:
+            - ParticleCorridor: 2500 gold <points> rendered as yellow circle + flying squares
+            - SoftImageMaterial GLSL: dirty black smudges instead of soft transparency
+            - Circular import: ShowcaseContext undefined in Rollup lazy chunk → white screen
+          Files deleted: showcase/Scene3D.jsx, showcase/ShowcaseCards.jsx
+          Root cause of white screen: ShowcaseContext imported from SmarShowcasePage
+          inside ShowcaseHUD created a circular dep. Rollup lazy chunks served the
+          partial (uninitialized) export → ShowcaseContext = undefined → useContext(undefined)
+          throws → React unmounts tree → white screen.
+          Fix: extracted ShowcaseContext to standalone ShowcaseContext.js.
 
-          Camera path (driven by useScroll().offset in useFrame):
-            camera.position.z = lerp(0, -30, scrollOffset)
-            camera.lookAt(0, 0, camera.position.z - 10)
+      - id: 30.1
+        name: "DOM Cinematic Refactor — Framer Motion + CSS Masks + Hero Video"
+        file: "src/pages/smar/showcase/SmarShowcasePage.jsx"
+        status: done
+        details: |
+          Tech stack: React + Framer Motion + CSS mask-image ONLY.
+          Zero WebGL. Zero canvas. Zero R3F.
 
-          Scene layout (PlaneGeometry textured, positioned along Z):
+          Architecture (500vh total):
+            Section 1 — HeroSection (100vh)
+              Full-screen <video autoPlay muted loop playsInline> object-cover
+              URL: .../homepage/Logo_Formation_Video_Ready.mp4
+              Gold animated scroll hint (Framer Motion bounce)
+              ShowcaseHUD (fixed, z:50) overlaid via ShowcaseContext
 
-            SCENE 1 — THE MOUNTAIN (z: 0 to z: -5)
-              Background: <video> element scroll-scrubbed OR autoplay loop
-              URL: https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/Mountain%20veiw.mp4
-              HTML overlay: Hero title "بيت سمار" + scroll hint
-              smar_ring.png spins at z:0, shrinks to top-left by z:-5
+            Section 2 — Villa KineticStation (200vh sticky)
+              Sticky inner div (top:0, height:100vh, overflow:hidden)
+              BG: beitsmar7.jpg with parallax drift y: 0%→-16%
+              Image: frontveiwvilla.png — enters from RIGHT (x: 92vw→0, at progress 0.85)
+              Text panel — enters from LEFT (x: -80vw→0, at progress 0.55)
+              CSS mask: radial-gradient(ellipse at center, black 48%, transparent 100%)
+              CTA → /listings?type=villa
 
-            SCENE 2 — THE CHALETS (z: -8 to z: -14)
-              PlaneGeometry (12×8) with texture:
-              URL: https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/smar-showcase/chalet-top-view.jpeg
-              Glassmorphism HTML card (Drei <Html>): title + description
-              Slight Y-axis tilt for depth feel
+            Section 3 — Chalet KineticStation (200vh sticky)
+              Image: beitsmar3.jpg — enters from LEFT (x: -92vw→0, at progress 0.85)
+              Text panel — enters from RIGHT (x: 80vw→0, at progress 0.55)
+              CTA → /listings?type=chalet
 
-            SCENE 3 — THE POOL (z: -16 to z: -22)
-              PlaneGeometry (14×9) with texture:
-              URL: https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/pool.png
-              Glassmorphism HTML card: pool amenities description
-              Gold particle burst around this plane
+          "Organic meeting" effect:
+            Text arrives at 0.55 (faster), image at 0.85 (slower).
+            Text waits in center — image slowly drifts in to meet it.
 
-            SCENE 4 — THE FINALE / SEA VIEW (z: -24 to z: -30)
-              PlaneGeometry (16×10) with texture:
-              URL: https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar3.jpg
-              Full CTA overlay: "إقامتك تنتظرك" + gold "Book Now" button
-              Bloom intensity ramps up for cinematic finale glow
+          Context architecture (circular import fix):
+            ShowcaseContext extracted to ShowcaseContext.js (standalone).
+            SmarShowcasePage imports from ./ShowcaseContext + re-exports it.
+            ShowcaseHUD imports from ./ShowcaseContext (no circular dep).
 
-          Transition technique between scenes:
-            - THREE.Fog makes distant scenes invisible until camera approaches
-            - Each plane's material.opacity driven by distance to camera
-            - Framer Motion useTransform on HTML overlays for text entrance
-            - Gold particle field (3000 points) rotates slowly throughout
-
-          Performance guardrails:
-            - Canvas dpr: [1, 1.5] — no 2x on mobile
-            - Textures loaded at max 1920px width
-            - ChromaticAberration desktop-only (innerWidth > 1024)
-            - Videos: preload="metadata", lazy buffering
+          CSS safety — inset shorthand avoided:
+            top/right/bottom/left: '-18%' used explicitly on parallax bg div.
+            Avoids Framer Motion / React style shorthand parsing issues.
 
   # ══════════════════════════════════════════════════════════════════════════
   # ملاحظات تقنية عامة
