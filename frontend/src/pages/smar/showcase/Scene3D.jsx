@@ -1,109 +1,122 @@
 /**
- * Scene3D.jsx  —  2.5D Kinetic Parallax Experience
+ * Scene3D.jsx  —  Option C: Cinematic Spatial Diorama
  *
- * Two-depth-plane architecture (no terrain):
+ * A drone flies through an elegant dark void where 3 floating stations
+ * are placed at their exact real-world map coordinates.
  *
- *   z: −30   BackgroundPlane  — vast sea/mountain panorama, slow Y drift (0 → −3)
- *   z: −10   VillaSubject     — transparent PNG cutout, slides up from y:−12 → −0.5
- *                               over scroll s: 0.05 → 0.55, scale 0.80 → 1.0
+ *   No terrain. No wireframe. Just darkness, gold dust, and floating art.
  *
- * Camera stays fixed at [0, y, 5] — very slight Y rise with scroll.
- * Parallax depth comes from the two planes being at different Z values
- * and moving at different vertical rates.
+ * Station layout (from client satellite map):
+ *   z:   0   Station 1 — Villas       RIGHT  (x: +4, y: +1)
+ *   z: -15   Station 2 — Pool/Café    CENTER (x:  0, y:  0)
+ *   z: -30   Station 3 — Chalets      LEFT   (x: -4, y: -1)
+ *   z: -50   Finale    — Sea Horizon  MASSIVE background plane
  *
- * Gold particle field adds atmosphere between the layers.
+ * Camera drone path:
+ *   Z: +10 → -45   (55-unit flight)
+ *   X: sways right (Villas) → center (Pool) → left (Chalets) → center
+ *   Y: gentle descent 2 → 0
+ *
+ * Soft-edge shader:
+ *   Each station image fades smoothly into the void via a UV-space
+ *   rectangular vignette (hFade × vFade smoothstep). No hard squares.
  */
 
 import { useRef, useMemo, useEffect } from 'react';
-import { useFrame, useThree }         from '@react-three/fiber';
-import { useScroll, Image }           from '@react-three/drei';
-import * as THREE                     from 'three';
+import { useFrame, useThree, extend } from '@react-three/fiber';
+import { useScroll, useTexture, shaderMaterial } from '@react-three/drei';
+import * as THREE from 'three';
 
 // ─── Asset URLs ───────────────────────────────────────────────────────────────
 const ASSETS = {
-  background: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar7.jpg',
-  villa:      'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/frontveiwvilla.png',
+  villas:  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/frontveiwvilla.png',
+  pool:    'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/pool.png',
+  chalets: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/smar-showcase/chalet-top-view.jpeg',
+  sea:     'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar7.jpg',
 };
 
-// ─── Smoothstep easing ────────────────────────────────────────────────────────
-function smoothstep(t) {
-  const c = Math.max(0, Math.min(1, t));
-  return c * c * (3 - 2 * c);
-}
+// ─── Soft-Edge Shader Material ────────────────────────────────────────────────
+// UV-space rectangular vignette: edges dissolve into the dark void.
+// hFade = horizontal edge ramp, vFade = vertical edge ramp, combined via multiply.
+const SoftImageMaterial = shaderMaterial(
+  { map: new THREE.Texture(), uOpacity: 1.0 },
 
-// ─── Deep Background Panorama ─────────────────────────────────────────────────
-// Massive sea/mountain image at z:−30.
-// Drifts down slowly (0 → −3) as user scrolls — creates a strong sense of depth.
-function BackgroundPlane() {
-  const groupRef = useRef();
-  const scroll   = useScroll();
+  /* ── vertex ── */
+  `varying vec2 vUv;
+   void main() {
+     vUv = uv;
+     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+   }`,
 
-  useFrame(() => {
-    if (!groupRef.current) return;
-    const s = scroll.offset;
-    groupRef.current.position.y = THREE.MathUtils.lerp(0, -3, s);
-  });
+  /* ── fragment ── */
+  `uniform sampler2D map;
+   uniform float      uOpacity;
+   varying vec2       vUv;
+
+   void main() {
+     vec4  tex    = texture2D(map, vUv);
+     // Soft edge amount — 0.20 gives a gentle 20% fade band on each side
+     float edge   = 0.20;
+     float hFade  = smoothstep(0.0,  edge,        vUv.x)
+                  * smoothstep(1.0,  1.0 - edge,  vUv.x);
+     float vFade  = smoothstep(0.0,  edge,        vUv.y)
+                  * smoothstep(1.0,  1.0 - edge,  vUv.y);
+     float fade   = hFade * vFade;
+     gl_FragColor = vec4(tex.rgb, tex.a * fade * uOpacity);
+   }`,
+);
+extend({ SoftImageMaterial });
+
+// ─── Floating Station ─────────────────────────────────────────────────────────
+// Plane geometry at 3D map coordinates with the soft-edge shader applied.
+function FloatingStation({ url, position, size }) {
+  const texture = useTexture(url);
+  const [w, h]  = size;
 
   return (
-    <group ref={groupRef} position={[0, 0, -30]}>
-      <Image
-        url={ASSETS.background}
-        scale={[35, 20]}
-        toneMapped={false}
+    <mesh position={position}>
+      <planeGeometry args={[w, h, 1, 1]} />
+      <softImageMaterial
+        map={texture}
+        uOpacity={1.0}
+        transparent
+        depthWrite={false}
       />
-    </group>
+    </mesh>
   );
 }
 
-// ─── Villa Foreground Cutout ──────────────────────────────────────────────────
-// Transparent PNG — kinetic slide-up from below the viewport.
-// s 0.05 → 0.55 : y lerp −12 → −0.5, scale lerp 0.80 → 1.0  (smoothstepped)
-function VillaSubject() {
-  const groupRef = useRef();
-  const scroll   = useScroll();
-
-  useFrame(() => {
-    if (!groupRef.current) return;
-    const s = scroll.offset;
-    const t = smoothstep((s - 0.05) / 0.50); // clamps to [0,1]
-
-    groupRef.current.position.y = THREE.MathUtils.lerp(-12, -0.5, t);
-    const sc = THREE.MathUtils.lerp(0.80, 1.0, t);
-    groupRef.current.scale.setScalar(sc);
-  });
-
+// ─── Background Sea Panorama ──────────────────────────────────────────────────
+// Massive hard-edge plane at journey's end — it IS the horizon, so it
+// should fill the viewport completely. No edge fade needed.
+function BackgroundSea() {
+  const texture = useTexture(ASSETS.sea);
   return (
-    <group ref={groupRef} position={[0, -12, -10]}>
-      <Image
-        url={ASSETS.villa}
-        scale={[16, 9]}
-        transparent={true}
-        toneMapped={false}
-      />
-    </group>
+    <mesh position={[0, 0, -50]}>
+      <planeGeometry args={[72, 40, 1, 1]} />
+      <meshBasicMaterial map={texture} toneMapped={false} />
+    </mesh>
   );
 }
 
-// ─── Gold Particle Field ──────────────────────────────────────────────────────
-// Atmospheric dust suspended between the two depth planes.
-function ParticleField() {
-  const COUNT = 2200;
+// ─── Gold Particle Corridor ───────────────────────────────────────────────────
+// 2 500 gold dust motes distributed along the full 55-unit flight path.
+function ParticleCorridor() {
+  const COUNT = 2500;
   const ref   = useRef();
 
   const positions = useMemo(() => {
     const pos = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
-      pos[i * 3]     = (Math.random() - 0.5) * 28; // X ±14
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 18; // Y ±9
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 20 - 12; // Z −22 → −2
+      pos[i * 3]     = (Math.random() - 0.5) * 24; // X ±12
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 14; // Y ±7
+      pos[i * 3 + 2] = 12 - Math.random() * 68;    // Z +12 → -56
     }
     return pos;
   }, []);
 
   useFrame(({ clock }) => {
-    if (ref.current) {
-      ref.current.rotation.y = clock.getElapsedTime() * 0.006;
-    }
+    if (ref.current) ref.current.rotation.z = clock.getElapsedTime() * 0.005;
   });
 
   return (
@@ -117,10 +130,10 @@ function ParticleField() {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.025}
+        size={0.028}
         color="#d4a853"
         transparent
-        opacity={0.28}
+        opacity={0.30}
         sizeAttenuation
         depthWrite={false}
       />
@@ -128,33 +141,52 @@ function ParticleField() {
   );
 }
 
-// ─── Scene Fog & Background ───────────────────────────────────────────────────
+// ─── Scene Environment (fog + bg) ────────────────────────────────────────────
 function SceneEnvironment() {
   const { scene } = useThree();
-
   useEffect(() => {
-    scene.fog        = new THREE.FogExp2('#0a0a0f', 0.018);
+    scene.fog        = new THREE.FogExp2('#0a0a0f', 0.022);
     scene.background = new THREE.Color('#0a0a0f');
-    return () => {
-      scene.fog        = null;
-      scene.background = null;
-    };
+    return () => { scene.fog = null; scene.background = null; };
   }, [scene]);
-
   return null;
 }
 
-// ─── Camera Rig ───────────────────────────────────────────────────────────────
-// Stays fixed at z:5 — very slight Y rise with scroll (0 → 0.8).
-// Parallax is entirely from the two planes, not the camera moving.
+// ─── Drone Camera Rig ─────────────────────────────────────────────────────────
+// Z: +10 → -45 (55 units, maps to scroll 0→1)
+//
+// X sway toward the active station:
+//   s ≈ 0.18  Villas  (x:+4)  → lean RIGHT  (+0.9)
+//   s ≈ 0.45  Pool    (x: 0)  → CENTER
+//   s ≈ 0.73  Chalets (x:-4)  → lean LEFT   (−0.9)
+//   s = 1.00  Finale          → CENTER
+//
+// Y: subtle descent 2.0 → 0 (feels like a real drone dip on approach)
 function CameraRig({ onProgress }) {
   const scroll = useScroll();
 
   useFrame(({ camera }) => {
     const s = scroll.offset;
     onProgress(s);
-    camera.position.set(0, THREE.MathUtils.lerp(0, 0.8, s), 5);
-    camera.lookAt(0, 0, 0);
+
+    // ── Z: steady forward flight ──
+    camera.position.z = THREE.MathUtils.lerp(10, -45, s);
+
+    // ── Y: gentle drone dip ──
+    camera.position.y = THREE.MathUtils.lerp(2.0, 0.0, Math.min(s * 1.6, 1));
+
+    // ── X: cinematic sway toward each station ──
+    if      (s < 0.18) camera.position.x = THREE.MathUtils.lerp(0,    0.9,  s / 0.18);
+    else if (s < 0.45) camera.position.x = THREE.MathUtils.lerp(0.9,  0,   (s - 0.18) / 0.27);
+    else if (s < 0.73) camera.position.x = THREE.MathUtils.lerp(0,   -0.9, (s - 0.45) / 0.28);
+    else               camera.position.x = THREE.MathUtils.lerp(-0.9, 0,   (s - 0.73) / 0.27);
+
+    // ── Look slightly ahead and slightly upward ──
+    camera.lookAt(
+      camera.position.x * 0.25,
+      camera.position.y * 0.35,
+      camera.position.z - 8,
+    );
   });
 
   return null;
@@ -167,23 +199,45 @@ export default function Scene3D({ onProgress }) {
       <CameraRig    onProgress={onProgress} />
       <SceneEnvironment />
 
-      {/* ── Lighting ── */}
-      <ambientLight intensity={0.15} />
-      {/* Warm gold wash — lights the villa from above-right */}
-      <pointLight position={[5,  8,  0]}  color="#d4a853" intensity={3.5} distance={40} />
-      {/* Cool blue accent — mountain side */}
-      <pointLight position={[-4, 6, -5]}  color="#4466cc" intensity={1.5} distance={35} />
-      {/* Soft fill — keeps villa visible against dark bg */}
-      <pointLight position={[0,  4, -8]}  color="#ffffff"  intensity={2.0} distance={30} />
-      {/* Hemisphere: warm sky / cool ground */}
-      <hemisphereLight args={['#1a1108', '#060610', 0.25]} />
+      {/* ── Lighting ────────────────────────────────────────────── */}
+      <ambientLight intensity={0.12} />
+      {/* Warm gold wash — villa entrance */}
+      <pointLight position={[4,  5,  2]}  color="#d4a853" intensity={5.0} distance={30} />
+      {/* Neutral fill — pool/cafeteria */}
+      <pointLight position={[0,  3, -14]} color="#ffffff"  intensity={3.0} distance={28} />
+      {/* Cool blue — mountain/chalet side */}
+      <pointLight position={[-4, 3, -28]} color="#4466cc" intensity={3.0} distance={28} />
+      {/* Grand flood — sea horizon finale */}
+      <pointLight position={[0,  5, -46]} color="#ffffff"  intensity={6.0} distance={36} />
+      {/* Warm sky / cool earth */}
+      <hemisphereLight args={['#1a1108', '#060610', 0.30]} />
 
-      {/* ── 2.5D Depth Layers ── */}
-      <BackgroundPlane />   {/* z: −30 — drifts down slowly */}
-      <VillaSubject />      {/* z: −10 — kinetic slide-up   */}
+      {/* ══ Station 1: Villas — RIGHT (x:+4, z:0) ══════════════════ */}
+      <FloatingStation
+        url={ASSETS.villas}
+        position={[4, 1, 0]}
+        size={[9, 5.5]}
+      />
 
-      {/* ── Atmospheric particles ── */}
-      <ParticleField />
+      {/* ══ Station 2: Pool / Cafeteria — CENTER (x:0, z:-15) ══════ */}
+      <FloatingStation
+        url={ASSETS.pool}
+        position={[0, 0, -15]}
+        size={[9, 5.5]}
+      />
+
+      {/* ══ Station 3: Chalets — LEFT (x:-4, z:-30) ════════════════ */}
+      <FloatingStation
+        url={ASSETS.chalets}
+        position={[-4, -1, -30]}
+        size={[9, 5.5]}
+      />
+
+      {/* ══ Finale: Sea Horizon — MASSIVE backdrop (z:-50) ═════════ */}
+      <BackgroundSea />
+
+      {/* ── Gold dust corridor ─────────────────────────────────────── */}
+      <ParticleCorridor />
     </>
   );
 }
