@@ -46,7 +46,7 @@ export const translations = {
     eyebrow:      'Lebanon · Mountain Retreat',
     title:        'Beit Smar',
     description:  'Where the mountain meets the Mediterranean — a private estate carved in Lebanese stone, designed for those who seek silence, luxury, and the scent of pine at dawn.',
-    scroll:       'Scroll',
+    scroll:       'Scroll down',
 
     // Timeline section header
     timeline_sub:   'Discover the Estate',
