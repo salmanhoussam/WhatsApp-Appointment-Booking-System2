@@ -14,7 +14,7 @@
  *   /smar  (empty / catch-all)   →  redirect → spatial
  */
 
-import React, { lazy, Suspense }   from 'react';
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import SpatialHomePage             from '../../pages/smar/spatial/SpatialHomePage';
 import SpatialPropertyDetails      from '../../pages/smar/spatial/SpatialPropertyDetails';
@@ -23,9 +23,11 @@ import SmarListingsPage            from '../../pages/smar/normal/SmarListingsPag
 import SmarPaymentPage             from '../../pages/smar/normal/SmarPaymentPage';
 import SmarClassicPage             from '../../pages/smar/normal/SmarClassicPage';
 
+// ShowcaseTemplate — new pure-DOM architecture (no WebGL, no FM MotionValue bindings)
+import ShowcaseTemplate from '../../templates/ShowcaseTemplate';
+
 // Heavy WebGL pages — lazy to keep chunk size small
-const SmarShowcasePage = lazy(() => import('../../pages/smar/showcase/SmarShowcasePage'));
-const SmarLiquidRing   = lazy(() => import('../../pages/smar/showcase/SmarLiquidRing'));
+const SmarLiquidRing = lazy(() => import('../../pages/smar/showcase/SmarLiquidRing'));
 
 // ── Gold-dot loading fallback ─────────────────────────────────────────────────
 function WebGLFallback() {
@@ -42,56 +44,6 @@ function WebGLFallback() {
   );
 }
 
-// ── Outer error boundary — catches crashes inside SmarShowcasePage itself ─────
-// The ErrorBoundary inside SmarShowcasePage only covers its children.
-// This outer boundary catches errors in SmarShowcasePage's own render / hooks.
-class ShowcaseRouteErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(err, info) {
-    console.error('[ShowcaseRoute] render crash:', err?.message, info?.componentStack);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{
-          width: '100vw', height: '100vh', background: '#0a0a0f',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 16,
-        }}>
-          <div style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: '#d4a853', boxShadow: '0 0 18px 4px rgba(212,168,83,0.5)',
-          }} />
-          <span style={{
-            color: 'rgba(255,255,255,0.25)', fontSize: 11,
-            letterSpacing: '0.2em', textTransform: 'uppercase',
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            Beit Smar
-          </span>
-          <a href="/listings" style={{
-            marginTop: 16, color: '#d4a853', fontSize: 12,
-            letterSpacing: '0.12em', textDecoration: 'none',
-            textTransform: 'uppercase', opacity: 0.65,
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            Discover Properties →
-          </a>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export default function SmarRoutes() {
   return (
@@ -100,17 +52,8 @@ export default function SmarRoutes() {
       <Route path="spatial"               element={<SpatialHomePage />} />
       <Route path="spatial/property/:id"  element={<SpatialPropertyDetails />} />
 
-      {/* ── WebGL immersive showcase ── */}
-      <Route
-        path="showcase"
-        element={
-          <ShowcaseRouteErrorBoundary>
-            <Suspense fallback={<WebGLFallback />}>
-              <SmarShowcasePage />
-            </Suspense>
-          </ShowcaseRouteErrorBoundary>
-        }
-      />
+      {/* ── Showcase — pure DOM template (KineticSection + TenantHero) ── */}
+      <Route path="showcase" element={<ShowcaseTemplate />} />
 
       {/* ── Liquid ring hero ── */}
       <Route

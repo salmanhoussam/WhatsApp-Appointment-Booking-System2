@@ -1407,3 +1407,459 @@ technical_decisions:
   whatsapp:
     placeholder: "9611234567 في CollageScene — يحتاج الرقم الحقيقي قبل production"
     auto_send:   "BackgroundTask يُرسل تأكيد WhatsApp بعد كل حجز ناجح"
+
+
+  # ══════════════════════════════════════════════════════════════════════════
+  #t { id, name_ar, name_en, price, image_url, type, available }
+            يُظهر: صورة + اسم (حسب lang) + PriceTag + Badge + Button
+
+          DateRangePicker.jsx
+            props: checkIn, checkOut, onChange(dates)
+            validation: checkOut > checkIn + minimum 1 night
+
+          GuestCounter.jsx
+            props: value, onChange, min=1, max=20
+
+          SearchBar.jsx
+            يجمع DateRangePicker + GuestCounter + FilterChips
+            props: onSearch(filters) callback
+
+          BookingSummary.jsx
+            props: unit, checkIn, checkOut, guests, totalPrice
+            ملخص الحجز قبل الدفع
+
+          PaymentMethodSelector.jsx
+            props: methods[], selected, onSelect
+            Cash | Card | WhatsApp | OMT | Whish
+        status: planned
+
+      - id: 32.3
+        name: "useTenantSlug Hook (موجود) — التأكد من الاستخدام الصحيح"
+        file: "src/utils/useTenantSlug.js"
+        details: |
+          الـ hook موجود من Phase 30 (تم بناؤه).
+          القاعدة الجديدة: كل كومبونت يحتاج السلوغ يستخدمه مباشرة.
+          لا تمرير slug كـ prop إلا في Admin preview mode فقط.
+        status: done
+
+      - id: 32.4
+        name: "useTenantConfig Hook"
+        file: "src/hooks/useTenantConfig.js"
+        details: |
+          GET /api/v1/public/{slug}/config
+
+          يُعيد:
+            slug, name_ar, name_en, primaryColor, logo_url,
+            hero_video_url, whatsapp_number,
+            features: { spatial, listings, booking, payment },
+            unit_types, currency, payment_methods
+
+          In-memory cache: لا يُعاد الطلب عند كل render.
+          Fallback defaults إذا فشل الطلب — لا white screen أبداً.
+
+          استخدام:
+            const config = useTenantConfig();        // يقرأ slug تلقائياً
+            const config = useTenantConfig('vila');  // override للـ admin preview
+        status: planned
+
+      - id: 32.5
+        name: "useUnits Hook — Dynamic Listings per Slug"
+        file: "src/hooks/useUnits.js"
+        details: |
+          GET /api/v1/public/{slug}/listings?type=X&check_in=Y&check_out=Z
+
+          interface:
+            const { units, isLoading, error, search, reset } = useUnits();
+
+          search(filters):
+            filters = { type?, check_in?, check_out?, guests? }
+            يُحدّث units بشكل reactive
+
+          يقرأ slug تلقائياً من useTenantSlug — لا slug prop.
+          Error handling: units=[], error=message, لا crash.
+          Loading: isLoading=true → skeleton cards في الـ UnitGrid.
+        status: planned
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 33 — Organisms — Slug-Driven Self-Contained Sections
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 33
+    name: "Organisms — Dynamic Slug-Aware Sections"
+    description: |
+      كل Organism = section كاملة تجلب بياناتها بنفسها.
+      المعادلة: <UnitGrid /> بدون props → يعمل لأي tenant تلقائياً.
+    status: planned
+
+    tasks:
+
+      - id: 33.1
+        name: "UnitGrid Organism"
+        file: "src/design-system/organisms/UnitGrid.jsx"
+        details: |
+          يستخدم useUnits() مباشرة — لا data props.
+          يُظهر SearchBar في الأعلى.
+          يُظهر UnitCard[] في grid responsive.
+          Loading → Skeleton cards.
+          Empty → رسالة + زر WhatsApp (رقم من useTenantConfig).
+          Error → رسالة خطأ + retry button.
+
+          استخدام من أي صفحة لأي tenant:
+            <UnitGrid typeFilter="villa" />
+            <UnitGrid typeFilter="chalet" />
+            <UnitGrid />
+        status: planned
+
+      - id: 33.2
+        name: "BookingFlow Organism"
+        file: "src/design-system/organisms/BookingFlow.jsx"
+        details: |
+          يدير كامل flow الحجز.
+          States: idle → selecting → form → payment_method → confirming → success | error
+
+          API calls (كلها تقرأ slug من useTenantSlug):
+            GET  /{slug}/price    حساب السعر
+            GET  /{slug}/services الخدمات الإضافية
+            POST /{slug}/bookings الحجز النهائي
+
+          يُعيد callback onSuccess للصفحة الأم.
+          لا navigate داخلي — الصفحة الأم تتحكم بالـ routing.
+        status: planned
+
+      - id: 33.3
+        name: "TenantHeader Organism"
+        file: "src/design-system/organisms/TenantHeader.jsx"
+        details: |
+          Head PHASE 31 — Link Audit & Quick Fixes
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 31
+    name: "Link Audit — Bug Fixes"
+    description: "إصلاح الروابط المكسورة المكتشفة في فحص شامل للـ src/pages/smar + src/components."
+    status: pending
+
+    tasks:
+
+      - id: 31.1
+        name: "Fix broken /home navigate — SmarListingsPage + SmarPaymentPage"
+        files:
+          - "src/pages/smar/normal/SmarListingsPage.jsx:307"
+          - "src/pages/smar/normal/SmarPaymentPage.jsx:173"
+        details: |
+          المشكلة: navigate(`/${slug}/home`) — لا يوجد Route اسمه "home" في smar.routes.jsx.
+          Routes الموجودة فعلاً: showcase | spatial | listings | classic | payment | admin | ring
+          الإصلاح:
+            SmarListingsPage:307  → navigate(`/${slug}/showcase`)
+            SmarPaymentPage:173   → navigate(`/${slug}/showcase`)
+        status: pending
+
+      - id: 31.2
+        name: "Fix SmarClassicPage navigate('/payment') — broken everywhere"
+        file: "src/pages/smar/normal/SmarClassicPage.jsx:595"
+        details: |
+          المشكلة: navigate('/payment') بدون slug.
+            subdomain: smar.salmansaas.com/payment → App.jsx يقرأ slug="payment" → tenant "payment" → 404
+            localhost: /payment → نفس المشكلة
+          الإصلاح: استيراد useTenantSlug ثم:
+            const slug = useTenantSlug();
+            navigate(`/${slug}/payment`, { state: { ..., slug } })
+          ملاحظة: Phase 19.2 ستحذف SmarClassicPage — إذا تأخر الحذف يُصلح هذا أولاً.
+        status: pending
+
+      - id: 31.3
+        name: "Fix SmarHeader FM12+React19 crash on /spatial route"
+        file: "src/pages/smar/spatial/SmarHeader.jsx:18"
+        details: |
+          المشكلة: نفس نمط white screen الذي أصاب SmarShowcasePage v3.
+            const { scrollY } = useScroll()              ← MotionValue
+            useMotionValueEvent(scrollY, 'change', ...)  ← FM subscription عبر useLayoutEffect
+          React 19 StrictMode يدمر هذه الـ subscription أثناء double-mount → white screen على /spatial.
+          الإصلاح (نفس نهج ShowcaseHUD v2):
+            const [hidden, setHidden] = useState(false);
+            const lastY = useRef(0);
+            useEffect(() => {
+              function onScroll() {
+                const y = window.scrollY;
+                setHidden(y > lastY.current && y > 80);
+                lastY.current = y;
+              }
+              window.addEventListener('scroll', onScroll, { passive: true });
+              return () => window.removeEventListener('scroll', onScroll);
+            }, []);
+        status: pending
+
+      - id: 31.4
+        name: "Fix SpatialPropertyDetails navigate('/spatial') — broken on localhost"
+        file: "src/pages/smar/spatial/SpatialPropertyDetails.jsx:462"
+        details: |
+          المشكلة: navigate('/spatial') على localhost ينتج /spatial
+            App.jsx يقرأ slug="spatial" → tenant "spatial" → 404
+          الإصلاح:
+            import useTenantSlug from '../../../utils/useTenantSlug';
+            const slug = useTenantSlug();
+            navigate(`/${slug}/spatial`)
+        status: pending
+
+      - id: 31.5
+        name: "Fix ShowcaseHUD duplicate nav links"
+        file: "src/pages/smar/showcase/ShowcaseHUD.jsx:183"
+        details: |
+          المشكلة: كلا الرابطين يشيران لـ /listings — مكررين.
+            الشاليهات → /listings  (صحيح)
+            الأقسام   → /listings  (مكرر — يجب أن يختلف)
+          الإصلاح المؤقت: احذف رابط الأقسام أو غيّره لـ /listings#categories
+          الإصلاح الدائم: ينتظر بناء صفحة categories في Phase 33+.
+        status: pending
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 32 — Atomic Design System Foundation
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 32
+    name: "Atomic Design System — Foundation"
+    description: |
+      إعادة هيكلة الفرونت اند بنظام Atomic Design مع Dynamic Data Fetching per slug.
+
+      الفلسفة الأساسية:
+        كل Organism يعرف slug الخاص به عبر useTenantSlug() ويجلب بياناته مباشرة.
+        لا prop drilling للـ data. لا hardcoded tenant content.
+        إضافة tenant جديد = row في DB فقط — لا كود جديد.
+
+      الهيكل الجديد:
+        src/
+          design-system/
+            tokens.js      ← ألوان + مسافات + قيم CSS مشتركة
+            atoms/         ← building blocks بدون business logic
+            molecules/     ← atoms مجمعة، local state فقط
+            organisms/     ← sections كاملة تجلب بياناتها بنفسها
+          hooks/           ← data hooks مشتركة بين جميع التينانتس
+          templates/       ← page layouts تُرتب الـ organisms
+    status: planned
+
+    tasks:
+
+      - id: 32.1
+        name: "Design Tokens + Atoms"
+        file: "src/design-system/atoms/"
+        details: |
+          tokens.js — قيم CSS مشتركة:
+            colors:  gold #d4a853 | dark #0a0a0f | surface rgba(255,255,255,0.03)
+            spacing: 4 | 8 | 12 | 16 | 24 | 32 | 48 | 64
+            radius:  4 | 8 | 14 | 18 | 50
+            blur:    8 | 20 | 24
+
+          Atoms (props فقط — لا API calls):
+            Button.jsx      variant: primary | ghost | gold | danger
+            Input.jsx       type text|date|number + error state
+            Badge.jsx       variant: available | booked | pending
+            Skeleton.jsx    loading placeholder بشكل الـ content
+            GlassCard.jsx   GS MAR glassmorphism wrapper
+            PriceTag.jsx    سعر + عملة + فترة
+            GoldDot.jsx     نقطة ذهبية للـ loading/fallback
+        status: planned
+
+      - id: 32.2
+        name: "Molecules — Smart UI Combinations"
+        file: "src/design-system/molecules/"
+        details: |
+          Molecules = atoms مجمعة. تستقبل data كـ props — لا تجلبها.
+
+          UnitCard.jsx
+            props: unier ديناميكي يقرأ branding من useTenantConfig.
+          يُظهر: logo | اسم tenant | nav links | Language toggle | Login.
+
+          يحل محل كليهما:
+            ShowcaseHUD navbar (showcase page)
+            SmarHeader      (spatial page)
+
+          FM12+React19 safe:
+            لا useScroll — plain scroll listener في useEffect.
+            لا MotionValue في style props.
+            motion.* فقط لـ animate= و whileHover= و whileTap=.
+        status: planned
+
+      - id: 33.4
+        name: "TenantHero Organism"
+        file: "src/design-system/organisms/TenantHero.jsx"
+        details: |
+          Hero section ديناميكي يقرأ من useTenantConfig:
+            config.hero_video_url → يُظهر video
+            config.hero_image_url → يُظهر صورة (fallback)
+          Overlay: اسم tenant + tagline من config.
+          لا hardcoded URLs أو نصوص.
+        status: planned
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 34 — Templates — Page Layouts
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 34
+    name: "Templates — Page Layouts"
+    description: |
+      Templates = تجميع الـ Organisms في تخطيطات صفحات.
+      Template لا تعرف السلوغ ولا تجلب بيانات — تُرتّب فقط.
+      صفحة واحدة تعمل لجميع التينانتس.
+    status: planned
+
+    tasks:
+
+      - id: 34.1
+        name: "ShowcaseTemplate — يحل محل SmarShowcasePage"
+        file: "src/templates/ShowcaseTemplate.jsx"
+        details: |
+          <TenantHeader />
+          <TenantHero />
+          <KineticSection type="villa" />
+          <KineticSection type="chalet" />
+
+          يحل محل src/pages/smar/showcase/SmarShowcasePage.jsx
+          يعمل لأي tenant يملك hero_video + unit_types في config.
+        status: planned
+
+      - id: 34.2
+        name: "ListingsTemplate — يحل محل SmarListingsPage"
+        file: "src/templates/ListingsTemplate.jsx"
+        details: |
+          <TenantHeader />
+          <UnitGrid />
+          <TenantFooter />
+
+          يحل محل src/pages/smar/normal/SmarListingsPage.jsx
+        status: planned
+
+      - id: 34.3
+        name: "CheckoutTemplate — يحل محل SmarPaymentPage"
+        file: "src/templates/CheckoutTemplate.jsx"
+        details: |
+          <TenantHeader />
+          <BookingFlow />
+
+          يحل محل src/pages/smar/normal/SmarPaymentPage.jsx
+        status: planned
+
+      - id: 34.4
+        name: "TenantRouter — Dynamic Route Builder"
+        file: "src/router/TenantRouter.jsx"
+        details: |
+          بدل كتابة routes يدوياً لكل tenant، يُبنى من config:
+
+            const config = useTenantConfig(slug);
+
+            <Routes>
+              {config.features.spatial  && <Route path="showcase" element={<ShowcaseTemplate />} />}
+              {config.features.listings && <Route path="listings"  element={<ListingsTemplate />} />}
+              {config.features.booking  && <Route path="payment"   element={<CheckoutTemplate />} />}
+              <Route path="*" element={<Navigate to="showcase" replace />} />
+            </Routes>
+
+          إضافة tenant جديد = إضافة row في TenantConfig في DB فقط. لا كود جديد.
+        status: planned
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 35 — Backend: /config Endpoint + Smar Migration
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 35
+    name: "Backend Config Endpoint + Smar Migration"
+    description: |
+      تجهيز الـ backend لدعم النظام الذري.
+      ثم ترحيل smar من الكود القديم للـ templates الجديدة.
+    status: planned
+
+    tasks:
+
+      - id: 35.1
+        name: "Backend: GET /api/v1/public/{slug}/config"
+        file: "app/api/public_api.py"
+        details: |
+          endpoint جديد — 4-layer rule:
+            Route → Service → Repository → DB
+
+          Response لـ smar:
+            {
+              "slug": "smar",
+              "name_ar": "بيت سمر",
+              "name_en": "Beit Smar",
+              "primary_color": "#d4a853",
+              "hero_video_url": "https://.../Logo_Formation_Video_Ready.mp4",
+              "whatsapp_number": "96178727986",
+              "features": {
+                "spatial": true, "listings": true,
+                "booking": true, "payment": true
+              },
+              "unit_types": ["villa", "chalet"],
+              "currency": "USD",
+              "payment_methods": ["cash", "card", "whatsapp", "whish", "omt"]
+            }
+
+          المرحلة الأولى: hardcode القيم في Service مؤقتاً.
+          المرحلة الثانية: جدول TenantConfig في Prisma schema.
+        status: planned
+
+      - id: 35.2
+        name: "Smar: Replace SmarShowcasePage → ShowcaseTemplate"
+        file: "src/router/tenants/smar.routes.jsx"
+        details: |
+          قبل:
+            lazy(() => import('...SmarShowcasePage'))
+            <Route path="showcase" element={<Suspense><SmarShowcasePage /></Suspense>} />
+          بعد:
+            import ShowcaseTemplate from '../../templates/ShowcaseTemplate';
+            <Route path="showcase" element={<ShowcaseTemplate />} />
+        status: planned
+
+      - id: 35.3
+        name: "Smar: Replace SmarListingsPage + SmarPaymentPage → Templates"
+        details: |
+          نفس الخطوة لـ listings + payment.
+          يجب اختبار كامل flow الحجز قبل حذف الملفات القديمة.
+        status: planned
+
+      - id: 35.4
+        name: "Delete legacy files after migration"
+        details: |
+          بعد اكتمال الاختبار:
+            حذف: src/pages/smar/showcase/SmarShowcasePage.jsx
+            حذف: src/pages/smar/normal/SmarListingsPage.jsx
+            حذف: src/pages/smar/normal/SmarPaymentPage.jsx
+            حذف: src/pages/smar/normal/SmarClassicPage.jsx   (Phase 19.2 المعلقة)
+            حذف: src/components/PaymentCardDetails.jsx        (dead code — لا أحد يستورده)
+
+          إبقاء:
+            src/pages/smar/spatial/       (cinematic experience — خاص بـ smar)
+            src/pages/smar/admin/         (admin dashboard)
+            src/pages/smar/ui/SmarWhatsAppButton.jsx
+            src/pages/smar/showcase/ShowcaseHUD.jsx   (مؤقتاً حتى يُدمج في TenantHeader)
+        status: planned
+
+# ══════════════════════════════════════════════════════════════════════════════
+# قواعد النظام الذري الجديد
+# ══════════════════════════════════════════════════════════════════════════════
+
+atomic_architecture_rules:
+  slug_resolution:
+    rule: "كل كومبونت يقرأ السلوغ من useTenantSlug() مباشرة"
+    exception: "Admin preview فقط يمرر slug كـ prop"
+
+  data_fetching:
+    rule: "الـ Organisms تجلب بياناتها بنفسها — لا data prop drilling"
+    example: "<UnitGrid /> يعمل بدون أي props إضافية"
+
+  no_hardcoding:
+    rule: "لا tenant name أو URLs أو phone numbers في JSX مباشرة"
+    source: "كل هذا يأتي من useTenantConfig()"
+
+  fm12_react19_safety:
+    rule1: "لا MotionValue في style props — فقط animate= و whileHover= و whileTap="
+    rule2: "لا useScroll مع target ref — scroll listener في useEffect فقط"
+
+  error_boundaries:
+    rule1: "كل Template يُلفّ بـ ErrorBoundary على مستوى الـ route"
+    rule2: "كل Organism يُلفّ بـ ErrorBoundary داخلي — خطأ section لا يكسر الصفحة"
+
+  layer_mapping:
+    atoms:     "props فقط — لا hooks، لا API، لا state خارجي"
+    molecules: "local state فقط — لا API calls"
+    organisms: "useTenantSlug + useUnits + useBooking — self-contained"
+    templates: "تُرتّب organisms فقط — لا slug، لا data"
+    pages:     "= template instance في route — تختفي تدريجياً"
