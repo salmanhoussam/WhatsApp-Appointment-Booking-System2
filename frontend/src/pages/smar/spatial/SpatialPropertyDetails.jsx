@@ -352,7 +352,7 @@ const counterBtnStyle = {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function SpatialPropertyDetails() {
-  const { id }         = useParams();
+  const { slug = 'smar', id } = useParams();
   const navigate       = useNavigate();
   const location       = useLocation();
   const videoRef       = useRef(null);
@@ -459,7 +459,7 @@ export default function SpatialPropertyDetails() {
       }}>
         {/* Back button */}
         <motion.button
-          onClick={() => navigate('/spatial')}
+          onClick={() => navigate(`/${slug}/spatial`)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           style={{

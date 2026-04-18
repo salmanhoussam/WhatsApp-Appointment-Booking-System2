@@ -13,22 +13,32 @@ datasource db {
 }
 
 model Client {
-  id            String     @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  name          String     @map("name")
-  slug          String     @unique @map("slug")
-  phone         String     @unique @map("phone")
-  email         String?    @map("email")
-  password_hash String?    @map("password_hash")
-  isActive      Boolean    @default(true) @map("is_active")
-  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookings      Booking[]
-  customers     Customer[]
-  prices        Price[]
-  properties    Property[]
-  services      Service[]
-  units         Unit[]
-  users         User[]
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  name            String     @map("name")
+  name_ar         String?    @map("name_ar")
+  name_en         String?    @map("name_en")
+  slug            String     @unique @map("slug")
+  phone           String     @unique @map("phone")
+  email           String?    @map("email")
+  password_hash   String?    @map("password_hash")
+  isActive        Boolean    @default(true) @map("is_active")
+  // ── Branding & config (merged from TenantConfig) ──────────────────────────
+  primary_color   String?    @map("primary_color")
+  hero_video_url  String?    @map("hero_video_url")
+  whatsapp_number String?    @map("whatsapp_number")
+  currency        String     @default("USD") @map("currency")
+  features        Json?      @map("features")
+  unit_types      String[]   @map("unit_types")
+  payment_methods String[]   @map("payment_methods")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookings        Booking[]
+  customers       Customer[]
+  prices          Price[]
+  properties      Property[]
+  services        Service[]
+  units           Unit[]
+  users           User[]
 
   @@map("clients")
   @@schema("public")

@@ -19,18 +19,21 @@ class DashboardRepository:
         """
         Returns total bookings and confirmed revenue for the given month.
         Revenue counts only confirmed + completed bookings.
+        createdAt is Timestamptz — pass datetime objects, not date strings.
         """
         import calendar
-        num_days = calendar.monthrange(year, month)[1]
-        month_start = date(year, month, 1)
-        month_end   = date(year, month, num_days)
+        from datetime import datetime
+        num_days    = calendar.monthrange(year, month)[1]
+        # Timestamptz column: use datetime objects (naive = UTC assumed by Postgres)
+        month_start_dt = datetime(year, month, 1, 0, 0, 0)
+        month_end_dt   = datetime(year, month, num_days, 23, 59, 59)
 
         all_bookings = await self.db.booking.find_many(
             where={
                 "clientId": client_id,
                 "createdAt": {
-                    "gte": month_start.isoformat(),
-                    "lte": month_end.isoformat(),
+                    "gte": month_start_dt,
+                    "lte": month_end_dt,
                 },
             }
         )
@@ -61,11 +64,11 @@ class DashboardRepository:
         today = date.today()
         until = today + timedelta(days=days_ahead)
 
-        from datetime import datetime, timezone
+        from datetime import datetime
         if isinstance(today, date) and not isinstance(today, datetime):
-            today = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+            today = datetime.combine(today, datetime.min.time())
         if isinstance(until, date) and not isinstance(until, datetime):
-            until = datetime.combine(until, datetime.min.time()).replace(tzinfo=timezone.utc)
+            until = datetime.combine(until, datetime.min.time())
 
         return await self.db.booking.find_many(
             where={
@@ -86,11 +89,11 @@ class DashboardRepository:
         Returns all active bookings (pending/confirmed) in the period,
         with their unit+property included. Used to compute occupancy.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         if isinstance(start, date) and not isinstance(start, datetime):
-            start = datetime.combine(start, datetime.min.time()).replace(tzinfo=timezone.utc)
+            start = datetime.combine(start, datetime.min.time())
         if isinstance(end, date) and not isinstance(end, datetime):
-            end = datetime.combine(end, datetime.min.time()).replace(tzinfo=timezone.utc)
+            end = datetime.combine(end, datetime.min.time())
 
         return await self.db.booking.find_many(
             where={

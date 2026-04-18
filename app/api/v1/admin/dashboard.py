@@ -23,13 +23,12 @@ Response shape:
 import asyncio
 import calendar
 import logging
-from datetime import date, datetime, timedelta
-from decimal import Decimal
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db.client import prisma_client
-from app.core.tenant import get_current_admin_user, get_current_tenant
+from app.core.tenant import get_current_tenant
 from app.repositories.dashboard_repo import DashboardRepository
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,6 @@ def _get_repo() -> DashboardRepository:
 
 @router.get("/dashboard")
 async def get_dashboard(
-    request: Request,
     year:  int = Query(default=None, description="Year (defaults to current year)"),
     month: int = Query(default=None, ge=1, le=12, description="Month 1–12 (defaults to current month)"),
     tenant: dict = Depends(get_current_tenant),
@@ -141,45 +139,48 @@ async def get_quick_stats(tenant: dict = Depends(get_current_tenant)):
     """
     4 KPI numbers for the top of the Bookings tab.
     Returns: today_bookings, pending_count, monthly_revenue, available_units.
+
+    checkIn is @db.Date — queries use plain date objects (not datetime) to
+    avoid type-mismatch errors in Prisma Python.
     """
-    today     = date.today()
-    tomorrow  = today + timedelta(days=1)
-    month_start = date(today.year, today.month, 1)
+    try:
+        today       = date.today()
+        tomorrow    = today + timedelta(days=1)
+        month_start = date(today.year, today.month, 1)
+        client_id   = tenant["id"]
 
-    today_start    = datetime.combine(today,       datetime.min.time())
-    tomorrow_start = datetime.combine(tomorrow,    datetime.min.time())
-    month_start_dt = datetime.combine(month_start, datetime.min.time())
+        today_bookings_task = prisma_client.booking.count(where={
+            "clientId": client_id,
+            # Date column — pass date objects, NOT datetime
+            "checkIn":  {"gte": today, "lt": tomorrow},
+        })
+        pending_task = prisma_client.booking.count(where={
+            "clientId": client_id,
+            "status":   "pending",
+        })
+        revenue_task = prisma_client.booking.find_many(where={
+            "clientId": client_id,
+            "status":   "confirmed",
+            "checkIn":  {"gte": month_start},
+        })
+        units_task = prisma_client.unit.count(where={
+            "clientId":    client_id,
+            "isAvailable": True,
+            "isActive":    True,
+        })
 
-    client_id = tenant["id"]
+        today_count, pending_count, revenue_bookings, available_units = await asyncio.gather(
+            today_bookings_task, pending_task, revenue_task, units_task
+        )
 
-    today_bookings_task = prisma_client.booking.count(where={
-        "clientId": client_id,
-        "checkIn":  {"gte": today_start, "lt": tomorrow_start},
-    })
-    pending_task = prisma_client.booking.count(where={
-        "clientId": client_id,
-        "status":   "pending",
-    })
-    revenue_task = prisma_client.booking.find_many(where={
-        "clientId": client_id,
-        "status":   "confirmed",
-        "checkIn":  {"gte": month_start_dt},
-    })
-    units_task = prisma_client.unit.count(where={
-        "clientId":    client_id,
-        "isAvailable": True,
-        "isActive":    True,
-    })
+        monthly_revenue = round(sum(float(b.totalPrice) for b in revenue_bookings), 2)
 
-    today_count, pending_count, revenue_bookings, available_units = await asyncio.gather(
-        today_bookings_task, pending_task, revenue_task, units_task
-    )
-
-    monthly_revenue = round(sum(float(b.totalPrice) for b in revenue_bookings), 2)
-
-    return {
-        "today_bookings":  today_count,
-        "pending_count":   pending_count,
-        "monthly_revenue": monthly_revenue,
-        "available_units": available_units,
-    }
+        return {
+            "today_bookings":  today_count,
+            "pending_count":   pending_count,
+            "monthly_revenue": monthly_revenue,
+            "available_units": available_units,
+        }
+    except Exception as e:
+        logger.error("🔥 get_quick_stats failed for tenant %s: %s", tenant.get("slug"), e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to load dashboard stats")

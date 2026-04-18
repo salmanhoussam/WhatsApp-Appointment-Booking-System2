@@ -8,19 +8,25 @@
  *   • Language toggle button (AR ↔ EN)
  */
 
-import { useState, useContext } from 'react';
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useLanguage } from '../../../context/LanguageContext';
 
 export default function SmarHeader() {
   const [hidden, setHidden] = useState(false);
   const { t, toggleLang } = useLanguage();
-  const { scrollY } = useScroll();
+  const lastScrollY = useRef(0);
 
-  useMotionValueEvent(scrollY, 'change', (latest) => {
-    const prev = scrollY.getPrevious() ?? 0;
-    setHidden(latest > prev && latest > 80);
-  });
+  // Safe native scroll listener — NO useScroll/useMotionValueEvent (FM12+React19 crash)
+  useEffect(() => {
+    function onScroll() {
+      const current = window.scrollY;
+      setHidden(current > lastScrollY.current && current > 80);
+      lastScrollY.current = current;
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const navLinks = [
     { label: t.nav_chalets, href: '/smar' },

@@ -15,23 +15,45 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User } from 'lucide-react';
 import { Button } from '../atoms';
+import LoginModal from './LoginModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
-
-// ─── Nav links (bilingual) ─────────────────────────────────────────────────────
-const NAV_LINKS = [
-  { ar: 'الرئيسية',  en: 'Home'     },
-  { ar: 'الوحدات',   en: 'Units'    },
-  { ar: 'معرض الصور', en: 'Gallery' },
-  { ar: 'تواصل معنا', en: 'Contact' },
-];
+import useTenantSlug   from '../../utils/useTenantSlug';
 
 export default function TenantHeader() {
   const { config } = useTenantConfig();
+  const navigate   = useNavigate();
+  const slug       = useTenantSlug();
 
-  const [scrolled,  setScrolled]  = useState(false);
-  const [lang,      setLang]      = useState('ar');
-  const [menuOpen,  setMenuOpen]  = useState(false);
+  const [scrolled,        setScrolled]        = useState(false);
+  const [lang,            setLang]            = useState('ar');
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  // ── Nav link actions ──────────────────────────────────────────────────────
+  const NAV_LINKS = [
+    { ar: 'الرئيسية',   en: 'Home',    action: () => navigate(`/${slug}/showcase`) },
+    { ar: 'الوحدات',    en: 'Units',   action: () => navigate(`/${slug}/listings`) },
+    { ar: 'معرض الصور', en: 'Gallery', action: () => navigate(`/${slug}/gallery`) },
+    {
+      ar: 'تواصل معنا', en: 'Contact',
+      action: () => {
+        const number  = config?.whatsapp_number;
+        const message = lang === 'ar'
+          ? 'مرحباً، أودّ الاستفسار عن الوحدات المتاحة.'
+          : 'Hello, I would like to enquire about available units.';
+        if (number) {
+          window.open(
+            `https://wa.me/${number}?text=${encodeURIComponent(message)}`,
+            '_blank',
+            'noopener,noreferrer',
+          );
+        }
+      },
+    },
+  ];
 
   // ── Scroll elevation listener ─────────────────────────────────────────────
   useEffect(() => {
@@ -61,6 +83,7 @@ export default function TenantHeader() {
   const isRtl = lang === 'ar';
 
   return (
+    <>
     <header
       dir={isRtl ? 'rtl' : 'ltr'}
       className={[
@@ -97,6 +120,7 @@ export default function TenantHeader() {
             <button
               key={link.en}
               type="button"
+              onClick={link.action}
               className="
                 text-white/60 hover:text-[#d4a853]
                 text-sm tracking-wide
@@ -129,6 +153,24 @@ export default function TenantHeader() {
             "
           >
             {lang === 'ar' ? 'EN' : 'AR'}
+          </button>
+
+          {/* User / Login button */}
+          <button
+            type="button"
+            onClick={() => setIsLoginModalOpen(true)}
+            aria-label={isRtl ? 'تسجيل الدخول' : 'Sign in'}
+            className="
+              flex items-center justify-center
+              h-8 w-8 rounded-full
+              text-white/50 hover:text-[#d4a853]
+              border border-white/[0.08] hover:border-[#d4a853]/40
+              bg-white/[0.02] hover:bg-[#d4a853]/[0.06]
+              transition-all duration-200
+              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4a853]/50
+            "
+          >
+            <User size={15} strokeWidth={1.7} />
           </button>
 
           {/* Book Now — desktop */}
@@ -190,7 +232,7 @@ export default function TenantHeader() {
             <button
               key={link.en}
               type="button"
-              onClick={() => setMenuOpen(false)}
+              onClick={() => { link.action(); setMenuOpen(false); }}
               className="
                 text-start py-2.5 px-3 rounded-lg
                 text-sm text-white/70 hover:text-[#d4a853]
@@ -216,5 +258,11 @@ export default function TenantHeader() {
         </nav>
       </div>
     </header>
+
+    <LoginModal
+      isOpen={isLoginModalOpen}
+      onClose={() => setIsLoginModalOpen(false)}
+    />
+    </>
   );
 }

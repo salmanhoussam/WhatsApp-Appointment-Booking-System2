@@ -14,11 +14,14 @@
  * Add it to src/router/tenants/index.js only.
  */
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import SmarAdminDashboard from './pages/smar/admin/SmarAdminDashboard';
 import Login from './pages/admin/Login';
 import TenantResolver from './router/TenantResolver';
 import { LanguageProvider } from './context/LanguageContext';
+
+// Lazy — keeps heavy admin deps out of the main bundle
+const SmarAdminDashboard = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
 
 function NotFound() {
   return (
@@ -59,7 +62,7 @@ function App() {
 
           {/* ── Static admin routes ── */}
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard/:slug/*" element={<SmarAdminDashboard />} />
+          <Route path="/dashboard/:slug/*" element={<Suspense fallback={null}><SmarAdminDashboard /></Suspense>} />
 
           {/* ── 404 ── */}
           <Route path="/404" element={<NotFound />} />

@@ -8,7 +8,8 @@ class BookingServiceBase(BaseModel):
     price: float
 
 class BookingServiceCreate(BookingServiceBase):
-    pass
+    # price is ignored on create; the server reads it from service.basePrice
+    price: Optional[float] = None
 
 class BookingServiceUpdate(BaseModel):
     booking_id: Optional[str] = None

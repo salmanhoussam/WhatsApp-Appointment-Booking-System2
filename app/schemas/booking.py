@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 
 class BookingBase(BaseModel):
     check_in: datetime
@@ -36,3 +36,25 @@ class BookingResponse(BookingBase):
     arrival_time: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+# ── Public-facing booking schemas (used by /api/v1/public.py) ────────────────
+
+class ServiceSelection(BaseModel):
+    service_id: str
+    quantity: int = 1
+
+
+class PublicBookingRequest(BaseModel):
+    unit_id: str
+    customer_name: str
+    customer_phone: str
+    customer_email: Optional[str] = None
+    check_in: Optional[date] = None
+    check_out: Optional[date] = None
+    guests: Optional[int] = 1
+    services: Optional[List[ServiceSelection]] = []
+    payment_method: Optional[str] = "cash"       # cash | whish | omt | card
+    payment_reference: Optional[str] = None       # receipt ref for Whish/OMT
+    arrival_time: Optional[str] = "14:00"         # expected arrival HH:MM
+    client_slug: Optional[str] = None             # legacy /bookings/ route only

@@ -29,7 +29,7 @@ async def add_service_to_booking(db: Prisma, booking_id: str, data: BookingServi
         "bookingId": booking_id,
         "serviceId": data.service_id,
         "quantity": data.quantity,
-        "price": data.price # يفضل لاحقاً أخذ السعر من service.basePrice للأمان
+        "price": float(service.basePrice),  # always read from DB — never trust the payload
     })
 
 async def update_booking_service(db: Prisma, booking_id: str, service_id: str, data: BookingServiceUpdate, client_id: str) -> Optional[dict]:

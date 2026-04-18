@@ -1,39 +1,48 @@
 /**
  * smar.routes.jsx  —  All routes for the "smar" tenant
  *
- * Lazy-loaded by TenantPages.jsx when slug === 'smar'.
- * Three.js / R3F / postprocessing are NOT in the main bundle —
- * they only load when this chunk is requested.
+ * Lazy-loaded by TenantResolver when slug === 'smar'.
+ *
+ * Architecture rule (CRITICAL):
+ *   ALL pages that use FM useScroll / useTransform / MotionValue style bindings
+ *   MUST be lazy-loaded. A direct import makes their module execute at chunk-load
+ *   time, which can cause a FM12 + React 19 StrictMode crash that propagates
+ *   above any ErrorBoundary and leaves div#root empty.
  *
  * Routes:
- *   /smar/spatial                →  SpatialHomePage        (parallax + timeline)
- *   /smar/spatial/property/:id   →  SpatialPropertyDetails (cinematic video + booking)
- *   /smar/showcase               →  SmarShowcasePage       (WebGL 3D immersive)
- *   /smar/ring                   →  SmarLiquidRing         (Active Theory ring)
- *   /smar/admin                  →  SmarAdminDashboard
- *   /smar  (empty / catch-all)   →  redirect → spatial
+ *   /smar/showcase               →  ShowcaseTemplate      (lazy — GSAP Z-axis + billboard S1)
+ *   /smar/listings               →  ListingsTemplate      (atomic)
+ *   /smar/gallery                →  SmarGalleryPage       (lazy — AnimatePresence)
+ *   /smar/spatial                →  SpatialHomePage       (lazy — FM scroll)
+ *   /smar/spatial/property/:id   →  SpatialPropertyDetails (lazy — FM scroll)
+ *   /smar/ring                   →  SmarLiquidRing        (lazy — WebGL)
+ *   /smar/admin                  →  SmarAdminDashboard    (lazy)
+ *   /smar  (empty / catch-all)   →  redirect → showcase
  */
 
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import SpatialHomePage             from '../../pages/smar/spatial/SpatialHomePage';
-import SpatialPropertyDetails      from '../../pages/smar/spatial/SpatialPropertyDetails';
-import SmarAdminDashboard          from '../../pages/smar/admin/SmarAdminDashboard';
-import SmarListingsPage            from '../../pages/smar/normal/SmarListingsPage';
-import SmarPaymentPage             from '../../pages/smar/normal/SmarPaymentPage';
-import SmarClassicPage             from '../../pages/smar/normal/SmarClassicPage';
 
-// ShowcaseTemplate — new pure-DOM architecture (no WebGL, no FM MotionValue bindings)
-import ShowcaseTemplate from '../../templates/ShowcaseTemplate';
+// ListingsTemplate — no scroll hooks, direct import is safe
+import ListingsTemplate  from '../../templates/ListingsTemplate';
 
-// Heavy WebGL pages — lazy to keep chunk size small
-const SmarLiquidRing = lazy(() => import('../../pages/smar/showcase/SmarLiquidRing'));
+// ShowcaseTemplate — GSAP ScrollTrigger registers at module scope → lazy-isolated
+const ShowcaseTemplate = lazy(() => import('../../templates/ShowcaseTemplate'));
 
-// ── Gold-dot loading fallback ─────────────────────────────────────────────────
-function WebGLFallback() {
+// ── Lazy pages (FM scroll hooks or heavy deps — isolated per-route) ───────────
+const SpatialHomePage        = lazy(() => import('../../pages/smar/spatial/SpatialHomePage'));
+const SpatialPropertyDetails = lazy(() => import('../../pages/smar/spatial/SpatialPropertyDetails'));
+const SmarAdminDashboard     = lazy(() => import('../../pages/smar/admin/SmarAdminDashboard'));
+const SmarLiquidRing         = lazy(() => import('../../pages/smar/showcase/SmarLiquidRing'));
+const SmarGalleryPage        = lazy(() => import('../../pages/smar/gallery/SmarGalleryPage'));
+
+// ── Shared loading fallback ───────────────────────────────────────────────────
+function PageFallback() {
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#0a0a0f',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{
+      width: '100vw', height: '100vh', background: '#0a0a0f',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
       <div style={{
         width: 6, height: 6, borderRadius: '50%',
         background: '#d4a853', boxShadow: '0 0 18px 4px rgba(212,168,83,0.5)',
@@ -44,41 +53,43 @@ function WebGLFallback() {
   );
 }
 
+// ── Route wrapper: Suspense + per-route isolation ────────────────────────────
+function Lazy({ component: Component }) {
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Component />
+    </Suspense>
+  );
+}
 
 export default function SmarRoutes() {
   return (
     <Routes>
-      {/* ── Cinematic spatial experience ── */}
-      <Route path="spatial"               element={<SpatialHomePage />} />
-      <Route path="spatial/property/:id"  element={<SpatialPropertyDetails />} />
+      {/* ── Showcase — GSAP Z-axis cinema, lazy-isolated ── */}
+      <Route path="showcase" element={<Lazy component={ShowcaseTemplate} />} />
 
-      {/* ── Showcase — pure DOM template (KineticSection + TenantHero) ── */}
-      <Route path="showcase" element={<ShowcaseTemplate />} />
+      {/* ── Spatial experience (FM scroll — isolated via lazy) ── */}
+      <Route path="spatial"              element={<Lazy component={SpatialHomePage} />} />
+      <Route path="spatial/property/:id" element={<Lazy component={SpatialPropertyDetails} />} />
+
+      {/* ── Listings — atomic template, no FM scroll hooks ── */}
+      <Route path="listings" element={<ListingsTemplate />} />
+
+      {/* ── Gallery — AnimatePresence lightbox, lazy-isolated ── */}
+      <Route path="gallery"  element={<Lazy component={SmarGalleryPage} />} />
 
       {/* ── Liquid ring hero ── */}
-      <Route
-        path="ring"
-        element={
-          <Suspense fallback={<WebGLFallback />}>
-            <SmarLiquidRing />
-          </Suspense>
-        }
-      />
-
-      {/* ── Booking funnel ── */}
-      <Route path="listings" element={<SmarListingsPage />} />
-      <Route path="classic"  element={<SmarClassicPage />} />
-      <Route path="payment"  element={<SmarPaymentPage />} />
+      <Route path="ring"  element={<Lazy component={SmarLiquidRing} />} />
 
       {/* ── Admin portal ── */}
-      <Route path="admin" element={<SmarAdminDashboard />} />
+      <Route path="admin" element={<Lazy component={SmarAdminDashboard} />} />
 
-      {/* ── Default & catch-all → showcase (WebGL gallery entry point) ──
-          MUST use absolute path /showcase — relative "showcase" resolves
-          against the current URL and causes an infinite append loop on typos.
-          No /smar prefix — TenantResolver strips it on subdomains. ── */}
-      <Route path=""  element={<Navigate to="/showcase" replace />} />
-      <Route path="*" element={<Navigate to="/showcase" replace />} />
+      {/* ── Default & catch-all → showcase ─────────────────────────────────────
+          Use RELATIVE path "showcase" (no leading slash).
+          An absolute "/showcase" on localhost would route to slug="showcase"
+          which is not in the registry → 404 loop. ── */}
+      <Route path=""  element={<Navigate to="showcase" replace />} />
+      <Route path="*" element={<Navigate to="showcase" replace />} />
     </Routes>
   );
 }

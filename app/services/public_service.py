@@ -1,10 +1,249 @@
+import asyncio
 import logging
-from typing import Optional, Dict, Any
+import os
+import re
+from typing import Optional, Dict, Any, List
 from prisma import Prisma
+from fastapi import HTTPException
 from datetime import datetime, timedelta, date
 from app.services.whatsapp_service import WhatsAppService
 
+# ── Supabase storage client (storage-only, service key) ──────────────────────
+_SUPABASE_URL = os.getenv("SUPABASE_URL")
+_SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+try:
+    from supabase import create_client as _create_supabase
+    _supabase = _create_supabase(_SUPABASE_URL, _SUPABASE_KEY) if (_SUPABASE_URL and _SUPABASE_KEY) else None
+except Exception:
+    _supabase = None
+
+# Slug → Supabase storage folder mapping (slug may differ from folder name)
+_STORAGE_FOLDERS: Dict[str, str] = {
+    "smar": "beitsmar",
+}
+
+# Filename-based category inference for beitsmar images
+_CATEGORY_RANGES = [
+    (range(1,  4),  "chalet"),
+    (range(4,  7),  "nature"),
+    (range(7,  10), "pool"),
+    (range(10, 13), "chalet"),
+]
+
+def _infer_category(filename: str) -> str:
+    m = re.search(r"beitsmar(\d+)", filename, re.IGNORECASE)
+    if m:
+        n = int(m.group(1))
+        for rng, cat in _CATEGORY_RANGES:
+            if n in rng:
+                return cat
+    return "general"
+
 logger = logging.getLogger(__name__)
+
+async def get_tenant_gallery_images(slug: str) -> List[Dict[str, Any]]:
+    """
+    List gallery images from Supabase Storage at properties/{folder}/gallery/.
+    Returns [] if storage is not configured or the folder is empty.
+    Category is inferred from filename (beitsmar1-3→chalet, 4-6→nature, 7-9→pool, 10-12→chalet).
+    """
+    if not _supabase:
+        logger.warning("Supabase client not configured — gallery endpoint returns empty list")
+        return []
+
+    folder      = _STORAGE_FOLDERS.get(slug, slug)
+    bucket_path = f"{folder}/gallery"
+
+    def _list_files():
+        return _supabase.storage.from_("properties").list(bucket_path)
+
+    try:
+        files = await asyncio.to_thread(_list_files)
+    except Exception as e:
+        logger.error(f"🔥 Supabase storage list error for slug={slug}: {e}", exc_info=True)
+        return []
+
+    if not files:
+        return []
+
+    base_url = f"{_SUPABASE_URL}/storage/v1/object/public/properties/{bucket_path}/"
+    result: List[Dict[str, Any]] = []
+
+    for f in files:
+        name = f.get("name", "")
+        if not name or name.startswith("."):
+            continue
+        result.append({
+            "url":      base_url + name,
+            "filename": name,
+            "category": _infer_category(name),
+        })
+
+    return result
+
+
+async def get_unit_services_data(db: Prisma, unit_id: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Return all active services for the client that owns the given unit.
+    Returns None if the unit does not exist.
+    """
+    try:
+        unit = await db.unit.find_unique(where={"id": unit_id})
+        if not unit:
+            return None
+
+        services = await db.service.find_many(
+            where={"clientId": unit.clientId, "isActive": True}
+        )
+        return [
+            {
+                "id":             s.id,
+                "name_ar":        s.name_ar,
+                "name_en":        s.name_en,
+                "description_ar": getattr(s, "description_ar", ""),
+                "description_en": getattr(s, "description_en", ""),
+                "image_url":      getattr(s, "image_url", ""),
+                "basePrice":      float(s.basePrice),
+                "currency":       s.currency,
+                "duration":       getattr(s, "duration", 0),
+            }
+            for s in services
+        ]
+    except Exception as e:
+        logger.error(f"🔥 DB error in get_unit_services_data for unit {unit_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+async def get_unit_calendar_data(
+    db: Prisma,
+    slug: str,
+    unit_id: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Return availability + dynamic pricing data for a unit.
+
+    Response shape:
+        {
+            "disabled_dates":  ["YYYY-MM-DD", ...],
+            "price_overrides": { "YYYY-MM-DD": 350.0, ... }
+        }
+    """
+    try:
+        client = await db.client.find_first(where={"slug": slug, "isActive": True})
+        if not client:
+            return None
+
+        unit = await db.unit.find_unique(where={"id": unit_id})
+        if not unit or unit.clientId != client.id:
+            return None
+
+        # ── 1. Booking-level disabled dates ─────────────────────────────────
+        bookings = await db.booking.find_many(
+            where={
+                "unitId":   unit_id,
+                "clientId": client.id,
+                "status":   {"not": "cancelled"},
+            },
+            order={"checkIn": "asc"},
+        )
+        disabled_set: set[str] = set()
+        for b in bookings:
+            current = b.checkIn.date() if hasattr(b.checkIn, "date") else b.checkIn
+            end     = b.checkOut.date() if hasattr(b.checkOut, "date") else b.checkOut
+            while current < end:
+                disabled_set.add(current.strftime("%Y-%m-%d"))
+                current += timedelta(days=1)
+
+        # ── 2. Price-level disabled dates + custom price overrides ───────────
+        prices = await db.price.find_many(
+            where={"unitId": unit_id, "clientId": client.id},
+            order={"date": "asc"},
+        )
+        price_overrides: Dict[str, float] = {}
+        for p in prices:
+            d = p.date.date() if hasattr(p.date, "date") else p.date
+            d_str = d.strftime("%Y-%m-%d")
+            if not p.available:
+                disabled_set.add(d_str)
+            else:
+                price_overrides[d_str] = float(p.price)
+
+        return {
+            "disabled_dates":  sorted(disabled_set),
+            "price_overrides": price_overrides,
+        }
+    except Exception as e:
+        logger.error(
+            f"🔥 DB error in get_unit_calendar_data for slug={slug} unit={unit_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+# ── Smar default styling (applied on first deploy or missing fields) ──────────
+_SMAR_STYLING = {
+    "name_ar":         "بيت سمار",
+    "name_en":         "Beit Smar",
+    "primary_color":   "#d4a853",
+    "hero_video_url":  "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/Logo_Formation_Video_Ready.mp4",
+    "whatsapp_number": "96178727986",
+    "currency":        "USD",
+    "features":        {"spatial": True, "listings": True, "booking": True, "payment": True},
+    "unit_types":      ["villa", "chalet"],
+    "payment_methods": ["cash", "card", "whatsapp", "whish", "omt"],
+}
+
+# Full create payload — used only when the smar client row is entirely absent
+_SMAR_CREATE = {
+    "slug":  "smar",
+    "name":  "Beit Smar",
+    "phone": "+96178727986",
+    **_SMAR_STYLING,
+}
+
+
+def _record_to_dict(record) -> Dict[str, Any]:
+    return {
+        "slug":            record.slug,
+        "name_ar":         getattr(record, "name_ar",  None) or record.name,
+        "name_en":         getattr(record, "name_en",  None) or record.name,
+        "primary_color":   getattr(record, "primary_color",   None),
+        "hero_video_url":  getattr(record, "hero_video_url",  None),
+        "whatsapp_number": getattr(record, "whatsapp_number", None),
+        "currency":        getattr(record, "currency", "USD"),
+        "features":        getattr(record, "features", {}),
+        "unit_types":      getattr(record, "unit_types", []),
+        "payment_methods": getattr(record, "payment_methods", []),
+    }
+
+
+async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch tenant public config from the clients table.
+    If the client exists but has no styling (primary_color is null), auto-apply
+    SMAR defaults so the 404 vanishes on first deploy — no manual DB seed needed.
+    """
+    try:
+        record = await db.client.find_first(where={"slug": slug, "isActive": True})
+
+        if not record and slug == "smar":
+            logger.info("🌱 Auto-creating smar Client row with default styling")
+            record = await db.client.create(data=_SMAR_CREATE)
+
+        elif record and slug == "smar" and not record.primary_color:
+            logger.info("🎨 Auto-applying smar default styling to existing Client row")
+            record = await db.client.update(
+                where={"id": record.id},
+                data=_SMAR_STYLING,
+            )
+
+        if not record:
+            return None
+
+        return _record_to_dict(record)
+    except Exception as e:
+        logger.error(f"🔥 DB error fetching tenant config for '{slug}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
 
 async def get_client_catalog(
     db: Prisma,
@@ -109,16 +348,19 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             return None
 
         customer_phone = data.get("customer_phone")
-        customer = await db.customer.find_unique(where={"phone": customer_phone})
-        
+        customer = await db.customer.find_first(
+            where={"phone": customer_phone, "clientId": client.id}
+        )
+
         if not customer:
-            customer = await db.customer.create(
-                data={
-                    "clientId": client.id,
-                    "phone": customer_phone,
-                    "name": data.get("customer_name")
-                }
-            )
+            create_data: dict = {
+                "clientId": client.id,
+                "phone":    customer_phone,
+                "name":     data.get("customer_name"),
+            }
+            if data.get("customer_email"):
+                create_data["email"] = data["customer_email"]
+            customer = await db.customer.create(data=create_data)
 
         check_in_date = data.get("check_in") or (datetime.utcnow().date() + timedelta(days=1))
         check_out_date = data.get("check_out") or (datetime.utcnow().date() + timedelta(days=2))

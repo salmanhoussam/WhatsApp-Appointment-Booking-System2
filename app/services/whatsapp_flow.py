@@ -518,11 +518,13 @@ async def _resolve_client(display_phone: str):
 
 async def _estimate_price(session: ConversationSession) -> str:
     """Return a human-readable price estimate from the Price table."""
+    check_in_dt  = datetime.combine(session.check_in,  datetime.min.time())
+    check_out_dt = datetime.combine(session.check_out, datetime.min.time())
     prices = await prisma_client.price.find_many(
         where={
-            "unitId": session.unit_id,
-            "clientId": session.client_id,
-            "date": {"gte": session.check_in, "lt": session.check_out},
+            "unitId":    session.unit_id,
+            "clientId":  session.client_id,
+            "date":      {"gte": check_in_dt, "lt": check_out_dt},
             "available": True,
         }
     )
@@ -535,11 +537,13 @@ async def _estimate_price(session: ConversationSession) -> str:
 
 async def _calculate_total_price(session: ConversationSession) -> Decimal:
     """Sum up Price rows for the booking period."""
+    check_in_dt  = datetime.combine(session.check_in,  datetime.min.time())
+    check_out_dt = datetime.combine(session.check_out, datetime.min.time())
     prices = await prisma_client.price.find_many(
         where={
-            "unitId": session.unit_id,
+            "unitId":   session.unit_id,
             "clientId": session.client_id,
-            "date": {"gte": session.check_in, "lt": session.check_out},
+            "date":     {"gte": check_in_dt, "lt": check_out_dt},
         }
     )
     if not prices:

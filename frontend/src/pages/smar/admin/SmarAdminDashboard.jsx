@@ -16,6 +16,8 @@ import adminApi from '../../../utils/admin.config';
 import UnitCalendar from '../../../components/UnitCalendar';
 import UnitFormModal from './UnitFormModal';
 import ActionInbox from './components/ActionInbox';
+import SettingsTab from './components/SettingsTab';
+import TeamTab     from './components/TeamTab';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -223,6 +225,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded 
     { id: 'housekeeping', icon: '🧹', label: 'Housekeeping'  },
     { id: 'maintenance',  icon: '🔧', label: 'Maintenance'   },
     { id: 'gardens',      icon: '🌿', label: 'Gardens'       },
+    { id: 'settings',     icon: '⚙️', label: 'إعدادات المنصة' },
+    { id: 'team',         icon: '👥', label: 'إدارة الفريق'  },
   ];
   return (
     <div style={{
@@ -1657,6 +1661,8 @@ export default function SmarAdminDashboard() {
                 housekeeping: 'Housekeeping',
                 maintenance:  'Maintenance',
                 gardens:      'Gardens & Landscaping',
+                settings:     'إعدادات المنصة ⚙️',
+                team:         'إدارة الفريق 👥',
               }[activeTab] || 'Dashboard'}
             </h1>
           </div>
@@ -1689,6 +1695,8 @@ export default function SmarAdminDashboard() {
             {activeTab === 'housekeeping' && <HousekeepingTab />}
             {activeTab === 'maintenance'  && <MaintenanceTab  />}
             {activeTab === 'gardens'      && <GardensTab      />}
+            {activeTab === 'settings'     && <SettingsTab     />}
+            {activeTab === 'team'         && <TeamTab         />}
           </motion.div>
         </AnimatePresence>
       </div>

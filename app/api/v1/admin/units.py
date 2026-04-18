@@ -91,7 +91,7 @@ def _fmt(unit) -> dict:
     }
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+# ── Routes — collection endpoints FIRST, then item endpoints ──────────────────
 
 @router.get("/")
 async def list_units(tenant: dict = Depends(get_current_tenant)):
@@ -101,6 +101,45 @@ async def list_units(tenant: dict = Depends(get_current_tenant)):
         order=[{"unit_type": "asc"}, {"sort_order": "asc"}],
     )
     return [_fmt(u) for u in units]
+
+
+@router.post("/", status_code=201)
+async def create_unit(
+    body: UnitCreate,
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    Create a new unit.
+    propertyId is auto-resolved to the tenant's first active property.
+    """
+    prop = await prisma_client.property.find_first(
+        where={"clientId": tenant["id"], "isActive": True},
+        order={"createdAt": "asc"},
+    )
+    if not prop:
+        raise HTTPException(
+            status_code=422,
+            detail="No active property found for this tenant. Create a property first."
+        )
+
+    unit = await prisma_client.unit.create(
+        data={
+            "clientId":   tenant["id"],
+            "propertyId": prop.id,
+            "name_ar":    body.name_ar,
+            "name_en":    body.name_en,
+            "unit_type":  body.unit_type,
+            "capacity":   body.capacity,
+            "bedrooms":   body.bedrooms,
+            "bathrooms":  body.bathrooms,
+            "image_url":  body.images[0] if body.images and len(body.images) > 0 else body.image_url,
+            "images":     body.images if body.images else [],
+            "sort_order": body.sort_order,
+            "isActive":    True,
+            "isAvailable": True,
+        }
+    )
+    return _fmt(unit)
 
 
 @router.patch("/{unit_id}")
@@ -285,42 +324,3 @@ async def set_date_overrides(
         "is_blocked":   body.is_blocked,
         "custom_price": body.custom_price,
     }
-
-
-@router.post("/", status_code=201)
-async def create_unit(
-    body: UnitCreate,
-    tenant: dict = Depends(get_current_tenant),
-):
-    """
-    Create a new unit.
-    propertyId is auto-resolved to the tenant's first active property.
-    """
-    prop = await prisma_client.property.find_first(
-        where={"clientId": tenant["id"], "isActive": True},
-        order={"createdAt": "asc"},
-    )
-    if not prop:
-        raise HTTPException(
-            status_code=422,
-            detail="No active property found for this tenant. Create a property first."
-        )
-
-    unit = await prisma_client.unit.create(
-        data={
-            "clientId":   tenant["id"],
-            "propertyId": prop.id,
-            "name_ar":    body.name_ar,
-            "name_en":    body.name_en,
-            "unit_type":  body.unit_type,
-            "capacity":   body.capacity,
-            "bedrooms":   body.bedrooms,
-            "bathrooms":  body.bathrooms,
-            "image_url":  body.images[0] if body.images and len(body.images) > 0 else body.image_url,
-            "images":     body.images if body.images else [],
-            "sort_order": body.sort_order,
-            "isActive":    True,
-            "isAvailable": True,
-        }
-    )
-    return _fmt(unit)

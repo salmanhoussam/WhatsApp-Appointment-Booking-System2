@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence }      from 'framer-motion';
-import { useNavigate }                  from 'react-router-dom';
+import { useNavigate, useParams }        from 'react-router-dom';
 import { useSmarStore }                 from '../store/useSmarStore';
 
 // ── Assets ───────────────────────────────────────────────────────────────────
@@ -87,7 +87,8 @@ function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 export default function CollageScene() {
-  const navigate     = useNavigate();
+  const navigate         = useNavigate();
+  const { slug = 'smar' } = useParams();
   const tileRefs     = useRef([]);
   const ctaRef       = useRef(null);
 
@@ -152,7 +153,7 @@ export default function CollageScene() {
 
   const handleBook = () => {
     if (!expanded || !checkIn || !checkOut) return;
-    navigate('/payment', {
+    navigate(`/${slug}/payment`, {
       state: {
         formData: { unit_id: expanded.id, check_in: checkIn, check_out: checkOut, guests },
         unit: {
@@ -165,7 +166,7 @@ export default function CollageScene() {
         totalPrice:        null,
         availableServices: [],
         lang: 'en',
-        slug: 'smar',
+        slug,
       },
     });
   };
