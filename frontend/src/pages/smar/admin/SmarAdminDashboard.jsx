@@ -18,6 +18,7 @@ import UnitFormModal from './UnitFormModal';
 import ActionInbox from './components/ActionInbox';
 import SettingsTab from './components/SettingsTab';
 import TeamTab     from './components/TeamTab';
+import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../utils/useAdminRole';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -216,8 +217,8 @@ function GardensTab() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded }) {
-  const navItems = [
+function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded, role }) {
+  const ALL_NAV = [
     { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'  },
     { id: 'bookings',     icon: '📋', label: 'Reservations'  },
     { id: 'units',        icon: '🏠', label: 'الوحدات'       },
@@ -228,6 +229,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded 
     { id: 'settings',     icon: '⚙️', label: 'إعدادات المنصة' },
     { id: 'team',         icon: '👥', label: 'إدارة الفريق'  },
   ];
+  const navItems = ALL_NAV.filter(item => canAccessTab(role, item.id));
   return (
     <div style={{
       width:          isExpanded ? 220 : 80,
@@ -1620,12 +1622,24 @@ function UnitsTab() {
 }
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
+function UnauthorizedTab() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 12 }}>
+      <div style={{ fontSize: 40 }}>🔒</div>
+      <h2 style={{ color: C.textPri, fontSize: 20, fontWeight: 700, margin: 0 }}>غير مصرح لك</h2>
+      <p style={{ color: C.textMuted, fontSize: 14, margin: 0 }}>ليس لديك صلاحية الوصول إلى هذا القسم</p>
+    </div>
+  );
+}
+
 export default function SmarAdminDashboard() {
-  const [activeTab, setActiveTab] = useState('bookings');
+  const role = useAdminRole();
+  const allowedTabs = ROLE_TABS[role] ?? [];
+  const defaultTab = allowedTabs[0] ?? 'dashboard';
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const navigate = useNavigate();
 
-  // Guard: if no token, redirect to login
   useEffect(() => {
     const token = localStorage.getItem('admin_access_token');
     if (!token) navigate('/login', { replace: true });
@@ -1636,6 +1650,20 @@ export default function SmarAdminDashboard() {
     navigate('/login', { replace: true });
   };
 
+  const renderTab = () => {
+    if (!canAccessTab(role, activeTab)) return <UnauthorizedTab />;
+    if (activeTab === 'inbox')        return <ActionInbox     />;
+    if (activeTab === 'bookings')     return <BookingsTab     />;
+    if (activeTab === 'units')        return <UnitsTab        />;
+    if (activeTab === 'dashboard')    return <OverviewTab     />;
+    if (activeTab === 'housekeeping') return <HousekeepingTab />;
+    if (activeTab === 'maintenance')  return <MaintenanceTab  />;
+    if (activeTab === 'gardens')      return <GardensTab      />;
+    if (activeTab === 'settings')     return <SettingsTab     />;
+    if (activeTab === 'team')         return <TeamTab         />;
+    return null;
+  };
+
   return (
     <div style={{
       display:        'flex',
@@ -1644,7 +1672,14 @@ export default function SmarAdminDashboard() {
       fontFamily:     "'Inter', 'Segoe UI', sans-serif",
       color:          C.textPri,
     }}>
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+        isExpanded={isSidebarExpanded}
+        setIsExpanded={setIsSidebarExpanded}
+        role={role}
+      />
 
       {/* Main content */}
       <div style={{ flex: 1, padding: '40px 48px', overflowY: 'auto' }}>
@@ -1675,16 +1710,28 @@ export default function SmarAdminDashboard() {
               }[activeTab] || 'Dashboard'}
             </h1>
           </div>
-          <div style={{
-            padding:      '8px 16px',
-            borderRadius: 20,
-            background:   C.greenDim,
-            border:       `1px solid ${C.green}33`,
-            color:        C.green,
-            fontSize:     12,
-            fontWeight:   600,
-          }}>
-            ● Live
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {role && (
+              <div style={{
+                padding: '6px 12px', borderRadius: 20,
+                background: 'rgba(212,168,83,0.08)',
+                border: '1px solid rgba(212,168,83,0.2)',
+                color: C.gold, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
+              }}>
+                {role.replace(/_/g, ' ')}
+              </div>
+            )}
+            <div style={{
+              padding:      '8px 16px',
+              borderRadius: 20,
+              background:   C.greenDim,
+              border:       `1px solid ${C.green}33`,
+              color:        C.green,
+              fontSize:     12,
+              fontWeight:   600,
+            }}>
+              ● Live
+            </div>
           </div>
         </div>
 
@@ -1697,15 +1744,7 @@ export default function SmarAdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.18 }}
           >
-            {activeTab === 'inbox'        && <ActionInbox     />}
-            {activeTab === 'bookings'     && <BookingsTab     />}
-            {activeTab === 'units'        && <UnitsTab        />}
-            {activeTab === 'dashboard'    && <OverviewTab     />}
-            {activeTab === 'housekeeping' && <HousekeepingTab />}
-            {activeTab === 'maintenance'  && <MaintenanceTab  />}
-            {activeTab === 'gardens'      && <GardensTab      />}
-            {activeTab === 'settings'     && <SettingsTab     />}
-            {activeTab === 'team'         && <TeamTab         />}
+            {renderTab()}
           </motion.div>
         </AnimatePresence>
       </div>

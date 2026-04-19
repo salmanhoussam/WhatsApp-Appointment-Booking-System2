@@ -166,3 +166,25 @@ def invalidate_tenant_cache(slug: str) -> None:
     """Remove a slug from the in-process cache (call after client updates)."""
     _tenant_cache.pop(slug, None)
     logger.info("🗑️  Tenant cache invalidated: %s", slug)
+
+
+def require_roles(*allowed_roles: str):
+    """
+    Dependency factory — raises 403 if the admin user's role is not in allowed_roles.
+
+    Usage:
+        @router.patch("/settings")
+        async def update_settings(
+            user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+        ): ...
+    """
+    async def _dependency(request: Request):
+        user = await get_current_admin_user(request)
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Role '{role}' is not authorized. Required: {list(allowed_roles)}",
+            )
+        return user
+    return _dependency

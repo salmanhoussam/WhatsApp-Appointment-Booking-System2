@@ -46,13 +46,22 @@ model Client {
   @@schema("public")
 }
 
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  MANAGER_RESERVATIONS
+  MANAGER_UNITS
+
+  @@schema("public")
+}
+
 model User {
   id                String     @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
   clientId          String     @map("client_id") @db.Uuid
   email             String     @unique @map("email")
   password_hash     String     @map("password_hash")
   fullName          String     @map("full_name")
-  role              String     @default("manager") @map("role")
+  role              UserRole   @default(TENANT_ADMIN) @map("role")
   isActive          Boolean    @default(true) @map("is_active")
   createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)

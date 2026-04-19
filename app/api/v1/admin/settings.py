@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.db.client import prisma_client
-from app.core.tenant import get_current_tenant, invalidate_tenant_cache
+from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Settings"])
@@ -73,6 +73,7 @@ async def get_settings(tenant: dict = Depends(get_current_tenant)):
 async def update_settings(
     body: SettingsUpdateRequest,
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Partial update — only fields explicitly set in the request body are written.
