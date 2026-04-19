@@ -15,3 +15,4 @@ export { default as Skeleton    } from './Skeleton';
 export { default as GlassCard   } from './GlassCard';
 export { default as PriceTag    } from './PriceTag';
 export { default as GoldDot     } from './GoldDot';
+export { default as SEO         } from './SEO';

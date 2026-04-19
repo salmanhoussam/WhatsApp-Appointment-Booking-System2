@@ -8,16 +8,24 @@ Tenancy:    every query filtered by clientId from the token
 """
 
 from datetime import date, timedelta
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.services.storage_service import (
+    upload_unit_image as _svc_upload,
+    delete_unit_image as _svc_delete,
+)
 
 router = APIRouter(prefix="/units", tags=["Admin Units"])
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
+
+class ImageDeleteRequest(BaseModel):
+    url: str
+
 
 class UnitUpdate(BaseModel):
     """PATCH body — send only the field(s) you want to change."""
@@ -334,3 +342,71 @@ async def set_date_overrides(
         "is_blocked":   body.is_blocked,
         "custom_price": body.custom_price,
     }
+
+
+@router.post("/{unit_id}/images", status_code=201)
+async def upload_image(
+    unit_id: str,
+    file: UploadFile = File(...),
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    Upload an image for a unit to Supabase Storage.
+    Appends the returned public URL to Unit.images and updates Unit.image_url
+    to the first image in the array.
+    """
+    unit = await prisma_client.unit.find_first(
+        where={"id": unit_id, "clientId": tenant["id"]}
+    )
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found.")
+
+    file_bytes = await file.read()
+
+    public_url = await _svc_upload(
+        client_slug=tenant["slug"],
+        unit_id=unit_id,
+        file_bytes=file_bytes,
+        content_type=file.content_type or "image/jpeg",
+        original_filename=file.filename or "image.jpg",
+    )
+
+    current_images = list(getattr(unit, "images", []) or [])
+    new_images = current_images + [public_url]
+
+    updated = await prisma_client.unit.update(
+        where={"id": unit_id},
+        data={"images": new_images, "image_url": new_images[0]},
+    )
+    return {"images": list(updated.images), "image_url": updated.image_url}
+
+
+@router.delete("/{unit_id}/images")
+async def delete_image(
+    unit_id: str,
+    body: ImageDeleteRequest,
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    Remove an image from Supabase Storage and from Unit.images array.
+    Updates Unit.image_url to the next remaining image (or null if empty).
+    """
+    unit = await prisma_client.unit.find_first(
+        where={"id": unit_id, "clientId": tenant["id"]}
+    )
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found.")
+
+    await _svc_delete(body.url)
+
+    current_images = list(getattr(unit, "images", []) or [])
+    new_images = [u for u in current_images if u != body.url]
+
+    updated = await prisma_client.unit.update(
+        where={"id": unit_id},
+        data={
+            "images":    new_images,
+            "image_url": new_images[0] if new_images else None,
+        },
+    )
+    return {"images": list(updated.images), "image_url": updated.image_url}

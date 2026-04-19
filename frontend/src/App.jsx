@@ -16,8 +16,10 @@
 
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import Login from './pages/admin/Login';
 import TenantResolver from './router/TenantResolver';
+import ProtectedRoute from './router/ProtectedRoute';
 import { LanguageProvider } from './context/LanguageContext';
 
 // Lazy — keeps heavy admin deps out of the main bundle
@@ -54,6 +56,7 @@ function NotFound() {
 
 function App() {
   return (
+    <HelmetProvider>
     <LanguageProvider>
       <BrowserRouter>
         <Routes>
@@ -62,7 +65,11 @@ function App() {
 
           {/* ── Static admin routes ── */}
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard/:slug/*" element={<Suspense fallback={null}><SmarAdminDashboard /></Suspense>} />
+          <Route path="/dashboard/:slug/*" element={
+            <ProtectedRoute>
+              <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+            </ProtectedRoute>
+          } />
 
           {/* ── 404 ── */}
           <Route path="/404" element={<NotFound />} />
@@ -72,6 +79,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </LanguageProvider>
+    </HelmetProvider>
   );
 }
 

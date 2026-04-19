@@ -56,28 +56,30 @@ const INPUT_STYLE = {
   border:       '1px solid rgba(255,255,255,0.11)',
   borderRadius: 10,
   color:        '#fff',
-  fontSize:     13,
-  padding:      '9px 12px',
+  fontSize:     14,
+  padding:      '13px 12px',
   outline:      'none',
   width:        '100%',
   boxSizing:    'border-box',
   colorScheme:  'dark',
+  minHeight:    48,
 };
 
 const COUNTER_BTN_BASE = {
   display:        'flex',
   alignItems:     'center',
   justifyContent: 'center',
-  width:          32,
-  height:         32,
-  borderRadius:   8,
+  width:          44,
+  height:         44,
+  borderRadius:   10,
   background:     'rgba(255,255,255,0.06)',
   border:         '1px solid rgba(255,255,255,0.11)',
   color:          '#fff',
-  fontSize:       19,
+  fontSize:       20,
   cursor:         'pointer',
   userSelect:     'none',
   lineHeight:     1,
+  flexShrink:     0,
 };
 
 // ── Counter row ───────────────────────────────────────────────────────────────
@@ -143,6 +145,14 @@ export default function BookingDrawer({ isOpen, unit, onClose }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Body scroll lock — the drawer itself stays scrollable via overflowY:auto
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   // Reset form whenever a new unit is opened
   useEffect(() => {

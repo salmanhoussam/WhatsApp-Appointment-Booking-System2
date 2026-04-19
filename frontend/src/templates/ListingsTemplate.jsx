@@ -20,6 +20,7 @@
 import { useState }                                             from 'react';
 import { TenantHeader, UnitGrid, BookingDrawer,
          TenantFooter }                                        from '../design-system/organisms';
+import { SEO }                                                 from '../design-system/atoms';
 
 // ── Template ──────────────────────────────────────────────────────────────────
 export default function ListingsTemplate() {
@@ -27,6 +28,7 @@ export default function ListingsTemplate() {
 
   return (
     <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+      <SEO title="الوحدات" />
 
       {/* ── Sticky navigation ── */}
       <TenantHeader />

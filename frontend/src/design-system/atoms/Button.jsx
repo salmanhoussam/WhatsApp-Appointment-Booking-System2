@@ -62,7 +62,8 @@ const VARIANTS = {
 
 const BASE = [
   'inline-flex items-center justify-center gap-2',
-  'px-5 py-2.5',
+  'px-5 py-3',
+  'min-h-[48px]',
   'rounded-[8px]',
   'text-xs tracking-[0.18em] uppercase',
   'cursor-pointer',

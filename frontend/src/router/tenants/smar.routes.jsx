@@ -22,6 +22,7 @@
 
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import ProtectedRoute from '../ProtectedRoute';
 
 // ListingsTemplate — no scroll hooks, direct import is safe
 import ListingsTemplate  from '../../templates/ListingsTemplate';
@@ -81,8 +82,12 @@ export default function SmarRoutes() {
       {/* ── Liquid ring hero ── */}
       <Route path="ring"  element={<Lazy component={SmarLiquidRing} />} />
 
-      {/* ── Admin portal ── */}
-      <Route path="admin" element={<Lazy component={SmarAdminDashboard} />} />
+      {/* ── Admin portal — JWT required ── */}
+      <Route path="admin" element={
+        <ProtectedRoute>
+          <Lazy component={SmarAdminDashboard} />
+        </ProtectedRoute>
+      } />
 
       {/* ── Default & catch-all → showcase ─────────────────────────────────────
           Use RELATIVE path "showcase" (no leading slash).

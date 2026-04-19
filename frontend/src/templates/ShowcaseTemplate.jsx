@@ -23,6 +23,7 @@ import { ScrollTrigger }             from 'gsap/ScrollTrigger';
 import useTenantSlug                 from '../utils/useTenantSlug';
 import TenantHeader                  from '../design-system/organisms/TenantHeader';
 import useTenantConfig               from '../hooks/useTenantConfig';
+import { SEO }                       from '../design-system/atoms';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -243,11 +244,18 @@ const STYLES = `
   @media (max-width:640px) {
     .sc-nav-links { display:none; }
     .sc-glass { padding:1.5rem; }
-    .sc-finale-links { gap:1.5rem; }
+    .sc-finale-links { gap:1rem; }
+    .sc-finale-btn { padding:.85rem 2rem; font-size:.85rem; }
     .sc-glass-r,.sc-glass-l {
       top:auto; bottom:8%; transform:none;
       left:5%; right:5%; width:auto;
     }
+  }
+
+  @media (max-width:480px) {
+    .sc-finale-h { font-size:clamp(1.8rem,8vw,2.8rem); }
+    .sc-glass-title { font-size:clamp(1.2rem,5vw,1.6rem); }
+    .sc-glass-desc { font-size:.84rem; }
   }
 
   /* ── Villa Coming Soon Modal ─────────────────────────────────────────────── */
@@ -533,6 +541,7 @@ export default function ShowcaseTemplate() {
 
   return (
     <>
+      <SEO title="الرئيسية" />
       <style>{STYLES}</style>
 
       {/* Gold progress bar */}
@@ -619,7 +628,7 @@ export default function ShowcaseTemplate() {
             }} dir="rtl">
               <h1 style={{
                 color: '#d4a853',
-                fontSize: 'clamp(56px, 9.5vw, 128px)',
+                fontSize: 'clamp(28px, 9.5vw, 128px)',
                 fontWeight: 900, lineHeight: 1.0,
                 letterSpacing: '-0.02em', margin: '0 0 20px 0',
                 textShadow: '0 4px 32px rgba(212,168,83,0.45), 0 12px 60px rgba(0,0,0,0.8)',

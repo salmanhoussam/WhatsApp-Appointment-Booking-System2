@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const AUTH_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/v1/auth/login`
+  : 'http://127.0.0.1:8000/api/v1/auth/login';
+
 export default function Login() {
   const [identifier, setIdentifier] = useState(''); // سيحتوي على بريد إلكتروني أو هاتف أو slug
   const [password, setPassword] = useState('');
@@ -16,7 +20,7 @@ export default function Login() {
 
     try {
       // نرسل القيمة في حقل identifier (الباك إند يبحث في slug, email, phone)
-      const response = await axios.post('http://127.0.0.1:8000/api/v1/auth/login', {
+      const response = await axios.post(AUTH_URL, {
         identifier,
         password
       });

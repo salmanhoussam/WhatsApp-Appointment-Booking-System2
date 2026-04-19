@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence }          from 'framer-motion';
 import { TenantHeader, TenantFooter }       from '../../../design-system/organisms';
+import { SEO }                              from '../../../design-system/atoms';
 import publicApi                            from '../../../utils/publicApi';
 import useTenantSlug                        from '../../../utils/useTenantSlug';
 
@@ -139,6 +140,10 @@ export default function SmarGalleryPage() {
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{ minHeight: '100vh', background: '#0a0a0f', color: '#f0ebe3' }}
     >
+      <SEO
+        title="معرض الصور"
+        image="https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/gallery/beitsmar1.jpg"
+      />
       <TenantHeader />
 
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
@@ -254,7 +259,9 @@ export default function SmarGalleryPage() {
       </div>
 
       {/* ── Content Area ────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '72rem', margin: '0 auto', padding: '0 1.5rem 5rem' }}>
+      <div style={{ maxWidth: '72rem', margin: '0 auto', paddingBottom: '5rem' }}
+           className="px-4 sm:px-6 lg:px-8"
+      >
 
         {/* ── Skeleton loader ─────────────────────────────────────────────── */}
         {isLoading && (
