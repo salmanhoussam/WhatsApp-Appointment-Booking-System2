@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from 'lucide-react';
 import { Button } from '../atoms';
-import LoginModal from './LoginModal';
+import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
 import useTenantSlug   from '../../utils/useTenantSlug';
 
@@ -259,7 +259,7 @@ export default function TenantHeader() {
       </div>
     </header>
 
-    <LoginModal
+    <GlobalAuthModal
       isOpen={isLoginModalOpen}
       onClose={() => setIsLoginModalOpen(false)}
     />
