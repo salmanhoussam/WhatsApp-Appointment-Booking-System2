@@ -35,13 +35,20 @@ class Settings(BaseSettings):
     @property
     def CORS_ORIGINS(self) -> List[str]:
         origins = [
+            # Local dev
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:3000",
             "http://localhost:8000",
+            # Production — hardcoded as safety baseline so CORS never
+            # breaks if FRONTEND_URL env var is mis-configured on Railway
+            "https://salmansaas.com",
+            "https://www.salmansaas.com",
+            "https://smar.salmansaas.com",
+            "https://auth.salmansaas.com",
         ]
         if self.FRONTEND_URL:
-            # دعم عدة روابط مفصولة بفاصلة
+            # Additional origins from Railway env var (comma-separated)
             for url in self.FRONTEND_URL.split(","):
                 url = url.strip()
                 if url and url not in origins:

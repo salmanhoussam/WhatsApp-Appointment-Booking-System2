@@ -20,12 +20,13 @@ import { User } from 'lucide-react';
 import { Button } from '../atoms';
 import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
-import useTenantSlug   from '../../utils/useTenantSlug';
+import useTenantSlug, { useTenantBase } from '../../utils/useTenantSlug';
 
 export default function TenantHeader() {
   const { config } = useTenantConfig();
   const navigate   = useNavigate();
   const slug       = useTenantSlug();
+  const base       = useTenantBase();
 
   const [scrolled,        setScrolled]        = useState(false);
   const [lang,            setLang]            = useState('ar');
@@ -34,9 +35,9 @@ export default function TenantHeader() {
 
   // ── Nav link actions ──────────────────────────────────────────────────────
   const NAV_LINKS = [
-    { ar: 'الرئيسية',   en: 'Home',    action: () => navigate(`/${slug}/showcase`) },
-    { ar: 'الوحدات',    en: 'Units',   action: () => navigate(`/${slug}/listings`) },
-    { ar: 'معرض الصور', en: 'Gallery', action: () => navigate(`/${slug}/gallery`) },
+    { ar: 'الرئيسية',   en: 'Home',    action: () => navigate(`${base}/showcase`) },
+    { ar: 'الوحدات',    en: 'Units',   action: () => navigate(`${base}/listings`) },
+    { ar: 'معرض الصور', en: 'Gallery', action: () => navigate(`${base}/gallery`) },
     {
       ar: 'تواصل معنا', en: 'Contact',
       action: () => {

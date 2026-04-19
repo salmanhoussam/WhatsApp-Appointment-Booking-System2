@@ -17,6 +17,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect }     from 'react';
 import { useNavigate }             from 'react-router-dom';
+import { useTenantBase }           from '../../../utils/useTenantSlug';
 import publicApi                   from '../../../utils/publicApi';
 import UnitCalendar                from '../../../components/UnitCalendar';
 
@@ -198,6 +199,7 @@ function nightsBetween(a, b) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, lang = 'ar' }) {
   const navigate = useNavigate();
+  const base     = useTenantBase();
 
   // Date state — seeded from searchDates prop if provided, otherwise user picks via calendar
   const [dates, setDates] = useState({
@@ -277,7 +279,7 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
         ]);
 
         onClose();
-        navigate(`/${slug}/payment`, {
+        navigate(`${base}/payment`, {
           state: {
             formData:          { ...form, check_in: ci, check_out: co, unit_id: unit.id },
             unit,

@@ -20,7 +20,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate }                        from 'react-router-dom';
 import gsap                          from 'gsap';
 import { ScrollTrigger }             from 'gsap/ScrollTrigger';
-import useTenantSlug                 from '../utils/useTenantSlug';
+import useTenantSlug, { useTenantBase } from '../utils/useTenantSlug';
 import TenantHeader                  from '../design-system/organisms/TenantHeader';
 import useTenantConfig               from '../hooks/useTenantConfig';
 import { SEO }                       from '../design-system/atoms';
@@ -337,6 +337,7 @@ const STYLES = `
 export default function ShowcaseTemplate() {
   const navigate      = useNavigate();
   const slug          = useTenantSlug() ?? 'smar';
+  const base          = useTenantBase();
   const { config }    = useTenantConfig();
 
   const [villaModalOpen, setVillaModalOpen] = useState(false);
@@ -732,7 +733,7 @@ export default function ShowcaseTemplate() {
               </p>
               <button
                 className="sc-glass-cta"
-                onClick={() => navigate(`/${slug}/listings?type=chalet`)}
+                onClick={() => navigate(`${base}/listings?type=chalet`)}
               >
                 استكشف الشاليهات
               </button>
@@ -757,7 +758,7 @@ export default function ShowcaseTemplate() {
               </p>
               <button
                 className="sc-glass-cta"
-                onClick={() => navigate(`/${slug}/listings`)}
+                onClick={() => navigate(`${base}/listings`)}
               >
                 اكتشف كل ما نقدمه
               </button>
@@ -785,7 +786,7 @@ export default function ShowcaseTemplate() {
                 ref={ctaRef}
                 className="sc-finale-btn"
                 style={{ opacity: 0 }}
-                onClick={() => navigate(`/${slug}/listings`)}
+                onClick={() => navigate(`${base}/listings`)}
               >
                 احجز إقامتك الآن
               </button>
@@ -793,19 +794,19 @@ export default function ShowcaseTemplate() {
               <div ref={finaleLinksRef} className="sc-finale-links" style={{ opacity: 0 }}>
                 <button
                   className="sc-finale-link"
-                  onClick={() => navigate(`/${slug}/listings?type=villa`)}
+                  onClick={() => navigate(`${base}/listings?type=villa`)}
                 >
                   الفلل
                 </button>
                 <button
                   className="sc-finale-link"
-                  onClick={() => navigate(`/${slug}/listings?type=chalet`)}
+                  onClick={() => navigate(`${base}/listings?type=chalet`)}
                 >
                   الشاليهات
                 </button>
                 <button
                   className="sc-finale-link"
-                  onClick={() => navigate(`/${slug}/listings`)}
+                  onClick={() => navigate(`${base}/listings`)}
                 >
                   جميع الوحدات
                 </button>

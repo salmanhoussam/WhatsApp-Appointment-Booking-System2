@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence }      from 'framer-motion';
 import { useNavigate, useParams }        from 'react-router-dom';
+import { useTenantBase }                 from '../../../utils/useTenantSlug';
 import { useSmarStore }                 from '../store/useSmarStore';
 
 // ── Assets ───────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 export default function CollageScene() {
   const navigate         = useNavigate();
   const { slug = 'smar' } = useParams();
+  const base             = useTenantBase();
   const tileRefs     = useRef([]);
   const ctaRef       = useRef(null);
 
@@ -153,7 +155,7 @@ export default function CollageScene() {
 
   const handleBook = () => {
     if (!expanded || !checkIn || !checkOut) return;
-    navigate(`/${slug}/payment`, {
+    navigate(`${base}/payment`, {
       state: {
         formData: { unit_id: expanded.id, check_in: checkIn, check_out: checkOut, guests },
         unit: {

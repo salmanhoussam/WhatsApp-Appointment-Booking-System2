@@ -23,6 +23,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTenantBase } from '../../../utils/useTenantSlug';
 import { motion, AnimatePresence } from 'framer-motion';
 import publicApi from '../../../utils/publicApi';
 
@@ -354,6 +355,7 @@ const counterBtnStyle = {
 export default function SpatialPropertyDetails() {
   const { slug = 'smar', id } = useParams();
   const navigate       = useNavigate();
+  const base           = useTenantBase();
   const location       = useLocation();
   const videoRef       = useRef(null);
 
@@ -459,7 +461,7 @@ export default function SpatialPropertyDetails() {
       }}>
         {/* Back button */}
         <motion.button
-          onClick={() => navigate(`/${slug}/listings`)}
+          onClick={() => navigate(`${base}/listings`)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           style={{

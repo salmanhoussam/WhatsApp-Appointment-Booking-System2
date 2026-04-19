@@ -25,6 +25,11 @@ import { LanguageProvider } from './context/LanguageContext';
 // Lazy — keeps heavy admin deps out of the main bundle
 const SmarAdminDashboard = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
 
+// Detect subdomain mode at module scope (stable across renders)
+const _h = window.location.hostname;
+const IS_SUBDOMAIN_MODE =
+  _h !== 'localhost' && !_h.startsWith('127.') && _h.split('.').length >= 3;
+
 function NotFound() {
   return (
     <div style={{
@@ -61,7 +66,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* ── Root redirect ── */}
-          <Route path="/" element={<Navigate to="/smar" replace />} />
+          <Route path="/" element={
+            <Navigate to={IS_SUBDOMAIN_MODE ? '/showcase' : '/smar'} replace />
+          } />
 
           {/* ── Static admin routes ── */}
           <Route path="/login" element={<Login />} />
@@ -74,8 +81,13 @@ function App() {
           {/* ── 404 ── */}
           <Route path="/404" element={<NotFound />} />
 
-          {/* ── Dynamic tenant routes (must be last) ── */}
-          <Route path="/:slug/*" element={<TenantResolver />} />
+          {/* ── Dynamic tenant routes (must be last) ──
+               Subdomain mode: /* so smar.domain.com/showcase resolves cleanly
+               Localhost mode:  /:slug/* so /smar/showcase resolves correctly  */}
+          {IS_SUBDOMAIN_MODE
+            ? <Route path="/*"       element={<TenantResolver />} />
+            : <Route path="/:slug/*" element={<TenantResolver />} />
+          }
         </Routes>
       </BrowserRouter>
     </LanguageProvider>

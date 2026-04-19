@@ -71,6 +71,22 @@ export default function TenantResolver() {
     return <Navigate to="/smar" replace />;
   }
 
+  // auth.salmansaas.com → centralized SSO portal (Phase C: full page built there)
+  // For now routes to /login; Phase C will replace this with the SSO auth page.
+  if (activeSlug === 'auth') {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Legacy URL fix: smar.salmansaas.com/smar/showcase → /showcase
+  // Happens when old links or navigate() calls still include the slug prefix.
+  if (subdomain) {
+    const path = window.location.pathname;
+    if (path.startsWith(`/${subdomain}/`) || path === `/${subdomain}`) {
+      const stripped = path.slice(subdomain.length + 1) || '/showcase';
+      return <Navigate to={stripped + window.location.search} replace />;
+    }
+  }
+
   const tenant = tenantRegistry[activeSlug];
   if (!tenant) {
     return <Navigate to="/404" replace />;

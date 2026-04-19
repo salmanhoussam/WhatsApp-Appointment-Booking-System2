@@ -5,32 +5,39 @@
  *   • Subdomain  (smar.salmansaas.com/*)  → reads from hostname  → "smar"
  *   • Path-based (localhost/smar/*)        → reads from useParams → "smar"
  *
- * Problem this solves:
- *   App.jsx mounts the catch-all at /:slug/*, so on a subdomain like
- *   smar.salmansaas.com/showcase, useParams().slug === "showcase" (the
- *   path segment), NOT "smar" (the subdomain). This hook fixes that.
+ * Also exports useTenantBase() which returns the route prefix for navigate():
+ *   • Subdomain mode  → ""         (navigate('/showcase'))
+ *   • Path-based mode → "/smar"    (navigate('/smar/showcase'))
+ *
+ * This eliminates the double-slug URL bug (smar.salmansaas.com/smar/showcase).
  */
 
 import { useParams } from 'react-router-dom';
 
+function _isSubdomainMode() {
+  const h = window.location.hostname;
+  const isLocal = h === 'localhost' || h.startsWith('127.') || h.startsWith('192.168.');
+  if (isLocal) return false;
+  const parts = h.split('.');
+  return parts.length >= 3 && parts[0] !== 'www';
+}
+
 export default function useTenantSlug() {
   const { slug: pathSlug } = useParams();
-  const hostname = window.location.hostname;
-
-  // Treat localhost and 127.x.x.x as path-based
-  const isLocalhost =
-    hostname === 'localhost' ||
-    hostname.startsWith('127.') ||
-    hostname.startsWith('192.168.');
-
-  if (!isLocalhost) {
-    const parts = hostname.split('.');
-    // e.g. ["smar", "salmansaas", "com"] — length >= 3 and not "www"
-    if (parts.length >= 3 && parts[0] !== 'www') {
-      return parts[0];
-    }
+  if (_isSubdomainMode()) {
+    return window.location.hostname.split('.')[0];
   }
-
-  // Path-based fallback (localhost dev)
   return pathSlug;
+}
+
+/**
+ * useTenantBase()
+ * Returns the navigation prefix to prepend to tenant-scoped routes.
+ *   Subdomain: ""        → navigate(`${base}/showcase`) == navigate('/showcase')
+ *   Localhost: "/smar"   → navigate(`${base}/showcase`) == navigate('/smar/showcase')
+ */
+export function useTenantBase() {
+  const { slug: pathSlug } = useParams();
+  if (_isSubdomainMode()) return '';
+  return `/${pathSlug ?? ''}`;
 }
