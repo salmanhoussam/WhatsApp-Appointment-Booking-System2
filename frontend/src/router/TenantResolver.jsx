@@ -21,9 +21,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Suspense } from 'react';
-import { Navigate }  from 'react-router-dom';
-import { tenantRegistry } from './tenants/index';
+import { Suspense, lazy } from 'react';
+import { Navigate }        from 'react-router-dom';
+import { tenantRegistry }  from './tenants/index';
+
+const SSOLoginPage = lazy(() => import('../pages/auth/SSOLoginPage'));
 
 // ── Full-screen gold-dot fallback (shown while lazy chunk downloads) ──────────
 function TenantFallback() {
@@ -71,10 +73,13 @@ export default function TenantResolver() {
     return <Navigate to="/smar" replace />;
   }
 
-  // auth.salmansaas.com → centralized SSO portal (Phase C: full page built there)
-  // For now routes to /login; Phase C will replace this with the SSO auth page.
-  if (activeSlug === 'auth') {
-    return <Navigate to="/login" replace />;
+  // auth.salmansaas.com → render the SSO login page directly, no tenant routing
+  if (hostname.startsWith('auth.')) {
+    return (
+      <Suspense fallback={<TenantFallback />}>
+        <SSOLoginPage />
+      </Suspense>
+    );
   }
 
   // Legacy URL fix: smar.salmansaas.com/smar/showcase → /showcase

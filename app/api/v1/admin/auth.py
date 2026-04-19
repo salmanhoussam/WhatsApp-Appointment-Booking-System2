@@ -8,11 +8,31 @@ Two login flows:
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from app.db.client import prisma_client
 from app.core.security import verify_password, create_access_token
+from app.core.config import settings
+
+# Cookie lives on the root domain so all subdomains receive it automatically.
+# On localhost the domain kwarg is omitted (browsers reject .salmansaas.com there).
+_COOKIE_DOMAIN = ".salmansaas.com" if settings.is_production() else None
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    """Attach an HttpOnly JWT cookie valid across all *.salmansaas.com subdomains."""
+    kwargs = dict(
+        key="admin_access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_production(),
+        max_age=86400,
+    )
+    if _COOKIE_DOMAIN:
+        kwargs["domain"] = _COOKIE_DOMAIN
+    response.set_cookie(**kwargs)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +72,7 @@ class UserLoginResponse(BaseModel):
 # ── Client (tenant root) login ─────────────────────────────────────────────────
 
 @router.post("/login", response_model=ClientLoginResponse)
-async def client_login(request: ClientLoginRequest):
+async def client_login(request: ClientLoginRequest, response: Response):
     """
     Authenticates the tenant root account (Client model).
     Accepts slug, email, or phone as the identifier.
@@ -90,6 +110,7 @@ async def client_login(request: ClientLoginRequest):
             "phone": client.phone,
         })
 
+        _set_auth_cookie(response, token)
         logger.info("✅ Client login success: %s", client.slug)
         return ClientLoginResponse(
             token=token,
@@ -109,7 +130,7 @@ async def client_login(request: ClientLoginRequest):
 # ── User (staff / manager) login ───────────────────────────────────────────────
 
 @router.post("/users/login", response_model=UserLoginResponse)
-async def user_login(request: UserLoginRequest):
+async def user_login(request: UserLoginRequest, response: Response):
     """
     Authenticates a staff member or manager (User model).
     Returns a JWT with type='admin', user_id, client_id, and role.
@@ -145,6 +166,7 @@ async def user_login(request: UserLoginRequest):
             "role": user.role,
         })
 
+        _set_auth_cookie(response, token)
         logger.info("✅ User login success: %s (role=%s)", user.email, user.role)
         return UserLoginResponse(
             token=token,

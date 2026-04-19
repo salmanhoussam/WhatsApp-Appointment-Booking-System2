@@ -1,17 +1,35 @@
 /**
  * ProtectedRoute.jsx
  *
- * Guards any route that requires an authenticated admin session.
- * Reads `admin_access_token` from localStorage — the same key
- * that Login.jsx writes on successful auth.
+ * Guards admin routes. Two auth sources are supported:
  *
- * Usage (in smar.routes.jsx):
- *   <Route path="admin" element={<ProtectedRoute><Lazy component={SmarAdminDashboard} /></ProtectedRoute>} />
+ *   1. localStorage `admin_access_token`  — set by the local Login.jsx
+ *   2. URL `?token=<jwt>`                 — set by SSOLoginPage redirect from
+ *                                           auth.salmansaas.com (cross-subdomain)
+ *
+ * SSO token handoff flow:
+ *   auth.salmansaas.com logs in → redirects to
+ *   smar.salmansaas.com/dashboard/smar/units?token=<jwt>
+ *   ProtectedRoute reads ?token=, saves to localStorage, strips from URL,
+ *   then renders the protected page on the next pass.
  */
 
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 export default function ProtectedRoute({ children }) {
+  const location = useLocation();
+
+  // ── SSO token handoff ────────────────────────────────────────────────────────
+  const params   = new URLSearchParams(location.search);
+  const urlToken = params.get('token');
+  if (urlToken) {
+    localStorage.setItem('admin_access_token', urlToken);
+    params.delete('token');
+    const clean = location.pathname + (params.toString() ? `?${params.toString()}` : '');
+    return <Navigate to={clean} replace />;
+  }
+
+  // ── Standard localStorage guard ──────────────────────────────────────────────
   const token = typeof window !== 'undefined'
     ? localStorage.getItem('admin_access_token')
     : null;
