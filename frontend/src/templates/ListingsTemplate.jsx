@@ -17,17 +17,9 @@
  *   Overlay fade uses animate={{ opacity: 1 }} on a plain motion.div — no MotionValues.
  */
 
-import { useState }    from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TenantHeader, UnitGrid, BookingFlow } from '../design-system/organisms';
-
-// ── Overlay fade variants — plain objects, no MotionValues ────────────────────
-const OVERLAY_VARIANTS = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit:    { opacity: 0 },
-};
-const OVERLAY_TRANSITION = { duration: 0.2, ease: 'easeOut' };
+import { useState }                                             from 'react';
+import { TenantHeader, UnitGrid, BookingDrawer,
+         TenantFooter }                                        from '../design-system/organisms';
 
 // ── Template ──────────────────────────────────────────────────────────────────
 export default function ListingsTemplate() {
@@ -36,10 +28,10 @@ export default function ListingsTemplate() {
   return (
     <div className="relative min-h-screen bg-[#0a0a0f] text-white">
 
-      {/* ── Sticky navigation ────────────────────────────────────────────────── */}
+      {/* ── Sticky navigation ── */}
       <TenantHeader />
 
-      {/* ── Unit grid — pt-24 clears the fixed header (h-66 ≈ 66px) ─────────── */}
+      {/* ── Unit grid — pt-24 clears the fixed header ── */}
       <main className="pt-24 pb-12">
         <UnitGrid
           lang="ar"
@@ -47,30 +39,14 @@ export default function ListingsTemplate() {
         />
       </main>
 
-      {/* ── BookingFlow overlay ───────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {selectedUnit && (
-          <motion.div
-            key="booking-overlay"
-            className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-[#0a0a0f]/80 p-4 pt-10 backdrop-blur-sm"
-            variants={OVERLAY_VARIANTS}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={OVERLAY_TRANSITION}
-            // Clicking the backdrop (not the card) closes the overlay
-            onMouseDown={e => {
-              if (e.target === e.currentTarget) setSelectedUnit(null);
-            }}
-          >
-            <BookingFlow
-              unit={selectedUnit}
-              onCancel={() => setSelectedUnit(null)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Booking drawer — manages its own AnimatePresence + slide animation ── */}
+      <BookingDrawer
+        isOpen={!!selectedUnit}
+        unit={selectedUnit}
+        onClose={() => setSelectedUnit(null)}
+      />
 
+      <TenantFooter />
     </div>
   );
 }

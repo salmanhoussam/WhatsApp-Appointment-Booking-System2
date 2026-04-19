@@ -29,6 +29,8 @@ class SettingsUpdateRequest(BaseModel):
     primary_color:   Optional[str]       = None
     hero_video_url:  Optional[str]       = None
     whatsapp_number: Optional[str]       = None
+    instagram_url:   Optional[str]       = None
+    maps_url:        Optional[str]       = None
     currency:        Optional[str]       = None
     payment_methods: Optional[List[str]] = None
     unit_types:      Optional[List[str]] = None
@@ -53,6 +55,8 @@ async def get_settings(tenant: dict = Depends(get_current_tenant)):
             "primary_color":   client.primary_color,
             "hero_video_url":  client.hero_video_url,
             "whatsapp_number": client.whatsapp_number,
+            "instagram_url":   getattr(client, "instagram_url", None),
+            "maps_url":        getattr(client, "maps_url", None),
             "currency":        client.currency,
             "features":        client.features,
             "unit_types":      client.unit_types,

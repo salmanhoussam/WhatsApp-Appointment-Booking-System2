@@ -5,7 +5,7 @@
  * Composes Atoms only — ZERO data fetching, ZERO routing.
  *
  * Props:
- *   unit       — { id, name_ar, name_en, price, image_url, type, available }
+ *   unit       — { id, name_ar, name_en, description_ar, description_en, capacity, price, image_url, type, available }
  *   lang       — 'ar' | 'en'  (default 'ar')
  *   currency   — string passed to <PriceTag> (default 'USD')
  *   onSelect   — fn(unit) — called when the CTA button is clicked
@@ -42,6 +42,9 @@ export default function UnitCard({
     id,
     name_ar,
     name_en,
+    description_ar,
+    description_en,
+    capacity,
     price,
     image_url,
     type      = 'chalet',
@@ -49,6 +52,7 @@ export default function UnitCard({
   } = unit;
 
   const displayName = lang === 'ar' ? (name_ar || name_en) : (name_en || name_ar);
+  const displayDesc = lang === 'ar' ? (description_ar || description_en) : (description_en || description_ar);
   const typeLabel   = TYPE_LABEL[type]?.[lang] ?? type;
   const imgSrc      = image_url || FALLBACK_IMG;
   const badgeVariant = available ? 'available' : 'booked';
@@ -126,6 +130,20 @@ export default function UnitCard({
         >
           {displayName}
         </h3>
+
+        {/* Description */}
+        {displayDesc && (
+          <p className="text-xs text-white/45 leading-relaxed line-clamp-2">
+            {displayDesc}
+          </p>
+        )}
+
+        {/* Capacity */}
+        {capacity && (
+          <p className="text-xs text-[#d4a853]/70 tracking-wide">
+            {lang === 'ar' ? `يتسع لـ ${capacity} أشخاص` : `Up to ${capacity} guests`}
+          </p>
+        )}
 
         {/* Price row */}
         <div className="flex items-center justify-between mt-auto pt-1">

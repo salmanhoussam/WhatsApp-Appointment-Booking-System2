@@ -6,10 +6,10 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
     capacity: 2,
     bedrooms: 1,
     bathrooms: 1,
+    price: '',
     image_url: '',
   });
 
-  // Hydrate form when opening in Edit mode or reset for Add mode
   useEffect(() => {
     if (unit) {
       setFormData({
@@ -17,6 +17,7 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
         capacity: unit.capacity || 2,
         bedrooms: unit.bedrooms || 0,
         bathrooms: unit.bathrooms || 0,
+        price: unit.price != null ? String(unit.price) : '',
         image_url: unit.image_url || '',
       });
     } else {
@@ -25,6 +26,7 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
         capacity: 2,
         bedrooms: 1,
         bathrooms: 1,
+        price: '',
         image_url: '',
       });
     }
@@ -32,11 +34,10 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Auto-cast number fields to integers
-    const isNumberField = ['capacity', 'bedrooms', 'bathrooms'].includes(name);
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: isNumberField ? parseInt(value) || 0 : value 
+    const intFields = ['capacity', 'bedrooms', 'bathrooms'];
+    setFormData((prev) => ({
+      ...prev,
+      [name]: intFields.includes(name) ? parseInt(value) || 0 : value,
     }));
   };
 
@@ -45,7 +46,8 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
     // Prepare the payload mimicking the UnitUpdate schema expectations
     const updatedData = {
       ...formData,
-      images: formData.image_url ? [formData.image_url] : []
+      price: formData.price !== '' ? parseFloat(formData.price) : null,
+      images: formData.image_url ? [formData.image_url] : [],
     };
     
     // Call the parent's save handler and close 
@@ -124,6 +126,23 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
                 min="0"
               />
             </div>
+          </div>
+
+          {/* Base Nightly Price */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Base Nightly Price (USD)
+            </label>
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              placeholder="e.g. 850"
+              min="0"
+              step="0.01"
+              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-all"
+            />
           </div>
 
           {/* Image URL Field */}

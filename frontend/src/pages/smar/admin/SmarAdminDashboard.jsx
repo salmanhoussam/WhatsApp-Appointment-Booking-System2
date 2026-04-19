@@ -865,7 +865,7 @@ const UNIT_TYPES = [
 
 const EMPTY_FORM = {
   name_ar: '', name_en: '', unit_type: 'chalet',
-  capacity: 2, bedrooms: 1, bathrooms: 1, image_url: '',
+  capacity: 2, bedrooms: 1, bathrooms: 1, price: '', image_url: '',
 };
 
 function AddUnitModal({ onClose, onCreated }) {
@@ -897,6 +897,7 @@ function AddUnitModal({ onClose, onCreated }) {
         capacity:  Number(form.capacity),
         bedrooms:  form.bedrooms ? Number(form.bedrooms) : null,
         bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
+        price:     form.price !== '' ? parseFloat(form.price) : null,
         image_url: form.image_url || null,
       });
       onCreated(data);
@@ -1007,6 +1008,14 @@ function AddUnitModal({ onClose, onCreated }) {
               <input type="number" min={0} style={inputStyle} value={form.bathrooms}
                 onChange={e => set('bathrooms', e.target.value)} />
             </div>
+          </div>
+
+          {/* Base price */}
+          <div>
+            <label style={labelStyle}>السعر الليلي الأساسي (USD)</label>
+            <input type="number" min={0} step="0.01" style={inputStyle} value={form.price}
+              onChange={e => set('price', e.target.value)}
+              placeholder="مثال: 850" />
           </div>
 
           {/* Image URL */}

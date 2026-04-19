@@ -459,7 +459,7 @@ export default function SpatialPropertyDetails() {
       }}>
         {/* Back button */}
         <motion.button
-          onClick={() => navigate(`/${slug}/spatial`)}
+          onClick={() => navigate(`/${slug}/listings`)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           style={{

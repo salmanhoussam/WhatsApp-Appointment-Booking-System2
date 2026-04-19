@@ -21,19 +21,21 @@ router = APIRouter(prefix="/units", tags=["Admin Units"])
 
 class UnitUpdate(BaseModel):
     """PATCH body — send only the field(s) you want to change."""
-    name:         Optional[str] = None
-    name_ar:      Optional[str] = None
-    name_en:      Optional[str] = None
-    type:         Optional[str] = None
-    unit_type:    Optional[str] = None
-    capacity:     Optional[int] = None
-    beds:         Optional[int] = None
-    bedrooms:     Optional[int] = None
-    baths:        Optional[int] = None
-    bathrooms:    Optional[int] = None
+    name:         Optional[str]   = None
+    name_ar:      Optional[str]   = None
+    name_en:      Optional[str]   = None
+    type:         Optional[str]   = None
+    unit_type:    Optional[str]   = None
+    capacity:     Optional[int]   = None
+    beds:         Optional[int]   = None
+    bedrooms:     Optional[int]   = None
+    baths:        Optional[int]   = None
+    bathrooms:    Optional[int]   = None
+    price:        Optional[float] = None
+    price_label:  Optional[str]   = None
     images:       Optional[List[str]] = None
-    is_available: Optional[bool] = None
-    is_active:    Optional[bool] = None
+    is_available: Optional[bool]  = None
+    is_active:    Optional[bool]  = None
 
 
 class BlockDatesRequest(BaseModel):
@@ -58,15 +60,17 @@ class DateOverrideRequest(BaseModel):
 
 
 class UnitCreate(BaseModel):
-    name_ar:    str
-    name_en:    Optional[str]  = None
-    unit_type:  Optional[str]  = "chalet"   # villa | chalet | restaurant | pool
-    capacity:   int            = 2
-    bedrooms:   Optional[int]  = None
-    bathrooms:  Optional[int]  = None
-    image_url:  Optional[str]  = None
-    images:     Optional[List[str]] = None
-    sort_order: Optional[int]  = 0
+    name_ar:     str
+    name_en:     Optional[str]   = None
+    unit_type:   Optional[str]   = "chalet"
+    capacity:    int             = 2
+    bedrooms:    Optional[int]   = None
+    bathrooms:   Optional[int]   = None
+    price:       Optional[float] = None
+    price_label: Optional[str]   = None
+    image_url:   Optional[str]   = None
+    images:      Optional[List[str]] = None
+    sort_order:  Optional[int]   = 0
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -88,6 +92,8 @@ def _fmt(unit) -> dict:
         "position_x":  getattr(unit, "position_x", None),
         "position_y":  getattr(unit, "position_y", None),
         "images":      getattr(unit, "images", []),
+        "price":       float(unit.price) if unit.price is not None else None,
+        "price_label": getattr(unit, "price_label", None),
     }
 
 
@@ -132,9 +138,11 @@ async def create_unit(
             "capacity":   body.capacity,
             "bedrooms":   body.bedrooms,
             "bathrooms":  body.bathrooms,
-            "image_url":  body.images[0] if body.images and len(body.images) > 0 else body.image_url,
-            "images":     body.images if body.images else [],
-            "sort_order": body.sort_order,
+            "image_url":   body.images[0] if body.images and len(body.images) > 0 else body.image_url,
+            "images":      body.images if body.images else [],
+            "price":       body.price,
+            "price_label": body.price_label,
+            "sort_order":  body.sort_order,
             "isActive":    True,
             "isAvailable": True,
         }
@@ -185,10 +193,12 @@ async def update_unit(
         
     if body.images is not None:
         patch["images"] = body.images
-        if len(body.images) > 0:
-            patch["image_url"] = body.images[0]
-        else:
-            patch["image_url"] = None
+        patch["image_url"] = body.images[0] if body.images else None
+
+    if body.price is not None:
+        patch["price"] = body.price
+    if body.price_label is not None:
+        patch["price_label"] = body.price_label
 
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")

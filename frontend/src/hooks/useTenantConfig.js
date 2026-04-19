@@ -35,7 +35,7 @@ const DEFAULT_CONFIG = {
   primary_color:   '#d4a853',
   hero_video_url:  null,
   hero_image_url:  null,
-  whatsapp_number: null,
+  whatsapp_number: '96171000000',
   currency:        'USD',
   features: {
     spatial:  false,

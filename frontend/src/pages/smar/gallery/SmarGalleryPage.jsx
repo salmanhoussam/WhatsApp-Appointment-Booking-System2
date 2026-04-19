@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence }          from 'framer-motion';
-import { TenantHeader }                     from '../../../design-system/organisms';
+import { TenantHeader, TenantFooter }       from '../../../design-system/organisms';
 import publicApi                            from '../../../utils/publicApi';
 import useTenantSlug                        from '../../../utils/useTenantSlug';
 
@@ -717,6 +717,8 @@ export default function SmarGalleryPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <TenantFooter />
 
       {/* ── Scoped styles — hover effects + responsive masonry ─────────────── */}
       <style>{`

@@ -20,9 +20,17 @@
  *   <UnitGrid lang="ar" onSelect={(u) => navigate(`/${slug}/spatial/property/${u.id}`)} />
  */
 
+import { useState } from 'react';
 import { GoldDot, Skeleton, Button } from '../atoms';
 import { UnitCard } from '../molecules';
 import useUnits from '../../hooks/useUnits';
+
+const FILTERS = [
+  { key: 'all',    ar: 'الكل',     en: 'All'     },
+  { key: 'chalet', ar: 'شاليهات',  en: 'Chalets' },
+  { key: 'villa',  ar: 'فيلات',    en: 'Villas'  },
+  { key: 'studio', ar: 'ستوديوهات',en: 'Studios' },
+];
 
 // ── Loading skeleton — mimics UnitCard proportions ────────────────────────────
 function CardSkeleton() {
@@ -94,12 +102,51 @@ export default function UnitGrid({
   className = '',
 }) {
   const { units, isLoading, error, fetchUnits } = useUnits();
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const visibleUnits = activeFilter === 'all'
+    ? units
+    : units.filter(u => u.type === activeFilter);
 
   return (
     <section
       className={`container mx-auto px-4 py-12 ${className}`}
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
     >
+
+      {/* ── Category filter pills ── */}
+      {!isLoading && !error && (
+        <div className="flex flex-wrap gap-2 mb-10 justify-center">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setActiveFilter(f.key)}
+              className="transition-all duration-200 focus-visible:outline-none"
+              style={{
+                padding: '7px 20px',
+                borderRadius: 100,
+                fontSize: 13,
+                fontWeight: activeFilter === f.key ? 700 : 400,
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                border: activeFilter === f.key
+                  ? '1px solid rgba(212,168,83,0.6)'
+                  : '1px solid rgba(255,255,255,0.10)',
+                background: activeFilter === f.key
+                  ? 'rgba(212,168,83,0.14)'
+                  : 'rgba(255,255,255,0.03)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                color: activeFilter === f.key ? '#d4a853' : 'rgba(255,255,255,0.55)',
+              }}
+            >
+              {lang === 'ar' ? f.ar : f.en}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Loading ── */}
       {isLoading && (
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
@@ -115,12 +162,12 @@ export default function UnitGrid({
       )}
 
       {/* ── Empty ── */}
-      {!isLoading && !error && units.length === 0 && <EmptyState />}
+      {!isLoading && !error && visibleUnits.length === 0 && <EmptyState />}
 
       {/* ── Success ── */}
-      {!isLoading && !error && units.length > 0 && (
+      {!isLoading && !error && visibleUnits.length > 0 && (
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
-          {units.map((unit) => (
+          {visibleUnits.map((unit) => (
             <UnitCard
               key={unit.id}
               unit={unit}

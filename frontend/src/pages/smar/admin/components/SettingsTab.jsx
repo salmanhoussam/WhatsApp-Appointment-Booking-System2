@@ -79,6 +79,8 @@ export default function SettingsTab() {
           primary_color:   d.primary_color   ?? '#d4a853',
           hero_video_url:  d.hero_video_url  ?? '',
           whatsapp_number: d.whatsapp_number ?? '',
+          instagram_url:   d.instagram_url   ?? '',
+          maps_url:        d.maps_url        ?? '',
           currency:        d.currency        ?? 'USD',
           payment_methods: d.payment_methods ?? [],
           features:        d.features        ?? {},
@@ -200,6 +202,20 @@ export default function SettingsTab() {
               value={form.whatsapp_number}
               onChange={e => set('whatsapp_number', e.target.value)}
               placeholder="96178727986" dir="ltr" />
+          </div>
+          <div>
+            <label style={labelStyle}>Instagram</label>
+            <input style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 12 }}
+              value={form.instagram_url}
+              onChange={e => set('instagram_url', e.target.value)}
+              placeholder="https://instagram.com/beitsmar" dir="ltr" />
+          </div>
+          <div>
+            <label style={labelStyle}>رابط الموقع على الخريطة</label>
+            <input style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 11 }}
+              value={form.maps_url}
+              onChange={e => set('maps_url', e.target.value)}
+              placeholder="https://maps.google.com/?q=…" dir="ltr" />
           </div>
           <div>
             <label style={labelStyle}>رابط فيديو الواجهة (Supabase URL)</label>

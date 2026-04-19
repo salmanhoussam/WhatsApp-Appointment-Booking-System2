@@ -21,6 +21,8 @@ import { useNavigate }                        from 'react-router-dom';
 import gsap                          from 'gsap';
 import { ScrollTrigger }             from 'gsap/ScrollTrigger';
 import useTenantSlug                 from '../utils/useTenantSlug';
+import TenantHeader                  from '../design-system/organisms/TenantHeader';
+import useTenantConfig               from '../hooks/useTenantConfig';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -42,11 +44,6 @@ const ASSETS = {
 // Billboard panel — % of journey_forest.jpg (1376×768). Tune to match image.
 const BILLBOARD = { left: '79.5%', top: '45%', width: '13%', height: '17%', tilt: 'perspective(500px) rotateY(8deg) rotateZ(-3deg)' };
 
-// Nav i18n labels
-const NAV_LABELS = {
-  ar: { gallery: 'معرض الصور', chalets: 'الشاليهات', villas: 'الفلل', about: 'من نحن', login: 'تسجيل الدخول', lang: 'EN' },
-  en: { gallery: 'Gallery',    chalets: 'Chalets',     villas: 'Villas', about: 'About',   login: 'Login',           lang: 'AR' },
-};
 
 // ─── Deterministic particles (no Math.random → no hydration mismatch) ─────────
 const DUST = Array.from({ length: 28 }, (_, i) => ({
@@ -73,24 +70,6 @@ const STYLES = `
     background:#d4a853; transform-origin:left; transform:scaleX(0);
     z-index:300; pointer-events:none;
   }
-
-  .sc-nav {
-    position:fixed; top:0; left:0; right:0; z-index:200;
-    padding:1.25rem 2rem;
-    display:flex; align-items:center; justify-content:space-between;
-    pointer-events:auto;
-  }
-  .sc-nav-logo {
-    font-size:.9rem; font-weight:700; letter-spacing:.22em;
-    color:rgba(255,255,255,.82); text-transform:uppercase;
-  }
-  .sc-nav-links { display:flex; gap:2rem; }
-  .sc-nav-btn {
-    font-size:.65rem; letter-spacing:.28em; text-transform:uppercase;
-    color:rgba(255,255,255,.4); background:none; border:none; cursor:pointer;
-    transition:color .22s;
-  }
-  .sc-nav-btn:hover { color:#d4a853; }
 
   .sc-stage {
     position:relative; width:100vw; height:100vh;
@@ -348,20 +327,17 @@ const STYLES = `
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ShowcaseTemplate() {
-  const navigate = useNavigate();
-  const slug     = useTenantSlug() ?? 'smar';
+  const navigate      = useNavigate();
+  const slug          = useTenantSlug() ?? 'smar';
+  const { config }    = useTenantConfig();
 
   const [villaModalOpen, setVillaModalOpen] = useState(false);
-  const [lang, setLang] = useState('ar');
-  const t = NAV_LABELS[lang];
 
-  // Close modal on ESC key
   useEffect(() => {
-    if (!villaModalOpen) return;
     const onKey = (e) => { if (e.key === 'Escape') setVillaModalOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [villaModalOpen]);
+  }, []);
 
   const stageRef        = useRef(null);
   const progressRef     = useRef(null);
@@ -562,25 +538,8 @@ export default function ShowcaseTemplate() {
       {/* Gold progress bar */}
       <div ref={progressRef} className="sc-progress" />
 
-      {/* Immersive transparent nav */}
-      <nav className="sc-nav" dir="rtl" aria-label="القائمة الرئيسية">
-        <div className="sc-nav-links">
-          <button className="sc-nav-btn" onClick={() => navigate(`/${slug}/gallery`)}>{t.gallery}</button>
-          <button className="sc-nav-btn" onClick={() => navigate(`/${slug}/listings?type=chalet`)}>{t.chalets}</button>
-          <button className="sc-nav-btn" onClick={() => navigate(`/${slug}/listings?type=villa`)}>{t.villas}</button>
-          <button className="sc-nav-btn" onClick={() => navigate(`/${slug}/listings`)}>{t.about}</button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="sc-nav-btn" onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
-            style={{ border: '1px solid rgba(255,255,255,0.18)', borderRadius: 14, padding: '4px 11px' }}>
-            {t.lang}
-          </button>
-          <button className="sc-nav-btn" onClick={() => navigate('/login')}
-            style={{ border: '1px solid rgba(212,168,83,0.4)', borderRadius: 20, padding: '5px 16px', color: '#d4a853' }}>
-            {t.login}
-          </button>
-        </div>
-      </nav>
+      {/* ── Shared navigation — same across all tenant pages ── */}
+      <TenantHeader />
 
       <div className="sc-root">
         <div ref={stageRef} className="sc-stage">
@@ -692,48 +651,32 @@ export default function ShowcaseTemplate() {
             </div>
           </div>
 
-          {/* ── S2 — Cafeteria & Mountain View ───────────────────────────── */}
+          {/* ── S2 — Atmosphere statement ────────────────────────────────── */}
           <div ref={s2Ref} className="sc-station" style={{ zIndex: 10, opacity: 0 }}>
-            {/* Background still image */}
-            <img
-              src={ASSETS.cafeImg}
-              alt=""
-              className="sc-bg sc-forest-img"
-              loading="eager"
-              aria-hidden="true"
-            />
-            {/* Aerial cafeteria video — centered glass frame */}
-            <div style={{
-              position: 'absolute',
-              top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'clamp(280px, 52vw, 720px)',
-              aspectRatio: '16/9',
-              borderRadius: 18,
-              overflow: 'hidden',
-              border: '1px solid rgba(212,168,83,0.30)',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.04)',
-              zIndex: 15,
-            }}>
-              <video
-                src={ASSETS.cafeVideo}
-                autoPlay muted loop playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-            {/* Gradient overlay */}
+            <img src={ASSETS.cafeImg} alt="" className="sc-bg sc-forest-img" loading="eager" aria-hidden="true" />
             <div style={{
               position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: 'linear-gradient(to bottom, rgba(5,5,8,.35) 0%, transparent 40%, rgba(5,5,8,.55) 100%)',
+              background: 'linear-gradient(to bottom, rgba(5,5,8,.55) 0%, rgba(5,5,8,.25) 50%, rgba(5,5,8,.72) 100%)',
             }} />
-            {/* Caption */}
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
-              style={{ alignItems: 'flex-end', paddingBottom: '7vh' }}>
-              <div ref={forestTextRef} className="sc-whisper">
-                <p className="sc-whisper-word" style={{ fontSize: 'clamp(0.9rem, 1.8vw, 1.2rem)', letterSpacing: '0.38em' }}>
-                  مطعم ومناسبات بإطلالة جبلية لا تُنسى
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none" dir="rtl">
+              <div ref={forestTextRef} className="sc-whisper" style={{ textAlign: 'center', padding: '0 8vw' }}>
+                <p style={{
+                  fontSize: 'clamp(1.6rem, 4.5vw, 3.8rem)',
+                  fontWeight: 800, color: '#ffffff',
+                  lineHeight: 1.35, letterSpacing: '-0.01em',
+                  textShadow: '0 4px 40px rgba(0,0,0,0.7)',
+                  marginBottom: '1.2rem',
+                }}>
+                  مطعمنا الجبلي مفتوح<br />على أفق البحر
                 </p>
-                <div className="sc-whisper-line" />
+                <p style={{
+                  fontSize: 'clamp(0.85rem, 1.6vw, 1.1rem)',
+                  fontWeight: 400, color: 'rgba(212,168,83,0.85)',
+                  letterSpacing: '0.22em', textTransform: 'uppercase',
+                }}>
+                  أعراس · احتفالات · طعام فاخر
+                </p>
+                <div className="sc-whisper-line" style={{ marginTop: '1.4rem' }} />
               </div>
             </div>
           </div>
@@ -857,14 +800,36 @@ export default function ShowcaseTemplate() {
                 >
                   جميع الوحدات
                 </button>
-                <a
-                  href="https://instagram.com/beitsmar"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sc-finale-link"
-                >
-                  Instagram
-                </a>
+                {config.instagram_url && (
+                  <a
+                    href={config.instagram_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sc-finale-link"
+                  >
+                    Instagram
+                  </a>
+                )}
+                {config.maps_url && (
+                  <a
+                    href={config.maps_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sc-finale-link"
+                  >
+                    الموقع
+                  </a>
+                )}
+                {config.whatsapp_number && (
+                  <a
+                    href={`https://wa.me/${config.whatsapp_number}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sc-finale-link"
+                  >
+                    واتساب
+                  </a>
+                )}
               </div>
             </div>
           </div>
