@@ -10,7 +10,8 @@ Tenancy:    every query filtered by clientId from the token
 from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
+from prisma import Json
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.services.storage_service import (
@@ -29,21 +30,28 @@ class ImageDeleteRequest(BaseModel):
 
 class UnitUpdate(BaseModel):
     """PATCH body — send only the field(s) you want to change."""
-    name:         Optional[str]   = None
-    name_ar:      Optional[str]   = None
-    name_en:      Optional[str]   = None
-    type:         Optional[str]   = None
-    unit_type:    Optional[str]   = None
-    capacity:     Optional[int]   = None
-    beds:         Optional[int]   = None
-    bedrooms:     Optional[int]   = None
-    baths:        Optional[int]   = None
-    bathrooms:    Optional[int]   = None
-    price:        Optional[float] = None
-    price_label:  Optional[str]   = None
-    images:       Optional[List[str]] = None
-    is_available: Optional[bool]  = None
-    is_active:    Optional[bool]  = None
+    name:           Optional[str]   = None
+    name_ar:        Optional[str]   = None
+    name_en:        Optional[str]   = None
+    type:           Optional[str]   = None
+    unit_type:      Optional[str]   = None
+    capacity:       Optional[int]   = None
+    beds:           Optional[int]   = None
+    bedrooms:       Optional[int]   = None
+    baths:          Optional[int]   = None
+    bathrooms:      Optional[int]   = None
+    price:          Optional[float] = None
+    price_label:    Optional[str]   = None
+    images:         Optional[List[str]] = None
+    is_available:   Optional[bool]  = None
+    is_active:      Optional[bool]  = None
+    # ── Dynamic Content (Block Builder) ────────────────────────────────────────
+    category:       Optional[str]   = None
+    description_ar: Optional[str]   = None
+    description_en: Optional[str]   = None
+    content_blocks: Optional[Any]   = None   # JSON array of {type, content, style?}
+    amenities:      Optional[Any]   = None   # JSON array of {icon, label}
+    rules_policies: Optional[Any]   = None   # JSON {checkIn, checkOut, cancellation, rules[]}
 
 
 class BlockDatesRequest(BaseModel):
@@ -68,17 +76,24 @@ class DateOverrideRequest(BaseModel):
 
 
 class UnitCreate(BaseModel):
-    name_ar:     str
-    name_en:     Optional[str]   = None
-    unit_type:   Optional[str]   = "chalet"
-    capacity:    int             = 2
-    bedrooms:    Optional[int]   = None
-    bathrooms:   Optional[int]   = None
-    price:       Optional[float] = None
-    price_label: Optional[str]   = None
-    image_url:   Optional[str]   = None
-    images:      Optional[List[str]] = None
-    sort_order:  Optional[int]   = 0
+    name_ar:        str
+    name_en:        Optional[str]   = None
+    unit_type:      Optional[str]   = "chalet"
+    capacity:       int             = 2
+    bedrooms:       Optional[int]   = None
+    bathrooms:      Optional[int]   = None
+    price:          Optional[float] = None
+    price_label:    Optional[str]   = None
+    image_url:      Optional[str]   = None
+    images:         Optional[List[str]] = None
+    sort_order:     Optional[int]   = 0
+    # ── Dynamic Content (Block Builder) ────────────────────────────────────────
+    category:       Optional[str]   = None
+    description_ar: Optional[str]   = None
+    description_en: Optional[str]   = None
+    content_blocks: Optional[Any]   = None
+    amenities:      Optional[Any]   = None
+    rules_policies: Optional[Any]   = None
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -86,22 +101,29 @@ class UnitCreate(BaseModel):
 def _fmt(unit) -> dict:
     """Serialize a Prisma Unit to a plain dict the frontend expects."""
     return {
-        "id":          unit.id,
-        "name_ar":     unit.name_ar,
-        "name_en":     unit.name_en,
-        "unit_type":   getattr(unit, "unit_type",   "chalet"),
-        "capacity":    unit.capacity,
-        "bedrooms":    unit.bedrooms,
-        "bathrooms":   unit.bathrooms,
-        "image_url":   unit.image_url,
-        "sort_order":  getattr(unit, "sort_order",  0),
-        "is_active":   unit.isActive,
-        "is_available": unit.isAvailable,
-        "position_x":  getattr(unit, "position_x", None),
-        "position_y":  getattr(unit, "position_y", None),
-        "images":      getattr(unit, "images", []),
-        "price":       float(unit.price) if unit.price is not None else None,
-        "price_label": getattr(unit, "price_label", None),
+        "id":             unit.id,
+        "name_ar":        unit.name_ar,
+        "name_en":        unit.name_en,
+        "unit_type":      getattr(unit, "unit_type",   "chalet"),
+        "capacity":       unit.capacity,
+        "bedrooms":       unit.bedrooms,
+        "bathrooms":      unit.bathrooms,
+        "image_url":      unit.image_url,
+        "sort_order":     getattr(unit, "sort_order",  0),
+        "is_active":      unit.isActive,
+        "is_available":   unit.isAvailable,
+        "position_x":     getattr(unit, "position_x", None),
+        "position_y":     getattr(unit, "position_y", None),
+        "images":         getattr(unit, "images", []),
+        "price":          float(unit.price) if unit.price is not None else None,
+        "price_label":    getattr(unit, "price_label", None),
+        # ── Dynamic Content (Block Builder) ────────────────────────────────────
+        "category":       getattr(unit, "category", None),
+        "description_ar": getattr(unit, "description_ar", None),
+        "description_en": getattr(unit, "description_en", None),
+        "content_blocks": getattr(unit, "content_blocks", None),
+        "amenities":      getattr(unit, "amenities", None),
+        "rules_policies": getattr(unit, "rules_policies", None),
     }
 
 
@@ -138,21 +160,28 @@ async def create_unit(
 
     unit = await prisma_client.unit.create(
         data={
-            "clientId":   tenant["id"],
-            "propertyId": prop.id,
-            "name_ar":    body.name_ar,
-            "name_en":    body.name_en,
-            "unit_type":  body.unit_type,
-            "capacity":   body.capacity,
-            "bedrooms":   body.bedrooms,
-            "bathrooms":  body.bathrooms,
-            "image_url":   body.images[0] if body.images and len(body.images) > 0 else body.image_url,
-            "images":      body.images if body.images else [],
-            "price":       body.price,
-            "price_label": body.price_label,
-            "sort_order":  body.sort_order,
-            "isActive":    True,
-            "isAvailable": True,
+            "clientId":       tenant["id"],
+            "propertyId":     prop.id,
+            "name_ar":        body.name_ar,
+            "name_en":        body.name_en,
+            "unit_type":      body.unit_type,
+            "capacity":       body.capacity,
+            "bedrooms":       body.bedrooms,
+            "bathrooms":      body.bathrooms,
+            "image_url":      body.images[0] if body.images and len(body.images) > 0 else body.image_url,
+            "images":         body.images if body.images else [],
+            "price":          body.price,
+            "price_label":    body.price_label,
+            "sort_order":     body.sort_order,
+            "isActive":       True,
+            "isAvailable":    True,
+            # ── Dynamic Content (Block Builder) ────────────────────────────────
+            "category":       body.category,
+            "description_ar": body.description_ar,
+            "description_en": body.description_en,
+            "content_blocks": Json(body.content_blocks) if body.content_blocks is not None else None,
+            "amenities":      Json(body.amenities)      if body.amenities      is not None else None,
+            "rules_policies": Json(body.rules_policies) if body.rules_policies is not None else None,
         }
     )
     return _fmt(unit)
@@ -207,6 +236,20 @@ async def update_unit(
         patch["price"] = body.price
     if body.price_label is not None:
         patch["price_label"] = body.price_label
+
+    # ── Dynamic Content (Block Builder) ────────────────────────────────────
+    if body.category is not None:
+        patch["category"] = body.category
+    if body.description_ar is not None:
+        patch["description_ar"] = body.description_ar
+    if body.description_en is not None:
+        patch["description_en"] = body.description_en
+    if body.content_blocks is not None:
+        patch["content_blocks"] = Json(body.content_blocks)
+    if body.amenities is not None:
+        patch["amenities"] = Json(body.amenities)
+    if body.rules_policies is not None:
+        patch["rules_policies"] = Json(body.rules_policies)
 
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")

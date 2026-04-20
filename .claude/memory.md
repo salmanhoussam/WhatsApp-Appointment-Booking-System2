@@ -1,4 +1,42 @@
 
+# ⏱️ Health Monitor Script (CREATED 2026-04-20)
+- **File:** `scripts/monitor_health.py`
+- **Purpose:** Synthetic login test against SSO (`api.salmansaas.com`)
+- **Checks:** HTTP 200 + `admin_access_token` cookie/body presence
+- **Env vars:** `API_BASE_URL`, `TEST_EMAIL`, `TEST_PASSWORD`, `HEALTH_TIMEOUT`
+- **Cron:** `*/20 * * * *` — exits 0 (OK) or 1 (FAIL) for CI integration
+
+---
+
+# 🧩 Dynamic Content Schema — Block Builder (DEPLOYED 2026-04-20)
+
+## What Was Added
+6 new columns on `Unit` model (prisma/schema.prisma):
+- `category String?`      — Filterable classification (villa/chalet/studio)
+- `description_ar String?` — Arabic description (replaces single description)
+- `description_en String?` — English description
+- `content_blocks Json?`   — Block Builder array [{type, content, style?, icon?}]
+- `amenities Json?`        — Array of {icon, label, label_ar?}
+- `rules_policies Json?`   — Object {checkIn, checkOut, cancellation, rules[]}
+
+## Files Modified
+- `prisma/schema.prisma` — Unit model with 6 new fields
+- `app/schemas/unit.py` — Pydantic UnitBase/Create/Response with new fields
+- `app/api/v1/admin/units.py` — UnitCreate, UnitUpdate, _fmt() with new fields
+- `app/services/public_service.py` — get_client_catalog() returns new fields + fixed phantom image_url1..5
+
+## Bug Fixed
+- `public_service.py` was referencing `image_url1..5` which NEVER existed in the schema — replaced with `images[]` array
+
+## Commands to Run (user must execute):
+```bash
+npx prisma format
+npx prisma db push
+python -m prisma generate
+```
+
+---
+
 This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
 
 Summary:

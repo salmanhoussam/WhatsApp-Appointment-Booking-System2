@@ -95,32 +95,51 @@ model Property {
 }
 
 model Unit {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  propertyId  String    @map("property_id") @db.Uuid
-  clientId    String    @map("client_id") @db.Uuid
-  unitNumber  String?   @map("unit_number")
-  unit_type   String?   @default("chalet") @map("unit_type") // villa | chalet | restaurant | pool
-  name_ar     String?   @map("name_ar")
-  name_en     String?   @map("name_en")
-  description String?   @map("description")
-  image_url   String?   @map("image_url")
-  capacity    Int       @map("capacity")
-  bedrooms    Int?      @map("bedrooms")
-  bathrooms   Int?      @map("bathrooms")
-  price       Decimal?  @map("price") @db.Decimal(10, 2)
-  price_label String?   @map("price_label")
-  isActive    Boolean   @default(true) @map("is_active")
-  isAvailable Boolean   @default(true) @map("is_available")
-  sort_order  Int?      @default(0) @map("sort_order")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  position_x  Float?    @map("position_x")
-  position_y  Float?    @map("position_y")
-  images      String[]  @default([]) @map("images")
-  bookings    Booking[]
-  prices      Price[]
-  client      Client    @relation(fields: [clientId], references: [id])
-  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  unitNumber  String?  @map("unit_number")
+  unit_type   String?  @default("chalet") @map("unit_type") // villa | chalet | restaurant | pool
+  name_ar     String?  @map("name_ar")
+  name_en     String?  @map("name_en")
+  description String?  @map("description")
+  image_url   String?  @map("image_url")
+  capacity    Int      @map("capacity")
+  bedrooms    Int?     @map("bedrooms")
+  bathrooms   Int?     @map("bathrooms")
+  price       Decimal? @map("price") @db.Decimal(10, 2)
+  price_label String?  @map("price_label")
+  isActive    Boolean  @default(true) @map("is_active")
+  isAvailable Boolean  @default(true) @map("is_available")
+  sort_order  Int?     @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  position_x  Float?   @map("position_x")
+  position_y  Float?   @map("position_y")
+  images      String[] @default([]) @map("images")
+
+  // ── Dynamic Content (Block Builder) ─────────────────────────────────────────
+  category       String? @map("category") // villa | chalet | studio — filterable classification
+  description_ar String? @map("description_ar") // Arabic description (replaces single 'description')
+  description_en String? @map("description_en") // English description
+
+  // Block Builder JSON — array of {type, content, style?, icon?, title?}
+  // Types: section_title, highlight_item, paragraph
+  // Example: [{"type":"section_title","content":"Serenity 🌿","style":{"size":"large","color":"gold","bold":true}}]
+  content_blocks Json? @map("content_blocks")
+
+  // Amenities — array of {icon, label, label_ar?}
+  // Example: [{"icon":"wifi","label":"Free WiFi"},{"icon":"pool","label":"Private Pool"}]
+  amenities Json? @map("amenities")
+
+  // Rules & Policies — {checkIn, checkOut, cancellation, rules[]}
+  // Example: {"checkIn":"15:00","checkOut":"12:00","cancellation":"50% refund...","rules":["No Pets","Quiet hours"]}
+  rules_policies Json? @map("rules_policies")
+
+  bookings Booking[]
+  prices   Price[]
+  client   Client    @relation(fields: [clientId], references: [id])
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@map("units")
   @@schema("public")

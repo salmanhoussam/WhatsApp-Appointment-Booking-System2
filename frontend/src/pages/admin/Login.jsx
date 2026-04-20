@@ -2,10 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const AUTH_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1/auth/users/login`
-  : 'http://127.0.0.1:8000/api/v1/auth/users/login';
-
 export default function Login() {
   const [identifier, setIdentifier] = useState(''); // سيحتوي على بريد إلكتروني أو هاتف أو slug
   const [password, setPassword] = useState('');
@@ -18,14 +14,24 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    try {
-      // نرسل القيمة في حقل identifier (الباك إند يبحث في slug, email, phone)
-      const response = await axios.post(AUTH_URL, {
-        email: identifier,
-        password,
-      });
+    const USER_URL   = import.meta.env.VITE_API_URL
+      ? `${import.meta.env.VITE_API_URL}/api/v1/auth/users/login`
+      : 'http://127.0.0.1:8000/api/v1/auth/users/login';
+    const CLIENT_URL = import.meta.env.VITE_API_URL
+      ? `${import.meta.env.VITE_API_URL}/api/v1/auth/login`
+      : 'http://127.0.0.1:8000/api/v1/auth/login';
 
-      const { token, slug: returnedSlug } = response.data;
+    try {
+      let data;
+      try {
+        // 1. Try User (staff) login — User table, requires email
+        ({ data } = await axios.post(USER_URL, { email: identifier, password }));
+      } catch {
+        // 2. Fallback: Client (tenant root) login — accepts slug / email / phone
+        ({ data } = await axios.post(CLIENT_URL, { identifier, password }));
+      }
+
+      const { token, slug: returnedSlug } = data;
       localStorage.setItem('admin_access_token', token);
       navigate(`/dashboard/${returnedSlug}/units`);
     } catch (err) {

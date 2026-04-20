@@ -12,6 +12,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect }     from 'react';
+import DynamicContentRenderer from '../../../components/ui/DynamicContentRenderer';
 
 // ── Design tokens — Sunlit Heritage Light Theme ──────────────────────────────
 const G = {
@@ -65,11 +66,10 @@ export default function SmarUnitModal({ unit, onClose, onBook, lang = 'ar' }) {
 
   if (!unit) return null;
 
-  // Build image array
-  const rawImages = [
-    unit.image_url1, unit.image_url2, unit.image_url3,
-    unit.image_url4, unit.image_url5,
-  ].filter(Boolean);
+  // Build image array — use unit.images[] (current schema) with image_url fallback
+  const rawImages = unit.images?.length > 0
+    ? unit.images
+    : (unit.image_url ? [unit.image_url] : []);
 
   const images = rawImages.length > 0
     ? rawImages
@@ -77,19 +77,25 @@ export default function SmarUnitModal({ unit, onClose, onBook, lang = 'ar' }) {
         `https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/interiors/${unit.id}_${i + 1}.jpg`
       );
 
-  const name         = lang === 'ar' ? (unit.name_ar || unit.name_en) : (unit.name_en || unit.name_ar);
-  const typeLabel    = unit.unit_type || unit.type || 'Chalet';
-  const price        = unit.price_per_night || unit.base_price;
-  const capacity     = unit.capacity || '—';
-  const description  = unit.description
+  const name      = lang === 'ar' ? (unit.name_ar || unit.name_en) : (unit.name_en || unit.name_ar);
+  const typeLabel = unit.unit_type || unit.type || 'Chalet';
+  const price     = unit.price || unit.price_per_night || unit.base_price;
+  const capacity  = unit.capacity || '—';
+
+  // Prefer bilingual description fields, fall back to single description field
+  const description =
+    (lang === 'ar' ? unit.description_ar : unit.description_en)
+    || unit.description
     || (lang === 'ar'
       ? 'استمتع بالهدوء والفخامة في هذه الوحدة المميزة بإطلالات طبيعية لا تُنسى وتصميم تراثي أصيل.'
       : 'Experience tranquility and luxury in this distinctive unit with unforgettable natural views and authentic heritage design.');
 
+  // Fallback spec chips — shown only when no amenities JSON data
+  const hasDynamicContent = unit.amenities?.length > 0 || unit.content_blocks?.length > 0;
   const specs = [
     { icon: '👥', label: lang === 'ar' ? `يتسع لـ ${capacity} أشخاص` : `${capacity} guests` },
-    { icon: '🛏', label: lang === 'ar' ? 'سرير مزدوج' : 'Double bed' },
-    { icon: '🚿', label: lang === 'ar' ? 'حمام خاص' : 'Private bath' },
+    { icon: '🛏', label: lang === 'ar' ? `${unit.bedrooms || 1} غرفة نوم` : `${unit.bedrooms || 1} bedroom` },
+    { icon: '🚿', label: lang === 'ar' ? `${unit.bathrooms || 1} حمام` : `${unit.bathrooms || 1} bath` },
     { icon: '🌲', label: lang === 'ar' ? 'إطلالة طبيعية' : 'Nature view' },
   ];
 
@@ -280,15 +286,20 @@ export default function SmarUnitModal({ unit, onClose, onBook, lang = 'ar' }) {
             {description}
           </p>
 
-          {/* Spec chips */}
-          <div style={{
-            display:             'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap:                 10,
-            marginBottom:        36,
-          }}>
-            {specs.map((s) => <Chip key={s.label} {...s} />)}
-          </div>
+          {/* Dynamic content — amenities, content blocks, rules */}
+          {hasDynamicContent
+            ? <DynamicContentRenderer unit={unit} lang={lang} theme="light" />
+            : (
+              <div style={{
+                display:             'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap:                 10,
+                marginBottom:        28,
+              }}>
+                {specs.map((s) => <Chip key={s.label} {...s} />)}
+              </div>
+            )
+          }
 
           {/* Book CTA */}
           <motion.button
