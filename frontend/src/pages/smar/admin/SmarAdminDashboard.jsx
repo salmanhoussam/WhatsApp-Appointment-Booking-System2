@@ -1592,11 +1592,18 @@ function UnitsTab() {
       {calendarUnit && <CalendarManagerModal unit={calendarUnit} onClose={() => setCalendarUnit(null)} />}
 
       {/* Unit Edit Modal (Phase 24) */}
-      <UnitFormModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        unit={selectedUnit} 
-        onSave={handleSaveUnit} 
+      <UnitFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        unit={selectedUnit}
+        onSave={handleSaveUnit}
+        onImagesChange={(imgs) =>
+          setUnits(us => us.map(u =>
+            u.id === selectedUnit?.id
+              ? { ...u, images: imgs, image_url: imgs[0] ?? null }
+              : u
+          ))
+        }
       />
 
       {/* Toast */}

@@ -1,6 +1,6 @@
 project: Smar 3D Scrollytelling Experience
 tenant: smar
-last_updated: 2026-04-17  # Session: BUG-02 crushed + Phase 30.1 ShowcaseTemplate GSAP complete.
+last_updated: 2026-04-20  # Session: Auth hotfixes A–D complete + blank public pages fixed.
 
 phases:
 
@@ -2239,6 +2239,152 @@ technical_decisions:
       - "39.4 تسجيل الـ route"
       - "39.1 Backend endpoint (الصور الأولى يمكن hardcode URLs في frontend مؤقتاً)"
       - "39.5 تعديل ShowcaseTemplate S3 CTA"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 40: Auth Evolution Plan A–D  (2026-04-19 → 2026-04-20) ✅ COMPLETE
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 40
+    name: "Auth Evolution — Phases A → D"
+    description: |
+      Full authentication hardening sprint: DB integrity, SSO portal,
+      centralized admin login, and RBAC tab guards in the dashboard.
+    tasks:
+      - id: 40.A
+        name: "Phase A — DB Integrity"
+        status: done
+        details: |
+          scripts/fix_passwords.py: bcrypt-hashes all plain-text passwords (Client + User tables).
+          scripts/backfill_smar.py: fills null branding fields (primary_color, whatsapp_number, etc.).
+          seed.py updated: new Client rows include all 4 branding defaults.
+          DB state verified: all passwords hashed, smar client has zero null critical fields.
+
+      - id: 40.B
+        name: "Phase B — GlobalAuthModal"
+        status: done
+        details: |
+          src/design-system/organisms/GlobalAuthModal.jsx — GS MAR glassmorphism modal.
+          Toggle pills: تسجيل الدخول / إنشاء حساب — AnimatePresence form swap.
+          Fields: name (register) + phone/email + password with show/hide toggle.
+          Calls POST /public/{slug}/auth/login and /register — inline error/success.
+          Admin bridge footer → window.location.href = 'https://auth.salmansaas.com'.
+          TenantHeader: LoginModal → GlobalAuthModal.
+
+      - id: 40.C
+        name: "Phase C — SSO Centralized Admin Portal"
+        status: done
+        details: |
+          src/pages/auth/SSOLoginPage.jsx — enterprise glassmorphism portal for auth.salmansaas.com.
+          Backend: both login endpoints set HttpOnly cookie admin_access_token on .salmansaas.com
+            (secure=True, samesite=lax, max_age=86400).
+          Dual-mode: try /auth/login (client) first; 401 → fallback to /auth/users/login (staff).
+          SSO redirect: https://{slug}.salmansaas.com/dashboard/{slug}/units?token={jwt}.
+          ProtectedRoute: reads ?token= on arrival, saves to localStorage, strips URL param.
+          TenantResolver: hostname.startsWith('auth.') → renders SSOLoginPage directly.
+
+      - id: 40.D
+        name: "Phase D — RBAC Tab Guards"
+        status: done
+        details: |
+          prisma/schema.prisma: enum UserRole { SUPER_ADMIN TENANT_ADMIN MANAGER_RESERVATIONS MANAGER_UNITS }.
+          User.role: String @default("manager") → UserRole @default(TENANT_ADMIN).
+          src/utils/useAdminRole.js: useAdminRole(), ROLE_TABS map, canAccessTab(role, tabId).
+          SmarAdminDashboard: Sidebar filters navItems via canAccessTab; renderTab() blocks unauthorized;
+            UnauthorizedTab glass view; default tab = first allowed for role; top bar role badge.
+          app/core/tenant.py: require_roles(*allowed_roles) dependency factory.
+          app/api/v1/admin/settings.py PATCH: require_roles("SUPER_ADMIN", "TENANT_ADMIN") guard.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 41: Auth Hotfixes  (2026-04-20) ✅ COMPLETE
+  # 5 production bugs found after Phase 40 deployment — all fixed same session.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 41
+    name: "Auth Production Hotfixes"
+    description: |
+      Five regressions found immediately after Phase 40 deployed to Railway.
+      All fixed in session 2026-04-20.
+    tasks:
+      - id: 41.1
+        name: "useAdminRole — backward compat"
+        file: "src/utils/useAdminRole.js"
+        status: done
+        details: |
+          Old JWTs (role:"manager" string, pre-enum) → not in ROLE_TABS → all tabs blocked.
+          Login.jsx stored a CLIENT token (type:"client", no role field) → null role → blocked.
+          Fix: _LEGACY_ROLE_MAP = { manager: 'TENANT_ADMIN', admin: 'TENANT_ADMIN' }.
+          Fix: type:"client" tokens → TENANT_ADMIN (client owners have full access).
+
+      - id: 41.2
+        name: "Login.jsx — wrong endpoint"
+        file: "src/pages/admin/Login.jsx"
+        status: done
+        details: |
+          Was calling /api/v1/auth/login (client endpoint → type:"client" token, no role).
+          Changed to /api/v1/auth/users/login. Body: {identifier} → {email: identifier}.
+
+      - id: 41.3
+        name: "App.jsx — auth.* root redirect"
+        file: "src/App.jsx"
+        status: done
+        details: |
+          auth.salmansaas.com/ was redirecting to /showcase (wrong).
+          Added IS_AUTH_SUBDOMAIN constant.
+          Root redirect: IS_SUBDOMAIN_MODE ? (auth.* → /login, else → /showcase) : /smar.
+          /login route: IS_AUTH_SUBDOMAIN → SSOLoginPage, else → Login.jsx.
+
+      - id: 41.4
+        name: "Cleanup — delete MountainDashboard.jsx"
+        file: "src/pages/admin/MountainDashboard.jsx"
+        status: done
+        details: |
+          Legacy unused dashboard. Deleted. App.jsx was already importing SmarAdminDashboard.
+
+      - id: 41.5
+        name: "Subdomain routing — IS_SUBDOMAIN_MODE in App.jsx"
+        file: "src/App.jsx"
+        status: done
+        details: |
+          Subdomain mode: <Route path="/*"> (pathnameBase=/) for clean /showcase URLs.
+          Localhost mode: <Route path="/:slug/*"> (pathnameBase=/smar).
+          useTenantBase() in useTenantSlug.js: returns '' on subdomain, /${slug} on localhost.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 42: Fix Blank Public Pages — Tailwind CDN Conflict  (2026-04-20) ✅ COMPLETE
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 42
+    name: "Fix Blank Public Pages — Tailwind v3 CDN vs v4 Build Conflict"
+    description: |
+      smar.salmansaas.com/listings and /showcase showed blank white pages after
+      Railway deploy. No JS errors. Root cause: Tailwind v3 CDN in index.html
+      overrode the v4 PostCSS built CSS at runtime.
+    tasks:
+      - id: 42.1
+        name: "Remove Tailwind CDN from index.html"
+        file: "frontend/index.html"
+        status: done
+        details: |
+          Removed <script src="https://cdn.tailwindcss.com">.
+          The project already uses Tailwind v4 (tailwindcss ^4.2.1 + @tailwindcss/postcss ^4.2.1).
+          index.css has @import "tailwindcss" → v4 processes all classes at build time.
+          CDN was loading a v3 stylesheet at runtime → overrode bg-[#0a0a0f] → white page.
+
+      - id: 42.2
+        name: "Harden ListingsTemplate background"
+        file: "src/templates/ListingsTemplate.jsx"
+        status: done
+        details: |
+          Root div: added style={{ background: '#0a0a0f', color: '#fff' }} alongside className.
+          Guarantees dark background regardless of Tailwind CSS state.
+
+      - id: 42.3
+        name: "Harden TenantHeader background"
+        file: "src/design-system/organisms/TenantHeader.jsx"
+        status: done
+        details: |
+          Header: added inline style with scrolled-aware rgba backgrounds.
+          Nav was invisible (white header text on white bg) without dark background.
 
 # ══════════════════════════════════════════════════════════════════════════════
 # قواعد النظام الذري الجديد

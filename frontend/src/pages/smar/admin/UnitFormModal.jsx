@@ -64,7 +64,7 @@ function Spinner() {
 }
 
 
-export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
+export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesChange }) {
   const [activeTab, setActiveTab] = useState('details');
 
   // ── Details form state ────────────────────────────────────────────────────
@@ -129,6 +129,7 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setImages(data.images || []);
+      onImagesChange?.(data.images || []);
     } catch (err) {
       setUploadError(err.response?.data?.detail || 'فشل رفع الصورة — حاول مجدداً');
     } finally {
@@ -142,6 +143,7 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave }) {
     try {
       const { data } = await adminApi.delete(`/units/${unit.id}/images`, { data: { url } });
       setImages(data.images || []);
+      onImagesChange?.(data.images || []);
     } catch (err) {
       setUploadError(err.response?.data?.detail || 'فشل حذف الصورة');
     } finally {
