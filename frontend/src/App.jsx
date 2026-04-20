@@ -4,7 +4,7 @@
  * Static routes:
  *   /               →  redirect → /smar
  *   /login          →  Login
- *   /dashboard/:slug/units  →  MountainDashboard (admin portal)
+ *   /dashboard/:slug/units  →  SmarAdminDashboard (admin portal)
  *   /404            →  NotFound
  *
  * Dynamic tenant route (catches all slugs):
@@ -67,7 +67,11 @@ function App() {
         <Routes>
           {/* ── Root redirect ── */}
           <Route path="/" element={
-            <Navigate to={IS_SUBDOMAIN_MODE ? '/showcase' : '/smar'} replace />
+            <Navigate to={
+              IS_SUBDOMAIN_MODE
+                ? (_h.startsWith('auth.') ? '/login' : '/showcase')
+                : '/smar'
+            } replace />
           } />
 
           {/* ── Static admin routes ── */}

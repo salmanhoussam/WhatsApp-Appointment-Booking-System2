@@ -86,28 +86,39 @@ export default function SSOLoginPage() {
     }
     setError(''); setLoading(true);
 
+    const opts = { withCredentials: true };
+    let data = null;
+
     try {
-      const { data } = await axios.post(
+      // Attempt 1: Client (tenant owner) — identifier = slug / email / phone
+      ({ data } = await axios.post(
         `${API_BASE}/api/v1/auth/login`,
         { identifier, password },
-        { withCredentials: true }, // sends/receives the HttpOnly cookie
-      );
-
-      const { token, slug } = data;
-      // Hard redirect — crosses from auth.salmansaas.com to smar.salmansaas.com.
-      // ?token= is picked up by ProtectedRoute on the destination, saved to
-      // localStorage, then immediately stripped from the URL.
-      const dest = import.meta.env.PROD
-        ? `https://${slug}.salmansaas.com/dashboard/${slug}/units?token=${token}`
-        : `http://localhost:5173/dashboard/${slug}/units?token=${token}`;
-
-      window.location.href = dest;
-    } catch (err) {
-      const msg = err?.response?.data?.detail || err?.response?.data?.error;
-      setError(msg || 'بيانات الدخول غير صحيحة. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setLoading(false);
+        opts,
+      ));
+    } catch {
+      try {
+        // Attempt 2: Staff / Manager — identifier treated as email
+        ({ data } = await axios.post(
+          `${API_BASE}/api/v1/auth/users/login`,
+          { email: identifier, password },
+          opts,
+        ));
+      } catch (err) {
+        const msg = err?.response?.data?.detail || err?.response?.data?.error;
+        setError(msg || 'بيانات الدخول غير صحيحة. يرجى المحاولة مرة أخرى.');
+        setLoading(false);
+        return;
+      }
     }
+
+    const { token, slug } = data;
+    const dest = import.meta.env.PROD
+      ? `https://${slug}.salmansaas.com/dashboard/${slug}/units?token=${token}`
+      : `http://localhost:5173/dashboard/${slug}/units?token=${token}`;
+
+    window.location.href = dest;
+    setLoading(false);
   }
 
   return (
