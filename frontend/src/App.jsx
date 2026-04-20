@@ -24,11 +24,13 @@ import { LanguageProvider } from './context/LanguageContext';
 
 // Lazy — keeps heavy admin deps out of the main bundle
 const SmarAdminDashboard = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
+const SSOLoginPage        = lazy(() => import('./pages/auth/SSOLoginPage'));
 
 // Detect subdomain mode at module scope (stable across renders)
 const _h = window.location.hostname;
 const IS_SUBDOMAIN_MODE =
   _h !== 'localhost' && !_h.startsWith('127.') && _h.split('.').length >= 3;
+const IS_AUTH_SUBDOMAIN = IS_SUBDOMAIN_MODE && _h.startsWith('auth.');
 
 function NotFound() {
   return (
@@ -75,7 +77,12 @@ function App() {
           } />
 
           {/* ── Static admin routes ── */}
-          <Route path="/login" element={<Login />} />
+          {/* auth.salmansaas.com/login → SSO portal | localhost/login → legacy dev form */}
+          <Route path="/login" element={
+            IS_AUTH_SUBDOMAIN
+              ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
+              : <Login />
+          } />
           <Route path="/dashboard/:slug/*" element={
             <ProtectedRoute>
               <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
