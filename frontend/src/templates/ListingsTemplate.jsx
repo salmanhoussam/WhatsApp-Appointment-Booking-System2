@@ -27,7 +27,7 @@ export default function ListingsTemplate() {
   const [selectedUnit, setSelectedUnit] = useState(null);
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] text-white">
+    <div className="relative min-h-screen bg-[#0a0a0f] text-white" style={{ background: '#0a0a0f', color: '#fff' }}>
       <SEO title="الوحدات" />
 
       {/* ── Sticky navigation ── */}

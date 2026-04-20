@@ -93,6 +93,7 @@ export default function TenantHeader() {
           ? 'bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/[0.10] shadow-[0_4px_32px_rgba(0,0,0,0.55)]'
           : 'bg-[#0a0a0f]/60 backdrop-blur-md border-b border-white/[0.04]',
       ].join(' ')}
+      style={{ background: scrolled ? 'rgba(10,10,15,0.90)' : 'rgba(10,10,15,0.60)', color: '#f0f0f5' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
