@@ -494,7 +494,8 @@ function BookingsTab() {
   const [statusFilter,  setStatusFilter] = useState('all');
   const [dateFrom,      setDateFrom]     = useState('');
   const [dateTo,        setDateTo]       = useState('');
-  const [expandedRow,   setExpandedRow]  = useState(null); // booking id for detail row
+  const [expandedRow,   setExpandedRow]  = useState(null);
+  const [showNewModal,  setShowNewModal] = useState(false);
 
   const LIMIT = 20;
 
@@ -597,6 +598,13 @@ function BookingsTab() {
           >
             ↻ Refresh
           </button>
+          {/* New Booking */}
+          <button
+            onClick={() => setShowNewModal(true)}
+            style={{ ...inputStyle, color: '#0a0a0f', fontWeight: 700, background: C.gold, border: 'none', cursor: 'pointer' }}
+          >
+            + حجز جديد
+          </button>
         </div>
       </div>
 
@@ -694,7 +702,10 @@ function BookingsTab() {
                       onMouseLeave={e => e.currentTarget.style.background = isExpanded ? 'rgba(212,168,83,0.04)' : rowBg}
                       onClick={() => setExpandedRow(isExpanded ? null : b.id)}
                     >
-                      <td style={{ padding: '12px 14px', color: C.textPri, fontWeight: 500 }}>{customerName}</td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ color: C.textPri, fontWeight: 500 }}>{customerName}</div>
+                        <div style={{ color: C.textMuted, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }}>#{b.id?.slice(0, 8)}</div>
+                      </td>
                       <td style={{ padding: '12px 14px', color: C.textMuted }}>{customerPhone}</td>
                       <td style={{ padding: '12px 14px', color: C.textPri }}>{unitName}</td>
                       <td style={{ padding: '12px 14px', color: C.textMuted, whiteSpace: 'nowrap' }}>{checkIn}</td>
@@ -794,6 +805,16 @@ function BookingsTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── New Booking Modal ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {showNewModal && (
+          <AdminBookingModal
+            onClose={() => setShowNewModal(false)}
+            onCreated={() => { setShowNewModal(false); fetchPage(1); showToast('تم إنشاء الحجز بنجاح.', true); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -856,6 +877,194 @@ function Toggle({ on, onChange, disabled }) {
         display:     'block',
       }} />
     </button>
+  );
+}
+
+// ─── Admin Booking Modal ──────────────────────────────────────────────────────
+const EMPTY_BOOKING = {
+  unit_id: '', customer_name: '', customer_phone: '',
+  guests: 1, total_price: '', currency: 'SAR', notes: '',
+};
+
+function AdminBookingModal({ onClose, onCreated }) {
+  const { slug } = useParams();
+  const tenantSlug = slug || 'smar';
+
+  const [form,     setForm]     = useState(EMPTY_BOOKING);
+  const [units,    setUnits]    = useState([]);
+  const [dates,    setDates]    = useState({ checkIn: null, checkOut: null });
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState('');
+
+  useEffect(() => {
+    adminApi.get('/units/').then(r => setUnits(r.data.data ?? r.data ?? [])).catch(() => {});
+  }, []);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSubmit = async () => {
+    if (!form.unit_id)           { setError('اختر الوحدة'); return; }
+    if (!form.customer_name.trim()) { setError('اسم العميل مطلوب'); return; }
+    if (!form.customer_phone.trim()) { setError('رقم الهاتف مطلوب'); return; }
+    if (!dates.checkIn || !dates.checkOut) { setError('اختر تواريخ الحجز'); return; }
+    if (!form.total_price)       { setError('السعر الإجمالي مطلوب'); return; }
+
+    const toDateStr = (d) => {
+      if (!d) return '';
+      if (typeof d === 'string') return d.slice(0, 10);
+      return d.toISOString().slice(0, 10);
+    };
+
+    setSaving(true);
+    setError('');
+    try {
+      await adminApi.post('/bookings/', {
+        unit_id:        form.unit_id,
+        customer_name:  form.customer_name.trim(),
+        customer_phone: form.customer_phone.trim(),
+        check_in:       toDateStr(dates.checkIn),
+        check_out:      toDateStr(dates.checkOut),
+        guests:         Number(form.guests),
+        total_price:    parseFloat(form.total_price).toFixed(2),
+        currency:       form.currency,
+        notes:          form.notes || null,
+      });
+      onCreated();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'فشل إنشاء الحجز.');
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%', padding: '11px 14px', borderRadius: 8,
+    background: C.bg, border: `1px solid ${C.border}`,
+    color: C.textPri, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+  };
+  const labelStyle = {
+    display: 'block', color: C.textMuted, fontSize: 11,
+    marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        overflowY: 'auto', padding: '40px 16px',
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        style={{
+          background: C.surface, borderRadius: 16, border: `1px solid ${C.borderHi}`,
+          width: '100%', maxWidth: 780, padding: 32,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ color: C.textPri, fontSize: 18, fontWeight: 700, margin: 0 }}>
+            + حجز جديد
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Top fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={labelStyle}>الوحدة</label>
+            <select value={form.unit_id} onChange={e => set('unit_id', e.target.value)}
+              style={{ ...inputStyle, colorScheme: 'dark' }}>
+              <option value="">— اختر الوحدة —</option>
+              {units.map(u => (
+                <option key={u.id} value={u.id}>{u.name_ar || u.name_en || u.unitNumber}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>عدد الضيوف</label>
+            <input type="number" min={1} max={30} value={form.guests}
+              onChange={e => set('guests', e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>اسم العميل</label>
+            <input value={form.customer_name} onChange={e => set('customer_name', e.target.value)}
+              placeholder="محمد العلي" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>رقم الهاتف</label>
+            <input value={form.customer_phone} onChange={e => set('customer_phone', e.target.value)}
+              placeholder="+966xxxxxxxxx" style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Calendar */}
+        {form.unit_id && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>تواريخ الحجز</label>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+              <UnitCalendar
+                unitId={form.unit_id}
+                slug={tenantSlug}
+                adminMode={true}
+                value={dates}
+                onChange={({ checkIn, checkOut }) => setDates({ checkIn, checkOut })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Price + currency + notes */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={labelStyle}>السعر الإجمالي</label>
+            <input type="number" min={0} step="0.01" value={form.total_price}
+              onChange={e => set('total_price', e.target.value)}
+              placeholder="0.00" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>العملة</label>
+            <select value={form.currency} onChange={e => set('currency', e.target.value)}
+              style={{ ...inputStyle, colorScheme: 'dark' }}>
+              <option value="SAR">SAR ريال</option>
+              <option value="USD">USD دولار</option>
+              <option value="EUR">EUR يورو</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>ملاحظات</label>
+            <input value={form.notes} onChange={e => set('notes', e.target.value)}
+              placeholder="أي تعليمات خاصة…" style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{ background: C.redDim, border: `1px solid ${C.red}44`, borderRadius: 8, padding: '10px 14px', color: C.red, fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={saving}
+            style={{ padding: '10px 22px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, cursor: 'pointer', fontSize: 14 }}>
+            إلغاء
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            style={{ padding: '10px 28px', borderRadius: 8, border: 'none', background: C.gold, color: '#0a0a0f', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, opacity: saving ? 0.6 : 1 }}>
+            {saving ? '…' : 'إنشاء الحجز'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
