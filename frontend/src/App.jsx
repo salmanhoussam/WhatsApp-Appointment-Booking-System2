@@ -83,6 +83,15 @@ function App() {
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Login />
           } />
+          {/* Subdomain mode: smar.domain.com/dashboard/units  (no slug in path) */}
+          {IS_SUBDOMAIN_MODE && (
+            <Route path="/dashboard/*" element={
+              <ProtectedRoute>
+                <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+              </ProtectedRoute>
+            } />
+          )}
+          {/* Localhost/multi-tenant mode: domain.com/dashboard/smar/units */}
           <Route path="/dashboard/:slug/*" element={
             <ProtectedRoute>
               <Suspense fallback={null}><SmarAdminDashboard /></Suspense>

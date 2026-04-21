@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
 import UnitCalendar from '../../../components/UnitCalendar';
@@ -1643,9 +1643,25 @@ export default function SmarAdminDashboard() {
   const role = useAdminRole();
   const allowedTabs = ROLE_TABS[role] ?? [];
   const defaultTab = allowedTabs[0] ?? 'dashboard';
-  const [activeTab, setActiveTab] = useState(defaultTab);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const navigate = useNavigate();
+  const { slug, '*': urlTab } = useParams();
+
+  // Derive base path: subdomain → /dashboard, localhost → /dashboard/smar
+  const dashBase = slug ? `/dashboard/${slug}` : '/dashboard';
+
+  // Read active tab from URL wildcard segment
+  const tabFromUrl = urlTab?.split('/')[0];
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl && allowedTabs.includes(tabFromUrl) ? tabFromUrl : defaultTab
+  );
+
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+
+  // Keep URL in sync when tab changes
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(`${dashBase}/${tab}`, { replace: true });
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('admin_access_token');
@@ -1681,7 +1697,7 @@ export default function SmarAdminDashboard() {
     }}>
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onLogout={handleLogout}
         isExpanded={isSidebarExpanded}
         setIsExpanded={setIsSidebarExpanded}

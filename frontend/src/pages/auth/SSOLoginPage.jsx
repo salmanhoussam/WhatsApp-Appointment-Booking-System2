@@ -114,7 +114,7 @@ export default function SSOLoginPage() {
 
     const { token, slug } = data;
     const dest = import.meta.env.PROD
-      ? `https://${slug}.salmansaas.com/dashboard/${slug}/units?token=${token}`
+      ? `https://${slug}.salmansaas.com/dashboard/units?token=${token}`
       : `http://localhost:5173/dashboard/${slug}/units?token=${token}`;
 
     window.location.href = dest;
