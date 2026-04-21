@@ -15,9 +15,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
 import UnitCalendar from '../../../components/UnitCalendar';
 import UnitFormModal from './UnitFormModal';
-import ActionInbox from './components/ActionInbox';
-import SettingsTab from './components/SettingsTab';
-import TeamTab     from './components/TeamTab';
+import ActionInbox  from './components/ActionInbox';
+import SettingsTab  from './components/SettingsTab';
+import TeamTab      from './components/TeamTab';
+import ServicesTab  from './components/ServicesTab';
 import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../utils/useAdminRole';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -222,6 +223,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded,
     { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'  },
     { id: 'bookings',     icon: '📋', label: 'Reservations'  },
     { id: 'units',        icon: '🏠', label: 'الوحدات'       },
+    { id: 'services',     icon: '✨', label: 'الخدمات الإضافية' },
     { id: 'dashboard',    icon: '📊', label: 'Overview'      },
     { id: 'housekeeping', icon: '🧹', label: 'Housekeeping'  },
     { id: 'maintenance',  icon: '🔧', label: 'Maintenance'   },
@@ -1678,6 +1680,7 @@ export default function SmarAdminDashboard() {
     if (activeTab === 'inbox')        return <ActionInbox     />;
     if (activeTab === 'bookings')     return <BookingsTab     />;
     if (activeTab === 'units')        return <UnitsTab        />;
+    if (activeTab === 'services')     return <ServicesTab     />;
     if (activeTab === 'dashboard')    return <OverviewTab     />;
     if (activeTab === 'housekeeping') return <HousekeepingTab />;
     if (activeTab === 'maintenance')  return <MaintenanceTab  />;
@@ -1724,6 +1727,7 @@ export default function SmarAdminDashboard() {
                 inbox:        '🛎️ Action Inbox',
                 bookings:     'Reservations',
                 units:        'الوحدات — Unit Management',
+                services:     '✨ الخدمات الإضافية',
                 dashboard:    'Overview',
                 housekeeping: 'Housekeeping',
                 maintenance:  'Maintenance',

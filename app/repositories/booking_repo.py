@@ -76,7 +76,7 @@ class BookingRepository:
         conflicting_bookings = await self.db.booking.find_many(
             where={
                 "unitId": unit_id,
-                "status": {"in": ["pending", "confirmed"]},  # Matches schema default casing
+                "status": {"in": ["pending", "confirmed", "blocked"]},
                 "OR": [
                     {
                         "AND": [

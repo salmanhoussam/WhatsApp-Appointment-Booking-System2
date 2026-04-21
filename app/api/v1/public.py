@@ -98,33 +98,15 @@ async def get_services_by_slug(
     slug: str,
     unit_id: str = Query(...),
 ):
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
-
-    services = await public_service.get_unit_services_data(prisma_client, unit_id)
+    services = await public_service.get_unit_services_data(prisma_client, slug, unit_id)
     if services is None:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
-
-    # Verify the unit belongs to this tenant
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
-    if not unit or unit.clientId != client.id:
-        raise HTTPException(status_code=404, detail="الشاليه غير موجود")
-
     return services
 
 
 @router.get("/{slug}/units/{unit_id}/services")
 async def get_unit_services_by_slug(slug: str, unit_id: str):
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
-
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
-    if not unit or unit.clientId != client.id:
-        raise HTTPException(status_code=404, detail="الشاليه غير موجود")
-
-    services = await public_service.get_unit_services_data(prisma_client, unit_id)
+    services = await public_service.get_unit_services_data(prisma_client, slug, unit_id)
     if services is None:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
     return services

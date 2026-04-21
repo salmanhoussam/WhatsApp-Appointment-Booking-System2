@@ -28,7 +28,7 @@ model Client {
   whatsapp_number String?    @map("whatsapp_number")
   instagram_url   String?    @map("instagram_url")
   maps_url        String?    @map("maps_url")
-  currency        String     @default("USD") @map("currency")
+  currency        String     @default("SAR") @map("currency")
   features        Json?      @map("features")
   unit_types      String[]   @map("unit_types")
   payment_methods String[]   @map("payment_methods")

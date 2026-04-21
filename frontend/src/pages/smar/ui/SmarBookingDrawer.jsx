@@ -20,6 +20,7 @@ import { useNavigate }             from 'react-router-dom';
 import { useTenantBase }           from '../../../utils/useTenantSlug';
 import publicApi                   from '../../../utils/publicApi';
 import UnitCalendar                from '../../../components/UnitCalendar';
+import ServicesAddon              from '../../../components/ui/ServicesAddon';
 
 // ── Tokens — Sunlit Heritage Light Theme ─────────────────────────────────────
 const G = {
@@ -223,7 +224,19 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
   const [isSuccess,    setIsSuccess]    = useState(false);
   const [error,        setError]        = useState('');
 
+  // Add-on services state
+  const [availableServices, setAvailableServices] = useState([]);
+  const [selectedServices,  setSelectedServices]  = useState({});  // { [serviceId]: quantity }
+
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+  // Fetch available services for this unit once
+  useEffect(() => {
+    if (!unit?.id || !slug) return;
+    publicApi.get(`/${slug}/units/${unit.id}/services`)
+      .then(r => setAvailableServices(r.data || []))
+      .catch(() => setAvailableServices([]));
+  }, [unit?.id, slug]);
 
   // Recalculate price whenever dates or guests change
   useEffect(() => {
@@ -281,10 +294,11 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
         onClose();
         navigate(`${base}/payment`, {
           state: {
-            formData:          { ...form, check_in: ci, check_out: co, unit_id: unit.id },
+            formData:          { ...form, check_in: ci, check_out: co, unit_id: unit.id, services: servicesToSend },
             unit,
-            totalPrice:        priceResp.data.total_price,
+            totalPrice:        grandTotal ?? priceResp.data.total_price,
             availableServices: servicesResp.data,
+            selectedServices,
             lang,
             slug,
           },
@@ -310,6 +324,7 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
         payment_reference: form.paymentReference,
         check_in:          ci,
         check_out:         co,
+        services:          servicesToSend,
       });
       setIsSuccess(true);
     } catch {
@@ -321,6 +336,20 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
 
   const unitName = lang === 'ar' ? (unit?.name_ar || unit?.name_en) : (unit?.name_en || unit?.name_ar);
   const nights   = nightsBetween(dates.checkIn, dates.checkOut);
+
+  // Derive services total from selectedServices map
+  const servicesTotal = Object.entries(selectedServices).reduce((sum, [id, qty]) => {
+    const svc = availableServices.find(s => s.id === id);
+    return sum + (svc ? svc.base_price * qty : 0);
+  }, 0);
+
+  const grandTotal = livePrice
+    ? (parseFloat(livePrice.total_price) + servicesTotal).toFixed(2)
+    : null;
+
+  const servicesToSend = Object.entries(selectedServices)
+    .filter(([, qty]) => qty > 0)
+    .map(([service_id, quantity]) => ({ service_id, quantity }));
 
   return (
     <AnimatePresence>
@@ -471,12 +500,27 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
                         {lang === 'ar' ? 'الإجمالي' : 'Total'}
                       </span>
                       <span style={{ color: G.gold, fontSize: '0.95rem', fontWeight: 700 }}>
-                        {priceLoading ? '...' : livePrice ? `${livePrice.total_price} ${livePrice.currency}` : '—'}
+                        {priceLoading ? '...' : grandTotal ? `${grandTotal} ${livePrice.currency}` : '—'}
                       </span>
+                      {servicesTotal > 0 && (
+                        <span style={{ color: G.textMuted, fontSize: '0.65rem', display: 'block', marginTop: 2 }}>
+                          {lang === 'ar' ? `يشمل ${servicesTotal} خدمات` : `incl. ${servicesTotal} services`}
+                        </span>
+                      )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Add-on services — shown after dates are picked */}
+              {nights > 0 && availableServices.length > 0 && (
+                <ServicesAddon
+                  services={availableServices}
+                  selectedServices={selectedServices}
+                  onChange={setSelectedServices}
+                  lang={lang}
+                />
+              )}
 
               {/* Personal info */}
               <GlassInput label={lang === 'ar' ? 'الاسم الكامل' : 'Full Name'} name="name" value={form.name} onChange={handleChange} placeholder={lang === 'ar' ? 'سلمان...' : 'Your name...'} />

@@ -64,8 +64,13 @@ class UnitRepository:
         )
 
     async def update(self, unit_id: str, client_id: str, data: dict):
-        """Update a unit (admin only). Client isolation enforced."""
-        return await self.db.unit.update_many(
-            where={"id": unit_id, "clientId": client_id},
+        """Update a unit (admin only). Client isolation enforced. Raises ValueError if not found."""
+        existing = await self.db.unit.find_first(
+            where={"id": unit_id, "clientId": client_id}
+        )
+        if not existing:
+            raise ValueError(f"Unit {unit_id} not found for this client.")
+        return await self.db.unit.update(
+            where={"id": unit_id},
             data={k: v for k, v in data.items() if v is not None},
         )

@@ -53,7 +53,7 @@ async def _verify_tenant(slug: str) -> dict:
         logger.warning("⚠️  Tenant slug not found in DB: '%s'", slug)
         raise HTTPException(status_code=404, detail=f"Tenant '{slug}' not found.")
 
-    tenant = {"id": client.id, "slug": client.slug}
+    tenant = {"id": client.id, "slug": client.slug, "currency": client.currency}
     _tenant_cache[slug] = (tenant, now)
     logger.info("✅ Tenant verified and cached: %s", slug)
     return tenant

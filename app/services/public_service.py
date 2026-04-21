@@ -82,13 +82,18 @@ async def get_tenant_gallery_images(slug: str) -> List[Dict[str, Any]]:
     return result
 
 
-async def get_unit_services_data(db: Prisma, unit_id: str) -> Optional[List[Dict[str, Any]]]:
+async def get_unit_services_data(db: Prisma, slug: str, unit_id: str) -> Optional[List[Dict[str, Any]]]:
     """
     Return all active services for the client that owns the given unit.
-    Returns None if the unit does not exist.
+    Enforces clientId isolation — unit must belong to the tenant identified by slug.
+    Returns None if the unit does not exist or belongs to a different tenant.
     """
     try:
-        unit = await db.unit.find_unique(where={"id": unit_id})
+        client = await db.client.find_first(where={"slug": slug, "isActive": True})
+        if not client:
+            return None
+
+        unit = await db.unit.find_first(where={"id": unit_id, "clientId": client.id})
         if not unit:
             return None
 

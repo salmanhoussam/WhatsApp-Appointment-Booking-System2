@@ -59,7 +59,16 @@ async def delete_price(db: Prisma, price_id: str, client_id: str) -> bool:
     await db.price.delete(where={"id": price_id})
     return True
 
-async def set_bulk_prices(db: Prisma, client_id: str, unit_id: str, start_date: date, end_date: date, price: float, weekend_price: Optional[float] = None) -> int:
+async def set_bulk_prices(
+    db: Prisma,
+    client_id: str,
+    unit_id: str,
+    start_date: date,
+    end_date: date,
+    price: float,
+    weekend_price: Optional[float] = None,
+    currency: str = "SAR",
+) -> int:
     prices_to_create = []
     current_date = start_date
 
@@ -72,7 +81,7 @@ async def set_bulk_prices(db: Prisma, client_id: str, unit_id: str, start_date: 
             "unitId": unit_id,
             "date": to_datetime_start(current_date),
             "price": daily_price,
-            "currency": "USD",
+            "currency": currency,
             "available": True
         })
         current_date += timedelta(days=1)
