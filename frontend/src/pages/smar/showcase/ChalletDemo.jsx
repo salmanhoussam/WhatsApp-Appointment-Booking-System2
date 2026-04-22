@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import challetHtml from '../../../../../public/challet.html?raw';
+import challetHtml from '../../../../public/challet.html?raw';
 
 export default function ChalletDemo() {
   useEffect(() => {
