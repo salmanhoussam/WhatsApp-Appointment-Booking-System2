@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beit Smar — Boutique Resort, Batroun</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Cinzel:wght@400;500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sand: #f5efe6;
+    --linen: #ede4d5;
+    --warm: #c9a96e;
+    --terracotta: #b5673d;
+    --bark: #6b4c2a;
+    --stone: #3d3530;
+    --ink: #1e1710;
+    --mist: rgba(245,239,230,0.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--sand);
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    height: 100vh;
+    min-height: 700px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 0 8vw 8vh;
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 30%, rgba(201,169,110,0.13) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 80% at 20% 80%, rgba(181,103,61,0.10) 0%, transparent 55%),
+      linear-gradient(160deg, #1e1710 0%, #2a1f14 40%, #1a130c 100%);
+  }
+
+  .hero-pattern {
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(201,169,110,0.04) 60px),
+      repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(201,169,110,0.04) 60px);
+    background-size: 60px 60px;
+  }
+
+  .hero-ornament {
+    position: absolute;
+    top: 12vh; right: 8vw;
+    width: 320px; height: 320px;
+    border: 1px solid rgba(201,169,110,0.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    animation: slowspin 40s linear infinite;
+  }
+  .hero-ornament::before {
+    content: '';
+    position: absolute; inset: 20px;
+    border: 1px solid rgba(201,169,110,0.08);
+    border-radius: 50%;
+  }
+  .hero-ornament-inner {
+    font-family: 'Cinzel', serif;
+    font-size: 2.8rem;
+    color: rgba(201,169,110,0.3);
+    letter-spacing: 0.3em;
+  }
+
+  @keyframes slowspin { to { transform: rotate(360deg); } }
+
+  .hero-eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.35em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeup 1s 0.3s forwards;
+  }
+
+  .hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(4rem, 9vw, 9rem);
+    font-weight: 300;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    margin-bottom: 2rem;
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeup 1s 0.5s forwards;
+  }
+
+  .hero-title em {
+    font-style: italic;
+    color: var(--warm);
+  }
+
+  .hero-sub {
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    color: rgba(245,239,230,0.5);
+    max-width: 420px;
+    line-height: 1.8;
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeup 1s 0.7s forwards;
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: var(--warm);
+    text-decoration: none;
+    text-transform: uppercase;
+    padding: 1rem 2rem;
+    border: 1px solid rgba(201,169,110,0.4);
+    transition: all 0.4s;
+    opacity: 0;
+    animation: fadeup 1s 0.9s forwards;
+  }
+
+  .hero-cta:hover {
+    background: rgba(201,169,110,0.1);
+    border-color: var(--warm);
+    gap: 1.5rem;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 4vh; right: 8vw;
+    display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.3em;
+    color: rgba(245,239,230,0.3);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    opacity: 0;
+    animation: fadeup 1.2s 1.2s forwards;
+  }
+
+  .hero-scroll-line {
+    width: 1px; height: 60px;
+    background: linear-gradient(to bottom, var(--warm), transparent);
+    animation: scrollpulse 2s ease-in-out infinite;
+  }
+
+  @keyframes scrollpulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.1); }
+  }
+
+  @keyframes fadeup {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    display: flex; align-items: center; gap: 2rem;
+    padding: 0 8vw;
+    margin: 5rem 0 3rem;
+  }
+  .divider-line { flex: 1; height: 1px; background: rgba(201,169,110,0.2); }
+  .divider-symbol {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.4em;
+    color: var(--warm);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── STORY SECTION ── */
+  .story {
+    padding: 4rem 8vw;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: center;
+  }
+
+  .story-text h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.5rem, 4vw, 4rem);
+    font-weight: 300;
+    line-height: 1.15;
+    margin-bottom: 1.5rem;
+  }
+
+  .story-text h2 em { font-style: italic; color: var(--warm); }
+
+  .story-text p {
+    color: rgba(245,239,230,0.6);
+    line-height: 2;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .story-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    background: rgba(201,169,110,0.1);
+  }
+
+  .stat {
+    background: var(--ink);
+    padding: 2.5rem 2rem;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+  }
+
+  .stat:hover { background: rgba(201,169,110,0.05); }
+
+  .stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 3.5rem;
+    font-weight: 300;
+    color: var(--warm);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: rgba(245,239,230,0.4);
+    text-transform: uppercase;
+  }
+
+  /* ── ALPHABET STRIP ── */
+  .alphabet-strip {
+    overflow: hidden;
+    padding: 2rem 0;
+    border-top: 1px solid rgba(201,169,110,0.1);
+    border-bottom: 1px solid rgba(201,169,110,0.1);
+    margin: 3rem 0;
+  }
+
+  .alphabet-track {
+    display: flex;
+    gap: 3rem;
+    animation: marquee 20s linear infinite;
+    white-space: nowrap;
+  }
+
+  .alphabet-char {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    font-style: italic;
+    color: rgba(201,169,110,0.3);
+    letter-spacing: 0.1em;
+    transition: color 0.3s;
+  }
+
+  .alphabet-char:hover { color: var(--warm); }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* ── SECTION HEADING ── */
+  .section-head {
+    padding: 0 8vw 3rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .section-head h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.5rem, 4.5vw, 5rem);
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .section-head h2 em { font-style: italic; color: var(--warm); }
+
+  .section-head p {
+    color: rgba(245,239,230,0.4);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    max-width: 280px;
+    line-height: 1.8;
+    text-align: right;
+  }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    padding: 0 8vw 2.5rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    padding: 0.6rem 1.4rem;
+    border: 1px solid rgba(201,169,110,0.25);
+    background: transparent;
+    color: rgba(245,239,230,0.5);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .filter-btn:hover,
+  .filter-btn.active {
+    border-color: var(--warm);
+    color: var(--warm);
+    background: rgba(201,169,110,0.07);
+  }
+
+  /* ── UNIT GRID ── */
+  .units-grid {
+    padding: 0 8vw;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 2px;
+  }
+
+  .unit-card {
+    position: relative;
+    background: #1a130c;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+
+  .unit-card:hover { transform: translateY(-4px); }
+  .unit-card:hover .unit-img-bg { transform: scale(1.05); }
+  .unit-card:hover .unit-overlay { opacity: 1; }
+  .unit-card:hover .unit-book-btn { opacity: 1; transform: translateY(0); }
+
+  .unit-img-wrap {
+    height: 260px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .unit-img-bg {
+    width: 100%; height: 100%;
+    transition: transform 0.6s ease;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 5rem;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+  .unit-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 30%, rgba(26,19,12,0.95) 100%);
+    opacity: 0.7;
+    transition: opacity 0.4s;
+  }
+
+  .unit-phoenician {
+    position: absolute;
+    top: 1.2rem; left: 1.5rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.5rem;
+    font-style: italic;
+    color: var(--warm);
+    opacity: 0.9;
+    line-height: 1;
+    z-index: 2;
+  }
+
+  .unit-type-badge {
+    position: absolute;
+    top: 1.2rem; right: 1.5rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.5rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--warm);
+    background: rgba(26,19,12,0.8);
+    border: 1px solid rgba(201,169,110,0.3);
+    padding: 0.3rem 0.7rem;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+  }
+
+  .unit-book-btn {
+    position: absolute;
+    bottom: 1.2rem; right: 1.5rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--warm);
+    padding: 0.5rem 1rem;
+    z-index: 3;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s;
+    border: none; cursor: pointer;
+  }
+
+  .unit-info {
+    padding: 1.5rem 1.8rem 2rem;
+    border-top: 1px solid rgba(201,169,110,0.1);
+  }
+
+  .unit-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    margin-bottom: 0.3rem;
+    letter-spacing: 0.02em;
+  }
+
+  .unit-subtype {
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .unit-desc {
+    font-size: 0.82rem;
+    color: rgba(245,239,230,0.5);
+    line-height: 1.75;
+    margin-bottom: 1.2rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .unit-meta {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .unit-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    color: rgba(245,239,230,0.35);
+    letter-spacing: 0.05em;
+  }
+
+  .unit-meta-icon { font-size: 0.9rem; }
+
+  .unit-amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+
+  .amenity-pill {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: rgba(245,239,230,0.35);
+    border: 1px solid rgba(201,169,110,0.12);
+    padding: 0.25rem 0.6rem;
+    text-transform: uppercase;
+  }
+
+  /* type-based color bands */
+  .unit-card[data-type="Garden"] .unit-img-bg { background: linear-gradient(135deg, #1e2a18, #2d3d22, #1a2315); color: rgba(120,160,80,0.2); }
+  .unit-card[data-type="Terrace"] .unit-img-bg { background: linear-gradient(135deg, #1e1a2a, #2d2540, #1a1525); color: rgba(140,110,200,0.2); }
+  .unit-card[data-type="Detached"] .unit-img-bg { background: linear-gradient(135deg, #2a1a18, #3d2820, #251512); color: rgba(200,120,80,0.2); }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(15,10,7,0.92);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+    display: flex; align-items: center; justify-content: center;
+    padding: 2rem;
+  }
+
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: #1e160f;
+    border: 1px solid rgba(201,169,110,0.2);
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: translateY(30px);
+    transition: transform 0.4s;
+    position: relative;
+  }
+
+  .modal-backdrop.open .modal { transform: translateY(0); }
+
+  .modal::-webkit-scrollbar { width: 3px; }
+  .modal::-webkit-scrollbar-track { background: transparent; }
+  .modal::-webkit-scrollbar-thumb { background: var(--warm); border-radius: 2px; }
+
+  .modal-header {
+    padding: 2.5rem 2.5rem 2rem;
+    border-bottom: 1px solid rgba(201,169,110,0.1);
+    position: sticky; top: 0;
+    background: #1e160f;
+    z-index: 1;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+
+  .modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.5rem;
+    font-weight: 300;
+  }
+
+  .modal-title span {
+    display: block;
+    font-size: 0.7rem;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.3em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .modal-close {
+    width: 36px; height: 36px;
+    border: 1px solid rgba(201,169,110,0.3);
+    background: transparent;
+    color: var(--warm);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .modal-close:hover { background: rgba(201,169,110,0.1); }
+
+  .modal-body { padding: 2rem 2.5rem 2.5rem; }
+
+  .modal-desc {
+    font-size: 0.9rem;
+    color: rgba(245,239,230,0.65);
+    line-height: 1.9;
+    margin-bottom: 2rem;
+  }
+
+  .modal-section-title {
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.35em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(201,169,110,0.15);
+  }
+
+  .modal-highlights {
+    list-style: none;
+    margin-bottom: 2rem;
+  }
+
+  .modal-highlights li {
+    font-size: 0.85rem;
+    color: rgba(245,239,230,0.6);
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(201,169,110,0.06);
+    padding-left: 1.2rem;
+    position: relative;
+    line-height: 1.6;
+  }
+
+  .modal-highlights li::before {
+    content: '—';
+    position: absolute; left: 0;
+    color: var(--warm);
+    font-size: 0.7rem;
+  }
+
+  .modal-amenities {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .modal-amenity {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,239,230,0.5);
+    border: 1px solid rgba(201,169,110,0.2);
+    padding: 0.4rem 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .modal-amenity:hover { border-color: var(--warm); color: var(--warm); }
+
+  .modal-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .modal-info-box {
+    background: rgba(201,169,110,0.05);
+    border: 1px solid rgba(201,169,110,0.1);
+    padding: 1.2rem 1.5rem;
+  }
+
+  .modal-info-box h4 {
+    font-family: 'Cinzel', serif;
+    font-size: 0.55rem;
+    letter-spacing: 0.3em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 0.7rem;
+  }
+
+  .modal-info-box p {
+    font-size: 0.8rem;
+    color: rgba(245,239,230,0.55);
+    line-height: 1.7;
+  }
+
+  .modal-addons {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .addon-item {
+    background: rgba(201,169,110,0.04);
+    border: 1px solid rgba(201,169,110,0.12);
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .addon-price {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem;
+    color: var(--warm);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+
+  .addon-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,239,230,0.35);
+  }
+
+  .modal-policies {
+    list-style: none;
+    margin-bottom: 2rem;
+  }
+
+  .modal-policies li {
+    font-size: 0.78rem;
+    color: rgba(245,239,230,0.45);
+    padding: 0.45rem 0;
+    padding-left: 1rem;
+    border-bottom: 1px solid rgba(201,169,110,0.05);
+    position: relative;
+    line-height: 1.6;
+  }
+
+  .modal-policies li::before {
+    content: '·';
+    position: absolute; left: 0;
+    color: var(--warm);
+  }
+
+  .modal-book-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem 2rem;
+    background: rgba(201,169,110,0.06);
+    border: 1px solid rgba(201,169,110,0.15);
+    margin-top: 1rem;
+  }
+
+  .modal-checkin {
+    font-size: 0.75rem;
+    color: rgba(245,239,230,0.5);
+  }
+
+  .modal-checkin strong {
+    display: block;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    color: var(--sand);
+    font-weight: 400;
+  }
+
+  .modal-reserve-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--warm);
+    border: none;
+    padding: 0.9rem 2rem;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+
+  .modal-reserve-btn:hover { background: #d4b47a; }
+
+  /* ── FACILITIES ── */
+  .facilities {
+    padding: 5rem 8vw;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2px;
+    background: rgba(201,169,110,0.06);
+    margin: 5rem 0;
+  }
+
+  .facility-item {
+    background: var(--ink);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    transition: background 0.3s;
+  }
+
+  .facility-item:hover { background: rgba(201,169,110,0.06); }
+
+  .facility-icon { font-size: 2rem; margin-bottom: 1rem; }
+
+  .facility-name {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    color: var(--warm);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .facility-detail {
+    font-size: 0.75rem;
+    color: rgba(245,239,230,0.35);
+    line-height: 1.6;
+  }
+
+  /* ── LOCATION ── */
+  .location-section {
+    padding: 3rem 8vw 5rem;
+  }
+
+  .location-inner {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .location-text h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 3.5vw, 3.5rem);
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    line-height: 1.1;
+  }
+
+  .location-text h2 em { font-style: italic; color: var(--warm); }
+
+  .location-text p {
+    font-size: 0.85rem;
+    color: rgba(245,239,230,0.55);
+    line-height: 1.9;
+    margin-bottom: 1rem;
+  }
+
+  .location-tags {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .loc-tag {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--warm);
+    border: 1px solid rgba(201,169,110,0.3);
+    padding: 0.4rem 0.9rem;
+  }
+
+  .location-map-placeholder {
+    height: 380px;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(201,169,110,0.06) 30px),
+      repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(201,169,110,0.06) 30px),
+      linear-gradient(135deg, #1a130c, #251a12);
+    border: 1px solid rgba(201,169,110,0.15);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .map-dot {
+    width: 12px; height: 12px;
+    background: var(--warm);
+    border-radius: 50%;
+    box-shadow: 0 0 0 8px rgba(201,169,110,0.15), 0 0 0 20px rgba(201,169,110,0.06);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .map-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    color: var(--warm);
+    text-transform: uppercase;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 8px rgba(201,169,110,0.15), 0 0 0 20px rgba(201,169,110,0.06); }
+    50% { box-shadow: 0 0 0 14px rgba(201,169,110,0.1), 0 0 0 30px rgba(201,169,110,0.03); }
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid rgba(201,169,110,0.15);
+    padding: 3rem 8vw;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .footer-brand {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--warm);
+  }
+
+  .footer-note {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: rgba(245,239,230,0.25);
+    text-align: center;
+  }
+
+  .footer-contact {
+    font-size: 0.75rem;
+    color: rgba(245,239,230,0.4);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .story { grid-template-columns: 1fr; gap: 3rem; }
+    .location-inner { grid-template-columns: 1fr; }
+    .modal-grid { grid-template-columns: 1fr; }
+    .section-head { flex-direction: column; align-items: flex-start; }
+    .section-head p { text-align: left; }
+    .hero-ornament { display: none; }
+    footer { flex-direction: column; text-align: center; }
+    .footer-contact { text-align: center; }
+    .units-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-pattern"></div>
+  <div class="hero-ornament">
+    <div class="hero-ornament-inner">𐤁𐤔</div>
+  </div>
+  <p class="hero-eyebrow">Smar Jbeil · Batroun · Lebanon</p>
+  <h1 class="hero-title">Beit<br><em>Smar</em></h1>
+  <p class="hero-sub">Where Phoenician heritage meets contemporary luxury — eleven private cottages nestled in the midlands of Batroun, between ancient citadels and the Mediterranean horizon.</p>
+  <a href="#units" class="hero-cta">Explore Cottages →</a>
+  <div class="hero-scroll">
+    <div class="hero-scroll-line"></div>
+    Scroll
+  </div>
+</section>
+
+<!-- ALPHABET STRIP -->
+<div class="alphabet-strip">
+  <div class="alphabet-track" id="alphaTrack"></div>
+</div>
+
+<!-- STORY -->
+<section class="story">
+  <div class="story-text">
+    <h2>A Resort Rooted in<br><em>Ancient Letters</em></h2>
+    <p>Each cottage at Beit Smar carries the name of a Phoenician letter — the very alphabet born on this Levantine coast, the ancestor of all Western writing. From Alep to Zayin, eleven dwellings, eleven characters, one story.</p>
+    <p>Set among the vineyards of Batroun, minutes from the Old Souk and the Smar Jbeil Citadel, this boutique resort offers a rare convergence of heritage, nature, and refined hospitality.</p>
+  </div>
+  <div class="story-stats">
+    <div class="stat"><div class="stat-num">11</div><div class="stat-label">Private Cottages</div></div>
+    <div class="stat"><div class="stat-num">3</div><div class="stat-label">Cottage Types</div></div>
+    <div class="stat"><div class="stat-num">15<span style="font-size:1.5rem">min</span></div><div class="stat-label">From Batroun Souk</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Sea & Valley Views</div></div>
+  </div>
+</section>
+
+<!-- UNITS SECTION -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-symbol">The Cottages</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="section-head" id="units">
+  <h2>Eleven Letters,<br><em>Eleven Retreats</em></h2>
+  <p>Filter by cottage type or browse all eleven uniquely named sanctuaries.</p>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="filterUnits('all', this)">All Cottages</button>
+  <button class="filter-btn" onclick="filterUnits('Garden', this)">Garden Cottages</button>
+  <button class="filter-btn" onclick="filterUnits('Terrace', this)">Terrace Cottages</button>
+  <button class="filter-btn" onclick="filterUnits('Detached', this)">Detached Cottages</button>
+</div>
+
+<div class="units-grid" id="unitsGrid"></div>
+
+<!-- FACILITIES -->
+<div class="divider" style="margin-top:5rem">
+  <div class="divider-line"></div>
+  <div class="divider-symbol">Resort Facilities</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="facilities">
+  <div class="facility-item">
+    <div class="facility-icon">🏊</div>
+    <div class="facility-name">Swimming Pool</div>
+    <div class="facility-detail">May 15 – Oct 5<br>9:00 AM – 7:00 PM</div>
+  </div>
+  <div class="facility-item">
+    <div class="facility-icon">🍹</div>
+    <div class="facility-name">Pool Bar</div>
+    <div class="facility-detail">Refreshments & cocktails poolside</div>
+  </div>
+  <div class="facility-item">
+    <div class="facility-icon">🍽️</div>
+    <div class="facility-name">Dining Clubhouse</div>
+    <div class="facility-detail">Breakfast served<br>9:30 – 11:30 AM</div>
+  </div>
+  <div class="facility-item">
+    <div class="facility-icon">🛎️</div>
+    <div class="facility-name">Concierge</div>
+    <div class="facility-detail">Guest support<br>9:00 AM – 10:00 PM</div>
+  </div>
+  <div class="facility-item">
+    <div class="facility-icon">🚗</div>
+    <div class="facility-name">Airport Transfer</div>
+    <div class="facility-detail">Pick-up & drop-off available on request</div>
+  </div>
+  <div class="facility-item">
+    <div class="facility-icon">🐾</div>
+    <div class="facility-name">Pet Friendly</div>
+    <div class="facility-detail">Pets welcome in cottages</div>
+  </div>
+</div>
+
+<!-- LOCATION -->
+<section class="location-section">
+  <div class="location-inner">
+    <div class="location-text">
+      <h2>Phoenician<br><em>Territory</em></h2>
+      <p>Beit Smar sits in the heart of Smar Jbeil, Batroun — a region where civilisation wrote itself into stone thousands of years ago. The Citadel stands a stone's throw away. The vineyards surround you. The sea glimmers on the horizon.</p>
+      <p>15 minutes to Batroun's Old Souk. 5 minutes to the famous wineries. An eternity from the noise of the city.</p>
+      <div class="location-tags">
+        <span class="loc-tag">Smar Jbeil</span>
+        <span class="loc-tag">Batroun, Lebanon</span>
+        <span class="loc-tag">Near Citadel</span>
+        <span class="loc-tag">Vineyard Views</span>
+        <span class="loc-tag">Sea Views</span>
+      </div>
+    </div>
+    <div class="location-map-placeholder">
+      <div class="map-dot"></div>
+      <div class="map-label">Beit Smar · Smar Jbeil</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">Beit Smar</div>
+  <div class="footer-note">Boutique Resort · Smar Jbeil, Batroun · Lebanon<br>Named after the Phoenician alphabet — born on this shore</div>
+  <div class="footer-contact">Check-in: 5:00 PM<br>Check-out: 2:00 PM<br>Concierge: 9 AM – 10 PM</div>
+</footer>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+const units = [
+  {
+    name: "Alep", letter: "𐤀", subtitle: "Detached Cottage", type: "Detached",
+    desc: "Discover Alep Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Alep features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers for a spa-like experience","Stunning Views: Majestic sea and valley views from private patios","Well-Equipped Kitchenettes: All the essentials for convenient self-catering","Prime Location: Minutes away from Batroun's historic Old Souk"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Bēt", letter: "𐤁", subtitle: "Detached Cottage", type: "Detached",
+    desc: "Discover Bēt Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Bēt features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views from private patios","Well-Equipped Kitchenettes: All essentials for self-catering","Prime Location: Close to top wineries and local attractions"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Gīml", letter: "𐤂", subtitle: "Detached Cottage", type: "Detached",
+    desc: "Discover Gīml Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Gīml features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views from private patios","Well-Equipped Kitchenettes: All essentials for self-catering","Prime Location: Stone's throw from Smar Jbeil Citadel"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Dālet", letter: "𐤃", subtitle: "Detached Cottage", type: "Detached",
+    desc: "Discover Dālet Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Dālet features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views, perfect for sunrises and sunsets","Well-Equipped Kitchenettes","Prime Location: Minutes from Batroun's historic Old Souk"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "He", letter: "𐤄", subtitle: "Garden Cottage", type: "Garden",
+    desc: "Discover He Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. He features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views from private patios","Well-Equipped Kitchenettes","Prime Location: History whispers through the alleyways of Smar Jbeil"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Hēt", letter: "𐤇", subtitle: "Terrace Cottage", type: "Terrace",
+    desc: "Discover Hēt Terrace Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Hēt features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers for a spa-like experience","Stunning Views: Majestic sea and valley views, perfect for sunrises and sunsets","Well-Equipped Kitchenettes","Prime Location: Close to top wineries"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Lāmed", letter: "𐤋", subtitle: "Terrace Cottage", type: "Terrace",
+    desc: "Discover Lāmed Terrace Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Lāmed features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Majestic sea and valley views","Well-Equipped Kitchenettes","Prime Location: Minutes from the historic Old Souk"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Tēt", letter: "𐤈", subtitle: "Garden Cottage", type: "Garden",
+    desc: "Discover Tēt Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Tēt features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views","Well-Equipped Kitchenettes","Prime Location: Nestled amidst renowned Batroun vineyards"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Wāw", letter: "𐤅", subtitle: "Terrace Cottage", type: "Terrace",
+    desc: "Discover Wāw Terrace Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Wāw features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views, sunrises and sunsets","Well-Equipped Kitchenettes","Prime Location: 5 minutes from famous wineries"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Yod", letter: "𐤉", subtitle: "Terrace Cottage", type: "Terrace",
+    desc: "Discover Yod Terrace Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Yod features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Sea and valley views from private patios","Well-Equipped Kitchenettes","Prime Location: Step into history at the Smar Jbeil Citadel"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  },
+  {
+    name: "Zayin", letter: "𐤆", subtitle: "Garden Cottage", type: "Garden",
+    desc: "Discover Zayin Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Zayin features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating — ideal for those who cherish independence & tranquility.",
+    highlights: ["Luxurious Accommodation: King-size beds with fine linens, Dual rain showers","Stunning Views: Majestic sea and valley views from private patios","Well-Equipped Kitchenettes: All essentials for convenient self-catering","Prime Location: Close to top wineries and local attractions"],
+    amenities: ["Wifi","Microwave","Balcony","Hangers","Outdoor Furniture","Hairdryer","AC","Kettle","Smart TV"],
+    checkin: "17:00", checkout: "14:00", guests: 2,
+    addons: [{label:"Pool Entrance",price:25,unit:"per person"},{label:"Sofa Bed",price:30,unit:"per person"},{label:"Crib",price:30,unit:"per stay"}],
+    cancellation: ["100% refund up to 14 days before arrival","50% refund up to 7 days before arrival"]
+  }
+];
+
+// Build alphabet strip
+const names = units.map(u => `${u.letter} ${u.name}`);
+const track = document.getElementById('alphaTrack');
+const allNames = [...names, ...names];
+track.innerHTML = allNames.map(n => `<span class="alphabet-char">${n}</span>`).join('');
+
+// Build grid
+function buildGrid(filter = 'all') {
+  const grid = document.getElementById('unitsGrid');
+  const filtered = filter === 'all' ? units : units.filter(u => u.type === filter);
+  grid.innerHTML = filtered.map((u, i) => `
+    <div class="unit-card" data-type="${u.type}" onclick="openModal(${units.indexOf(u)})" style="animation: fadeup 0.6s ${i * 0.07}s both;">
+      <div class="unit-img-wrap">
+        <div class="unit-img-bg">${u.letter}</div>
+        <div class="unit-overlay"></div>
+        <div class="unit-phoenician">${u.letter}</div>
+        <div class="unit-type-badge">${u.type} Cottage</div>
+        <button class="unit-book-btn">Reserve Now</button>
+      </div>
+      <div class="unit-info">
+        <div class="unit-name">${u.name}</div>
+        <div class="unit-subtype">${u.subtitle}</div>
+        <div class="unit-desc">${u.desc}</div>
+        <div class="unit-meta">
+          <div class="unit-meta-item"><span class="unit-meta-icon">👤</span> Up to ${u.guests} guests</div>
+          <div class="unit-meta-item"><span class="unit-meta-icon">🛏</span> 1 Bedroom</div>
+          <div class="unit-meta-item"><span class="unit-meta-icon">🚿</span> 1 Bathroom</div>
+        </div>
+        <div class="unit-amenities">
+          ${u.amenities.slice(0,5).map(a => `<span class="amenity-pill">${a}</span>`).join('')}
+          ${u.amenities.length > 5 ? `<span class="amenity-pill">+${u.amenities.length - 5} more</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+buildGrid();
+
+function filterUnits(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildGrid(type);
+}
+
+function openModal(idx) {
+  const u = units[idx];
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <div class="modal-header">
+      <div class="modal-title">
+        <span>${u.letter} · ${u.type} Cottage</span>
+        ${u.name}
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">${u.desc}</p>
+
+      <div class="modal-section-title">Highlights</div>
+      <ul class="modal-highlights">
+        ${u.highlights.map(h => `<li>${h}</li>`).join('')}
+      </ul>
+
+      <div class="modal-section-title">Amenities</div>
+      <div class="modal-amenities">
+        ${u.amenities.map(a => `<span class="modal-amenity">${a}</span>`).join('')}
+      </div>
+
+      <div class="modal-grid">
+        <div class="modal-info-box">
+          <h4>Check-in / Check-out</h4>
+          <p>Check-in from ${u.checkin}<br>Check-out by ${u.checkout}<br>Quiet hours: Midnight – 9:00 AM</p>
+        </div>
+        <div class="modal-info-box">
+          <h4>Included Services</h4>
+          <p>Concierge support (9 AM – 10 PM)<br>Room service (9 AM – 10 PM)<br>Pool access (seasonal)</p>
+        </div>
+        <div class="modal-info-box">
+          <h4>Cancellation Policy</h4>
+          <p>${u.cancellation.join('<br>')}</p>
+        </div>
+        <div class="modal-info-box">
+          <h4>Optional Breakfast</h4>
+          <p>Served at the Clubhouse<br>9:30 AM – 11:30 AM</p>
+        </div>
+      </div>
+
+      <div class="modal-section-title">Add-ons & Extras</div>
+      <div class="modal-addons">
+        ${u.addons.map(a => `
+          <div class="addon-item">
+            <div class="addon-price">$${a.price}</div>
+            <div class="addon-label">${a.label}<br>${a.unit}</div>
+          </div>
+        `).join('')}
+        <div class="addon-item">
+          <div class="addon-price" style="font-size:1.2rem;padding-top:0.4rem">Optional</div>
+          <div class="addon-label">Breakfast<br>at Clubhouse</div>
+        </div>
+      </div>
+
+      <div class="modal-book-bar">
+        <div class="modal-checkin">
+          <strong>Check-in ${u.checkin}</strong>
+          Check-out ${u.checkout}
+        </div>
+        <div class="modal-checkin">
+          <strong>2 Guests</strong>
+          King bed + Sofa option
+        </div>
+        <button class="modal-reserve-btn">Reserve ${u.name}</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalBackdrop')) closeModalDirect();
+}
+
+function closeModalDirect() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+</script>
+</body>
+</html>
