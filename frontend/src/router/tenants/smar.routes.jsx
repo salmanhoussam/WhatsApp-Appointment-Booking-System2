@@ -36,6 +36,7 @@ const SpatialPropertyDetails = lazy(() => import('../../pages/smar/spatial/Spati
 const SmarAdminDashboard     = lazy(() => import('../../pages/smar/admin/SmarAdminDashboard'));
 const SmarLiquidRing         = lazy(() => import('../../pages/smar/showcase/SmarLiquidRing'));
 const SmarGalleryPage        = lazy(() => import('../../pages/smar/gallery/SmarGalleryPage'));
+const ChalletDemo            = lazy(() => import('../../pages/smar/showcase/ChalletDemo'));
 
 // ── Shared loading fallback ───────────────────────────────────────────────────
 function PageFallback() {
@@ -78,6 +79,9 @@ export default function SmarRoutes() {
 
       {/* ── Gallery — AnimatePresence lightbox, lazy-isolated ── */}
       <Route path="gallery"  element={<Lazy component={SmarGalleryPage} />} />
+
+      {/* ── Challet Static Demo Preview ── */}
+      <Route path="challet"  element={<Lazy component={ChalletDemo} />} />
 
       {/* ── Liquid ring hero ── */}
       <Route path="ring"  element={<Lazy component={SmarLiquidRing} />} />
