@@ -2,18 +2,21 @@
 """
 scripts/seed_beit_smar_units.py
 ──────────────────────────────
-Seeds all 12 Beit Smar units into the database.
-
-Units are named after Phoenician alphabet letters and match the actual
-resort layout: 9 cottages (3 types) + 3 villas.
+Seeds Beit Smar units from either the hardcoded UNITS array or a property JSON file.
 
 Usage:
+    # Seed all 12 hardcoded units (existing behaviour)
     python scripts/seed_beit_smar_units.py
 
-    # Dry run (prints what would be inserted, no DB writes):
-    python scripts/seed_beit_smar_units.py --dry-run
+    # Seed from a property JSON file
+    python scripts/seed_beit_smar_units.py --json-file data/zayin.json
+    python scripts/seed_beit_smar_units.py --json-file data/zayin.json --name-ar "كوخ زين — Zayin" --price 220
 
-    # Skip existing units (don't fail if already seeded):
+    # Dry run (no DB writes)
+    python scripts/seed_beit_smar_units.py --dry-run
+    python scripts/seed_beit_smar_units.py --json-file data/zayin.json --dry-run
+
+    # Skip existing units instead of aborting
     python scripts/seed_beit_smar_units.py --skip-existing
 
 Requires:
@@ -22,7 +25,7 @@ Requires:
 """
 
 import asyncio
-import os
+import json
 import sys
 import argparse
 
@@ -46,7 +49,207 @@ from prisma import Prisma, Json
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# UNIT DEFINITIONS
+# NORMALIZATION — Property JSON → Unit dict
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Keyword → Lucide icon name used by the frontend
+AMENITY_ICON_MAP = {
+    "wifi": "wifi", "internet": "wifi",
+    "smart tv": "tv", "tv": "tv", "television": "tv", "netflix": "tv",
+    "ac": "snowflake", "air conditioning": "snowflake", "heating": "snowflake",
+    "kitchenette": "utensils", "kitchen": "utensils", "microwave": "utensils",
+    "pool": "waves", "swimming": "waves",
+    "balcony": "sun", "terrace": "sun", "patio": "sun", "outdoor furniture": "sun",
+    "king": "bed-double", "bed": "bed-double",
+    "rain shower": "bath", "shower": "bath", "hairdryer": "bath", "hair dryer": "bath",
+    "parking": "car",
+    "kettle": "coffee", "coffee": "coffee", "tea": "coffee", "breakfast": "coffee",
+    "hanger": "hanger",
+    "concierge": "sparkles", "room service": "sparkles",
+}
+
+
+def _amenity_icon(label: str) -> str:
+    lower = label.lower()
+    for keyword, icon in AMENITY_ICON_MAP.items():
+        if keyword in lower:
+            return icon
+    return "star"
+
+
+def normalize_amenities(amenities: list) -> list:
+    """
+    Accept either plain strings or existing {icon, label} dicts.
+    Returns a normalised [{icon, label, label_ar?}] list.
+    """
+    if not amenities:
+        return []
+    result = []
+    for a in amenities:
+        if isinstance(a, str):
+            result.append({"icon": _amenity_icon(a), "label": a})
+        elif isinstance(a, dict):
+            result.append(a)
+    return result
+
+
+def unit_from_property_json(data: dict, name_ar: str | None = None, price: float | None = None, sort_order: int = 99) -> dict:
+    """
+    Convert the property delivery JSON format into a unit dict compatible
+    with the UNITS array and db.unit.create().
+
+    The caller may pass `name_ar` and `price` as overrides since the JSON
+    format doesn't carry Arabic names or nightly rates.
+    """
+    prop = data.get("property", data)
+
+    cap      = prop.get("capacity", {})
+    timings  = prop.get("timings", {})
+    policies = prop.get("policies", {})
+    loc      = prop.get("location", {})
+
+    # ── rules_policies — extends existing {checkIn, checkOut, cancellation, rules}
+    cancellation_text = " | ".join(policies.get("cancellation", []))
+    rules_policies = {
+        "checkIn":             timings.get("check_in",          "15:00"),
+        "checkOut":            timings.get("check_out",         "12:00"),
+        "quietHoursStart":     timings.get("quiet_hours_start"),
+        "quietHoursEnd":       timings.get("quiet_hours_end"),
+        "cancellation":        cancellation_text,
+        "rules":               policies.get("rules", []),
+        "facilities":          prop.get("facilities", []),
+        "servicesIncluded":    prop.get("services", {}).get("included",          []),
+        "servicesChargeable":  prop.get("services", {}).get("additional_charge", []),
+    }
+
+    # ── content_blocks from highlights
+    content_blocks = []
+    highlights = prop.get("highlights", [])
+    if highlights:
+        content_blocks.append({
+            "type": "section_title",
+            "content": "Highlights ✨",
+            "style": {"size": "large", "color": "gold", "bold": True},
+        })
+        for h in highlights:
+            # "Title: detail" → split on first colon
+            parts = h.split(":", 1)
+            title  = parts[0].strip()
+            detail = parts[1].strip() if len(parts) > 1 else h
+            content_blocks.append({
+                "type":    "highlight_item",
+                "icon":    _amenity_icon(title),
+                "title":   title,
+                "content": detail,
+            })
+
+    # Location note as trailing paragraph
+    if loc.get("distance_info"):
+        content_blocks.append({
+            "type":    "paragraph",
+            "content": loc["distance_info"],
+            "style":   {"size": "normal", "color": "gray"},
+        })
+
+    effective_name   = prop.get("name", "")
+    effective_name_ar = name_ar or effective_name
+
+    return {
+        "name_en":        effective_name,
+        "name_ar":        effective_name_ar,
+        "unit_type":      "chalet",
+        "category":       "chalet",
+        "capacity":       cap.get("max_guests",  2),
+        "bedrooms":       cap.get("bedrooms",    1),
+        "bathrooms":      cap.get("bathrooms",   1),
+        # area_sqm stored for reference — requires schema migration (Phase 1) to persist
+        "_area_sqm":      cap.get("area_sqm"),
+        "price":          price,
+        "price_label":    f"Starting from ${price:.0f} / night" if price else None,
+        "sort_order":     sort_order,
+        "description_en": prop.get("description", ""),
+        "description_ar": prop.get("description", ""),
+        "amenities":      normalize_amenities(prop.get("amenities", [])),
+        "content_blocks": content_blocks,
+        "rules_policies": rules_policies,
+        # Metadata passed through to service seeder — not written to Unit table
+        "_addons":        prop.get("addons_and_pricing", {}),
+        "_location":      loc,
+        "_property_type": prop.get("type"),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVICE SEEDING FROM addons_and_pricing
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Known addon keys → (name_en, name_ar)
+_ADDON_NAMES: dict[str, tuple[str, str]] = {
+    "visitor_pool_entrance": ("Pool Entrance",  "دخول المسبح للزوار"),
+    "sofa_bed":              ("Sofa Bed",        "سرير أريكة إضافي"),
+    "crib":                  ("Baby Crib",       "سرير أطفال"),
+    "breakfast":             ("Breakfast",       "وجبة فطور"),
+}
+
+
+async def seed_services_from_json(
+    db:        Prisma,
+    client_id: str,
+    prop_id:   str,
+    addons:    dict,
+    dry_run:   bool = False,
+) -> int:
+    """
+    Upsert Service records from the addons_and_pricing block.
+    Skips entries with no numeric price (e.g. breakfast with status=Optional only).
+    Returns the number of services created.
+    """
+    created = 0
+    for key, val in addons.items():
+        if not isinstance(val, dict):
+            continue
+        price = val.get("price")
+        if price is None:
+            print(f"      ⏭  SERVICE SKIP  {key} (no numeric price)")
+            continue
+
+        names = _ADDON_NAMES.get(
+            key,
+            (key.replace("_", " ").title(), key.replace("_", " ")),
+        )
+        name_en, name_ar = names
+
+        if dry_run:
+            print(f"      🔵 DRY-RUN SERVICE  {name_en} — {price} {val.get('currency','USD')} / {val.get('unit','per_stay')}")
+            created += 1
+            continue
+
+        existing = await db.service.find_first(
+            where={"clientId": client_id, "name_en": name_en}
+        )
+        if existing:
+            print(f"      ⏭  SERVICE EXISTS  {name_en}")
+            continue
+
+        await db.service.create(data={
+            "clientId":    client_id,
+            "propertyId":  prop_id,
+            "name_en":     name_en,
+            "name_ar":     name_ar,
+            "basePrice":   float(price),
+            "currency":    val.get("currency", "USD"),
+            "isActive":    True,
+            "is_included":  False,
+            "pricing_unit": val.get("unit"),  # "per_person" | "per_stay" | null
+        })
+        print(f"      ✅ SERVICE CREATED  {name_en} — {price} {val.get('currency','USD')}")
+        created += 1
+
+    return created
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIT DEFINITIONS  (hardcoded Phoenician roster)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Shared amenities for all cottages
@@ -70,11 +273,11 @@ _VILLA_AMENITIES = [
     {"icon": "snowflake",      "label": "AC & Heating",          "label_ar": "تكييف وتدفئة"},
     {"icon": "utensils",       "label": "Full Modern Kitchen",   "label_ar": "مطبخ حديث مجهز بالكامل"},
     {"icon": "mountain",       "label": "Panoramic View",        "label_ar": "إطلالة بانورامية"},
-    {"icon": "pool",           "label": "Pool Access (The Club)","label_ar": "الوصول للمسبح - نادي بيت سمار"},
+    {"icon": "waves",          "label": "Pool Access (The Club)","label_ar": "الوصول للمسبح - نادي بيت سمار"},
     {"icon": "sparkles",       "label": "5-Star Concierge",      "label_ar": "خدمة كونسيرج 5 نجوم"},
 ]
 
-# Shared rules for all units (slight variations applied per unit)
+
 def _make_rules(check_in="15:00", check_out="12:00", cancellation_days=14):
     return {
         "checkIn":      check_in,
@@ -94,7 +297,7 @@ def _make_rules(check_in="15:00", check_out="12:00", cancellation_days=14):
 
 
 UNITS = [
-    # ── Detached Cottages (Aleph, Beth, Zayin, Het) ───────────────────────────
+    # ── Detached Cottages (Aleph, Beth) ───────────────────────────────────────
     {
         "name_ar":      "كوخ ألف — Aleph",
         "name_en":      "Aleph Cottage",
@@ -315,7 +518,7 @@ UNITS = [
             {"type": "section_title", "content": "فخامة الفيلا بإطلالة البحر الأبيض المتوسط 🌊", "style": {"size": "large", "color": "gold", "bold": True}},
             {"type": "highlight_item", "icon": "bed-double", "title": "غرفتا نوم فاخرتان", "content": "غرفة رئيسية بسرير كينغ وغرفة ثانية بسرير مزدوج — بياضات فندقية فاخرة في كلتيهما."},
             {"type": "highlight_item", "icon": "utensils", "title": "مطبخ حديث متكامل", "content": "مطبخ عصري مجهز بالكامل — مثالي للوجبات المنزلية مع إطلالة على الوادي والبحر."},
-            {"type": "highlight_item", "icon": "pool", "title": "نادي بيت سمار", "content": "وصول كامل لمرافق النادي: المسبح، البار، الصالة الداخلية، ومنطقة الاستراحة الخارجية."},
+            {"type": "highlight_item", "icon": "waves", "title": "نادي بيت سمار", "content": "وصول كامل لمرافق النادي: المسبح، البار، الصالة الداخلية، ومنطقة الاستراحة الخارجية."},
             {"type": "paragraph", "content": "فيلا إيريس — من أكثر الوحدات طلباً لمناسبات الذكرى السنوية وشهر العسل في بيت سمار.", "style": {"size": "normal", "color": "gray"}},
         ],
         "rules_policies": _make_rules(check_in="17:00", check_out="14:00"),
@@ -364,7 +567,7 @@ UNITS = [
             {"icon": "tv",           "label": "Multiple Smart TVs",       "label_ar": "تلفزيونات ذكية في كل غرفة"},
             {"icon": "snowflake",    "label": "Central AC & Heating",     "label_ar": "تكييف وتدفئة مركزية"},
             {"icon": "mountain",     "label": "360° Panoramic View",      "label_ar": "إطلالة بانورامية 360°"},
-            {"icon": "pool",         "label": "Exclusive Pool Access",    "label_ar": "وصول حصري للمسبح"},
+            {"icon": "waves",        "label": "Exclusive Pool Access",    "label_ar": "وصول حصري للمسبح"},
             {"icon": "sparkles",     "label": "Dedicated Concierge",      "label_ar": "كونسيرج مخصص للفيلا"},
             {"icon": "baby",         "label": "Family & Pet Friendly",    "label_ar": "مناسبة للعائلات والحيوانات"},
         ],
@@ -384,88 +587,145 @@ UNITS = [
 # SEED LOGIC
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def seed(dry_run: bool = False, skip_existing: bool = False):
+def _unit_payload(u: dict) -> dict:
+    """Build the data dict for create/update (excludes relation fields)."""
+    return {
+        k: v for k, v in {
+            "name_en":        u.get("name_en"),
+            "unit_type":      u.get("unit_type", "chalet"),
+            "category":       u.get("category"),
+            "capacity":       u["capacity"],
+            "bedrooms":       u.get("bedrooms"),
+            "bathrooms":      u.get("bathrooms"),
+            "area_sqm":       u.get("_area_sqm"),
+            "price":          u.get("price"),
+            "price_label":    u.get("price_label"),
+            "sort_order":     u.get("sort_order", 0),
+            "description_ar": u.get("description_ar"),
+            "description_en": u.get("description_en"),
+            "content_blocks": Json(u["content_blocks"]) if u.get("content_blocks") else None,
+            "amenities":      Json(u["amenities"])       if u.get("amenities")       else None,
+            "rules_policies": Json(u["rules_policies"])  if u.get("rules_policies")  else None,
+        }.items() if v is not None
+    }
+
+
+async def _create_unit(
+    db: Prisma, client_id: str, prop_id: str, u: dict,
+    dry_run: bool, update: bool = False,
+) -> tuple[bool, str | None]:
+    """
+    Insert or update a unit.
+    Returns (action_taken: bool, unit_id: str | None).
+    action_taken is True for create/update, False for skip.
+    """
+    name_ar = u["name_ar"]
+
+    existing = await db.unit.find_first(
+        where={"clientId": client_id, "name_ar": name_ar}
+    )
+
+    if existing:
+        if not update:
+            print(f"   ⏭  SKIP  {name_ar} (already exists — use --update to overwrite)")
+            return False, existing.id
+
+        # UPDATE existing unit
+        if dry_run:
+            print(f"   🔵 DRY-RUN UPDATE  {name_ar} — id: {existing.id}")
+            return True, existing.id
+
+        await db.unit.update(where={"id": existing.id}, data=_unit_payload(u))
+        print(f"   ♻️  UPDATED {name_ar} ({u.get('name_en','')}) — id: {existing.id}")
+        return True, existing.id
+
+    # CREATE new unit
+    if dry_run:
+        print(f"   🔵 DRY-RUN CREATE  {name_ar} ({u.get('name_en','')})"
+              f" — ${u.get('price','?')}/night — {u['capacity']} guests")
+        return True, None
+
+    unit = await db.unit.create(data={
+        "clientId":    client_id,
+        "propertyId":  prop_id,
+        "name_ar":     name_ar,
+        "isActive":    True,
+        "isAvailable": True,
+        "images":      [],
+        **_unit_payload(u),
+    })
+    print(f"   ✅ CREATED {unit.name_ar} ({unit.name_en}) — id: {unit.id}")
+    return True, unit.id
+
+
+async def seed(
+    dry_run:  bool  = False,
+    update:   bool  = False,
+    json_file: str | None = None,
+    name_ar:   str | None = None,
+    price:     float | None = None,
+):
     db = Prisma()
     await db.connect()
 
     try:
-        # ── Resolve smar client ────────────────────────────────────────────────
         client = await db.client.find_first(where={"slug": "smar", "isActive": True})
         if not client:
-            print("❌ Client 'smar' not found in the database.")
-            print("   Run: python scripts/backfill_smar.py first.")
+            print("❌ Client 'smar' not found. Run: python scripts/backfill_smar.py first.")
             return
 
-        # ── Resolve property ───────────────────────────────────────────────────
         prop = await db.property.find_first(
             where={"clientId": client.id, "isActive": True},
             order={"createdAt": "asc"},
         )
         if not prop:
             print("❌ No active Property found for smar.")
-            print("   Create one via the Admin Settings → Properties tab first.")
             return
 
         print(f"✅ Client: {client.name} ({client.id})")
         print(f"✅ Property: {prop.name} ({prop.id})")
-        print(f"   Units to seed: {len(UNITS)}")
-        print()
 
-        created = 0
-        skipped = 0
+        # ── JSON file mode ─────────────────────────────────────────────────────
+        if json_file:
+            path = Path(json_file)
+            if not path.exists():
+                print(f"❌ JSON file not found: {json_file}")
+                return
+
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            unit_dict = unit_from_property_json(data, name_ar=name_ar, price=price)
+            print(f"\n   Seeding from JSON: {path.name}")
+            print(f"   Unit: {unit_dict['name_en']} — {unit_dict['capacity']} guests")
+
+            acted, unit_id = await _create_unit(db, client.id, prop.id, unit_dict, dry_run, update)
+
+            addons = unit_dict.get("_addons", {})
+            if addons:
+                print(f"   Seeding {len(addons)} addon service(s)…")
+                await seed_services_from_json(db, client.id, prop.id, addons, dry_run=dry_run)
+
+            print()
+            print("🎉 JSON seed complete." if not dry_run else "🔵 DRY RUN complete.")
+            return
+
+        # ── Default: seed hardcoded UNITS array ────────────────────────────────
+        print(f"   Units to seed: {len(UNITS)}\n")
+        created = skipped = 0
 
         for u in UNITS:
-            name_ar = u["name_ar"]
-
-            # ── Skip if already exists ─────────────────────────────────────────
-            existing = await db.unit.find_first(
-                where={"clientId": client.id, "name_ar": name_ar}
-            )
-            if existing:
-                if skip_existing:
-                    print(f"   ⏭  SKIP  {name_ar} (already exists)")
-                    skipped += 1
-                    continue
-                else:
-                    print(f"   ⚠️  DUPLICATE: {name_ar} — use --skip-existing to skip")
-                    skipped += 1
-                    continue
-
-            if dry_run:
-                print(f"   🔵 DRY-RUN  {name_ar} ({u['name_en']}) — ${u['price']}/night — {u['capacity']} guests")
+            acted, _ = await _create_unit(db, client.id, prop.id, u, dry_run, update)
+            if acted:
                 created += 1
-                continue
-
-            unit = await db.unit.create(data={
-                "clientId":       client.id,
-                "propertyId":     prop.id,
-                "name_ar":        name_ar,
-                "name_en":        u["name_en"],
-                "unit_type":      u["unit_type"],
-                "category":       u.get("category"),
-                "capacity":       u["capacity"],
-                "bedrooms":       u.get("bedrooms"),
-                "bathrooms":      u.get("bathrooms"),
-                "price":          u.get("price"),
-                "price_label":    u.get("price_label"),
-                "sort_order":     u.get("sort_order", 0),
-                "description_ar": u.get("description_ar"),
-                "description_en": u.get("description_en"),
-                "content_blocks": Json(u["content_blocks"]) if u.get("content_blocks") else None,
-                "amenities":      Json(u["amenities"])      if u.get("amenities")      else None,
-                "rules_policies": Json(u["rules_policies"]) if u.get("rules_policies") else None,
-                "images":         [],
-                "isActive":       True,
-                "isAvailable":    True,
-            })
-            print(f"   ✅ CREATED {unit.name_ar} ({unit.name_en}) — id: {unit.id}")
-            created += 1
+            else:
+                skipped += 1
 
         print()
         if dry_run:
-            print(f"🔵 DRY RUN complete — {created} units would be created, {skipped} skipped.")
+            print(f"🔵 DRY RUN complete — {created} units would be created/updated, {skipped} skipped.")
         else:
-            print(f"🎉 Seed complete — {created} units created, {skipped} skipped.")
+            print(f"🎉 Seed complete — {created} units created/updated, {skipped} skipped.")
 
     finally:
         await db.disconnect()
@@ -473,11 +733,23 @@ async def seed(dry_run: bool = False, skip_existing: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="Seed Beit Smar units")
-    parser.add_argument("--dry-run",       action="store_true", help="Print plan without writing to DB")
-    parser.add_argument("--skip-existing", action="store_true", help="Skip units that already exist")
+    parser.add_argument("--dry-run",  action="store_true", help="Print plan without writing to DB")
+    parser.add_argument("--update",   action="store_true", help="Update existing units with new JSON data")
+    parser.add_argument("--json-file", type=str, default=None,
+                        help="Path to a property JSON file (single unit ingestion)")
+    parser.add_argument("--name-ar",   type=str, default=None,
+                        help="Arabic name override when using --json-file")
+    parser.add_argument("--price",     type=float, default=None,
+                        help="Nightly price override when using --json-file")
     args = parser.parse_args()
 
-    asyncio.run(seed(dry_run=args.dry_run, skip_existing=args.skip_existing))
+    asyncio.run(seed(
+        dry_run=args.dry_run,
+        update=args.update,
+        json_file=args.json_file,
+        name_ar=args.name_ar,
+        price=args.price,
+    ))
 
 
 if __name__ == "__main__":

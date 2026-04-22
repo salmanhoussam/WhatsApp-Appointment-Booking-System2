@@ -1,0 +1,97 @@
+{
+    "property": {
+        "name": "Zayin - Garden Cottage",
+        "type": "Bed & Breakfast",
+        "location": {
+            "area": "Smar Jbeil",
+            "region": "Batroun",
+            "distance_info": "Fifteen minutes from Batroun Old Souk & five minutes from Batroun's famous wineries. A stone's throw away from the Smar Jbeil Citadel."
+        },
+        "capacity": {
+            "max_guests": 2,
+            "bedrooms": 1,
+            "bathrooms": 1,
+            "area_sqm": null
+        },
+        "timings": {
+            "check_in": "17:00",
+            "check_out": "14:00",
+            "quiet_hours_start": "00:00",
+            "quiet_hours_end": "09:00"
+        },
+        "description": "Discover Zayin Patio Cottage at Beit Smar Boutique Resort your getaway hub in Batroun midlands. Zayin features a luxurious king bed, cozy sofa bed, kitchenettes, & private patios with pergolas & outdoor seating - ideal for those who cherish independence & tranquility.",
+        "highlights": [
+            "Luxurious Accommodation: King-size beds with fine linens, Dual rain showers",
+            "Stunning Views: Majestic sea and valley views from private patios",
+            "Well-Equipped Kitchenettes: All the essentials for convenient self-catering",
+            "Prime Location: Close to top wineries and local attractions"
+        ],
+        "amenities": [
+            "Wifi",
+            "Microwave",
+            "Balcony",
+            "Hangers",
+            "Outdoor Furniture",
+            "Hairdryer",
+            "AC",
+            "Kettle",
+            "Smart TV"
+        ],
+        "facilities": [
+            "Pool access (May 15 to Oct 5, 9:00 AM - 7:00 PM)",
+            "Pool Bar",
+            "Dining / Clubhouse"
+        ],
+        "services": {
+            "included": [
+                "Concierge guest support (9:00 AM - 10:00 PM)",
+                "Room Service (9:00 AM - 10:00 PM)"
+            ],
+            "additional_charge": [
+                "Airport pick up and drop off",
+                "Housekeeping Services"
+            ]
+        },
+        "addons_and_pricing": {
+            "visitor_pool_entrance": {
+                "price": 25,
+                "currency": "USD",
+                "unit": "per person"
+            },
+            "sofa_bed": {
+                "price": 30,
+                "currency": "USD",
+                "unit": "per person"
+            },
+            "crib": {
+                "price": 30,
+                "currency": "USD",
+                "unit": "per stay"
+            },
+            "breakfast": {
+                "status": "Optional",
+                "time": "9:30 AM - 11:30 AM",
+                "location": "Clubhouse"
+            }
+        },
+        "policies": {
+            "cancellation": [
+                "100% refund up to 14 days before arrival",
+                "50% refund up to 7 days before arrival"
+            ],
+            "rules": [
+                "Identity Cards are required by law at check-in.",
+                "Energy is scarce, close water taps and turn electric appliances off when leaving.",
+                "Treat the property as your own residence.",
+                "Please do not leave the key in the door lock; hand it to an agent at check out.",
+                "Park strictly in the designated parking area (avoid road/grass).",
+                "Pets are allowed in the Cottage, but NOT at the Clubhouse.",
+                "Hookahs/chicha are strictly prohibited on all the property.",
+                "Maximum 2 visitors allowed per cottage.",
+                "Food and drink is prohibited in or near the pool area.",
+                "BBQ activities are strictly prohibited.",
+                "Bringing outside food or ordering food delivery is strictly prohibited."
+            ]
+        }
+    }
+}

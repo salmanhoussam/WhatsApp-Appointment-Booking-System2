@@ -453,3 +453,22 @@ async def delete_image(
         },
     )
     return {"images": list(updated.images), "image_url": updated.image_url}
+
+
+@router.delete("/{unit_id}")
+async def delete_unit(
+    unit_id: str,
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    Permanently delete a unit and all its associated bookings, prices, and images.
+    Cascade is enforced at the DB level (onDelete: Cascade on Booking → Unit).
+    """
+    unit = await prisma_client.unit.find_first(
+        where={"id": unit_id, "clientId": tenant["id"]}
+    )
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found.")
+
+    await prisma_client.unit.delete(where={"id": unit_id})
+    return {"success": True, "deleted_id": unit_id}

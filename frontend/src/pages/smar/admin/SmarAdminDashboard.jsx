@@ -1543,9 +1543,11 @@ function UnitsTab() {
   const [units,        setUnits]       = useState([]);
   const [loading,      setLoading]     = useState(true);
   const [error,        setError]       = useState(null);
-  const [toggling,     setToggling]    = useState(null); // unit id being toggled
+  const [toggling,     setToggling]    = useState(null);
   const [showModal,    setShowModal]   = useState(false);
-  const [calendarUnit, setCalendarUnit] = useState(null); // unit whose calendar is open
+  const [calendarUnit, setCalendarUnit] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // unit pending deletion
+  const [deleting,     setDeleting]    = useState(false);
   const [toast,        setToast]       = useState(null);
   
   // Unit Editor Modal (Phase 24)
@@ -1612,6 +1614,21 @@ function UnitsTab() {
   const handleCreated = (newUnit) => {
     setUnits(us => [...us, newUnit]);
     showToast(`تمت إضافة "${newUnit.name_ar}" بنجاح`, true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await adminApi.delete(`/units/${deleteTarget.id}`);
+      setUnits(us => us.filter(u => u.id !== deleteTarget.id));
+      showToast(`تم حذف "${deleteTarget.name_ar}" بنجاح`, true);
+      setDeleteTarget(null);
+    } catch (e) {
+      showToast(e.response?.data?.detail || 'فشل الحذف، حاول مجدداً', false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Group by type for display
@@ -1686,7 +1703,7 @@ function UnitsTab() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.borderHi}` }}>
-                  {['Image', 'Name', 'Capacity', 'Beds / Baths', 'Available', 'Active', 'Calendar'].map(h => (
+                  {['Image', 'Name', 'Capacity', 'Beds / Baths', 'Available', 'Active', 'Actions'].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -1773,19 +1790,33 @@ function UnitsTab() {
                         </div>
                       </td>
 
-                      {/* Calendar action */}
-                      <td style={tdStyle}>
-                        <button
-                          onClick={() => setCalendarUnit(u)}
-                          style={{
-                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.gold}44`,
-                            background: C.goldDim, color: C.gold,
-                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
-                          }}
-                        >
-                          📅 إدارة
-                        </button>
+                      {/* Actions */}
+                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            onClick={() => setCalendarUnit(u)}
+                            style={{
+                              padding: '5px 10px', borderRadius: 6, border: `1px solid ${C.gold}44`,
+                              background: C.goldDim, color: C.gold,
+                              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+                            }}
+                          >
+                            📅 إدارة
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(u)}
+                            title="حذف الوحدة"
+                            style={{
+                              padding: '5px 8px', borderRadius: 6,
+                              border: `1px solid ${C.red}44`,
+                              background: C.redDim, color: C.red,
+                              fontSize: 13, cursor: 'pointer', lineHeight: 1,
+                            }}
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1798,6 +1829,91 @@ function UnitsTab() {
 
       {/* Add unit modal */}
       {showModal && <AddUnitModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
+
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 2000,
+              background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+            }}
+            onClick={() => !deleting && setDeleteTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1,    y: 0  }}
+              exit={{    opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: C.surface, borderRadius: 16,
+                border: `1px solid ${C.red}55`,
+                padding: 32, maxWidth: 440, width: '100%',
+                boxShadow: `0 0 40px ${C.red}22`,
+              }}
+            >
+              {/* Icon */}
+              <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 16 }}>🗑️</div>
+
+              {/* Title */}
+              <h3 style={{ color: C.textPri, fontSize: 17, fontWeight: 700, margin: '0 0 10px', textAlign: 'center' }}>
+                حذف الوحدة
+              </h3>
+
+              {/* Unit name */}
+              <p style={{ color: C.gold, fontSize: 15, fontWeight: 600, textAlign: 'center', margin: '0 0 16px' }}>
+                {deleteTarget.name_ar}
+                {deleteTarget.name_en ? ` — ${deleteTarget.name_en}` : ''}
+              </p>
+
+              {/* Warning box */}
+              <div style={{
+                background: C.redDim, border: `1px solid ${C.red}44`,
+                borderRadius: 10, padding: '14px 16px', marginBottom: 24,
+              }}>
+                <p style={{ color: C.red, fontSize: 13, margin: 0, lineHeight: 1.6, fontWeight: 600 }}>
+                  ⚠️ تحذير: سيتم حذف جميع الحجوزات المرتبطة بهذه الوحدة بشكل نهائي.
+                </p>
+                <p style={{ color: C.red, fontSize: 12, margin: '8px 0 0', opacity: 0.75, lineHeight: 1.5 }}>
+                  يشمل ذلك سجلات الأسعار والتواريخ المحجوزة. هذا الإجراء لا يمكن التراجع عنه.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  style={{
+                    flex: 1, padding: '11px 0', borderRadius: 8,
+                    border: `1px solid ${C.border}`, background: 'transparent',
+                    color: C.textMuted, fontSize: 14, cursor: 'pointer', fontWeight: 600,
+                  }}
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  style={{
+                    flex: 1, padding: '11px 0', borderRadius: 8,
+                    border: 'none', background: C.red,
+                    color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    opacity: deleting ? 0.6 : 1,
+                    transition: 'opacity 0.15s',
+                  }}
+                >
+                  {deleting ? '…جاري الحذف' : 'نعم، احذف الوحدة'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Calendar manager modal */}
       {calendarUnit && <CalendarManagerModal unit={calendarUnit} onClose={() => setCalendarUnit(null)} />}

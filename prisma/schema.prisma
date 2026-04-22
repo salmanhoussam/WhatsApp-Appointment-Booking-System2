@@ -82,13 +82,16 @@ model Property {
   max_guests  Int       @map("max_guests")
   bedrooms    Int       @map("bedrooms")
   bathrooms   Int       @map("bathrooms")
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  manager     User?     @relation("manager_properties", fields: [managerId], references: [id])
-  services    Service[]
-  units       Unit[]
+  isActive      Boolean   @default(true) @map("is_active")
+  property_type String?   @map("property_type") // "Bed & Breakfast" | "Chalet" | "Villa"
+  location      Json?     @map("location")       // {area, region, distance_info}
+  facilities    Json?     @map("facilities")      // ["Pool access...", "Dining / Clubhouse"]
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  manager       User?     @relation("manager_properties", fields: [managerId], references: [id])
+  services      Service[]
+  units         Unit[]
 
   @@map("properties")
   @@schema("public")
@@ -134,7 +137,9 @@ model Unit {
 
   // Rules & Policies — {checkIn, checkOut, cancellation, rules[]}
   // Example: {"checkIn":"15:00","checkOut":"12:00","cancellation":"50% refund...","rules":["No Pets","Quiet hours"]}
-  rules_policies Json? @map("rules_policies")
+  rules_policies Json?  @map("rules_policies")
+
+  area_sqm Float? @map("area_sqm")
 
   bookings Booking[]
   prices   Price[]
@@ -177,13 +182,15 @@ model Service {
   duration    Int?             @map("duration")
   basePrice   Decimal          @map("base_price") @db.Decimal(10, 2)
   currency    String           @default("SAR") @map("currency")
-  isActive    Boolean          @default(true) @map("is_active")
-  sort_order  Int?             @default(0) @map("sort_order")
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookings    BookingService[]
-  client      Client           @relation(fields: [clientId], references: [id])
-  property    Property?        @relation(fields: [propertyId], references: [id])
+  isActive      Boolean          @default(true)  @map("is_active")
+  is_included   Boolean          @default(false) @map("is_included")  // free vs paid
+  pricing_unit  String?          @map("pricing_unit") // "per_person" | "per_stay" | "per_night"
+  sort_order    Int?             @default(0) @map("sort_order")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookings      BookingService[]
+  client        Client           @relation(fields: [clientId], references: [id])
+  property      Property?        @relation(fields: [propertyId], references: [id])
 
   @@index([clientId])
   @@index([propertyId])
@@ -228,9 +235,9 @@ model Booking {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
   services         BookingService[]
-  client           Client           @relation(fields: [clientId], references: [id])
-  customer         Customer         @relation(fields: [customerId], references: [id])
-  unit             Unit             @relation(fields: [unitId], references: [id])
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  unit             Unit             @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([unitId])
