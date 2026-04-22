@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import challetHtml from '../../../../../public/challet.html?raw';
 
 export default function ChalletDemo() {
   useEffect(() => {
@@ -17,11 +18,10 @@ export default function ChalletDemo() {
       </Helmet>
       
       <div style={{ width: '100vw', height: '100vh', background: '#1e1710' }}>
-        {/* We use an iframe pointing to the static public file. 
-            This guarantees it renders perfectly without React Router loops 
-            and without CSS conflicts. */}
+        {/* We use srcDoc to load the HTML directly from the bundle. 
+            This bypasses any server static routing issues! */}
         <iframe 
-          src="/challet.html" 
+          srcDoc={challetHtml}
           style={{ width: '100%', height: '100%', border: 'none' }}
           title="Challet Preview"
         />
