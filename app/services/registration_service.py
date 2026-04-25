@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 from prisma import Prisma
@@ -57,8 +58,8 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "whatsapp_number": data["whatsapp_number"],
         "primary_color":   data.get("primary_color", "#6d28d9"),
         "currency":        data.get("currency", "USD"),
-        "config":          _DEFAULT_CONFIG,
-        "features":        _DEFAULT_FEATURES,
+        "config":          json.dumps(_DEFAULT_CONFIG),
+        "features":        json.dumps(_DEFAULT_FEATURES),
         "payment_methods": data.get("payment_methods", ["cash", "card"]),
         "unit_types":      VENUE_TYPE_MAP.get(venue_type, ["chalet"]),
         "status":          "trial",
