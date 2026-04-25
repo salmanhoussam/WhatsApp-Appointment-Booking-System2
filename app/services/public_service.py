@@ -176,6 +176,7 @@ async def get_unit_calendar_data(
         return {
             "disabled_dates":  sorted(disabled_set),
             "price_overrides": price_overrides,
+            "base_price":      float(unit.price) if unit.price else None,
         }
     except Exception as e:
         logger.error(
@@ -219,6 +220,7 @@ def _record_to_dict(record) -> Dict[str, Any]:
         "maps_url":        getattr(record, "maps_url",        None),
         "currency":        getattr(record, "currency", "USD"),
         "features":        getattr(record, "features", {}),
+        "config":          getattr(record, "config",   {}) or {},
         "unit_types":      getattr(record, "unit_types", []),
         "payment_methods": getattr(record, "payment_methods", []),
     }
@@ -308,7 +310,8 @@ async def get_client_catalog(
 
         available_units = await db.unit.find_many(
             where=units_query_where,
-            order={"sort_order": "asc"}
+            order={"sort_order": "asc"},
+            include={"galleryImages": {"where": {"isActive": True}}},
         )
 
         return {
@@ -337,6 +340,21 @@ async def get_client_catalog(
                     "content_blocks": getattr(unit, 'content_blocks', None),
                     "amenities":      getattr(unit, 'amenities', None),
                     "rules_policies": getattr(unit, 'rules_policies', None),
+                    # ── Gallery ────────────────────────────────────────────────
+                    "gallery_images": sorted(
+                        [
+                            {
+                                "id":         g.id,
+                                "url":        g.url,
+                                "sort_order": g.sort_order,
+                                "span_size":  getattr(g, "span_size", "small"),
+                                "caption_ar": g.caption_ar,
+                                "caption_en": g.caption_en,
+                            }
+                            for g in (getattr(unit, "galleryImages", None) or [])
+                        ],
+                        key=lambda x: x["sort_order"],
+                    ),
                 } for unit in available_units
             ],
             "services": [
@@ -383,15 +401,35 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             check_out_date = datetime.combine(check_out_date, datetime.min.time())
 
         from app.services import price_service
+
+        # Fetch unit for base price fallback
+        unit_record = await db.unit.find_unique(where={"id": data.get("unit_id")})
+        base_price_per_night = float(unit_record.price) if (unit_record and unit_record.price) else 0.0
+
         end_date = check_out_date - timedelta(days=1)
         prices = await price_service.get_prices(
-            db=db, 
+            db=db,
             client_id=client.id,
             unit_id=data.get("unit_id"),
             date_from=check_in_date,
-            date_to=end_date
+            date_to=end_date,
         )
-        unit_price = sum(float(p.price) for p in prices if p.available)
+
+        # Build date → price map from calendar entries
+        price_map: dict = {}
+        for p in prices:
+            if p.available:
+                day = p.date.date() if hasattr(p.date, "date") else p.date
+                price_map[day] = float(p.price)
+
+        # Sum per night — fall back to unit.price for days with no calendar entry
+        nights = (check_out_date - check_in_date).days
+        unit_price = 0.0
+        cursor = check_in_date
+        for _ in range(nights):
+            day = cursor.date() if hasattr(cursor, "date") else cursor
+            unit_price += price_map.get(day, base_price_per_night)
+            cursor += timedelta(days=1)
 
         services_data = data.get("services", []) or []
         total_service_price = 0.0
@@ -434,7 +472,22 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
                 "create": valid_services
             }
 
-        # إنشاء الحجز
+        # ── Race condition guard: final availability check before write ──────────
+        overlap = await db.booking.find_first(
+            where={
+                "unitId":   data.get("unit_id"),
+                "clientId": client.id,
+                "status":   {"notIn": ["cancelled", "rejected"]},
+                "checkIn":  {"lt": check_out_date},
+                "checkOut": {"gt": check_in_date},
+            }
+        )
+        if overlap:
+            raise HTTPException(
+                status_code=409,
+                detail="Unit is no longer available for these dates.",
+            )
+
         new_booking = await db.booking.create(data=booking_data)
 
         try:
@@ -452,6 +505,8 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
 
         return new_booking
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"🔥 Error creating booking: {e}", exc_info=True)
         return None

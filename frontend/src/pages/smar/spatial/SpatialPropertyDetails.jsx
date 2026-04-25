@@ -26,6 +26,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTenantBase } from '../../../utils/useTenantSlug';
 import { motion, AnimatePresence } from 'framer-motion';
 import publicApi from '../../../utils/publicApi';
+import UnitImageGallery from '../../../components/ui/UnitImageGallery';
 
 // ─── Asset base ───────────────────────────────────────────────────────────────
 const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
@@ -509,6 +510,11 @@ export default function SpatialPropertyDetails() {
         >
           {isMuted ? '🔇' : '🔊'}
         </motion.button>
+      </div>
+
+      {/* ── BENTO GALLERY (Phase 1 UI) ── */}
+      <div style={{ position: 'relative', zIndex: 10, marginTop: '80px', pointerEvents: 'auto' }}>
+        <UnitImageGallery />
       </div>
 
       {/* ── CHAPTER NAVIGATION BAR (bottom, over video) ── */}

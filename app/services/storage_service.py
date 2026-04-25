@@ -79,6 +79,51 @@ async def upload_unit_image(
     return public_url
 
 
+async def upload_to_gallery_path(
+    client_slug: str,
+    folder_context: str,
+    file_bytes: bytes,
+    content_type: str,
+    original_filename: str,
+) -> str:
+    """
+    Upload a gallery image to Supabase Storage at:
+      properties/{client_slug}/{folder_context}/{uuid}.{ext}
+
+    folder_context example: "units/{unit_id}/gallery"
+    Returns the public URL.
+    """
+    if not _supabase:
+        raise HTTPException(status_code=500, detail="Storage not configured — check SUPABASE_URL and SUPABASE_SERVICE_KEY")
+
+    if content_type not in _ALLOWED:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{content_type}'. Allowed: jpeg, png, webp, gif")
+
+    if len(file_bytes) > _MAX_BYTES:
+        raise HTTPException(status_code=400, detail="File exceeds 8 MB limit")
+
+    ext  = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
+    path = f"{client_slug}/{folder_context}/{uuid.uuid4()}.{ext}"
+
+    def _do_upload():
+        _supabase.storage.from_(_BUCKET).upload(
+            path,
+            file_bytes,
+            {"content-type": content_type, "cache-control": "31536000", "upsert": "false"},
+        )
+        return _supabase.storage.from_(_BUCKET).get_public_url(path)
+
+    try:
+        public_url: str = await asyncio.to_thread(_do_upload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔥 Supabase gallery upload failed — path={path}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Storage upload failed")
+
+    return public_url
+
+
 async def delete_unit_image(public_url: str) -> None:
     """
     Remove an image from Supabase Storage by its public URL.

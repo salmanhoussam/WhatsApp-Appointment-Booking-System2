@@ -1,10 +1,13 @@
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.handlers import register_handlers
-from app.db.client import connect_db, disconnect_db
+from app.db.client import connect_db, disconnect_db, prisma_client
 
 # Routers
 from app.api.v1.public import router as public_v1_router
@@ -57,3 +60,16 @@ async def root():
         "version": settings.VERSION,
         "docs": "/docs",
     }
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    ts = datetime.now(timezone.utc).isoformat()
+    try:
+        await prisma_client.execute_raw("SELECT 1")
+        return {"status": "ok", "db": "ok", "timestamp": ts}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "db": "unreachable", "timestamp": ts, "detail": str(e)},
+        )

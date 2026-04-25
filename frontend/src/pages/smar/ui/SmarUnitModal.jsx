@@ -13,6 +13,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect }     from 'react';
 import DynamicContentRenderer from '../../../components/ui/DynamicContentRenderer';
+import { useTenantConfigContext } from '../../../context/TenantConfigContext';
 
 // ── Design tokens — Sunlit Heritage Light Theme ──────────────────────────────
 const G = {
@@ -52,6 +53,8 @@ function Chip({ icon, label }) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function SmarUnitModal({ unit, onClose, onBook, lang = 'ar' }) {
+  const { config } = useTenantConfigContext();
+  const waPhone = config.whatsapp_number || '96178727986';
   const [activeImg, setActiveImg] = useState(0);
 
   // Reset active image when unit changes
@@ -329,7 +332,7 @@ export default function SmarUnitModal({ unit, onClose, onBook, lang = 'ar' }) {
 
           {/* WhatsApp fallback */}
           <motion.a
-            href={`https://wa.me/96178727986?text=${encodeURIComponent(lang === 'ar' ? `مرحباً، أريد الاستفسار عن وحدة: ${name}` : `Hello, I'd like to inquire about: ${name}`)}`}
+            href={`https://wa.me/${waPhone}?text=${encodeURIComponent(lang === 'ar' ? `مرحباً، أريد الاستفسار عن وحدة: ${name}` : `Hello, I'd like to inquire about: ${name}`)}`}
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ opacity: 0.8 }}

@@ -35,6 +35,7 @@ class SettingsUpdateRequest(BaseModel):
     payment_methods: Optional[List[str]] = None
     unit_types:      Optional[List[str]] = None
     features:        Optional[Dict[str, Any]] = None
+    config:          Optional[Dict[str, Any]] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ async def get_settings(tenant: dict = Depends(get_current_tenant)):
             "maps_url":        getattr(client, "maps_url", None),
             "currency":        client.currency,
             "features":        client.features,
+            "config":          getattr(client, "config", None) or {},
             "unit_types":      client.unit_types,
             "payment_methods": client.payment_methods,
         }
@@ -84,7 +86,7 @@ async def update_settings(
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
 
     try:
-        updated = await prisma_client.client.update(
+        await prisma_client.client.update(
             where={"id": tenant["id"]},
             data=update_data,
         )

@@ -10,11 +10,8 @@ ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # 1. إذا كانت الكلمة في الداتابيز نصاً عادياً (للتطوير والتجارب اليدوية)
     if not hashed_password.startswith("$2"):
-        return plain_password == hashed_password
-        
-    # 2. التحقق الطبيعي للكلمات المشفرة باستخدام bcrypt
+        return False
     try:
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     except ValueError:

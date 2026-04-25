@@ -1,0 +1,251 @@
+project: Smar 3D Scrollytelling Experience
+tenant: smar
+last_updated: 2026-04-24
+# split from phases_roadmap.yaml on 2026-04-24
+
+phases:
+
+  # ── UPCOMING: Phases 36-39 ────────────────────────────────────────────
+
+  - id: 36
+    name: "components/ Folder Cleanup — Tech Debt"
+    status: planned
+    priority: low
+    description: |
+      مجلد src/components/ يحتوي على 16 مكوّن قديم.
+      14 منهم orphans (لا أحد يستوردهم).
+      يجب تنظيف المجلد قبل إضافة tenants جدد.
+    tasks:
+
+      - id: 36.1
+        name: "Migrate UnitCalendar → design-system/organisms"
+        file: "src/components/UnitCalendar.jsx"
+        status: planned
+        details: |
+          UnitCalendar مستخدم في:
+            - SmarAdminDashboard.jsx:1169
+            - SmarBookingDrawer.jsx:421
+          يجب نقله إلى src/design-system/organisms/UnitCalendar.jsx
+          وتحديث الاستيرادات في الملفين.
+          لا تغيير في المنطق — نقل فقط.
+
+      - id: 36.2
+        name: "Delete 13 orphan components"
+        status: planned
+        files_to_delete:
+          - src/components/AboutResort.jsx
+          - src/components/BookingModal.jsx
+          - src/components/BookingPolicy.jsx
+          - src/components/ChaletCard.jsx
+          - src/components/ChaletInterior.jsx
+          - src/components/ChaletMarker.jsx
+          - src/components/CustomerHeader.jsx
+          - src/components/DateSearchBar.jsx
+          - src/components/FooterPolicies.jsx
+          - src/components/LanguageSwitcher.jsx
+          - src/components/LocationMap.jsx
+          - src/components/PoolAndCafe.jsx
+          - src/components/ResortAboutUs.jsx
+          - src/components/PaymentCard.css
+        details: |
+          كلها يتيمة (0 imports في المشروع).
+          التحقق قبل الحذف: grep -r "ComponentName" src/ --include="*.jsx"
+
+      - id: 36.3
+        name: "Review MountainMap + ChaletModal"
+        status: planned
+        details: |
+          يُستخدمان فقط في pages/admin/MountainDashboard.jsx
+          وهي صفحة غير مرتبطة بأي route في smar.routes.jsx.
+          القرار: إذا لا يوجد route → حذف MountainDashboard + المكونين معها.
+
+  - id: 37
+    name: "ShowcaseTemplate — Portrait Mobile Optimization"
+    status: planned
+    priority: medium
+    description: |
+      تحسين تجربة الموبايل في ShowcaseTemplate.
+      الأولوية بعد اكتمال تجهيز الصور (Phase 30.2).
+    tasks:
+
+      - id: 37.1
+        name: "Portrait asset swap via <picture> or srcset"
+        details: |
+          استخدام <picture> element بدل <img> للـ S2-S6:
+            <picture>
+              <source media="(max-width: 640px)" srcSet={ASSETS.forest_portrait} />
+              <img src={ASSETS.forest} ... />
+            </picture>
+          يتطلب رفع نسخ portrait على Supabase أولاً (Phase 30.2)
+
+      - id: 37.2
+        name: "Mobile glass panel positioning"
+        details: |
+          على الموبايل: sc-glass-r و sc-glass-l تتحول لـ bottom positioning
+          (الـ CSS media query موجود، لكن قد يحتاج fine-tuning بعد الاختبار)
+
+  - id: 38
+    name: "Admin Settings — homepage_assets Editor"
+    status: planned
+    priority: low
+    description: |
+      إضافة قسم في SettingsTab بلوحة الأدمن يسمح لبيت سمار
+      بتحديث روابط الأصول (Assets) من الواجهة بدون تدخل مطور.
+    tasks:
+
+      - id: 38.1
+        name: "SettingsTab — Assets Section"
+        file: "src/pages/smar/admin/components/SettingsTab.jsx"
+        details: |
+          إضافة section جديد في SettingsTab:
+            - Input لكل asset URL (forest, villa, chalet, pool, sunset)
+            - Preview thumbnail صغيرة بجانب كل input
+            - PATCH /api/v1/admin/settings مع homepage_assets JSON
+          يتطلب إضافة homepage_assets لـ SettingsUpdateRequest في backend
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 39: Gallery Page — /smar/gallery
+  # صفحة معرض مستقلة تجلب صورها من Supabase Storage تلقائياً
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 39
+    name: "Gallery Page — Masonry Grid + Lightbox + Coming Soon Villas"
+    status: planned
+    priority: high
+    description: |
+      صفحة /smar/gallery مستقلة — Masonry Grid أنيق لعرض جمال بيت سمار.
+      البيانات تُجلب من properties/beitsmar/gallery/ في Supabase Storage (auto-list).
+      الفلل تظهر واجهة Coming Soon بدلاً من صور.
+
+    supabase_storage:
+      showcase_bucket: "properties/beitsmar/showcase/"   # أصول الـ ShowcaseTemplate
+      gallery_bucket:  "properties/beitsmar/gallery/"    # صور المعرض العامة (beitsmar1→12)
+
+    tasks:
+
+      - id: 39.1
+        name: "Backend — List Gallery Images from Supabase Storage"
+        file: "app/api/v1/public.py"
+        status: planned
+        details: |
+          إضافة endpoint:
+            GET /api/v1/public/{slug}/gallery
+            يُعيد قائمة الصور من Supabase Storage bucket properties/{slug}/gallery/
+            يستخدم supabase-py storage.list() — لا column في DB
+            Response: [ { url, filename, category } ]
+
+          Category تُستخرج من اسم الملف:
+            beitsmar1-3  → "chalet"
+            beitsmar4-6  → "nature"
+            beitsmar7-9  → "pool"
+            beitsmar10-12 → "chalet"
+          (أو تُخزَّن في metadata مع الرفع — أسهل)
+
+          Multi-tenancy: bucket path يحتوي slug — لا تسريب بين tenants
+
+      - id: 39.2
+        name: "Gallery Page — React Component"
+        file: "src/pages/smar/gallery/SmarGalleryPage.jsx"
+        status: planned
+        details: |
+          Route: /smar/gallery
+          يُضاف إلى smar.routes.jsx كـ lazy import.
+
+          Layout:
+            1. TenantHeader (sticky, glassmorphism)
+            2. Page title "معرض بيت سمار" + subtitle
+            3. Filter Tabs: الكل | الشاليهات | المسبح | الطبيعة | الفلل
+            4. Masonry Grid (CSS columns: 3 desktop / 2 tablet / 1 mobile)
+            5. Footer
+
+          Filter Tabs منطق:
+            - الكل / الشاليهات / المسبح / الطبيعة:
+                يُرشّح صور gallery/ بالـ category وتُعرض
+            - تاب الفلل → Coming Soon State (لا صور):
+                واجهة glassmorphism كاملة (backdrop-blur + border ذهبي)
+                أيقونة قفل ذهبي (🔒 أو SVG)
+                نص: "الفلل الملكية" / "نجهز لكم تجربة استثنائية"
+                نص ثانوي: "قريباً جداً..."
+                لا صور ولا grid — الواجهة تملأ المساحة بأناقة
+
+      - id: 39.3
+        name: "Lightbox — Fullscreen Image Viewer"
+        file: "src/pages/smar/gallery/SmarGalleryPage.jsx"
+        status: planned
+        details: |
+          عند الضغط على أي صورة في الـ Masonry Grid:
+            - AnimatePresence: overlay يظهر (opacity 0→1)
+            - الصورة تتمدد لـ fullscreen (scale + y animation)
+            - Glassmorphism toolbar: X للإغلاق + اسم الصورة
+            - ← / → للتنقل بين الصور
+            - ESC key يغلق
+            - Swipe gesture على الموبايل (touchstart/touchend)
+
+          Implementation: state فقط — لا مكتبة خارجية (react-photo-view / lightgallery)
+          No external deps: AnimatePresence + motion.div فقط
+
+      - id: 39.4
+        name: "Route Registration — /smar/gallery"
+        file: "src/router/tenants/smar.routes.jsx"
+        status: planned
+        details: |
+          إضافة lazy import:
+            const SmarGalleryPage = lazy(() => import('../../pages/smar/gallery/SmarGalleryPage'));
+          إضافة route:
+            <Route path="gallery" element={<Lazy component={SmarGalleryPage} />} />
+          إضافة رابط Gallery في nav الـ ShowcaseTemplate S6 Finale.
+
+      - id: 39.5
+        name: "ShowcaseTemplate — S3 Coming Soon Modal"
+        file: "src/templates/ShowcaseTemplate.jsx"
+        status: planned
+        details: |
+          تعديل زر "استكشف الفلل" في S3:
+            - لا navigate — يُطلق useState showVillaModal=true
+            - AnimatePresence modal (glassmorphism, backdrop-blur):
+                قفل ذهبي + "الفلل الملكية" + "قريباً جداً..."
+                زر إغلاق X
+            - نفس Coming Soon design المستخدم في Gallery tab
+
+    implementation_order:
+      - "39.2 + 39.3 أولاً (Gallery Page) — نتيجة بصرية فورية للصور المرفوعة"
+      - "39.4 تسجيل الـ route"
+      - "39.1 Backend endpoint (الصور الأولى يمكن hardcode URLs في frontend مؤقتاً)"
+      - "39.5 تعديل ShowcaseTemplate S3 CTA"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 40: Auth Evolution Plan A–D  (2026-04-19 → 2026-04-20) ✅ COMPLETE
+  # ══════════════════════════════════════════════════════════════════════════
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# قواعد النظام الذري الجديد
+# ══════════════════════════════════════════════════════════════════════════════
+
+atomic_architecture_rules:
+  slug_resolution:
+    rule: "كل كومبونت يقرأ السلوغ من useTenantSlug() مباشرة"
+    exception: "Admin preview فقط يمرر slug كـ prop"
+
+  data_fetching:
+    rule: "الـ Organisms تجلب بياناتها بنفسها — لا data prop drilling"
+    example: "<UnitGrid /> يعمل بدون أي props إضافية"
+
+  no_hardcoding:
+    rule: "لا tenant name أو URLs أو phone numbers في JSX مباشرة"
+    source: "كل هذا يأتي من useTenantConfig()"
+
+  fm12_react19_safety:
+    rule1: "لا MotionValue في style props — فقط animate= و whileHover= و whileTap="
+    rule2: "لا useScroll مع target ref — scroll listener في useEffect فقط"
+
+  error_boundaries:
+    rule1: "كل Template يُلفّ بـ ErrorBoundary على مستوى الـ route"
+    rule2: "كل Organism يُلفّ بـ ErrorBoundary داخلي — خطأ section لا يكسر الصفحة"
+
+  layer_mapping:
+    atoms:     "props فقط — لا hooks، لا API، لا state خارجي"
+    molecules: "local state فقط — لا API calls"
+    organisms: "useTenantSlug + useUnits + useBooking — self-contained"
+    templates: "تُرتّب organisms فقط — لا slug، لا data"
+    pages:     "= template instance في route — تختفي تدريجياً"

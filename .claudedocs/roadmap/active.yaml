@@ -1,0 +1,233 @@
+project: Smar 3D Scrollytelling Experience
+tenant: smar
+last_updated: 2026-04-24
+# split from phases_roadmap.yaml on 2026-04-24
+
+phases:
+
+  # ── ACTIVE: Phase 35 — Backend Config + Smar Migration ─────────────────
+
+  - id: 35
+    name: "Backend Config Endpoint + Smar Migration"
+    description: |
+      تجهيز الـ backend لدعم النظام الذري.
+      ثم ترحيل smar من الكود القديم للـ templates الجديدة.
+    status: planned
+
+    tasks:
+
+      - id: 35.1
+        name: "Backend: GET /api/v1/public/{slug}/config"
+        file: "app/api/public_api.py"
+        details: |
+          endpoint جديد — 4-layer rule:
+            Route → Service → Repository → DB
+
+          Response لـ smar:
+            {
+              "slug": "smar",
+              "name_ar": "بيت سمر",
+              "name_en": "Beit Smar",
+              "primary_color": "#d4a853",
+              "hero_video_url": "https://.../Logo_Formation_Video_Ready.mp4",
+              "whatsapp_number": "96178727986",
+              "features": {
+                "spatial": true, "listings": true,
+                "booking": true, "payment": true
+              },
+              "unit_types": ["villa", "chalet"],
+              "currency": "USD",
+              "payment_methods": ["cash", "card", "whatsapp", "whish", "omt"]
+            }
+
+          المرحلة الأولى: hardcode القيم في Service مؤقتاً.
+          المرحلة الثانية: جدول TenantConfig في Prisma schema.
+        status: planned
+
+      - id: 35.2
+        name: "Smar: Replace SmarShowcasePage → ShowcaseTemplate"
+        file: "src/router/tenants/smar.routes.jsx"
+        details: |
+          قبل:
+            lazy(() => import('...SmarShowcasePage'))
+            <Route path="showcase" element={<Suspense><SmarShowcasePage /></Suspense>} />
+          بعد:
+            import ShowcaseTemplate from '../../templates/ShowcaseTemplate';
+            <Route path="showcase" element={<ShowcaseTemplate />} />
+        status: planned
+
+      - id: 35.3
+        name: "Smar: Replace SmarListingsPage + SmarPaymentPage → Templates"
+        details: |
+          نفس الخطوة لـ listings + payment.
+          يجب اختبار كامل flow الحجز قبل حذف الملفات القديمة.
+        status: planned
+
+      - id: 35.4
+        name: "Delete legacy files after migration"
+        details: |
+          بعد اكتمال الاختبار:
+            حذف: src/pages/smar/showcase/SmarShowcasePage.jsx
+            حذف: src/pages/smar/normal/SmarListingsPage.jsx
+            حذف: src/pages/smar/normal/SmarPaymentPage.jsx
+            حذف: src/pages/smar/normal/SmarClassicPage.jsx   (Phase 19.2 المعلقة)
+            حذف: src/components/PaymentCardDetails.jsx        (dead code — لا أحد يستورده)
+
+          إبقاء:
+            src/pages/smar/spatial/       (cinematic experience — خاص بـ smar)
+            src/pages/smar/admin/         (admin dashboard)
+            src/pages/smar/ui/SmarWhatsAppButton.jsx
+            src/pages/smar/showcase/ShowcaseHUD.jsx   (مؤقتاً حتى يُدمج في TenantHeader)
+        status: planned
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # SESSION 2026-04-17 — Backend Bulletproofing + Cinematic Showcase
+  # ══════════════════════════════════════════════════════════════════════════
+
+
+  # ── IN PROGRESS: Phase 30 — ShowcaseTemplate Z-Axis ─────────────────
+
+  - id: 30
+    name: "Phase 30 — Cinematic Z-Axis Showcase"
+    status: in_progress
+    description: |
+      تحويل صفحة Showcase من KineticSection (Framer Motion) إلى
+      تجربة سينمائية بـ GSAP ScrollTrigger + CSS perspective Z-axis.
+      مستوحاة من نمط FootlabAboutPage.jsx (6 محطات pinned).
+
+    tasks:
+
+      - id: 30.1
+        name: "Build ShowcaseTemplate — GSAP Z-Axis 6 Stations"
+        file: "src/templates/ShowcaseTemplate.jsx"
+        status: done
+        completed: 2026-04-17
+        details: |
+          Architecture:
+            - Single pinned stage (100vh) — perspective: 1400px
+            - 6 stations (position: absolute, transform-style: preserve-3d)
+            - gsap.context() scoped to stageRef → ctx.revert() on unmount
+            - gsap.matchMedia() — separate values for desktop / mobile
+            - invalidateOnRefresh: true
+
+          Stations:
+            S1 — Hero Video     : starts visible, exits Z (scale up + blur)
+                                  اللوجو يركب داخل الإطار الحجري (video autoPlay muted loop)
+            S2 — Forest Journey : Z-enter + image zoom 1→1.7 + whisper "خطوات نحو الهدوء"
+            S3 — Villa (القنطرة الحجرية):
+                                  Z-enter + glass panel slides from RIGHT (x: 88px→0)
+                                  ⚠️  CTA "استكشف الفلل" → Coming Soon Glass Modal
+                                  (الفلل غير جاهزة — لا navigate — modal بذهبي + قفل)
+            S4 — Chalet         : X-slide entry (28vw→0) + glass panel from LEFT
+                                  CTA يعمل → navigate(`/${slug}/listings?type=chalet`)
+            S5 — Pool & Cocktail: blur reveal (scale 1.14→1) + glass panel fades up
+                                  صور المسبح والمشروبات (beitsmar11 + beitsmar12)
+            S6 — Sunset Finale  : deep Z-enter (z:-4400) + CTA + links reveal
+                                  تراس بيت سمار + غروب + رابط الخريطة + footer
+
+          Ambient effects (deterministic — no Math.random):
+            - 28 dust motes: float upward, CSS @keyframes, --op custom property
+            - 16 fireflies: gold pulse, CSS @keyframes
+            - 7 depth rings: expand via depthRef scale 1→3.8 throughout journey
+
+          Immersive nav:
+            - position: fixed, z-index: 200, fully transparent background
+            - Logo "بيت سمار" + 3 nav buttons (ultra-low opacity)
+            - No TenantHeader — immersive, no black bar
+
+          Scroll end: +=600% desktop / +=440% mobile
+          scrub: 1.4  (same as Footlab reference)
+
+          CSS approach:
+            - All styles in STYLES const (inline <style> tag) — zero global pollution
+            - All class names prefixed sc- to avoid conflicts
+            - sc-glass-b uses margin:0 auto (not transform:translateX(-50%))
+              → GSAP y-animation is safe (no CSS transform conflict)
+
+        route_change:
+          file: "src/router/tenants/smar.routes.jsx"
+          change: "ShowcaseTemplate converted from direct import → lazy()
+                   because gsap.registerPlugin(ScrollTrigger) runs at module scope"
+
+      - id: 30.2
+        name: "Asset Preparation — User Task"
+        status: waiting_for_user
+        owner: salman
+        details: |
+          الصور المطلوبة من المستخدم (تجهيز + رفع على Supabase):
+
+          المسار الهدف: properties/beitsmar/showcase/
+
+          الملف                       | المصدر              | المعالجة المطلوبة
+          ---                         | ---                 | ---
+          hero_video.mp4              | موجود               | لا شيء
+          journey_forest.jpg          | image_54e344.png    | Outpainting +40% (تحمّل scale:1.7)
+          showcase_villa_arch.jpg     | Wake up to serenity | Relighting + 4K upscale
+          showcase_chalet_ext.png     | beitsmar3.jpg       | PNG masking أو 4K JPG
+          showcase_pool_top.jpg       | beitsmar11.jpg      | 4K upscale
+          showcase_cocktail.png       | beitsmar12.jpg      | Object extraction (optional)
+          horizon_sunset_terrace.jpg  | beitsmar1.jpg       | Sky outpainting +60%
+
+          Dimensions المطلوبة:
+            - Landscape (desktop): 3840×2160 minimum
+            - Portrait (mobile):   828×1792 نسخة إضافية لكل صورة
+            - Sunset: 5120×2160 (ultra-wide — نص ختامي يحتاج مساحة سماء)
+
+          Color Grading: Teal & Orange LUT موحّد على كل الصور
+
+      - id: 30.3
+        name: "DB Migration — homepage_assets + social_links"
+        file: "prisma/schema.prisma"
+        status: planned
+        depends_on: "30.2 (assets uploaded to Supabase first)"
+        details: |
+          إضافة حقلين إلى model Client:
+
+            homepage_assets Json?   // URLs لكل asset بعد الرفع
+            social_links    Json?   // Instagram, Facebook, Google Maps
+
+          شكل homepage_assets JSON:
+            {
+              "hero_video":  "https://.../hero_video.mp4",
+              "forest":      "https://.../journey_forest.jpg",
+              "villa":       "https://.../showcase_villa_arch.jpg",
+              "chalet":      "https://.../showcase_chalet_ext.png",
+              "pool":        "https://.../showcase_pool_top.jpg",
+              "cocktail":    "https://.../showcase_cocktail.png",
+              "sunset":      "https://.../horizon_sunset_terrace.jpg"
+            }
+
+          الأوامر:
+            npx prisma db push
+            ثم تحديث سجل smar في DB بالـ JSON
+
+      - id: 30.4
+        name: "Backend — Return homepage_assets in /config"
+        file: "app/api/v1/public.py + app/services/public_service.py"
+        status: planned
+        depends_on: "30.3"
+        details: |
+          تعديل _record_to_dict() في public_service.py ليشمل:
+            "homepage_assets": getattr(record, "homepage_assets", None),
+            "social_links":    getattr(record, "social_links",    None),
+
+          لا تغيير في الـ endpoint — نفس GET /{slug}/config
+
+      - id: 30.5
+        name: "Frontend — Wire ShowcaseTemplate to useTenantConfig"
+        file: "src/templates/ShowcaseTemplate.jsx"
+        status: planned
+        depends_on: "30.4"
+        details: |
+          استبدال ASSETS const الـ hardcoded بـ:
+
+            const { config } = useTenantConfig();
+            const ASSETS = config?.homepage_assets ?? ASSETS_FALLBACK;
+
+          حيث ASSETS_FALLBACK = القيم الحالية المكتوبة مباشرة
+          (يضمن عمل الصفحة حتى لو DB غير محدّثة بعد)
+
+          نفس الشيء لـ social_links في S6 Finale:
+            config?.social_links?.instagram  → رابط Instagram
+            config?.social_links?.maps       → رابط الخريطة
+

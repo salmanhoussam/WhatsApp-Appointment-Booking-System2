@@ -23,6 +23,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../ProtectedRoute';
+import { TenantConfigProvider } from '../../context/TenantConfigContext';
 
 // ListingsTemplate — no scroll hooks, direct import is safe
 import ListingsTemplate  from '../../templates/ListingsTemplate';
@@ -66,6 +67,7 @@ function Lazy({ component: Component }) {
 
 export default function SmarRoutes() {
   return (
+    <TenantConfigProvider slug="smar">
     <Routes>
       {/* ── Showcase — GSAP Z-axis cinema, lazy-isolated ── */}
       <Route path="showcase" element={<Lazy component={ShowcaseTemplate} />} />
@@ -100,5 +102,6 @@ export default function SmarRoutes() {
       <Route path=""  element={<Navigate to="showcase" replace />} />
       <Route path="*" element={<Navigate to="showcase" replace />} />
     </Routes>
+    </TenantConfigProvider>
   );
 }

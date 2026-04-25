@@ -16,6 +16,7 @@ import { motion, AnimatePresence }      from 'framer-motion';
 import { useNavigate, useParams }        from 'react-router-dom';
 import { useTenantBase }                 from '../../../utils/useTenantSlug';
 import { useSmarStore }                 from '../store/useSmarStore';
+import { useTenantConfigContext }        from '../../../context/TenantConfigContext';
 
 // ── Assets ───────────────────────────────────────────────────────────────────
 const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
@@ -90,6 +91,8 @@ function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 export default function CollageScene() {
   const navigate         = useNavigate();
   const { slug = 'smar' } = useParams();
+  const { config }       = useTenantConfigContext();
+  const waPhone          = config.whatsapp_number || '96178727986';
   const base             = useTenantBase();
   const tileRefs     = useRef([]);
   const ctaRef       = useRef(null);
@@ -184,7 +187,7 @@ export default function CollageScene() {
           ref={(el) => { tileRefs.current[i] = el; }}
           onClick={() => {
             if (tile.bookable) setExpanded(tile);
-            else if (tile.waText) window.open(`https://wa.me/9611234567?text=${tile.waText}`, '_blank');
+            else if (tile.waText) window.open(`https://wa.me/${waPhone}?text=${tile.waText}`, '_blank');
           }}
           onMouseEnter={() => setHovered(i)}
           onMouseLeave={() => setHovered(null)}

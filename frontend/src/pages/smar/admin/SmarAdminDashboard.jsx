@@ -19,6 +19,7 @@ import ActionInbox  from './components/ActionInbox';
 import SettingsTab  from './components/SettingsTab';
 import TeamTab      from './components/TeamTab';
 import ServicesTab  from './components/ServicesTab';
+import VisualBuilder from './VisualBuilder';
 import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../utils/useAdminRole';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -229,6 +230,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded,
     { id: 'maintenance',  icon: '🔧', label: 'Maintenance'   },
     { id: 'gardens',      icon: '🌿', label: 'Gardens'       },
     { id: 'settings',     icon: '⚙️', label: 'إعدادات المنصة' },
+    { id: 'pagebuilder',  icon: '🎨', label: 'Page Builder'   },
     { id: 'team',         icon: '👥', label: 'إدارة الفريق'  },
   ];
   const navItems = ALL_NAV.filter(item => canAccessTab(role, item.id));
@@ -2011,6 +2013,7 @@ export default function SmarAdminDashboard() {
     if (activeTab === 'maintenance')  return <MaintenanceTab  />;
     if (activeTab === 'gardens')      return <GardensTab      />;
     if (activeTab === 'settings')     return <SettingsTab     />;
+    if (activeTab === 'pagebuilder')  return <VisualBuilder   />;
     if (activeTab === 'team')         return <TeamTab         />;
     return null;
   };
@@ -2058,6 +2061,7 @@ export default function SmarAdminDashboard() {
                 maintenance:  'Maintenance',
                 gardens:      'Gardens & Landscaping',
                 settings:     'إعدادات المنصة ⚙️',
+                pagebuilder:  '🎨 Page Builder',
                 team:         'إدارة الفريق 👥',
               }[activeTab] || 'Dashboard'}
             </h1>

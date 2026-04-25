@@ -5,8 +5,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-
-const SMAR_PHONE = '96178727986';
+import { useTenantConfigContext } from '../../../context/TenantConfigContext';
 
 const S = {
   wrap: {
@@ -48,6 +47,8 @@ const S = {
 };
 
 export default function SmarWhatsAppButton({ lang = 'ar' }) {
+  const { config } = useTenantConfigContext();
+  const phone = config.whatsapp_number || '96178727986';
   const [hovered, setHovered] = useState(false);
 
   const message = lang === 'ar'
@@ -73,7 +74,7 @@ export default function SmarWhatsAppButton({ lang = 'ar' }) {
 
       {/* Button */}
       <motion.a
-        href={`https://wa.me/${SMAR_PHONE}?text=${encodeURIComponent(message)}`}
+        href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`}
         target="_blank"
         rel="noopener noreferrer"
         style={S.btn}

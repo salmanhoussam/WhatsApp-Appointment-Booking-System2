@@ -29,6 +29,14 @@ class BookingRequest(BaseModel):
 # ── Slug-in-path endpoints ─────────────────────────────────────────
 # Defined explicitly before includes to prevent shadowing
 
+@router.get("/{slug}/config", tags=["Public Tenant"])
+async def get_tenant_config_by_slug(slug: str):
+    data = await public_service.get_tenant_config(prisma_client, slug)
+    if not data:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return data
+
+
 @router.get("/{slug}/listings", tags=["Public Tenant"])
 async def get_listings_by_slug(
     slug: str,
@@ -127,6 +135,32 @@ async def get_services_by_slug(
             "duration": getattr(s, 'duration', 0),
         } for s in services
     ]
+
+@router.get("/{slug}/units/{unit_id}/gallery", tags=["Public Tenant"])
+async def get_unit_gallery(slug: str, unit_id: str):
+    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
+    if not client:
+        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+
+    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
+    if not unit or unit.clientId != client.id:
+        raise HTTPException(status_code=404, detail="الشاليه غير موجود")
+
+    images = await prisma_client.galleryimage.find_many(
+        where={"unitId": unit_id, "clientId": client.id, "isActive": True},
+        order={"sort_order": "asc"},
+    )
+    return [
+        {
+            "id":         img.id,
+            "url":        img.url,
+            "sort_order": img.sort_order,
+            "caption_ar": img.caption_ar,
+            "caption_en": img.caption_en,
+        }
+        for img in images
+    ]
+
 
 @router.get("/{slug}/units/{unit_id}/calendar", tags=["Public Tenant"])
 async def get_unit_calendar(slug: str, unit_id: str):

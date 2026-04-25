@@ -639,6 +639,326 @@ function RulesPoliciesEditor({ rules, onChange }) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ──────────────────── GALLERY TAB (Tab 2) ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function GalleryTab({ unitId }) {
+  const [items,           setItems]           = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [uploading,       setUploading]       = useState(false);
+  const [error,           setError]           = useState('');
+  const [isDragging,      setIsDragging]      = useState(false);
+  const [pendingSpanSize, setPendingSpanSize] = useState('small');
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminApi.get(`/gallery/${unitId}`)
+      .then(({ data }) => { if (!cancelled) setItems(data); })
+      .catch(() => { if (!cancelled) setError('فشل تحميل معرض الصور'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [unitId]);
+
+  const upload = async (file) => {
+    setError('');
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('span_size', pendingSpanSize);
+    fd.append('folder_context', `units/${unitId}/gallery`);
+    try {
+      const { data } = await adminApi.post(`/gallery/${unitId}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setItems(prev => [...prev, data]);
+    } catch (e) {
+      setError(e.response?.data?.detail || 'فشل رفع الصورة');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const patchItem = async (id, fields) => {
+    try {
+      const { data } = await adminApi.patch(`/gallery/images/${id}`, fields);
+      setItems(prev => prev.map(img => img.id === id ? data : img));
+    } catch {
+      setError('فشل الحفظ');
+    }
+  };
+
+  const deleteItem = async (id) => {
+    try {
+      await adminApi.delete(`/gallery/images/${id}`);
+      setItems(prev => prev.filter(img => img.id !== id));
+    } catch {
+      setError('فشل الحذف');
+    }
+  };
+
+  const moveItem = async (idx, dir) => {
+    const arr = [...items];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= arr.length) return;
+    [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+    const reordered = arr.map((img, i) => ({ ...img, sort_order: i }));
+    setItems(reordered);
+    try {
+      await adminApi.put(`/gallery/${unitId}/reorder`,
+        reordered.map(img => ({ id: img.id, sort_order: img.sort_order }))
+      );
+    } catch {
+      setError('فشل الترتيب');
+    }
+  };
+
+  const setCaptionLocal = (id, field, value) =>
+    setItems(prev => prev.map(img => img.id === id ? { ...img, [field]: value } : img));
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '48px 0', color: C.muted, fontSize: 13 }}>
+      جاري التحميل...
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header count */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{
+          color: C.muted, fontSize: 11, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>
+          معرض الصور ({items.length})
+        </span>
+        {items.some(img => !img.is_active) && (
+          <span style={{ color: C.muted, fontSize: 10 }}>
+            {items.filter(img => !img.is_active).length} مخفية
+          </span>
+        )}
+      </div>
+
+      {/* Empty state */}
+      {items.length === 0 && (
+        <div style={{
+          padding: '32px 20px', textAlign: 'center', borderRadius: 12,
+          background: 'rgba(255,255,255,0.015)', border: `1px dashed ${C.border}`,
+        }}>
+          <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
+            لم يتم رفع أي صور بعد
+          </p>
+        </div>
+      )}
+
+      {/* Image rows */}
+      {items.map((img, idx) => (
+        <div
+          key={img.id}
+          style={{
+            display: 'grid', gridTemplateColumns: '76px 1fr', gap: 12,
+            padding: '12px', borderRadius: 12,
+            background: img.is_active ? C.surface2 : 'rgba(255,255,255,0.012)',
+            border: `1px solid ${img.is_active ? C.border : 'rgba(255,255,255,0.04)'}`,
+            opacity: img.is_active ? 1 : 0.5,
+            transition: 'all 0.2s',
+          }}
+        >
+          {/* Thumbnail + reorder */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            <div style={{
+              width: 76, height: 58, borderRadius: 8, overflow: 'hidden',
+              border: `1px solid ${C.border}`, background: C.bg, flexShrink: 0,
+            }}>
+              <img
+                src={img.url} alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                loading="lazy"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 3 }}>
+              <SmallBtn onClick={() => moveItem(idx, -1)} disabled={idx === 0} title="تحريك لأعلى">
+                <ArrowUpIcon />
+              </SmallBtn>
+              <SmallBtn onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1} title="تحريك لأسفل">
+                <ArrowDownIcon />
+              </SmallBtn>
+            </div>
+          </div>
+
+          {/* Caption + actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <input
+                className={inputCls}
+                value={img.caption_ar || ''}
+                onChange={e => setCaptionLocal(img.id, 'caption_ar', e.target.value)}
+                onBlur={e => patchItem(img.id, { caption_ar: e.target.value || null })}
+                placeholder="وصف عربي (اختياري)"
+                dir="rtl"
+                style={{ padding: '6px 10px', fontSize: 11 }}
+              />
+              <input
+                className={inputCls}
+                value={img.caption_en || ''}
+                onChange={e => setCaptionLocal(img.id, 'caption_en', e.target.value)}
+                onBlur={e => patchItem(img.id, { caption_en: e.target.value || null })}
+                placeholder="Caption (optional)"
+                style={{ padding: '6px 10px', fontSize: 11 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {/* Span-size toggle */}
+              <button
+                type="button"
+                onClick={() => patchItem(img.id, { span_size: img.span_size === 'large' ? 'small' : 'large' })}
+                title="حجم الصورة في بنتو المعرض"
+                style={{
+                  padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${img.span_size === 'large' ? C.goldBorder : C.border}`,
+                  background: img.span_size === 'large' ? C.goldDim : 'transparent',
+                  color: img.span_size === 'large' ? C.gold : C.muted,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {img.span_size === 'large' ? '⬛ Hero' : '▪ Small'}
+              </button>
+
+              {/* Visibility toggle */}
+              <button
+                type="button"
+                onClick={() => patchItem(img.id, { is_active: !img.is_active })}
+                style={{
+                  padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${img.is_active ? C.green + '40' : C.border}`,
+                  background: img.is_active ? C.greenDim : 'transparent',
+                  color: img.is_active ? C.green : C.muted,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {img.is_active ? '👁 مرئية' : '🚫 مخفية'}
+              </button>
+
+              {/* Delete */}
+              <button
+                type="button"
+                onClick={() => deleteItem(img.id)}
+                style={{
+                  padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${C.border}`,
+                  background: 'transparent', color: C.red,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <TrashIcon size={11} /> حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Upload dropzone */}
+      <div>
+        <p style={{
+          color: C.muted, fontSize: 11, fontWeight: 600,
+          textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10,
+        }}>
+          رفع صورة جديدة
+        </p>
+
+        {/* Span-size pre-selector */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+          padding: '10px 14px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`,
+        }}>
+          <span style={{ color: C.muted, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            حجم في المعرض:
+          </span>
+          {[
+            { value: 'small', label: '▪ صغيرة' },
+            { value: 'large', label: '⬛ Hero (كبيرة)' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPendingSpanSize(opt.value)}
+              style={{
+                padding: '5px 14px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                border: `1px solid ${pendingSpanSize === opt.value ? C.gold : C.border}`,
+                background: pendingSpanSize === opt.value ? C.goldDim : 'transparent',
+                color: pendingSpanSize === opt.value ? C.gold : C.muted,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          onClick={() => !uploading && fileRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={e => {
+            e.preventDefault(); setIsDragging(false);
+            const f = e.dataTransfer.files?.[0]; if (f) upload(f);
+          }}
+          style={{
+            border: `2px dashed ${isDragging ? C.gold : C.goldBorder}`,
+            borderRadius: 14, padding: '28px 20px', textAlign: 'center',
+            cursor: uploading ? 'wait' : 'pointer',
+            background: isDragging ? C.goldDim : 'rgba(212,168,83,0.03)',
+            transition: 'border-color 0.18s, background 0.18s',
+          }}
+        >
+          {uploading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <Spinner />
+              <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>جاري الرفع…</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ color: C.goldBorder, marginBottom: 10 }}><UploadIcon /></div>
+              <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>
+                اسحب الصورة هنا أو اضغط للاختيار
+              </p>
+              <p style={{ color: C.muted, fontSize: 11, margin: 0 }}>
+                PNG, JPG, WEBP — حد أقصى 8 MB
+              </p>
+            </>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          style={{ display: 'none' }}
+          onChange={e => {
+            if (e.target.files?.[0]) upload(e.target.files[0]);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      {error && (
+        <div style={{
+          background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`,
+          borderRadius: 8, padding: '10px 14px', color: C.red, fontSize: 12,
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ──────────────────────── MAIN MODAL ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -659,14 +979,6 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
     checkIn: '15:00', checkOut: '12:00', cancellation: '', rules: [],
   });
 
-  // ── Images state ──────────────────────────────────────────────────────────
-  const [images,      setImages]      = useState([]);
-  const [uploading,   setUploading]   = useState(false);
-  const [deleting,    setDeleting]    = useState(null);
-  const [uploadError, setUploadError] = useState('');
-  const [isDragging,  setIsDragging]  = useState(false);
-  const fileInputRef = useRef(null);
-
   // ── Save status ───────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
 
@@ -674,7 +986,6 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
   useEffect(() => {
     if (!isOpen) return;
     setActiveTab('details');
-    setUploadError('');
     setSaving(false);
 
     if (unit) {
@@ -690,7 +1001,6 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
         description_ar: unit.description_ar || '',
         description_en: unit.description_en || '',
       });
-      setImages(Array.isArray(unit.images) ? unit.images : []);
       setContentBlocks(Array.isArray(unit.content_blocks) ? unit.content_blocks : []);
       setAmenities(Array.isArray(unit.amenities) ? unit.amenities : []);
       setRulesPolicies(
@@ -702,7 +1012,6 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
       setForm({ name_ar: '', name_en: '', category: 'chalet',
         capacity: 2, bedrooms: 1, bathrooms: 1, price: '', price_label: '',
         description_ar: '', description_en: '' });
-      setImages([]);
       setContentBlocks([]);
       setAmenities([]);
       setRulesPolicies({ checkIn: '15:00', checkOut: '12:00', cancellation: '', rules: [] });
@@ -746,46 +1055,6 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleUpload = async (file) => {
-    if (!file || !unit?.id) return;
-    setUploadError('');
-    setUploading(true);
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const { data } = await adminApi.post(`/units/${unit.id}/images`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setImages(data.images || []);
-      onImagesChange?.(data.images || []);
-    } catch (err) {
-      setUploadError(err.response?.data?.detail || 'فشل رفع الصورة — حاول مجدداً');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDelete = async (url) => {
-    if (!unit?.id) return;
-    setDeleting(url);
-    try {
-      const { data } = await adminApi.delete(`/units/${unit.id}/images`, { data: { url } });
-      setImages(data.images || []);
-      onImagesChange?.(data.images || []);
-    } catch (err) {
-      setUploadError(err.response?.data?.detail || 'فشل حذف الصورة');
-    } finally {
-      setDeleting(null);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
   };
 
   // ── Tab definitions ───────────────────────────────────────────────────────
@@ -1011,131 +1280,9 @@ export default function UnitFormModal({ isOpen, onClose, unit, onSave, onImagesC
             )}
 
 
-            {/* ═══════════════ TAB 2: IMAGES ═══════════════ */}
+            {/* ═══════════════ TAB 2: GALLERY ═══════════════ */}
             {activeTab === 'images' && unit?.id && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-                {/* Current images grid */}
-                {images.length > 0 ? (
-                  <div>
-                    <p style={{ color: C.muted, fontSize: 11, fontWeight: 600,
-                      textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-                      الصور الحالية ({images.length})
-                    </p>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 8,
-                    }}>
-                      {images.map(url => (
-                        <div
-                          key={url}
-                          style={{
-                            position: 'relative', borderRadius: 10, overflow: 'hidden',
-                            aspectRatio: '1', border: `1px solid ${C.border}`,
-                            background: '#0a0a0f',
-                          }}
-                        >
-                          <img
-                            src={url}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                            loading="lazy"
-                          />
-                          <button
-                            onClick={() => handleDelete(url)}
-                            disabled={deleting === url}
-                            title="حذف الصورة"
-                            style={{
-                              position: 'absolute', inset: 0,
-                              background: 'rgba(0,0,0,0)',
-                              border: 'none', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              opacity: 0, transition: 'background 0.18s, opacity 0.18s',
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = 'rgba(248,113,113,0.55)';
-                              e.currentTarget.style.opacity = '1';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = 'rgba(0,0,0,0)';
-                              e.currentTarget.style.opacity = '0';
-                            }}
-                          >
-                            {deleting === url
-                              ? <Spinner />
-                              : <span style={{ color: '#fff', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}>
-                                  <TrashIcon />
-                                </span>
-                            }
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{ color: C.muted, fontSize: 13, textAlign: 'center', padding: '8px 0' }}>
-                    لا توجد صور بعد — ارفع أول صورة أدناه
-                  </p>
-                )}
-
-                {/* Dropzone */}
-                <div>
-                  <p style={{ color: C.muted, fontSize: 11, fontWeight: 600,
-                    textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-                    رفع صورة جديدة
-                  </p>
-                  <div
-                    onClick={() => !uploading && fileInputRef.current?.click()}
-                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={handleDrop}
-                    style={{
-                      border: `2px dashed ${isDragging ? C.gold : C.goldBorder}`,
-                      borderRadius: 14,
-                      padding: '32px 20px',
-                      textAlign: 'center',
-                      cursor: uploading ? 'wait' : 'pointer',
-                      background: isDragging ? C.goldDim : 'rgba(212,168,83,0.03)',
-                      transition: 'border-color 0.18s, background 0.18s',
-                    }}
-                  >
-                    {uploading ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                        <Spinner />
-                        <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>جاري الرفع…</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ color: C.goldBorder, marginBottom: 10 }}><UploadIcon /></div>
-                        <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>
-                          اسحب الصورة هنا أو اضغط للاختيار
-                        </p>
-                        <p style={{ color: C.muted, fontSize: 11, margin: 0 }}>
-                          PNG, JPG, WEBP — حد أقصى 8 MB
-                        </p>
-                      </>
-                    )}
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    style={{ display: 'none' }}
-                    onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); e.target.value = ''; }}
-                  />
-                </div>
-
-                {uploadError && (
-                  <div style={{
-                    background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`,
-                    borderRadius: 8, padding: '10px 14px',
-                    color: C.red, fontSize: 12,
-                  }}>
-                    {uploadError}
-                  </div>
-                )}
-              </div>
+              <GalleryTab unitId={unit.id} />
             )}
 
 

@@ -35,7 +35,9 @@ const DEFAULT_CONFIG = {
   primary_color:   '#d4a853',
   hero_video_url:  null,
   hero_image_url:  null,
-  whatsapp_number: '96171000000',
+  whatsapp_number: '',
+  instagram_url:   null,
+  maps_url:        null,
   currency:        'USD',
   features: {
     spatial:  false,
@@ -43,6 +45,7 @@ const DEFAULT_CONFIG = {
     booking:  true,
     payment:  false,
   },
+  config:          {},
   unit_types:      [],
   payment_methods: ['cash'],
 };
