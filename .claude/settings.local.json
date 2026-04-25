@@ -24,7 +24,10 @@
       "Bash(npm run:*)",
       "Bash(npx vite:*)",
       "Bash(node node_modules/vite/bin/vite.js build)",
-      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\)\\)\\)\")"
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\)\\)\\)\")",
+      "Bash(gh pr create --repo salmanhoussam/WhatsApp-Appointment-Booking-System2 --title 'docs: add smar tenant comprehensive reference' --body ' *)",
+      "Bash(where gh *)",
+      "Read(//usr/local/bin/**)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Lenovo\\.claude\\projects\\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System"
