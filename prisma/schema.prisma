@@ -35,6 +35,11 @@ model Client {
   payment_methods String[]       @map("payment_methods")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // ── Trial & Lifecycle ────────────────────────────────────────────────────────
+  status        String    @default("trial")       @map("status")
+  trial_ends_at DateTime? @map("trial_ends_at")   @db.Timestamptz(6)
+  service_type  String?   @default("real_estate") @map("service_type")
+  notes         String?   @map("notes")
   bookings        Booking[]
   customers       Customer[]
   prices          Price[]

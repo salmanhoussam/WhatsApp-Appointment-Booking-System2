@@ -4,7 +4,7 @@ from datetime import date
 from pydantic import BaseModel
 from typing import List
 
-from . import properties, units, bookings, listings
+from . import properties, units, bookings, listings, registration
 from app.db.client import prisma_client
 from app.services import public_service
 
@@ -209,7 +209,8 @@ async def get_unit_calendar(slug: str, unit_id: str):
 
 
 # ── Nested sub-routers ─────────────────────────────────────────────
-router.include_router(properties.router, prefix="/properties", tags=["Public Properties"])
-router.include_router(units.router, prefix="/units", tags=["Public Units"])
-router.include_router(bookings.router, prefix="/bookings", tags=["Public Bookings"])
-router.include_router(listings.router, prefix="/listings", tags=["Public Listings"])
+router.include_router(properties.router,   prefix="/properties", tags=["Public Properties"])
+router.include_router(units.router,        prefix="/units",       tags=["Public Units"])
+router.include_router(bookings.router,     prefix="/bookings",    tags=["Public Bookings"])
+router.include_router(listings.router,     prefix="/listings",    tags=["Public Listings"])
+router.include_router(registration.router)
