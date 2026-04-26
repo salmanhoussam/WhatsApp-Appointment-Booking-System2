@@ -13,6 +13,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import adminApi from '../../../utils/admin.config';
+import { getTenantSlug } from '../../../utils/tenant.config';
 import UnitCalendar from '../../../components/UnitCalendar';
 import UnitFormModal from './UnitFormModal';
 import ActionInbox  from './components/ActionInbox';
@@ -2062,16 +2063,19 @@ export default function SmarAdminDashboard() {
   const allowedTabs = ROLE_TABS[role] ?? [];
   const defaultTab = allowedTabs[0] ?? 'dashboard';
   const navigate = useNavigate();
-  const { slug, '*': urlTab } = useParams();
+  const { slug: paramSlug, '*': urlTab } = useParams();
+
+  // Subdomain mode (/admin/*) has no slug param — fall back to JWT/URL resolution
+  const slug = paramSlug || getTenantSlug();
 
   // Detect route context: /demo/:slug/*, /:slug/admin/*, /admin/*, /dashboard/*
   const _pathParts   = window.location.pathname.split('/').filter(Boolean);
   const _isDemoPath  = _pathParts[0] === 'demo';
   const _isAdminPath = _pathParts[0] === 'admin' || _pathParts[1] === 'admin';
-  const dashBase = slug
-    ? (_isDemoPath  ? `/demo/${slug}`
-       : _isAdminPath ? `/${slug}/admin`
-       : `/dashboard/${slug}`)
+  const dashBase = paramSlug
+    ? (_isDemoPath  ? `/demo/${paramSlug}`
+       : _isAdminPath ? `/${paramSlug}/admin`
+       : `/dashboard/${paramSlug}`)
     : (_isAdminPath ? '/admin' : '/dashboard');
 
   // Read active tab from URL wildcard segment
@@ -2090,8 +2094,10 @@ export default function SmarAdminDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('admin_access_token');
-    if (!token) navigate('/login', { replace: true });
-  }, [navigate]);
+    if (!token) { navigate('/login', { replace: true }); return; }
+    // SUPER_ADMIN belongs in ClientsManager, not in tenant dashboard
+    if (role === 'SUPER_ADMIN') { navigate('/super/clients', { replace: true }); return; }
+  }, [navigate, role]);
 
   const handleLogout = () => {
     localStorage.removeItem('admin_access_token');

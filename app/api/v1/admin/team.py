@@ -27,7 +27,7 @@ class TeamMemberCreate(BaseModel):
     full_name: str
     email:     EmailStr
     password:  str
-    role:      Literal["admin", "manager"] = "manager"
+    role:      Literal["MANAGER_RESERVATIONS", "MANAGER_UNITS"] = "MANAGER_RESERVATIONS"
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

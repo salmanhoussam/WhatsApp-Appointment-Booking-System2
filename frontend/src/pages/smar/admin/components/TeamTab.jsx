@@ -32,8 +32,10 @@ const C = {
 };
 
 const ROLE_CONFIG = {
-  admin:   { label: 'مدير',    labelEn: 'Admin',   color: C.gold,  bg: C.goldDim  },
-  manager: { label: 'موظف',   labelEn: 'Manager', color: C.blue,  bg: C.blueDim  },
+  TENANT_ADMIN:         { label: 'مدير كامل',   labelEn: 'Admin',        color: C.gold,  bg: C.goldDim  },
+  SUPER_ADMIN:          { label: 'سوبر أدمن',   labelEn: 'Super Admin',  color: C.gold,  bg: C.goldDim  },
+  MANAGER_RESERVATIONS: { label: 'مدير حجوزات', labelEn: 'Reservations', color: C.blue,  bg: C.blueDim  },
+  MANAGER_UNITS:        { label: 'مدير وحدات',  labelEn: 'Units Mgr',   color: C.green, bg: C.greenDim },
 };
 
 const inputStyle = {
@@ -57,7 +59,7 @@ function fmtDate(iso) {
 
 // ── Add Member Modal ──────────────────────────────────────────────────────────
 function AddMemberModal({ onClose, onCreated }) {
-  const EMPTY = { full_name: '', email: '', password: '', role: 'manager' };
+  const EMPTY = { full_name: '', email: '', password: '', role: 'MANAGER_RESERVATIONS' };
   const [form,   setForm]   = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
@@ -152,7 +154,7 @@ function AddMemberModal({ onClose, onCreated }) {
               <label style={labelStyle}>البريد الإلكتروني *</label>
               <input style={{ ...inputStyle, fontFamily: 'monospace' }}
                 type="email" value={form.email} dir="ltr"
-                onChange={e => set('email', e.target.value)} placeholder="staff@beitsmar.com" />
+                onChange={e => set('email', e.target.value)} placeholder="staff@example.com" />
             </div>
             <div>
               <label style={labelStyle}>كلمة المرور *</label>
@@ -163,8 +165,8 @@ function AddMemberModal({ onClose, onCreated }) {
               <label style={labelStyle}>الصلاحية</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {[
-                  { id: 'manager', ar: 'موظف', en: 'Manager', desc: 'إدارة الحجوزات' },
-                  { id: 'admin',   ar: 'مدير',  en: 'Admin',   desc: 'صلاحيات كاملة' },
+                  { id: 'MANAGER_RESERVATIONS', ar: 'مدير حجوزات', en: 'Reservations', desc: 'Inbox + حجوزات + داشبورد' },
+                  { id: 'MANAGER_UNITS',        ar: 'مدير وحدات',  en: 'Units Manager', desc: 'وحدات + خدمات + داشبورد' },
                 ].map(r => (
                   <button
                     key={r.id} type="button"
@@ -335,7 +337,7 @@ export default function TeamTab() {
             </thead>
             <tbody>
               {activeMembers.map(m => {
-                const role = ROLE_CONFIG[m.role] || ROLE_CONFIG.manager;
+                const role = ROLE_CONFIG[m.role] || ROLE_CONFIG.MANAGER_RESERVATIONS;
                 return (
                   <tr key={m.id} style={{ transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}

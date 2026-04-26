@@ -1,6 +1,6 @@
 project: Smar 3D Scrollytelling Experience
 tenant: smar
-last_updated: 2026-04-26
+last_updated: 2026-04-27
 # split from phases_roadmap.yaml on 2026-04-24
 
 phases:
@@ -410,3 +410,158 @@ atomic_architecture_rules:
     organisms: "useTenantSlug + useUnits + useBooking — self-contained"
     templates: "تُرتّب organisms فقط — لا slug، لا data"
     pages:     "= template instance في route — تختفي تدريجياً"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 44: Admin Permissions System — Role-Based Multi-Tenant
+# القرار: 2026-04-27 | الأولوية: high | قبل onboarding أي tenant جديد
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 44
+    name: "Admin Permissions — SUPER_ADMIN / TENANT_ADMIN / Staff Roles"
+    status: planned
+    priority: high
+    agent: backend-architect
+    description: |
+      تصحيح وبناء نظام الصلاحيات الكامل.
+      المنطق الصحيح:
+        - سلمان (SUPER_ADMIN)    → ClientsManager فقط — لا وصول لـ SmarAdminDashboard
+        - أدمن كل tenant         → SmarAdminDashboard كاملة (TENANT_ADMIN)
+        - موظفون الـ tenant       → SmarAdminDashboard مقيّدة (MANAGER_RESERVATIONS | MANAGER_UNITS)
+      كل صلاحية مقيّدة بالـ slug الخاص بالـ tenant في كل query.
+
+    permission_model:
+      SUPER_ADMIN:
+        who:   "سلمان فقط — User record بـ role=SUPER_ADMIN"
+        where: "ClientsManager (/super/clients) فقط"
+        can:   "إنشاء/تعليق/تفعيل أي tenant — لا وصول لبيانات أي tenant"
+
+      TENANT_ADMIN:
+        who:   "مالك الـ tenant (Client JWT أو User بـ role=TENANT_ADMIN)"
+        where: "SmarAdminDashboard — كل الـ tabs"
+        can:   "إدارة كل شيء داخل سلوغه فقط: وحدات، حجوزات، فريق، إعدادات"
+
+      MANAGER_RESERVATIONS:
+        who:   "موظف أضافه الـ TENANT_ADMIN"
+        where: "SmarAdminDashboard — inbox + bookings + dashboard + housekeeping + maintenance + gardens"
+        can:   "قراءة وتحديث الحجوزات — لا وحدات، لا إعدادات، لا فريق"
+
+      MANAGER_UNITS:
+        who:   "موظف أضافه الـ TENANT_ADMIN"
+        where: "SmarAdminDashboard — units + services + dashboard + housekeeping + maintenance + gardens"
+        can:   "إدارة الوحدات والخدمات — لا حجوزات، لا فريق، لا إعدادات"
+
+    audit_findings_2026_04_27:
+      critical:
+        - file: "frontend/src/utils/useAdminRole.js"
+          issue: "SUPER_ADMIN في ROLE_TABS لديه نفس tabs التنانت — يجب redirect لـ /super/clients"
+          fix:   "إضافة guard في SmarAdminDashboard: if role===SUPER_ADMIN → navigate('/super/clients')"
+
+        - file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+          issue: |
+            Frontend يبعت role:'admin'|'manager' للباكند
+            لكن Prisma UserRole enum: TENANT_ADMIN | MANAGER_RESERVATIONS | MANAGER_UNITS
+            → mismatch كامل في الإنشاء والعرض
+          fix: |
+            تغيير الـ options في AddMemberModal:
+              'admin'   → 'TENANT_ADMIN'
+              'manager' → 'MANAGER_RESERVATIONS' أو 'MANAGER_UNITS'
+            تحديث ROLE_CONFIG ليعرض الأسماء الصحيحة
+
+      medium:
+        - file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+          issue: "slug undefined على subdomain mode (smar.salmansaas.com/admin) — Sidebar تعرض 'TENANT'"
+          fix:   "استخدام getTenantSlug() من tenant.config.js كـ fallback عند غياب useParams().slug"
+
+        - file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx:TrialBanner"
+          issue: "TrialBanner تقرأ من localStorage فقط — لا تعمل مع SSO direct login"
+          fix:   "قراءة status من JWT payload أيضاً كـ fallback"
+
+      low:
+        - file: "frontend/src/pages/smar/admin/components/TeamTab.jsx:155"
+          issue: "placeholder 'staff@beitsmar.com' hardcoded"
+          fix:   "استبدال بـ placeholder غير مرتبط بـ tenant"
+
+        - file: "frontend/src/pages/smar/admin/components/SettingsTab.jsx:148,153"
+          issue: "placeholders بـ 'beitsmar' hardcoded"
+          fix:   "استخدام slug ديناميكي من useParams أو getTenantSlug()"
+
+    tasks:
+
+      - id: 44.1
+        name: "SUPER_ADMIN redirect guard في SmarAdminDashboard"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: planned
+        priority: critical
+        details: |
+          في الـ useEffect الأول في SmarAdminDashboard:
+            if (role === 'SUPER_ADMIN') {
+              navigate('/super/clients', { replace: true });
+              return;
+            }
+          يمنع سلمان من رؤية بيانات tenant عند دخول الصفحة بالخطأ.
+
+      - id: 44.2
+        name: "TeamTab — تصحيح Role Mismatch"
+        file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+        status: planned
+        priority: critical
+        details: |
+          1. تحديث ROLE_CONFIG:
+               TENANT_ADMIN:          { label: 'مدير كامل', labelEn: 'Admin',             color: gold  }
+               MANAGER_RESERVATIONS:  { label: 'مدير حجوزات', labelEn: 'Reservations Mgr', color: blue  }
+               MANAGER_UNITS:         { label: 'مدير وحدات',  labelEn: 'Units Manager',    color: green }
+
+          2. تحديث AddMemberModal options:
+               بدل 'admin'   → 'MANAGER_RESERVATIONS' أو 'TENANT_ADMIN' (TENANT_ADMIN لا يُوصى بإنشائه من هنا)
+               بدل 'manager' → radio: MANAGER_RESERVATIONS | MANAGER_UNITS
+
+          3. Backend: تحقق من app/api/v1/admin/team.py أنه يقبل enum values
+
+      - id: 44.3
+        name: "Slug fallback في SmarAdminDashboard"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: planned
+        priority: medium
+        details: |
+          إضافة:
+            import { getTenantSlug } from '../../../utils/tenant.config';
+            const { slug: paramSlug } = useParams();
+            const slug = paramSlug || getTenantSlug();
+          يحل مشكلة subdomain mode (smar.salmansaas.com/admin).
+
+      - id: 44.4
+        name: "TeamTab placeholder cleanup"
+        file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+        status: planned
+        priority: low
+        details: "استبدال 'staff@beitsmar.com' بـ 'staff@example.com' أو input generic"
+
+      - id: 44.5
+        name: "SettingsTab placeholder cleanup"
+        file: "frontend/src/pages/smar/admin/components/SettingsTab.jsx"
+        status: planned
+        priority: low
+        details: "استبدال hardcoded 'beitsmar' بـ slug ديناميكي"
+
+      - id: 44.6
+        name: "WhatsApp Onboarding Questionnaire — n8n Flow"
+        status: planned
+        priority: medium
+        description: |
+          بعد تسجيل tenant جديد، يستلم رسالة WhatsApp تفاعلية لجمع:
+            - ستايل التصميم (Minimalist / Luxury / Bold)
+            - لون رئيسي
+            - لوغو (صورة)
+            - وصف قصير للمنشأة
+          n8n يجمع الإجابات ويبعثها لـ POST /api/v1/super/tenants/{slug}/brief
+          تُخزَّن في tenant_configs ← تظهر في ClientsManager
+
+    implementation_order:
+      - "44.1 فوراً (critical — security)"
+      - "44.2 فوراً (critical — data corruption)"
+      - "44.3 بعدها (medium)"
+      - "44.4 + 44.5 أي وقت (low)"
+      - "44.6 Phase مستقل بعد استقرار الباقي"
+
+    estimated_effort: "44.1-44.3: ساعة واحدة | 44.4-44.5: 30 دقيقة | 44.6: Phase كامل"
