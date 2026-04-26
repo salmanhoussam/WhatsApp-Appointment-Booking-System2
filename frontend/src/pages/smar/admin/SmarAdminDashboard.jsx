@@ -219,7 +219,7 @@ function GardensTab() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded, role }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded, role, slug }) {
   const ALL_NAV = [
     { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'  },
     { id: 'bookings',     icon: '📋', label: 'Reservations'  },
@@ -266,10 +266,10 @@ function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded,
         {isExpanded && (
           <>
             <div style={{ fontSize: 11, letterSpacing: '0.18em', color: C.textMuted, marginBottom: 4 }}>
-              GS MAR ADMIN
+              {slug ? slug.toUpperCase() : 'TENANT'} ADMIN
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: C.gold, letterSpacing: '0.06em' }}>
-              بيت سمار
+              {slug || 'Dashboard'}
             </div>
           </>
         )}
@@ -1280,6 +1280,8 @@ const TYPE_ICON = { villa: '🏡', chalet: '🏕️', restaurant: '🍽️', poo
 // Admin drags on the calendar to select a range, then sets price/block status.
 // No manual date inputs — the calendar IS the input.
 function CalendarManagerModal({ unit, onClose }) {
+  const { slug: paramSlug } = useParams();
+  const tenantSlug = paramSlug || 'smar';
   const [calKey,       setCalKey]      = useState(0);
   const [selection,    setSelection]   = useState({ checkIn: null, checkOut: null });
   const [customPrice,  setCustomPrice] = useState('');
@@ -1393,7 +1395,7 @@ function CalendarManagerModal({ unit, onClose }) {
             <UnitCalendar
               key={calKey}
               unitId={unit.id}
-              slug="smar"
+              slug={tenantSlug}
               adminMode={true}
               onChange={setSelection}
               value={selection}
@@ -2127,6 +2129,7 @@ export default function SmarAdminDashboard() {
         isExpanded={isSidebarExpanded}
         setIsExpanded={setIsSidebarExpanded}
         role={role}
+        slug={slug}
       />
 
       {/* Main content */}
@@ -2143,7 +2146,7 @@ export default function SmarAdminDashboard() {
         }}>
           <div>
             <div style={{ fontSize: 12, letterSpacing: '0.14em', color: C.textMuted, marginBottom: 4 }}>
-              SMAR TENANT · ADMIN PORTAL
+              {slug ? slug.toUpperCase() : 'TENANT'} · ADMIN PORTAL
             </div>
             <h1 style={{ fontSize: 28, fontWeight: 800, color: C.textPri, letterSpacing: '-0.02em' }}>
               {{
