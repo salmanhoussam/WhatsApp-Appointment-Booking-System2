@@ -29,15 +29,33 @@ function generateSlug(text) {
     .replace(/^-|-$/g, '');
 }
 
-function adminUrl(slug, token) {
-  return import.meta.env.PROD
-    ? `https://${slug}.salmansaas.com/admin/units?token=${token}`
-    : `http://localhost:5173/${slug}/admin/units?token=${token}`;
+const SUPER_ADMIN_SLUG = 'smar'; // platform owner's client slug
+
+function _isSuperAdmin(token) {
+  try {
+    const p = JSON.parse(atob(token.split('.')[1]));
+    return (p.type === 'client' && p.slug === SUPER_ADMIN_SLUG)
+        || (p.type === 'admin'  && p.role === 'SUPER_ADMIN');
+  } catch { return false; }
 }
 
-function storeTrialData(status, trial_ends_at) {
-  if (status)        localStorage.setItem('tenant_status',    status);
-  if (trial_ends_at) localStorage.setItem('trial_ends_at',    trial_ends_at);
+function resolveRedirect(slug, token) {
+  if (_isSuperAdmin(token)) {
+    return import.meta.env.PROD
+      ? 'https://auth.salmansaas.com/super/clients'
+      : '/super/clients';
+  }
+  // All trial/demo clients → auth subdomain, no new DNS per client
+  return import.meta.env.PROD
+    ? `https://auth.salmansaas.com/demo/${slug}/units?token=${token}`
+    : `http://localhost:5173/demo/${slug}/units?token=${token}`;
+}
+
+function storeTrialData(token, status, trial_ends_at) {
+  // Always store token on auth subdomain so /super/clients can read it
+  localStorage.setItem('admin_access_token', token);
+  if (status)        localStorage.setItem('tenant_status',  status);
+  if (trial_ends_at) localStorage.setItem('trial_ends_at',  trial_ends_at);
 }
 
 // ── Animation variants ────────────────────────────────────────────────────────
@@ -231,8 +249,8 @@ export default function SSOLoginPage() {
       }
     }
     const { token, slug: s, status, trial_ends_at } = data;
-    storeTrialData(status, trial_ends_at);
-    window.location.href = adminUrl(s, token);
+    storeTrialData(token, status, trial_ends_at);
+    window.location.href = resolveRedirect(s, token);
     setLoading(false);
   }
 
@@ -251,8 +269,8 @@ export default function SSOLoginPage() {
         { withCredentials: true },
       );
       const { token, slug: s, status, trial_ends_at } = data.data;
-      storeTrialData(status, trial_ends_at);
-      window.location.href = adminUrl(s, token);
+      storeTrialData(token, status, trial_ends_at);
+      window.location.href = resolveRedirect(s, token);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || err?.response?.data?.detail;
       setError(msg || 'حدث خطأ ما. يرجى المحاولة لاحقاً.');

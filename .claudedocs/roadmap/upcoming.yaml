@@ -1,6 +1,6 @@
 project: Smar 3D Scrollytelling Experience
 tenant: smar
-last_updated: 2026-04-24
+last_updated: 2026-04-26
 # split from phases_roadmap.yaml on 2026-04-24
 
 phases:
@@ -216,6 +216,167 @@ phases:
   # ══════════════════════════════════════════════════════════════════════════
   # PHASE 40: Auth Evolution Plan A–D  (2026-04-19 → 2026-04-20) ✅ COMPLETE
   # ══════════════════════════════════════════════════════════════════════════
+
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 43: Google Sheets CRM Integration
+  # ربط المنصة بـ Google Sheets كـ CRM خفيف لتتبع العملاء والصفقات
+  # القرار: 2026-04-26 | الأولوية: medium | بعد استقرار Super Admin
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 43
+    name: "Google Sheets CRM — Business Pipeline Integration"
+    status: planned
+    priority: medium
+    agent: backend-architect
+    description: |
+      عند كل registration جديد أو تغيير status في Super Admin،
+      يُحدَّث صف في Google Sheet تلقائياً.
+      الهدف: لوحة تشغيلية لسلمان لمتابعة العملاء بدون فتح الـ dashboard.
+
+    business_context: |
+      سلمان يدير المشروع وحده (bootstrapped).
+      Google Sheets = CRM خفيف + مصدر حقيقة للصفقات.
+      كل عميل = صف، كل عمود = مرحلة في دورة الحياة.
+
+    sheet_schema:
+      columns:
+        - slug:          "الرابط المختصر"
+        - business_name: "اسم المنشأة"
+        - owner_name:    "اسم المسؤول"
+        - phone:         "رقم الواتساب"
+        - email:         "البريد الإلكتروني"
+        - service_type:  "نوع الخدمة (real_estate / restaurant / hotel)"
+        - status:        "trial | active | demo | suspended | expired"
+        - trial_ends_at: "تاريخ انتهاء التجربة"
+        - created_at:    "تاريخ التسجيل"
+        - notes:         "ملاحظات سلمان (يملأها يدوياً)"
+        - deal_value:    "قيمة الصفقة المتوقعة $$ (يملأها يدوياً)"
+        - next_action:   "الخطوة التالية (يملأها يدوياً)"
+
+    trigger_events:
+      - event: "new_registration"
+        when:  "POST /api/v1/auth/register succeeds"
+        action: "append new row"
+      - event: "status_change"
+        when:  "PATCH /api/v1/super/clients/{id}/status succeeds"
+        action: "update status cell in existing row"
+
+    tasks:
+
+      - id: 43.1
+        name: "Google Sheets API — Service Account Setup"
+        status: planned
+        type: manual_setup
+        details: |
+          خطوات يدوية (مرة واحدة):
+          1. Google Cloud Console → New Project "SalmanSaaS CRM"
+          2. Enable Google Sheets API
+          3. Create Service Account → Download JSON credentials
+          4. Share the target Google Sheet with the service account email
+          5. Copy Sheet ID من URL: docs.google.com/spreadsheets/d/{SHEET_ID}/
+
+          Variables needed:
+            GOOGLE_SERVICE_ACCOUNT_JSON  ← محتوى الـ JSON كامل (base64 أو JSON string)
+            GOOGLE_SHEET_ID              ← ID الشيت
+
+      - id: 43.2
+        name: "Backend — sheets_service.py"
+        file: "app/services/sheets_service.py"
+        status: planned
+        details: |
+          مكتبة: google-api-python-client + google-auth
+          (pip install google-api-python-client google-auth)
+
+          Functions:
+            async def append_client_row(client_data: dict) -> None
+              → يُضيف صف جديد عند التسجيل
+              → columns: slug, name, owner, phone, email, service_type,
+                         status, trial_ends_at, created_at
+
+            async def update_client_status(slug: str, new_status: str) -> None
+              → يبحث عن الصف بالـ slug في العمود A
+              → يُحدّث خلية الـ status فقط
+
+          Error handling: Silent fail + log (Sheets API لا يوقف المنصة إذا فشل)
+          يُستدعى في: FastAPI BackgroundTasks (لا يُبطّئ الـ response)
+
+      - id: 43.3
+        name: "Backend — Wire to registration_service.py"
+        file: "app/services/registration_service.py"
+        status: planned
+        details: |
+          في register_new_tenant()، بعد إنشاء الـ client + user:
+
+            background_tasks.add_task(
+              sheets_service.append_client_row,
+              {
+                "slug":          client.slug,
+                "name":          client.name,
+                "owner_name":    data.get("owner_name"),
+                "phone":         data["whatsapp_number"],
+                "email":         data["email"],
+                "service_type":  venue_type,
+                "status":        "trial",
+                "trial_ends_at": trial_ends_at.isoformat(),
+                "created_at":    datetime.now(timezone.utc).isoformat(),
+              }
+            )
+
+          ملاحظة: register_new_tenant يحتاج BackgroundTasks param → تعديل signature
+          أو: استدعاء مباشر asyncio.create_task() من الـ endpoint
+
+      - id: 43.4
+        name: "Backend — Wire to super/clients.py (status change)"
+        file: "app/api/v1/super/clients.py"
+        status: planned
+        details: |
+          في update_client_status() endpoint:
+
+            background_tasks.add_task(
+              sheets_service.update_client_status,
+              slug=result["slug"],
+              new_status=body.status,
+            )
+
+          يُضاف background_tasks: BackgroundTasks = ... في signature
+
+      - id: 43.5
+        name: "Frontend — Super Admin: رابط لفتح Google Sheet"
+        file: "frontend/src/pages/super-admin/ClientsManager.jsx"
+        status: planned
+        details: |
+          إضافة زر في أعلى الـ Control Room:
+
+            <a href={GOOGLE_SHEET_URL} target="_blank">
+              📊 فتح CRM Sheet
+            </a>
+
+          GOOGLE_SHEET_URL = VITE_GOOGLE_SHEET_URL env var (Vite)
+          أو hardcode في ClientsManager لأنه super admin only
+
+    dependencies:
+      pip:
+        - google-api-python-client
+        - google-auth
+      env_vars:
+        - GOOGLE_SERVICE_ACCOUNT_JSON
+        - GOOGLE_SHEET_ID
+        - VITE_GOOGLE_SHEET_URL  # (frontend — رابط الـ Sheet لفتحه مباشرة)
+
+    implementation_order:
+      - "43.1 أولاً — Setup يدوي (Service Account + Sheet)"
+      - "43.2 — بناء sheets_service.py"
+      - "43.3 + 43.4 — ربط Registration و Status Change"
+      - "43.5 — رابط في Frontend (أسهل خطوة)"
+
+    estimated_effort: "2-3 ساعات (بعد اكتمال 43.1)"
+
+    alternative_considered:
+      n8n: |
+        أبطأ في الإعداد (n8n server مطلوب).
+        مناسب إذا أردنا workflows معقدة مستقبلاً (إشعارات WhatsApp + Sheets + Email).
+        يمكن الانتقال إليه لاحقاً بدون تغيير في الـ backend.
 
 
 # ══════════════════════════════════════════════════════════════════════════════

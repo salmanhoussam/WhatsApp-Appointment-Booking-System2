@@ -20,6 +20,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db.client import prisma_client
 from app.core.security import decode_token
+from app.core.config import settings
 
 # ── In-process TTL cache ─────────────────────────────────────────────────────
 # slug → ({"id": str, "slug": str}, monotonic_timestamp)
@@ -160,6 +161,41 @@ async def get_current_admin_user(request: Request):
         raise HTTPException(status_code=401, detail="User not found or inactive.")
 
     return user
+
+
+async def require_super_admin(request: Request):
+    """
+    FastAPI dependency for Super Admin endpoints.
+
+    Accepts EITHER:
+      - Admin JWT (type='admin') with role='SUPER_ADMIN'
+      - Client JWT (type='client') whose slug matches settings.SUPER_ADMIN_SLUG
+        (used by the platform owner who logs in as a Client, not a User)
+
+    Raises 401 for missing/invalid token, 403 for wrong role.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Authorization header.")
+
+    payload = decode_token(auth_header[7:])
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    token_type = payload.get("type")
+
+    if token_type == "admin":
+        role = payload.get("role", "")
+        if role == "SUPER_ADMIN":
+            return payload
+        raise HTTPException(status_code=403, detail="SUPER_ADMIN role required.")
+
+    if token_type == "client":
+        if payload.get("slug") == settings.SUPER_ADMIN_SLUG:
+            return payload
+        raise HTTPException(status_code=403, detail="Platform owner access required.")
+
+    raise HTTPException(status_code=401, detail="Unrecognised token type.")
 
 
 def invalidate_tenant_cache(slug: str) -> None:

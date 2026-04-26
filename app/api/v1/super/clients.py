@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, field_validator
 
 from app.db.client import prisma_client
-from app.core.tenant import require_roles
+from app.core.tenant import require_super_admin
 from app.services import super_service
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class StatusUpdate(BaseModel):
 
 @router.get("/clients")
 async def list_clients(
-    _user=Depends(require_roles("SUPER_ADMIN")),
+    _user=Depends(require_super_admin),
 ):
     """Return all tenants with lifecycle metadata. SUPER_ADMIN only."""
     clients = await super_service.list_clients(prisma_client)
@@ -44,7 +44,7 @@ async def list_clients(
 async def update_client_status(
     client_id: str = Path(..., description="Client UUID"),
     body: StatusUpdate = ...,
-    _user=Depends(require_roles("SUPER_ADMIN")),
+    _user=Depends(require_super_admin),
 ):
     """Change a tenant's lifecycle status. SUPER_ADMIN only."""
     result = await super_service.update_client_status(prisma_client, client_id, body.status)

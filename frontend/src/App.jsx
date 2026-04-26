@@ -124,6 +124,15 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* ── Demo dashboard — auth subdomain + localhost (no tenant DNS needed) ── */}
+          {(IS_AUTH_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
+            <Route path="/demo/:slug/*" element={
+              <ProtectedRoute>
+                <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+              </ProtectedRoute>
+            } />
+          )}
+
           {/* ── Super Admin Control Room ── */}
           <Route path="/super/*" element={
             <ProtectedRoute>

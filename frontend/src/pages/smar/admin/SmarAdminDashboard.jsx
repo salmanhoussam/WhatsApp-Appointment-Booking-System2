@@ -2062,11 +2062,14 @@ export default function SmarAdminDashboard() {
   const navigate = useNavigate();
   const { slug, '*': urlTab } = useParams();
 
-  // Detect /admin vs /dashboard path to support both new and legacy routes
-  const _pathParts  = window.location.pathname.split('/').filter(Boolean);
+  // Detect route context: /demo/:slug/*, /:slug/admin/*, /admin/*, /dashboard/*
+  const _pathParts   = window.location.pathname.split('/').filter(Boolean);
+  const _isDemoPath  = _pathParts[0] === 'demo';
   const _isAdminPath = _pathParts[0] === 'admin' || _pathParts[1] === 'admin';
   const dashBase = slug
-    ? (_isAdminPath ? `/${slug}/admin` : `/dashboard/${slug}`)
+    ? (_isDemoPath  ? `/demo/${slug}`
+       : _isAdminPath ? `/${slug}/admin`
+       : `/dashboard/${slug}`)
     : (_isAdminPath ? '/admin' : '/dashboard');
 
   // Read active tab from URL wildcard segment
