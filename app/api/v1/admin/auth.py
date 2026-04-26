@@ -54,6 +54,8 @@ class ClientLoginResponse(BaseModel):
     client_name: str
     slug: str
     phone: str
+    status: str | None = None
+    trial_ends_at: str | None = None
     token_type: str = "bearer"
 
 
@@ -68,6 +70,8 @@ class UserLoginResponse(BaseModel):
     full_name: str
     role: str
     slug: str
+    status: str | None = None
+    trial_ends_at: str | None = None
     token_type: str = "bearer"
 
 
@@ -120,6 +124,11 @@ async def client_login(request: ClientLoginRequest, response: Response):
             client_name=client.name,
             slug=client.slug,
             phone=client.phone,
+            status=getattr(client, "status", None),
+            trial_ends_at=(
+                client.trial_ends_at.isoformat()
+                if getattr(client, "trial_ends_at", None) else None
+            ),
         )
 
     except HTTPException:
@@ -177,6 +186,11 @@ async def user_login(request: UserLoginRequest, response: Response):
             full_name=user.fullName,
             role=user.role,
             slug=user.client.slug,
+            status=getattr(user.client, "status", None),
+            trial_ends_at=(
+                user.client.trial_ends_at.isoformat()
+                if getattr(user.client, "trial_ends_at", None) else None
+            ),
         )
 
     except HTTPException:
@@ -277,6 +291,8 @@ async def register_tenant(request: TenantRegistrationRequest, response: Response
         "data": {
             "token":         token,
             "slug":          slug,
+            "status":        "trial",
+            "venue_type":    request.venue_type,
             "trial_ends_at": result["data"]["trial_ends_at"],
             "dashboard_url": result["data"]["dashboard_url"],
         },

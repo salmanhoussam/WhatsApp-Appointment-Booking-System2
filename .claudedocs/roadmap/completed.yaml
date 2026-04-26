@@ -1,8 +1,94 @@
 project: Smar 3D Scrollytelling Experience
-tenant: smar
-last_updated: 2026-04-20  # Session: Auth hotfixes A–D complete + blank public pages fixed.
+tenant: smar + SaaS PLG
+last_updated: 2026-04-26
 
 phases:
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 40 — SaaS Showcase + PLG Registration (2026-04-25 → 2026-04-26)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 40
+    name: "SaaS Showcase Phase 1 + PLG Self-Registration"
+    status: done
+    completed: 2026-04-26
+    description: |
+      مرحلتان مكتملتان:
+      A) ترحيل Home-Page-main إلى frontend/src/pages/showcase/
+      B) بناء API + Form لتسجيل Tenants جدد عبر auth.salmansaas.com
+
+    tasks:
+
+      - id: 40.1
+        name: "Showcase Phase 1 — Monorepo Migration"
+        status: done
+        completed: 2026-04-25
+        files:
+          - frontend/src/pages/showcase/pages/HomePage.jsx
+          - frontend/src/pages/showcase/pages/GeneralPrivacyPage.jsx
+          - frontend/src/pages/showcase/pages/PrivacyTermsPage.jsx
+          - frontend/src/pages/showcase/pages/SpecificPrivacyPage.jsx
+          - frontend/src/pages/showcase/showcase.css
+          - frontend/src/router/showcase.routes.jsx
+        details: |
+          - CSS Zero-Bleed: body[data-slug="showcase"] scoping
+          - ShowcaseLayout sets/removes data-slug attribute
+          - ShowcaseLanguageContext منفصل (localStorage key: showcaseLang)
+          - IS_SHOWCASE_DOMAIN routing في App.jsx
+
+      - id: 40.2
+        name: "PLG Backend — POST /api/v1/public/register (legacy)"
+        status: done
+        completed: 2026-04-25
+        files:
+          - app/repositories/registration_repo.py
+          - app/services/registration_service.py
+          - app/api/v1/public/registration.py
+        details: |
+          4-layer architecture: Route → Service → Repository → DB
+          Creates Client + TENANT_ADMIN User in one call.
+
+      - id: 40.3
+        name: "PLG Frontend — RegistrationPage.jsx"
+        status: done
+        completed: 2026-04-25
+        files:
+          - frontend/src/pages/showcase/pages/RegistrationPage.jsx
+          - frontend/src/pages/showcase/components/home/HeroSection.jsx
+          - frontend/src/pages/showcase/components/home/CTASection.jsx
+        details: |
+          Auto-slug generation, glassmorphism form, inline conflict errors.
+          HeroSection + CTASection: "Start for Free" CTAs added.
+
+      - id: 40.4
+        name: "Architecture Revision — Registration → Auth Subdomain"
+        status: done
+        completed: 2026-04-26
+        files:
+          - app/api/v1/admin/auth.py
+          - app/services/registration_service.py
+          - frontend/src/pages/auth/SSOLoginPage.jsx
+          - frontend/src/App.jsx
+          - frontend/src/pages/showcase/pages/RegistrationPage.jsx
+          - frontend/src/pages/showcase/components/home/HeroSection.jsx
+          - frontend/src/pages/showcase/components/home/CTASection.jsx
+          - prisma/schema.prisma
+          - prisma/migrations/add_trial_fields.sql
+        decisions:
+          - "Registration نُقل من /public إلى /auth — أوبريشن auth يُصدر JWT"
+          - "Business model: Managed Trial (14 يوم) لا Self-Service كامل"
+          - "venue_type → unit_types mapping في service"
+          - "Default currency: USD (لبنان)"
+          - "SSOLoginPage: dual-mode /login و /register"
+          - "SMART_REGISTER_URL: auth.salmansaas.com في prod، /register في dev"
+        bugs_fixed:
+          - "prisma.errors.DataError: config/features يجب json.dumps() لا Python dict"
+          - "CORS error وهمي — Starlette لا يُضيف CORS headers على 500 responses"
+        pending:
+          - "Supabase migration SQL لم يُنفَّذ بعد (add_trial_fields.sql)"
+          - "redirect بعد التسجيل لا يزال يذهب إلى {slug}.salmansaas.com → يُحل في Phase 41"
+
+
 
   - id: 1
     name: "State Management — The Bridge"

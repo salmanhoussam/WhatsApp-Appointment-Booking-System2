@@ -14,6 +14,7 @@ from app.api.v1.public import router as public_v1_router
 from app.api.v1.admin import router as admin_v1_router
 from app.api.v1.admin.auth import router as auth_router
 from app.api.v1.webhook import router as webhook_router
+from app.api.v1.super.clients import router as super_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ app.include_router(auth_router,    prefix="/api/v1/auth",    tags=["Authenticati
 app.include_router(webhook_router, prefix="/api/v1/webhook", tags=["Webhooks"])
 app.include_router(public_v1_router,  prefix="/api/v1/public")
 app.include_router(admin_v1_router,   prefix="/api/v1/admin")
+app.include_router(super_router,      prefix="/api/v1/super", tags=["Super Admin"])
 
 
 @app.get("/", tags=["Health"])

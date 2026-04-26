@@ -1957,6 +1957,93 @@ function UnitsTab() {
   );
 }
 
+// ─── Trial lifecycle UI ─────────────────────────────────────────────────────────
+
+function TrialBanner() {
+  const status  = localStorage.getItem('tenant_status');
+  const endsAt  = localStorage.getItem('trial_ends_at');
+  if (!status || status === 'active' || status === 'demo') return null;
+  const daysLeft = endsAt
+    ? Math.max(0, Math.ceil((new Date(endsAt) - Date.now()) / 86_400_000))
+    : null;
+  if (daysLeft === 0) return null; // shown by ExpiredModal instead
+  return (
+    <div style={{
+      marginBottom: 24,
+      padding: '10px 18px',
+      borderRadius: 12,
+      background: 'rgba(212,168,83,0.07)',
+      border: '1px solid rgba(212,168,83,0.25)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    }}>
+      <span style={{ color: C.gold, fontSize: 13, fontWeight: 600 }}>
+        ⏳ تجربتك المجانية تنتهي خلال{' '}
+        {daysLeft !== null ? `${daysLeft} يوم` : 'قريباً'}
+      </span>
+      <a
+        href="https://wa.me/96178727986?text=أريد تفعيل حسابي على SalmanSaaS"
+        target="_blank" rel="noreferrer"
+        style={{
+          padding: '6px 14px', borderRadius: 8,
+          background: 'rgba(212,168,83,0.15)',
+          border: '1px solid rgba(212,168,83,0.3)',
+          color: C.gold, fontSize: 12, fontWeight: 700,
+          textDecoration: 'none', whiteSpace: 'nowrap',
+        }}
+      >
+        تواصل معنا للتفعيل ←
+      </a>
+    </div>
+  );
+}
+
+function ExpiredModal() {
+  const status  = localStorage.getItem('tenant_status');
+  const endsAt  = localStorage.getItem('trial_ends_at');
+  const daysLeft = endsAt
+    ? Math.ceil((new Date(endsAt) - Date.now()) / 86_400_000)
+    : null;
+  const show = status === 'expired' || (daysLeft !== null && daysLeft <= 0);
+  if (!show) return null;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      backdropFilter: 'blur(16px) brightness(0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(10,10,15,0.75)',
+    }}>
+      <div style={{
+        maxWidth: 400, width: '90%',
+        background: 'hsl(240 8% 9%)',
+        border: '1px solid rgba(212,168,83,0.2)',
+        borderRadius: 20, padding: '40px 32px',
+        textAlign: 'center', boxShadow: '0 40px 80px rgba(0,0,0,0.8)',
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ color: C.textPri, fontSize: 22, fontWeight: 800, margin: '0 0 10px' }}>
+          انتهت فترة التجربة
+        </h2>
+        <p style={{ color: C.textMuted, fontSize: 14, lineHeight: 1.7, margin: '0 0 28px' }}>
+          لقد انتهت تجربتك المجانية. تواصل معنا لتفعيل حسابك والاستمرار في استخدام المنصة.
+        </p>
+        <a
+          href="https://wa.me/96178727986?text=أريد تفعيل حسابي على SalmanSaaS"
+          target="_blank" rel="noreferrer"
+          style={{
+            display: 'block', width: '100%', padding: '13px 0',
+            borderRadius: 12, textDecoration: 'none',
+            background: 'linear-gradient(135deg, #d4a853 0%, #b8892e 100%)',
+            color: '#0a0a0f', fontWeight: 700, fontSize: 14,
+            boxShadow: '0 4px 22px rgba(212,168,83,0.3)',
+          }}
+        >
+          تواصل معنا عبر واتساب
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 function UnauthorizedTab() {
   return (
@@ -1975,8 +2062,12 @@ export default function SmarAdminDashboard() {
   const navigate = useNavigate();
   const { slug, '*': urlTab } = useParams();
 
-  // Derive base path: subdomain → /dashboard, localhost → /dashboard/smar
-  const dashBase = slug ? `/dashboard/${slug}` : '/dashboard';
+  // Detect /admin vs /dashboard path to support both new and legacy routes
+  const _pathParts  = window.location.pathname.split('/').filter(Boolean);
+  const _isAdminPath = _pathParts[0] === 'admin' || _pathParts[1] === 'admin';
+  const dashBase = slug
+    ? (_isAdminPath ? `/${slug}/admin` : `/dashboard/${slug}`)
+    : (_isAdminPath ? '/admin' : '/dashboard');
 
   // Read active tab from URL wildcard segment
   const tabFromUrl = urlTab?.split('/')[0];
@@ -2037,6 +2128,7 @@ export default function SmarAdminDashboard() {
 
       {/* Main content */}
       <div style={{ flex: 1, padding: '40px 48px', overflowY: 'auto' }}>
+        <TrialBanner />
         {/* Top bar */}
         <div style={{
           display:        'flex',
@@ -2104,6 +2196,7 @@ export default function SmarAdminDashboard() {
           </motion.div>
         </AnimatePresence>
       </div>
+      <ExpiredModal />
     </div>
   );
 }

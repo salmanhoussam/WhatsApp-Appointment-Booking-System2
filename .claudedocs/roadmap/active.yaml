@@ -1,9 +1,112 @@
 project: Smar 3D Scrollytelling Experience
-tenant: smar
-last_updated: 2026-04-24
-# split from phases_roadmap.yaml on 2026-04-24
+tenant: smar + SaaS PLG
+last_updated: 2026-04-26
 
 phases:
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 41 — Trial Dashboard on auth subdomain (2026-04-26)
+  # بدلاً من subdomain جديد لكل زبون، نخدم الـ dashboard على auth.salmansaas.com
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 41
+    name: "PLG — Trial Dashboard Without New Subdomain"
+    status: done
+    completed: 2026-04-26
+    priority: critical
+    agent: Frontend-Architect-Agent
+    description: |
+      بعد التسجيل، الـ redirect يذهب إلى {slug}.salmansaas.com/dashboard
+      لكن هذا الـ DNS غير موجود. الحل: خدمة الـ dashboard على auth.salmansaas.com/demo/{venue_type}/{slug}.
+      يلغي الحاجة لإنشاء subdomain DNS لكل زبون trial.
+
+    redirect_change:
+      before: "https://{slug}.salmansaas.com/dashboard/units?token=..."
+      after:  "https://auth.salmansaas.com/demo/{venue_type}/{slug}/units?token=..."
+
+    tasks:
+
+      - id: 41.1
+        name: "Backend — أضف venue_type في register response"
+        file: "app/api/v1/admin/auth.py"
+        status: done
+        details: |
+          في register_tenant() endpoint، أضف venue_type في الـ return:
+            return {
+              "success": True,
+              "data": {
+                "token":         token,
+                "slug":          slug,
+                "venue_type":    request.venue_type,   ← NEW
+                "trial_ends_at": result["data"]["trial_ends_at"],
+                "dashboard_url": f"https://auth.salmansaas.com/demo/{request.venue_type}/{slug}",
+              },
+            }
+
+      - id: 41.2
+        name: "Frontend — SSOLoginPage: بدّل redirect بعد التسجيل"
+        file: "frontend/src/pages/auth/SSOLoginPage.jsx"
+        status: done
+        details: |
+          في handleRegister()، بعد النجاح:
+            const { token, slug: s, venue_type } = data.data;
+            window.location.href = import.meta.env.PROD
+              ? `https://auth.salmansaas.com/demo/${venue_type}/${s}/units?token=${token}`
+              : `http://localhost:5173/demo/${venue_type}/${s}/units?token=${token}`;
+
+      - id: 41.3
+        name: "Frontend — App.jsx: أضف /admin/* و /:slug/admin/* routes"
+        file: "frontend/src/App.jsx"
+        status: done
+        details: |
+          إضافة تحت الـ IS_AUTH_SUBDOMAIN routes:
+            {IS_AUTH_SUBDOMAIN && (
+              <Route path="/demo/:venue_type/:slug/*" element={
+                <ProtectedRoute>
+                  <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+                </ProtectedRoute>
+              } />
+            )}
+          ملاحظة: SmarAdminDashboard يقرأ slug من JWT — يعمل لأي tenant.
+
+      - id: 41.4
+        name: "DB Migration — تنفيذ SQL على Supabase"
+        status: pending_manual
+        details: |
+          SQL جاهز في: prisma/migrations/add_trial_fields.sql
+          يُنفَّذ من Supabase SQL Editor:
+            ALTER TABLE clients
+              ADD COLUMN IF NOT EXISTS status        VARCHAR(20)  NOT NULL DEFAULT 'trial',
+              ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ,
+              ADD COLUMN IF NOT EXISTS service_type  VARCHAR(50)  DEFAULT 'real_estate',
+              ADD COLUMN IF NOT EXISTS notes         TEXT;
+            UPDATE clients SET status = 'demo' WHERE slug = 'smar';
+
+      - id: 41.5
+        name: "SmarAdminDashboard — TrialBanner + ExpiredModal + dashBase fix"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          التحقق أن الـ dashboard يقرأ slug من:
+            1. ?token= query param (ProtectedRoute يحفظه في localStorage)
+            2. JWT payload → slug field
+          وليس من window.location.pathname فقط.
+          إذا كان يقرأ من الـ URL path — يجب تعديله ليقرأ من JWT.
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 40.5 — Supabase Migration Pending (blocking 41)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 40.5
+    name: "Run Supabase Migration — add_trial_fields"
+    status: pending_manual
+    priority: critical
+    description: |
+      يجب تنفيذ migration SQL على Supabase قبل أن يعمل register بشكل كامل.
+      الملف جاهز: prisma/migrations/add_trial_fields.sql
+    blocker_for: [41]
+
+
 
   # ── ACTIVE: Phase 35 — Backend Config + Smar Migration ─────────────────
 

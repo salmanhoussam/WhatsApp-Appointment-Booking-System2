@@ -26,6 +26,7 @@ import { LanguageProvider } from './context/LanguageContext';
 const SmarAdminDashboard = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
 const SSOLoginPage        = lazy(() => import('./pages/auth/SSOLoginPage'));
 const ShowcaseRoutes      = lazy(() => import('./router/showcase.routes'));
+const ClientsManager      = lazy(() => import('./pages/super-admin/ClientsManager'));
 
 // Detect subdomain mode at module scope (stable across renders)
 const _h = window.location.hostname;
@@ -94,7 +95,15 @@ function App() {
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Navigate to="/" replace />
           } />
-          {/* Subdomain mode: smar.domain.com/dashboard/units  (no slug in path) */}
+          {/* Subdomain mode: smar.domain.com/admin/units  (no slug in path) */}
+          {IS_SUBDOMAIN_MODE && (
+            <Route path="/admin/*" element={
+              <ProtectedRoute>
+                <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+              </ProtectedRoute>
+            } />
+          )}
+          {/* Subdomain mode legacy: smar.domain.com/dashboard/units */}
           {IS_SUBDOMAIN_MODE && (
             <Route path="/dashboard/*" element={
               <ProtectedRoute>
@@ -102,10 +111,23 @@ function App() {
               </ProtectedRoute>
             } />
           )}
-          {/* Localhost/multi-tenant mode: domain.com/dashboard/smar/units */}
+          {/* Localhost: domain.com/:slug/admin/units */}
+          <Route path="/:slug/admin/*" element={
+            <ProtectedRoute>
+              <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+            </ProtectedRoute>
+          } />
+          {/* Localhost legacy: domain.com/dashboard/smar/units */}
           <Route path="/dashboard/:slug/*" element={
             <ProtectedRoute>
               <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+            </ProtectedRoute>
+          } />
+
+          {/* ── Super Admin Control Room ── */}
+          <Route path="/super/*" element={
+            <ProtectedRoute>
+              <Suspense fallback={null}><ClientsManager /></Suspense>
             </ProtectedRoute>
           } />
 
