@@ -250,8 +250,10 @@ export default function SSOLoginPage() {
           opts,
         ));
       } catch (err) {
-        const msg = err?.response?.data?.detail || err?.response?.data?.error;
-        setError(msg || 'بيانات الدخول غير صحيحة. يرجى المحاولة مرة أخرى.');
+        const raw = err?.response?.data;
+        const rawMsg = raw?.detail || raw?.error?.message || raw?.message;
+        const msg = typeof rawMsg === 'string' ? rawMsg : 'بيانات الدخول غير صحيحة. يرجى المحاولة مرة أخرى.';
+        setError(msg);
         setLoading(false);
         return;
       }
