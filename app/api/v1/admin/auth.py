@@ -9,11 +9,11 @@ Two login flows:
 
 import logging
 import re
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.db.client import prisma_client
-from app.core.security import verify_password, create_access_token
+from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.config import settings
 from app.services import registration_service as _reg_service
 
@@ -241,6 +241,62 @@ class TenantRegistrationRequest(BaseModel):
         if not re.match(r"^\+?[0-9]{7,15}$", normalized):
             raise ValueError("Enter a valid phone number (7–15 digits, optional + prefix).")
         return normalized
+
+
+@router.post("/create-user", tags=["Authentication"])
+async def create_platform_user(
+    payload: dict,
+    x_setup_key: str | None = Header(default=None),
+):
+    """
+    One-time route to seed admin User accounts in production without SSH.
+    Protected by SECRET_KEY — only the platform owner can call it.
+
+    POST /api/v1/auth/create-user
+    Headers: X-Setup-Key: <SECRET_KEY value from Railway env>
+    Body: { "email": "...", "password": "...", "role": "SUPER_ADMIN|TENANT_ADMIN", "full_name": "..." }
+    """
+    if x_setup_key != settings.SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid setup key.")
+
+    email     = payload.get("email", "").strip()
+    password  = payload.get("password", "")
+    role      = payload.get("role", "TENANT_ADMIN")
+    full_name = payload.get("full_name") or email.split("@")[0].title()
+
+    valid_roles = {"SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS"}
+    if role not in valid_roles:
+        raise HTTPException(status_code=422, detail=f"Invalid role. Choose: {sorted(valid_roles)}")
+    if not email or len(password) < 8:
+        raise HTTPException(status_code=422, detail="email required, password >= 8 chars.")
+
+    owner_slug = getattr(settings, "SUPER_ADMIN_SLUG", "smar")
+    owner = await prisma_client.client.find_unique(where={"slug": owner_slug})
+    if not owner:
+        raise HTTPException(status_code=500, detail=f"Platform owner client '{owner_slug}' not found.")
+
+    existing = await prisma_client.user.find_unique(where={"email": email})
+    if existing:
+        await prisma_client.user.update(
+            where={"email": email},
+            data={
+                "password_hash": get_password_hash(password),
+                "role": role,
+                "isActive": True,
+                "fullName": full_name,
+            },
+        )
+        return {"action": "updated", "email": email, "role": role}
+
+    await prisma_client.user.create(data={
+        "clientId":      owner.id,
+        "email":         email,
+        "password_hash": get_password_hash(password),
+        "fullName":      full_name,
+        "role":          role,
+        "isActive":      True,
+    })
+    return {"action": "created", "email": email, "role": role}
 
 
 @router.post("/register", tags=["Authentication"])

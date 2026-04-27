@@ -235,16 +235,18 @@ export default function SSOLoginPage() {
     const opts = { withCredentials: true };
     let data = null;
     try {
+      // User (staff/admin) login first — so SUPER_ADMIN always gets the right JWT
       ({ data } = await axios.post(
-        `${API_BASE}/api/v1/auth/login`,
-        { identifier, password: loginPass },
+        `${API_BASE}/api/v1/auth/users/login`,
+        { email: identifier, password: loginPass },
         opts,
       ));
     } catch {
       try {
+        // Fall back to client (tenant root) login for slug/phone/email identifiers
         ({ data } = await axios.post(
-          `${API_BASE}/api/v1/auth/users/login`,
-          { email: identifier, password: loginPass },
+          `${API_BASE}/api/v1/auth/login`,
+          { identifier, password: loginPass },
           opts,
         ));
       } catch (err) {
