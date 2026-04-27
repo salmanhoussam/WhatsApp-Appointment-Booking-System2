@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(python -m scripts.create_super_admin --password admin123456)",
+      "Bash(python -m scripts.create_admin_user --email admin@salmansaas.com --role TENANT_ADMIN --name \"Smar Admin\" --password admin123456)"
+    ]
+  }
+}
