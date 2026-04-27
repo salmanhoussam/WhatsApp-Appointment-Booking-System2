@@ -1,3 +1,12 @@
-// Moved to src/pages/smar/showcase/SmarShowcasePage.jsx
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTenantBase } from '../../../utils/useTenantSlug';
+
 export const LanguageContext = { t: {} };
-export default function SpatialHomePage() { return null; }
+
+export default function SpatialHomePage() {
+  const navigate = useNavigate();
+  const base = useTenantBase();
+  useEffect(() => { navigate(`${base}/listings`, { replace: true }); }, [navigate, base]);
+  return null;
+}

@@ -20,6 +20,7 @@ import ActionInbox  from './components/ActionInbox';
 import SettingsTab  from './components/SettingsTab';
 import TeamTab      from './components/TeamTab';
 import ServicesTab  from './components/ServicesTab';
+import GalleryTab   from './components/GalleryTab';
 import VisualBuilder from './VisualBuilder';
 import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../utils/useAdminRole';
 
@@ -222,17 +223,18 @@ function GardensTab() {
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ activeTab, setActiveTab, onLogout, isExpanded, setIsExpanded, role, slug }) {
   const ALL_NAV = [
-    { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'  },
-    { id: 'bookings',     icon: '📋', label: 'Reservations'  },
-    { id: 'units',        icon: '🏠', label: 'الوحدات'       },
+    { id: 'inbox',        icon: '🛎️', label: 'Action Inbox'     },
+    { id: 'bookings',     icon: '📋', label: 'Reservations'     },
+    { id: 'units',        icon: '🏠', label: 'الوحدات'          },
+    { id: 'gallery',      icon: '🖼️', label: 'معرض الصور'       },
     { id: 'services',     icon: '✨', label: 'الخدمات الإضافية' },
-    { id: 'dashboard',    icon: '📊', label: 'Overview'      },
-    { id: 'housekeeping', icon: '🧹', label: 'Housekeeping'  },
-    { id: 'maintenance',  icon: '🔧', label: 'Maintenance'   },
-    { id: 'gardens',      icon: '🌿', label: 'Gardens'       },
-    { id: 'settings',     icon: '⚙️', label: 'إعدادات المنصة' },
-    { id: 'pagebuilder',  icon: '🎨', label: 'Page Builder'   },
-    { id: 'team',         icon: '👥', label: 'إدارة الفريق'  },
+    { id: 'dashboard',    icon: '📊', label: 'Overview'         },
+    { id: 'housekeeping', icon: '🧹', label: 'Housekeeping'     },
+    { id: 'maintenance',  icon: '🔧', label: 'Maintenance'      },
+    { id: 'gardens',      icon: '🌿', label: 'Gardens'          },
+    { id: 'settings',     icon: '⚙️', label: 'إعدادات المنصة'  },
+    { id: 'pagebuilder',  icon: '🎨', label: 'Page Builder'      },
+    { id: 'team',         icon: '👥', label: 'إدارة الفريق'     },
   ];
   const navItems = ALL_NAV.filter(item => canAccessTab(role, item.id));
   return (
@@ -2109,6 +2111,7 @@ export default function SmarAdminDashboard() {
     if (activeTab === 'inbox')        return <ActionInbox     />;
     if (activeTab === 'bookings')     return <BookingsTab     />;
     if (activeTab === 'units')        return <UnitsTab        />;
+    if (activeTab === 'gallery')      return <GalleryTab      />;
     if (activeTab === 'services')     return <ServicesTab     />;
     if (activeTab === 'dashboard')    return <OverviewTab     />;
     if (activeTab === 'housekeeping') return <HousekeepingTab />;
@@ -2159,6 +2162,7 @@ export default function SmarAdminDashboard() {
                 inbox:        '🛎️ Action Inbox',
                 bookings:     'Reservations',
                 units:        'الوحدات — Unit Management',
+                gallery:      '🖼️ معرض الصور — Gallery Manager',
                 services:     '✨ الخدمات الإضافية',
                 dashboard:    'Overview',
                 housekeeping: 'Housekeeping',

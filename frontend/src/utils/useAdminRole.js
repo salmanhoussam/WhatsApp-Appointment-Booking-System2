@@ -21,10 +21,10 @@ export function useAdminRole() {
 
 // Role permission map — which tabs each role can access
 export const ROLE_TABS = {
-  SUPER_ADMIN:          ['inbox', 'bookings', 'units', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens', 'settings', 'pagebuilder', 'team'],
-  TENANT_ADMIN:         ['inbox', 'bookings', 'units', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens', 'settings', 'pagebuilder', 'team'],
+  SUPER_ADMIN:          ['inbox', 'bookings', 'units', 'gallery', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens', 'settings', 'pagebuilder', 'team'],
+  TENANT_ADMIN:         ['inbox', 'bookings', 'units', 'gallery', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens', 'settings', 'pagebuilder', 'team'],
   MANAGER_RESERVATIONS: ['inbox', 'bookings', 'dashboard', 'housekeeping', 'maintenance', 'gardens'],
-  MANAGER_UNITS:        ['units', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens'],
+  MANAGER_UNITS:        ['units', 'gallery', 'services', 'dashboard', 'housekeeping', 'maintenance', 'gardens'],
 };
 
 export function canAccessTab(role, tabId) {
