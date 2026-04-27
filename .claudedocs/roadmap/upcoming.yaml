@@ -419,8 +419,13 @@ atomic_architecture_rules:
 
   - id: 44
     name: "Admin Permissions — SUPER_ADMIN / TENANT_ADMIN / Staff Roles"
-    status: planned
+    status: partial  # 44.1-44.4 done (2026-04-27). 44.5 settings placeholder, 44.6 n8n pending
     priority: high
+    completed_tasks:
+      - "44.1: SUPER_ADMIN redirect guard in SmarAdminDashboard"
+      - "44.2: TeamTab role enum fix (admin→TENANT_ADMIN, manager→MANAGER_*)"
+      - "44.3: Slug fallback from getTenantSlug() on subdomain mode"
+      - "44.4: TeamTab + SettingsTab placeholder cleanup"
     agent: backend-architect
     description: |
       تصحيح وبناء نظام الصلاحيات الكامل.
@@ -565,3 +570,71 @@ atomic_architecture_rules:
       - "44.6 Phase مستقل بعد استقرار الباقي"
 
     estimated_effort: "44.1-44.3: ساعة واحدة | 44.4-44.5: 30 دقيقة | 44.6: Phase كامل"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 45: Gallery Admin Tab + Login System Finalization
+# منجز: 2026-04-27
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 45
+    name: "Gallery Admin Tab + Two-Account Login System"
+    status: done
+    completed_at: "2026-04-27"
+    commit: "a940d7e (gallery tab) + DB scripts"
+    description: |
+      إنشاء تبويب إدارة معرض الصور في لوحة الأدمن،
+      وإصلاح نظام تسجيل الدخول بحسابين منفصلين من auth.salmansaas.com.
+
+    tasks_done:
+
+      - id: 45.1
+        name: "GalleryTab.jsx — تبويب معرض الصور"
+        file: "frontend/src/pages/smar/admin/components/GalleryTab.jsx"
+        status: done
+        details: |
+          Unit pill selector (اختيار الوحدة)
+          Upload dropzone: drag-drop + multi-file + validation
+          Image grid: hover controls → span toggle (small/hero) + hide/show + delete
+          API: GET/POST /admin/gallery/{unit_id} + PATCH/DELETE /admin/gallery/images/{id}
+
+      - id: 45.2
+        name: "SmarAdminDashboard — wire gallery tab"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          gallery أضيف للـ ALL_NAV (بين units و services)
+          renderTab case + title map محدّثان
+
+      - id: 45.3
+        name: "useAdminRole — ROLE_TABS updated"
+        file: "frontend/src/utils/useAdminRole.js"
+        status: done
+        details: |
+          gallery أضيف لـ: SUPER_ADMIN, TENANT_ADMIN, MANAGER_UNITS
+
+      - id: 45.4
+        name: "SpatialHomePage — fix null render"
+        file: "frontend/src/pages/smar/spatial/SpatialHomePage.jsx"
+        status: done
+        details: "كانت ترجع null (blank page) → redirect لـ /${base}/listings"
+
+      - id: 45.5
+        name: "Two-Account Login — DB setup"
+        status: done
+        details: |
+          salman@salmansaas.com → SUPER_ADMIN → /super/clients
+          admin@salmansaas.com  → TENANT_ADMIN → smar.salmansaas.com/admin
+          smar status = 'demo' → redirect يذهب للـ subdomain مباشرة
+          SSOLoginPage.resolveRedirect تغطي كلا الحالتين بدون تعديل
+
+      - id: 45.6
+        name: "scripts/create_admin_user.py — general purpose"
+        file: "scripts/create_admin_user.py"
+        status: done
+        details: |
+          يقبل --email --role --password
+          يطبع الـ redirect المتوقع بعد الـ login
+          يستخدم DIRECT_URL لتجاوز pgbouncer
+
+    next_phase: "Phase 43 (Google Sheets CRM) — بعد 43.1 manual setup"
