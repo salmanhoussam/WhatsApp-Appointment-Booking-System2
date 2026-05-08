@@ -22,6 +22,12 @@ const glass = {
   borderRadius: 14, padding: 24,
 }
 
+const sectionTitle = {
+  fontSize: 15, fontWeight: 600,
+  color: 'rgba(255,255,255,0.8)',
+  marginBottom: 14,
+}
+
 function Field({ label, children, hint }) {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -33,15 +39,19 @@ function Field({ label, children, hint }) {
 }
 
 export default function SettingsTab({ settings, onUpdated, color }) {
+  const existingHero = settings?.config?.hero ?? {}
   const [form, setForm] = useState({
-    name_ar:         settings?.name_ar         ?? '',
-    name_en:         settings?.name_en         ?? '',
-    primary_color:   settings?.primary_color   ?? '#6366f1',
-    whatsapp_number: settings?.whatsapp_number ?? '',
+    name_ar:          settings?.name_ar         ?? '',
+    name_en:          settings?.name_en         ?? '',
+    primary_color:    settings?.primary_color   ?? '#6366f1',
+    whatsapp_number:  settings?.whatsapp_number ?? '',
+    hero_title_ar:    existingHero.title_ar     ?? '',
+    hero_subtitle_ar: existingHero.subtitle_ar  ?? '',
+    hero_cta_ar:      existingHero.cta_ar       ?? '',
   })
-  const [saving, setSaving]   = useState(false)
+  const [saving,  setSaving]  = useState(false)
   const [success, setSuccess] = useState(false)
-  const [error, setError]     = useState(null)
+  const [error,   setError]   = useState(null)
 
   const handleChange = (key) => (e) => {
     setForm(p => ({ ...p, [key]: e.target.value }))
@@ -53,8 +63,22 @@ export default function SettingsTab({ settings, onUpdated, color }) {
     setSaving(true)
     setError(null)
     try {
-      await adminApi.patch('/settings', form)
-      onUpdated(prev => ({ ...prev, ...form }))
+      const payload = {
+        name_ar:         form.name_ar,
+        name_en:         form.name_en,
+        primary_color:   form.primary_color,
+        whatsapp_number: form.whatsapp_number,
+        config: {
+          ...(settings?.config ?? {}),
+          hero: {
+            title_ar:    form.hero_title_ar    || undefined,
+            subtitle_ar: form.hero_subtitle_ar || undefined,
+            cta_ar:      form.hero_cta_ar      || undefined,
+          },
+        },
+      }
+      await adminApi.patch('/settings', payload)
+      onUpdated(prev => ({ ...prev, ...payload }))
       setSuccess(true)
     } catch (err) {
       setError(err?.response?.data?.detail ?? 'حدث خطأ أثناء الحفظ')
@@ -65,12 +89,11 @@ export default function SettingsTab({ settings, onUpdated, color }) {
 
   return (
     <div style={{ maxWidth: 560 }}>
-      <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 20 }}>
-        إعدادات المتجر
-      </div>
 
-      <div style={glass}>
-        <Field label="اسم المتجر (عربي)" >
+      {/* ── Branding ──────────────────────────────────────────────────── */}
+      <div style={{ ...sectionTitle, marginBottom: 14 }}>إعدادات المتجر</div>
+      <div style={{ ...glass, marginBottom: 20 }}>
+        <Field label="اسم المتجر (عربي)">
           <input style={inputStyle} value={form.name_ar} onChange={handleChange('name_ar')} placeholder="مثال: متجر لايلى" />
         </Field>
 
@@ -78,7 +101,7 @@ export default function SettingsTab({ settings, onUpdated, color }) {
           <input style={inputStyle} value={form.name_en} onChange={handleChange('name_en')} placeholder="e.g. Layla Store" />
         </Field>
 
-        <Field label="رقم واتساب" hint="للتواصل مع الزبائن — بدون مسافات مثال: 96170123456">
+        <Field label="رقم واتساب" hint="بدون مسافات — مثال: 96170123456">
           <input style={inputStyle} value={form.whatsapp_number} onChange={handleChange('whatsapp_number')} placeholder="96170123456" dir="ltr" />
         </Field>
 
@@ -108,35 +131,51 @@ export default function SettingsTab({ settings, onUpdated, color }) {
             }} />
           </div>
         </Field>
-
-        {/* Feedback */}
-        {error && (
-          <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', color: '#ff8080', fontSize: 13, marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
-        {success && (
-          <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(80,200,120,0.1)', border: '1px solid rgba(80,200,120,0.2)', color: '#60d080', fontSize: 13, marginBottom: 16 }}>
-            تم حفظ الإعدادات بنجاح
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            width: '100%', padding: '12px 0', borderRadius: 10,
-            background: color, border: 'none',
-            color: '#fff', fontSize: 14, fontWeight: 600,
-            fontFamily: "'Cairo', sans-serif",
-            cursor: saving ? 'wait' : 'pointer',
-            opacity: saving ? 0.7 : 1,
-            transition: 'opacity 0.2s',
-          }}
-        >
-          {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
-        </button>
       </div>
+
+      {/* ── Hero Section ──────────────────────────────────────────────── */}
+      <div style={{ ...sectionTitle, marginBottom: 14 }}>قسم الـ Hero</div>
+      <div style={{ ...glass, marginBottom: 20 }}>
+        <Field label="عنوان الصفحة (اختياري)" hint="يظهر بدلاً من اسم المتجر في الصفحة العامة">
+          <input style={inputStyle} value={form.hero_title_ar} onChange={handleChange('hero_title_ar')} placeholder="مثال: اكتشف عالم الأناقة" />
+        </Field>
+
+        <Field label="نص توضيحي (اختياري)" hint="وصف قصير يظهر تحت العنوان">
+          <input style={inputStyle} value={form.hero_subtitle_ar} onChange={handleChange('hero_subtitle_ar')} placeholder="مثال: أجمل المنتجات بأفضل الأسعار" />
+        </Field>
+
+        <Field label="نص زر التواصل (اختياري)" hint='افتراضي: "تواصل معنا"'>
+          <input style={inputStyle} value={form.hero_cta_ar} onChange={handleChange('hero_cta_ar')} placeholder="تواصل معنا" />
+        </Field>
+      </div>
+
+      {/* ── Feedback + Save ───────────────────────────────────────────── */}
+      {error && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', color: '#ff8080', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(80,200,120,0.1)', border: '1px solid rgba(80,200,120,0.2)', color: '#60d080', fontSize: 13, marginBottom: 16 }}>
+          تم حفظ الإعدادات بنجاح
+        </div>
+      )}
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        style={{
+          width: '100%', padding: '12px 0', borderRadius: 10,
+          background: color, border: 'none',
+          color: '#fff', fontSize: 14, fontWeight: 600,
+          fontFamily: "'Cairo', sans-serif",
+          cursor: saving ? 'wait' : 'pointer',
+          opacity: saving ? 0.7 : 1,
+          transition: 'opacity 0.2s',
+        }}
+      >
+        {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
+      </button>
     </div>
   )
 }

@@ -2,8 +2,10 @@ import { motion } from 'framer-motion';
 
 // ── SimpleHero — page_type === 'normal' ──────────────────────────────────────
 function SimpleHero({ config }) {
-  const accent = config?.primary_color || '#6d28d9';
-  const name   = config?.name_ar || config?.name_en || '';
+  const accent   = config?.primary_color || '#6d28d9';
+  const hero     = config?.config?.hero ?? {};
+  const title    = hero.title_ar    || config?.name_ar    || config?.name_en    || '';
+  const subtitle = hero.subtitle_ar || config?.service_type?.replace('_', ' ') || '';
 
   return (
     <div style={{
@@ -53,17 +55,18 @@ function SimpleHero({ config }) {
           lineHeight: 1.15,
           direction: 'rtl',
         }}>
-          {name}
+          {title}
         </h1>
 
-        {config?.service_type && (
+        {subtitle && (
           <p style={{
-            margin: 0, fontSize: 14,
+            margin: 0, fontSize: 15,
             color: 'rgba(255,255,255,0.4)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
+            maxWidth: 480,
+            lineHeight: 1.6,
+            direction: 'rtl',
           }}>
-            {config.service_type.replace('_', ' ')}
+            {subtitle}
           </p>
         )}
 
@@ -85,7 +88,7 @@ function SimpleHero({ config }) {
               letterSpacing: '0.04em',
             }}
           >
-            تواصل معنا
+            {hero.cta_ar || 'تواصل معنا'}
           </motion.a>
         )}
       </motion.div>
@@ -95,8 +98,10 @@ function SimpleHero({ config }) {
 
 // ── ShowcaseHero — page_type === 'showcase' ───────────────────────────────────
 function ShowcaseHero({ config }) {
-  const accent = config?.primary_color || '#6d28d9';
-  const name   = config?.name_ar || config?.name_en || '';
+  const accent   = config?.primary_color || '#6d28d9';
+  const hero     = config?.config?.hero ?? {};
+  const title    = hero.title_ar    || config?.name_ar    || config?.name_en    || '';
+  const subtitle = hero.subtitle_ar || null;
 
   return (
     <div style={{
@@ -136,18 +141,16 @@ function ShowcaseHero({ config }) {
           letterSpacing: '-0.04em',
           lineHeight: 1.1,
         }}>
-          {name}
+          {title}
         </h1>
 
-        {config?.service_type && (
+        {subtitle && (
           <p style={{
-            margin: 0, fontSize: 13,
-            color: `${accent}bb`,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            fontWeight: 600,
+            margin: 0, fontSize: 15,
+            color: 'rgba(255,255,255,0.5)',
+            lineHeight: 1.7, maxWidth: 360,
           }}>
-            {config.service_type.replace('_', ' ')}
+            {subtitle}
           </p>
         )}
 
@@ -170,7 +173,7 @@ function ShowcaseHero({ config }) {
               letterSpacing: '0.04em',
             }}
           >
-            ابدأ الآن
+            {hero.cta_ar || 'ابدأ الآن'}
             <span style={{ fontSize: 18 }}>←</span>
           </motion.a>
         )}
