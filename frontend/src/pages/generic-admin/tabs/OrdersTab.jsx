@@ -227,6 +227,102 @@ function PagBtn({ label, disabled, onClick, color }) {
   )
 }
 
+// ── Mobile skeleton ───────────────────────────────────────────────────────────
+function MobileCardSkeleton({ rows = 5 }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ ...glass, padding: '14px 16px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ height: 14, width: 120, borderRadius: 4, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+              <div style={{ height: 11, width: 90,  borderRadius: 4, background: 'rgba(255,255,255,0.04)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+            </div>
+            <div style={{ height: 22, width: 72, borderRadius: 20, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ height: 12, width: 100, borderRadius: 4, background: 'rgba(255,255,255,0.04)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+            <div style={{ height: 14, width: 60,  borderRadius: 4, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
+// ── Mobile order card ─────────────────────────────────────────────────────────
+function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color, currency }) {
+  return (
+    <div style={{ ...glass, padding: '14px 16px', marginBottom: 10 }}>
+      {/* Top: customer + status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
+            {order.customer_name || '—'}
+          </div>
+          {order.customer_phone && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', direction: 'ltr', marginTop: 2 }}>
+              {order.customer_phone}
+            </div>
+          )}
+        </div>
+        <StatusCell order={order} moduleKey={moduleKey} onUpdate={onUpdate} />
+      </div>
+
+      {/* Bottom: date + total + expand */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+          {fmtDate(order.created_at)}{order.created_at ? ` · ${fmtTime(order.created_at)}` : ''}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontWeight: 700, color, fontSize: 14, whiteSpace: 'nowrap' }}>
+            {fmtPrice(order.total_price, currency)}
+          </span>
+          <button
+            onClick={onExpand}
+            style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${expanded ? `${color}44` : 'rgba(255,255,255,0.1)'}`,
+              color: expanded ? color : 'rgba(255,255,255,0.4)',
+              cursor: 'pointer', fontSize: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {expanded ? '▲' : '▼'}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded: items + extra fields */}
+      {expanded && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          {order.items?.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {order.items.map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+                  <span>× {item.quantity} عنصر</span>
+                  <span>{fmtPrice(item.unit_price, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {order.table_number    && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>طاولة: {order.table_number}</div>}
+          {order.payment_method  && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>الدفع: {order.payment_method}</div>}
+          {order.notes           && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>ملاحظة: {order.notes}</div>}
+          {order.shipping_address && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+              الشحن: {typeof order.shipping_address === 'object'
+                ? Object.values(order.shipping_address).filter(Boolean).join('، ')
+                : order.shipping_address}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Skeleton loader ───────────────────────────────────────────────────────────
 function TableSkeleton({ rows = 5 }) {
   return (
@@ -260,7 +356,14 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
   const [sortDir,      setSortDir]      = useState('desc')
   const [page,         setPage]         = useState(1)
   const [expandedId,   setExpandedId]   = useState(null)
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const mountedRef = useRef(true)
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => () => { mountedRef.current = false }, [])
 
@@ -332,18 +435,37 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
     <div style={{ direction: 'rtl', fontFamily: "'Cairo', sans-serif" }}>
 
       {/* ── Filter bar ─────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row' }}>
 
-        {/* Search */}
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="بحث بالاسم أو الهاتف..."
-          style={{ ...inputStyle, flex: '1 1 180px', maxWidth: 280 }}
-        />
+        {/* Search + Refresh row on mobile */}
+        <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="بحث بالاسم أو الهاتف..."
+            style={{ ...inputStyle, flex: 1, maxWidth: isMobile ? '100%' : 280 }}
+          />
+          <button
+            onClick={loadOrders}
+            style={{
+              padding: '8px 14px', borderRadius: 8, fontSize: 12, flexShrink: 0,
+              background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+              border: `1px solid ${color}44`, color,
+            }}
+          >
+            ↻
+          </button>
+        </div>
 
-        {/* Status pills */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {/* Status pills — scrollable on mobile */}
+        <div style={{
+          display: 'flex', gap: 6,
+          flexWrap: isMobile ? 'nowrap' : 'wrap',
+          overflowX: isMobile ? 'auto' : 'visible',
+          width: isMobile ? '100%' : 'auto',
+          paddingBottom: isMobile ? 4 : 0,
+          scrollbarWidth: 'none',
+        }}>
           {['all', ...statuses].map(s => {
             const active = statusFilter === s
             const m = STATUS_META[s]
@@ -354,10 +476,11 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
                 style={{
                   padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
                   cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+                  flexShrink: 0,
                   background: active ? (m?.bg ?? `${color}22`) : 'rgba(255,255,255,0.04)',
                   color:      active ? (m?.color ?? color)     : 'rgba(255,255,255,0.4)',
                   border: `1px solid ${active ? (m?.color ?? color) + '55' : 'rgba(255,255,255,0.08)'}`,
-                  transition: 'all 0.15s',
+                  transition: 'all 0.15s', whiteSpace: 'nowrap',
                 }}
               >
                 {s === 'all' ? 'الكل' : (m?.label ?? s)}
@@ -371,17 +494,19 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
           })}
         </div>
 
-        {/* Refresh */}
-        <button
-          onClick={loadOrders}
-          style={{
-            marginRight: 'auto', padding: '6px 16px', borderRadius: 8, fontSize: 12,
-            background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
-            border: `1px solid ${color}44`, color,
-          }}
-        >
-          تحديث
-        </button>
+        {/* Refresh on desktop */}
+        {!isMobile && (
+          <button
+            onClick={loadOrders}
+            style={{
+              marginRight: 'auto', padding: '6px 16px', borderRadius: 8, fontSize: 12,
+              background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+              border: `1px solid ${color}44`, color,
+            }}
+          >
+            تحديث
+          </button>
+        )}
       </div>
 
       {/* ── Results count ──────────────────────────────────────────── */}
@@ -391,118 +516,140 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
         </div>
       )}
 
-      {/* ── Table ──────────────────────────────────────────────────── */}
-      <div style={{ ...glass, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <th style={{ ...thStyle, width: 36 }}>#</th>
-                <th style={thStyle}>العميل</th>
-                <SortHeader col="date"  label="التاريخ"  sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                <th style={thStyle}>الحالة</th>
-                <SortHeader col="total" label="الإجمالي" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                <th style={{ ...thStyle, textAlign: 'center' }}>العناصر</th>
-                <th style={{ ...thStyle, width: 32 }}></th>
-              </tr>
-            </thead>
-
-            {loading ? (
-              <TableSkeleton rows={6} />
-            ) : pagedOrders.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
-                    {orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'}
-                  </td>
-                </tr>
-              </tbody>
-            ) : (
-              <tbody>
-                {pagedOrders.map((order, idx) => {
-                  const expanded = expandedId === order.id
-                  const rowNum   = (page - 1) * PAGE_SIZE + idx + 1
-                  return (
-                    <>
-                      <tr
-                        key={order.id}
-                        style={{
-                          background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
-                          transition: 'background 0.15s',
-                        }}
-                      >
-                        <td style={{ ...tdStyle, color: 'rgba(255,255,255,0.25)', fontSize: 11, width: 36 }}>{rowNum}</td>
-
-                        {/* Customer */}
-                        <td style={tdStyle}>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>
-                            {order.customer_name || '—'}
-                          </div>
-                          {order.customer_phone && (
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', direction: 'ltr', textAlign: 'right' }}>
-                              {order.customer_phone}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Date */}
-                        <td style={tdStyle}>
-                          <div style={{ fontSize: 12 }}>{fmtDate(order.created_at)}</div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{fmtTime(order.created_at)}</div>
-                        </td>
-
-                        {/* Status */}
-                        <td style={tdStyle}>
-                          <StatusCell order={order} moduleKey={moduleKey} onUpdate={handleStatusChange} />
-                        </td>
-
-                        {/* Total */}
-                        <td style={{ ...tdStyle, fontWeight: 700, color, whiteSpace: 'nowrap' }}>
-                          {fmtPrice(order.total_price, currency)}
-                        </td>
-
-                        {/* Items count */}
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {order.items?.length > 0 && (
-                            <span style={{
-                              fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                              background: 'rgba(255,255,255,0.07)',
-                              color: 'rgba(255,255,255,0.5)',
-                            }}>
-                              {order.items.length}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Expand */}
-                        <td style={{ ...tdStyle, textAlign: 'center', width: 32 }}>
-                          <button
-                            onClick={() => setExpandedId(expanded ? null : order.id)}
-                            style={{
-                              width: 26, height: 26, borderRadius: 6,
-                              background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
-                              border: `1px solid ${expanded ? `${color}44` : 'rgba(255,255,255,0.08)'}`,
-                              color: expanded ? color : 'rgba(255,255,255,0.4)',
-                              cursor: 'pointer', fontSize: 12,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}
-                          >
-                            {expanded ? '▲' : '▼'}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {expanded && (
-                        <ExpandedRow key={`${order.id}-exp`} order={order} colSpan={7} currency={currency} />
-                      )}
-                    </>
-                  )
-                })}
-              </tbody>
-            )}
-          </table>
+      {/* ── Orders list — cards on mobile, table on desktop ──────── */}
+      {isMobile ? (
+        /* Mobile: card list */
+        <div>
+          {loading ? (
+            <MobileCardSkeleton rows={5} />
+          ) : pagedOrders.length === 0 ? (
+            <div style={{
+              ...glass, padding: '48px 24px',
+              textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
+            }}>
+              {orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'}
+            </div>
+          ) : (
+            pagedOrders.map(order => (
+              <MobileOrderCard
+                key={order.id}
+                order={order}
+                expanded={expandedId === order.id}
+                onExpand={() => setExpandedId(expandedId === order.id ? null : order.id)}
+                moduleKey={moduleKey}
+                onUpdate={handleStatusChange}
+                color={color}
+                currency={currency}
+              />
+            ))
+          )}
         </div>
-      </div>
+      ) : (
+        /* Desktop: table */
+        <div style={{ ...glass, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <th style={{ ...thStyle, width: 36 }}>#</th>
+                  <th style={thStyle}>العميل</th>
+                  <SortHeader col="date"  label="التاريخ"  sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                  <th style={thStyle}>الحالة</th>
+                  <SortHeader col="total" label="الإجمالي" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                  <th style={{ ...thStyle, textAlign: 'center' }}>العناصر</th>
+                  <th style={{ ...thStyle, width: 32 }}></th>
+                </tr>
+              </thead>
+
+              {loading ? (
+                <TableSkeleton rows={6} />
+              ) : pagedOrders.length === 0 ? (
+                <tbody>
+                  <tr>
+                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+                      {orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'}
+                    </td>
+                  </tr>
+                </tbody>
+              ) : (
+                <tbody>
+                  {pagedOrders.map((order, idx) => {
+                    const expanded = expandedId === order.id
+                    const rowNum   = (page - 1) * PAGE_SIZE + idx + 1
+                    return (
+                      <>
+                        <tr
+                          key={order.id}
+                          style={{
+                            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
+                            transition: 'background 0.15s',
+                          }}
+                        >
+                          <td style={{ ...tdStyle, color: 'rgba(255,255,255,0.25)', fontSize: 11, width: 36 }}>{rowNum}</td>
+
+                          <td style={tdStyle}>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{order.customer_name || '—'}</div>
+                            {order.customer_phone && (
+                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', direction: 'ltr', textAlign: 'right' }}>
+                                {order.customer_phone}
+                              </div>
+                            )}
+                          </td>
+
+                          <td style={tdStyle}>
+                            <div style={{ fontSize: 12 }}>{fmtDate(order.created_at)}</div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{fmtTime(order.created_at)}</div>
+                          </td>
+
+                          <td style={tdStyle}>
+                            <StatusCell order={order} moduleKey={moduleKey} onUpdate={handleStatusChange} />
+                          </td>
+
+                          <td style={{ ...tdStyle, fontWeight: 700, color, whiteSpace: 'nowrap' }}>
+                            {fmtPrice(order.total_price, currency)}
+                          </td>
+
+                          <td style={{ ...tdStyle, textAlign: 'center' }}>
+                            {order.items?.length > 0 && (
+                              <span style={{
+                                fontSize: 11, padding: '2px 8px', borderRadius: 10,
+                                background: 'rgba(255,255,255,0.07)',
+                                color: 'rgba(255,255,255,0.5)',
+                              }}>
+                                {order.items.length}
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ ...tdStyle, textAlign: 'center', width: 32 }}>
+                            <button
+                              onClick={() => setExpandedId(expanded ? null : order.id)}
+                              style={{
+                                width: 26, height: 26, borderRadius: 6,
+                                background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
+                                border: `1px solid ${expanded ? `${color}44` : 'rgba(255,255,255,0.08)'}`,
+                                color: expanded ? color : 'rgba(255,255,255,0.4)',
+                                cursor: 'pointer', fontSize: 12,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}
+                            >
+                              {expanded ? '▲' : '▼'}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {expanded && (
+                          <ExpandedRow key={`${order.id}-exp`} order={order} colSpan={7} currency={currency} />
+                        )}
+                      </>
+                    )
+                  })}
+                </tbody>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Pagination ─────────────────────────────────────────────── */}
       <Pagination
