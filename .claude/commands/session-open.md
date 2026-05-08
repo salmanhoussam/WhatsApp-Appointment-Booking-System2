@@ -8,11 +8,52 @@ Reloads full project context at the start of a new session so the agent hits the
 
 ## What This Command Does
 
-Reads the last session report + memory, then prints a structured brief so work starts in under 60 seconds.
+1. Creates (or returns) the session file for today.
+2. Reads the last session report + memory.
+3. Prints a structured brief so work starts in under 60 seconds.
 
 ---
 
 ## Execution Steps
+
+### Step 0 — Create Today's Session File
+
+```bash
+TODAY=$(date +%F)
+SESSION_FILE=".claudedocs/sessions/${TODAY}.md"
+
+if [ -f "$SESSION_FILE" ]; then
+  echo "📄 Session file already exists — returning its content."
+  cat "$SESSION_FILE"
+else
+  cat > "$SESSION_FILE" << 'TEMPLATE'
+# Session — REPLACE_DATE
+
+## أهداف اليوم
+
+- [ ] 
+- [ ] 
+- [ ] 
+
+---
+
+## ✅ منجز
+
+<!-- تملأ تلقائياً عند /session-close -->
+
+## 🔧 قرارات تقنية
+
+<!-- قرارات هامة اتُخذت خلال الجلسة -->
+
+## 🚧 ما لم يكتمل
+
+<!-- carry forward للجلسة القادمة -->
+TEMPLATE
+  # Fix the date placeholder
+  sed -i "s/REPLACE_DATE/$TODAY/" "$SESSION_FILE"
+  echo "✅ Session file created: $SESSION_FILE"
+fi
+```
 
 ### Step 1 — Read Context Files
 
