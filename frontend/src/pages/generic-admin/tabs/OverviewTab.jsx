@@ -1,9 +1,29 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Component } from 'react'
 import { motion }       from 'framer-motion'
 import adminApi         from '../../../utils/admin.config'
 import StatCard         from '../components/StatCard'
 import ActivityFeed    from '../components/ActivityFeed'
 import TopItemsWidget  from '../components/TopItemsWidget'
+
+// ── ErrorBoundary ──────────────────────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(err) { return { error: err } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+          borderRadius: 12, padding: '18px 20px',
+          color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center',
+        }}>
+          خطأ في تحميل المكوّن
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell,
@@ -508,6 +528,7 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
   const [resStats,      setResStats]      = useState(null)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [statsLoading,  setStatsLoading]  = useState(true)
+  const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
 
   // Catalog data — used for stat cards + bottom panel
   const [catalogCats,    setCatalogCats]    = useState([])
@@ -516,6 +537,12 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
 
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   // ── Derived order stats ────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -671,19 +698,24 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
       {hasOrders && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : '3fr 2fr',
           gap: 14,
         }}>
-          <ActivityFeed
-            orders={orders}
-            hasReservations={hasReservations}
-            color={color}
-          />
-          <TopItemsWidget
-            orders={orders}
-            loading={ordersLoading}
-            color={color}
-          />
+          <ErrorBoundary>
+            <ActivityFeed
+              orders={orders}
+              hasReservations={hasReservations}
+              color={color}
+              onRequestRefresh={loadOrders}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <TopItemsWidget
+              orders={orders}
+              loading={ordersLoading}
+              color={color}
+            />
+          </ErrorBoundary>
         </div>
       )}
 
