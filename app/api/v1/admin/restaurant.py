@@ -176,7 +176,7 @@ async def delete_category(
 
 # ── Menu Item CRUD ────────────────────────────────────────────────────────────
 
-class MenuItemIn(BaseModel):
+class CatalogItemIn(BaseModel):
     category_id:    str
     name_ar:        str
     name_en:        Optional[str] = None
@@ -210,7 +210,7 @@ async def list_items(
 
 @router.post("/menu/items")
 async def create_item(
-    body: MenuItemIn,
+    body: CatalogItemIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
@@ -249,7 +249,7 @@ async def create_item(
 @router.patch("/menu/items/{item_id}")
 async def update_item(
     item_id: str,
-    body: MenuItemIn,
+    body: CatalogItemIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
