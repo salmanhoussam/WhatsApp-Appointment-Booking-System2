@@ -5,7 +5,7 @@ import re
 from typing import Optional, Dict, Any, List
 from prisma import Prisma
 from fastapi import HTTPException
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from app.services.whatsapp_service import WhatsAppService
 
 # ── Supabase storage client (storage-only, service key) ──────────────────────
@@ -400,8 +400,8 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
                 create_data["email"] = data["customer_email"]
             customer = await db.customer.create(data=create_data)
 
-        check_in_date = data.get("check_in") or (datetime.utcnow().date() + timedelta(days=1))
-        check_out_date = data.get("check_out") or (datetime.utcnow().date() + timedelta(days=2))
+        check_in_date = data.get("check_in") or (datetime.now(timezone.utc).date() + timedelta(days=1))
+        check_out_date = data.get("check_out") or (datetime.now(timezone.utc).date() + timedelta(days=2))
 
         if isinstance(check_in_date, date) and not isinstance(check_in_date, datetime):
             check_in_date = datetime.combine(check_in_date, datetime.min.time())

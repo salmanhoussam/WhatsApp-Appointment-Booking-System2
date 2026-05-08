@@ -4,7 +4,7 @@ No auth required. Gated by require_service("reservations").
 Works for: restaurant tables, service appointments, property viewings.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -53,7 +53,7 @@ async def create_reservation(
             status_code=400,
             detail=f"Invalid module_key. Use: {VALID_MODULE_KEYS}",
         )
-    if body.reserved_at < datetime.utcnow():
+    if body.reserved_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Cannot reserve a past time slot.")
 
     try:
