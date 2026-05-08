@@ -1,7 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import adminApi   from '../../../utils/admin.config'
-import StatCard   from '../components/StatCard'
-import KanbanBoard from '../components/KanbanBoard'
+import { motion }       from 'framer-motion'
+import adminApi         from '../../../utils/admin.config'
+import StatCard         from '../components/StatCard'
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell,
+} from 'recharts'
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +106,41 @@ function timeAgo(iso) {
   return `منذ ${Math.floor(hours / 24)} ي`
 }
 
+// Arabic weekday abbreviations
+const AR_DAYS = ['أحد', 'اثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
+
+function buildRevenueSeries(orders) {
+  const map = {}
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const key = d.toDateString()
+    map[key] = { label: AR_DAYS[d.getDay()], revenue: 0, count: 0 }
+  }
+  orders.forEach(o => {
+    const key = new Date(o.created_at ?? o.createdAt).toDateString()
+    if (map[key]) {
+      map[key].revenue += Number(o.total_price) || 0
+      map[key].count   += 1
+    }
+  })
+  return Object.values(map)
+}
+
+function buildDonutData(orders) {
+  const pending   = orders.filter(o => o.status === 'pending').length
+  const completed = orders.filter(o => ['delivered', 'completed', 'confirmed'].includes(o.status)).length
+  const cancelled = orders.filter(o => o.status === 'cancelled').length
+  const other     = orders.length - pending - completed - cancelled
+  const data = []
+  if (pending   > 0) data.push({ name: 'معلّقة',   value: pending,   color: '#f59e0b' })
+  if (completed > 0) data.push({ name: 'مكتملة',   value: completed, color: '#10b981' })
+  if (cancelled > 0) data.push({ name: 'ملغاة',    value: cancelled, color: '#ef4444' })
+  if (other     > 0) data.push({ name: 'أخرى',     value: other,     color: '#6366f1' })
+  return data
+}
+
 const STATUS_COLORS = {
   pending:    '#f59e0b',
   preparing:  '#3b82f6',
@@ -117,6 +156,228 @@ const STATUS_LABELS = {
   pending: 'معلّق', preparing: 'قيد التحضير', processing: 'قيد المعالجة',
   ready: 'جاهز', shipped: 'شُحن', delivered: 'مُسلَّم',
   completed: 'مكتمل', refunded: 'مسترد', cancelled: 'ملغي',
+}
+
+// Framer Motion presets
+const CARD_VARIANTS = {
+  hidden: { opacity: 0, y: 18 },
+  show:   { opacity: 1, y: 0,  transition: { type: 'spring', stiffness: 220, damping: 22 } },
+}
+
+// ── Custom Recharts Tooltip ────────────────────────────────────────────────────
+
+function RevenueTooltip({ active, payload, label, currency }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: 'rgba(13,13,20,0.95)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 10, padding: '10px 14px',
+      fontSize: 12, color: '#f0ebe3',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: 'rgba(255,255,255,0.5)' }}>
+        الإيرادات: <span style={{ color: payload[0]?.color, fontWeight: 700 }}>
+          {Number(payload[0]?.value || 0).toLocaleString('ar-SA')} {currency}
+        </span>
+      </div>
+      {payload[0]?.payload?.count > 0 && (
+        <div style={{ color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+          {payload[0].payload.count} طلب
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DonutTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: 'rgba(13,13,20,0.95)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 10, padding: '9px 13px',
+      fontSize: 12, color: '#f0ebe3',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    }}>
+      <span style={{ color: payload[0]?.payload?.color, fontWeight: 700 }}>
+        {payload[0]?.name}
+      </span>
+      {' — '}
+      <span>{payload[0]?.value} طلب</span>
+    </div>
+  )
+}
+
+// ── RevenueChart ───────────────────────────────────────────────────────────────
+
+function RevenueChart({ orders, color, currency }) {
+  const data = useMemo(() => buildRevenueSeries(orders), [orders])
+  const hasData = orders.length > 0
+
+  return (
+    <motion.div
+      variants={CARD_VARIANTS}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 14, padding: '18px 20px',
+        minHeight: 200,
+      }}
+    >
+      <div style={{
+        fontSize: 13, fontWeight: 600,
+        color: 'rgba(255,255,255,0.55)',
+        marginBottom: 16, direction: 'rtl',
+      }}>
+        الإيرادات — آخر 7 أيام
+      </div>
+
+      {!hasData ? (
+        <div style={{
+          height: 140, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
+        }}>
+          لا توجد طلبات بعد
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={140}>
+          <LineChart data={data} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+            <defs>
+              <linearGradient id={`lineGrad-${color.replace('#','')}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stopColor={color} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={color} stopOpacity={1}   />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              stroke="rgba(255,255,255,0.04)"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={v => v === 0 ? '0' : `${Number(v).toLocaleString('ar-SA')}`}
+            />
+            <Tooltip
+              content={<RevenueTooltip currency={currency} />}
+              cursor={{ stroke: 'rgba(255,255,255,0.08)', strokeWidth: 1 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke={`url(#lineGrad-${color.replace('#','')})`}
+              strokeWidth={2.5}
+              dot={{ fill: color, r: 3, strokeWidth: 0 }}
+              activeDot={{ fill: color, r: 5, strokeWidth: 0 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </motion.div>
+  )
+}
+
+// ── StatusDonut ────────────────────────────────────────────────────────────────
+
+function StatusDonut({ orders, color }) {
+  const data  = useMemo(() => buildDonutData(orders), [orders])
+  const total = orders.length
+
+  return (
+    <motion.div
+      variants={CARD_VARIANTS}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 14, padding: '18px 20px',
+        minHeight: 200,
+      }}
+    >
+      <div style={{
+        fontSize: 13, fontWeight: 600,
+        color: 'rgba(255,255,255,0.55)',
+        marginBottom: 16, direction: 'rtl',
+      }}>
+        توزيع الطلبات
+      </div>
+
+      {total === 0 ? (
+        <div style={{
+          height: 140, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
+        }}>
+          لا توجد طلبات بعد
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          {/* Donut */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <ResponsiveContainer width={130} height={130}>
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={42}
+                  outerRadius={58}
+                  paddingAngle={3}
+                  dataKey="value"
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  {data.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} stroke="transparent" />
+                  ))}
+                </Pie>
+                <Tooltip content={<DonutTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Center label */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none',
+            }}>
+              <span style={{ fontSize: 20, fontWeight: 800, color: '#f0ebe3', lineHeight: 1 }}>
+                {total}
+              </span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                إجمالي
+              </span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, direction: 'rtl' }}>
+            {data.map((entry, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: entry.color, flexShrink: 0,
+                }} />
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                  {entry.name}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: entry.color }}>
+                  {entry.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  )
 }
 
 // ── RecentOrders ───────────────────────────────────────────────────────────────
@@ -241,8 +502,8 @@ function TopCatalogItems({ items, loading, color }) {
  *   currency        string
  */
 export default function OverviewTab({ color, moduleKey, hasReservations, currency = 'USD' }) {
-  const [orders,        setOrders]       = useState([])
-  const [resStats,      setResStats]     = useState(null)
+  const [orders,        setOrders]        = useState([])
+  const [resStats,      setResStats]      = useState(null)
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [statsLoading,  setStatsLoading]  = useState(true)
 
@@ -256,7 +517,7 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
 
   // ── Derived order stats ────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const os = computeOrderStats(orders)
+    const os  = computeOrderStats(orders)
     const byS = resStats?.by_status ?? {}
     return {
       todayCount:   os.todayCount   + (resStats?.today_total ?? 0),
@@ -323,12 +584,6 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
     loadResStats()
   }, [loadOrders, loadResStats])
 
-  // ── Status change handler (KanbanBoard) ────────────────────────────────────
-  const handleStatusChange = useCallback(async (orderId, newStatus) => {
-    await adminApi.patch(`/${moduleKey}/orders/${orderId}/status`, { status: newStatus })
-    await loadOrders()
-  }, [moduleKey, loadOrders])
-
   const orderStatsLoading = ordersLoading || statsLoading
   const hasOrders = moduleKey === 'restaurant' || moduleKey === 'store'
 
@@ -393,17 +648,21 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
         />
       </div>
 
-      {/* ── Kanban board — restaurant / store only ─────────────────────── */}
-      {hasOrders && (
-        <KanbanBoard
-          moduleKey={moduleKey}
-          color={color}
-          currency={currency}
-          orders={orders}
-          onStatusChange={handleStatusChange}
-          isLoading={ordersLoading}
-          onRefresh={loadOrders}
-        />
+      {/* ── Charts — restaurant / store only ───────────────────────────── */}
+      {hasOrders && !ordersLoading && (
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{ show: { transition: { staggerChildren: 0.1 } } }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <RevenueChart orders={orders} color={color} currency={currency} />
+          <StatusDonut  orders={orders} color={color} />
+        </motion.div>
       )}
 
       {/* ── Bottom panels ──────────────────────────────────────────────── */}

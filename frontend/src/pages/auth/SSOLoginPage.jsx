@@ -5,7 +5,7 @@
  *   /login    → existing tenant login (email/phone/slug + password)
  *   /register → new tenant self-onboarding (trial creation)
  *
- * On success both modes redirect to {slug}.salmansaas.com/dashboard
+ * On success: trial → salmansaas.com/dashboard/{slug}, active → {slug}.salmansaas.com/admin
  */
 
 import { useState, useEffect } from 'react';
@@ -44,11 +44,11 @@ function resolveRedirect(slug, token, status) {
       ? 'https://auth.salmansaas.com/super/clients'
       : '/super/clients';
   }
-  // Trial tenants → /{slug}/dashboard on auth subdomain (no new DNS per tenant)
+  // Trial tenants → salmansaas.com/dashboard/{slug} (path-based, no per-tenant DNS)
   if (status === 'trial') {
     return import.meta.env.PROD
-      ? `https://auth.salmansaas.com/${slug}/dashboard?token=${token}`
-      : `http://localhost:5173/${slug}/dashboard?token=${token}`;
+      ? `https://salmansaas.com/dashboard/${slug}?token=${token}`
+      : `http://localhost:5173/dashboard/${slug}?token=${token}`;
   }
   // Active / demo tenants → their own subdomain admin dashboard
   // ProtectedRoute handles the ?token= handoff to that subdomain's localStorage

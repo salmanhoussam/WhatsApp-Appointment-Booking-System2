@@ -27,9 +27,9 @@ const SmarAdminDashboard    = lazy(() => import('./pages/smar/admin/SmarAdminDas
 const GenericAdminDashboard = lazy(() => import('./pages/generic-admin/GenericAdminDashboard'));
 const SSOLoginPage          = lazy(() => import('./pages/auth/SSOLoginPage'));
 const TenantRegisterPage    = lazy(() => import('./pages/auth/TenantRegisterPage'));
-const ShowcaseRoutes      = lazy(() => import('./router/showcase.routes'));
-const ClientsManager      = lazy(() => import('./pages/super-admin/ClientsManager'));
-const DemoPublicPage      = lazy(() => import('./pages/demo/DemoPublicPage'));
+const ShowcaseRoutes        = lazy(() => import('./router/showcase.routes'));
+const ClientsManager        = lazy(() => import('./pages/super-admin/ClientsManager'));
+const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'));
 
 // Detect subdomain mode at module scope (stable across renders)
 const _h = window.location.hostname;
@@ -122,20 +122,19 @@ function App() {
               <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
             </ProtectedRoute>
           } />
-          {/* Localhost legacy: domain.com/dashboard/smar/units */}
+          {/* Path-based trial admin: salmansaas.com/dashboard/:slug  (all domains) */}
           <Route path="/dashboard/:slug/*" element={
             <ProtectedRoute>
-              <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+              <Suspense fallback={null}><GenericAdminDashboard /></Suspense>
             </ProtectedRoute>
           } />
 
           {/* ── Trial public page — no auth, customers browse here ── */}
-          {/* auth.salmansaas.com/demo/:slug  OR  localhost/demo/:slug        */}
-          {(IS_AUTH_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
-            <Route path="/demo/:slug" element={
-              <Suspense fallback={null}><DemoPublicPage /></Suspense>
-            } />
-          )}
+          {/* salmansaas.com/demo/:slug/*  or  auth.salmansaas.com/demo/:slug/*  or  localhost/demo/:slug/* */}
+          {/* More specific than /* so it wins on showcase domain without any condition. */}
+          <Route path="/demo/:slug/*" element={
+            <Suspense fallback={null}><DynamicTenantResolver /></Suspense>
+          } />
 
           {/* ── Trial admin — auth subdomain + localhost (no tenant DNS needed) ── */}
           {/* /:slug/dashboard  =  generic dashboard for all new tenants */}

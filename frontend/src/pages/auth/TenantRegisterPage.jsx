@@ -7,7 +7,7 @@
  *   1. POST  /api/v1/auth/register    → creates Client + TENANT_ADMIN user → returns USER JWT directly
  *   2. PATCH /api/v1/admin/settings   → apply template_key + primary_color
  *   3. POST  /api/v1/admin/catalog/seed-from-template → create starter categories
- *   4. Redirect → /{slug}/dashboard?welcome=1
+ *   4. Redirect → /dashboard/{slug}?welcome=1
  */
 
 import { useState, useEffect } from 'react'
@@ -164,7 +164,7 @@ export default function TenantRegisterPage() {
       setStep('success')
       setProgress('تم! جاري فتح لوحة التحكم...')
       setTimeout(() => {
-        navigate(`/${form.slug}/dashboard?welcome=1`, { replace: true })
+        navigate(`/dashboard/${form.slug}?welcome=1`, { replace: true })
       }, 900)
 
     } catch (err) {
