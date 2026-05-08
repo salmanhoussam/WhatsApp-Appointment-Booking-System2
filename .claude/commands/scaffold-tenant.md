@@ -62,19 +62,23 @@ body[data-slug="[slug]"] .hero-title {
 
 Create `src/router/tenants/[slug].routes.jsx`:
 
+> **Note (Phase 52+):** New tenants do NOT need a per-tenant admin dashboard.
+> `/:slug/dashboard` is handled by `GenericAdminDashboard` in App.jsx.
+> Only scaffold per-tenant admin if the tenant needs CUSTOM admin UI (like smar).
+
 ```jsx
 /**
- * [slug].routes.jsx — All routes for the "[slug]" tenant
+ * [slug].routes.jsx — Public routes for the "[slug]" tenant
+ * Admin route (/:slug/dashboard) is handled globally by GenericAdminDashboard.
  */
 import React, { lazy, Suspense }   from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import [Slug]HomePage              from '../../pages/[slug]/spatial/[Slug]HomePage';
-import [Slug]AdminDashboard        from '../../pages/[slug]/admin/[Slug]AdminDashboard';
 
-// Heavy WebGL pages — lazy loaded
+// Heavy WebGL / FM pages — lazy loaded (FM12 rule: must be lazy)
+const [Slug]HomePage    = lazy(() => import('../../pages/[slug]/spatial/[Slug]HomePage'));
 const [Slug]ShowcasePage = lazy(() => import('../../pages/[slug]/showcase/[Slug]ShowcasePage'));
 
-function WebGLFallback() {
+function PageFallback() {
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0a0a0f',
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -89,13 +93,8 @@ function WebGLFallback() {
 export default function [Slug]Routes() {
   return (
     <Routes>
-      <Route path="home"    element={<[Slug]HomePage />} />
-      <Route path="admin"   element={<[Slug]AdminDashboard />} />
-      <Route path="showcase" element={
-        <Suspense fallback={<WebGLFallback />}>
-          <[Slug]ShowcasePage />
-        </Suspense>
-      } />
+      <Route path="home"    element={<Suspense fallback={<PageFallback />}><[Slug]HomePage /></Suspense>} />
+      <Route path="showcase" element={<Suspense fallback={<PageFallback />}><[Slug]ShowcasePage /></Suspense>} />
       <Route path=""  element={<Navigate to="home" replace />} />
       <Route path="*" element={<Navigate to="home" replace />} />
     </Routes>
@@ -177,8 +176,12 @@ https://[project].supabase.co/storage/v1/object/public/properties/[slug]/[catego
 - [ ] `src/pages/[slug]/` — full folder structure created
 - [ ] `src/pages/[slug]/[slug].css` — scoped CSS file
 - [ ] `src/pages/[slug]/store/use[Slug]Store.js` — Zustand store
-- [ ] `src/router/tenants/[slug].routes.jsx` — routes file
+- [ ] `src/router/tenants/[slug].routes.jsx` — routes file (public pages only)
 - [ ] `src/router/tenants/index.js` — registry entry added
-- [ ] DB Tenant table — slug inserted
-- [ ] Supabase storage — folder created
+- [ ] DB Client table — slug inserted (use POST /auth/register or super admin)
+- [ ] Supabase storage — folder created (`properties/[slug]/`)
 - [ ] Test: navigate to `/:slug/` in browser
+- [ ] Admin: `/:slug/dashboard` works via GenericAdminDashboard (no extra step needed)
+
+> Note: `/admin/` per-tenant pages (like `src/pages/smar/admin/`) are only needed
+> for tenants with custom admin UI. Most tenants use GenericAdminDashboard automatically.

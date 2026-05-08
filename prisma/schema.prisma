@@ -22,7 +22,7 @@ model Client {
   email           String?        @map("email")
   password_hash   String?        @map("password_hash")
   isActive        Boolean        @default(true) @map("is_active")
-  // ── Branding & config (merged from TenantConfig) ──────────────────────────
+  // -- Branding & config (merged from TenantConfig) --------------------------
   primary_color   String?        @map("primary_color")
   hero_video_url  String?        @map("hero_video_url")
   whatsapp_number String?        @map("whatsapp_number")
@@ -35,7 +35,7 @@ model Client {
   payment_methods String[]       @map("payment_methods")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  // ── Trial & Lifecycle ────────────────────────────────────────────────────────
+  // -- Trial & Lifecycle --------------------------------------------------------
   status        String    @default("trial")       @map("status")
   trial_ends_at DateTime? @map("trial_ends_at")   @db.Timestamptz(6)
   service_type  String?   @default("real_estate") @map("service_type")
@@ -48,6 +48,32 @@ model Client {
   units           Unit[]
   users           User[]
   galleryImages   GalleryImage[]
+  // -- Module gate ------------------------------------------------------------
+  clientServices  ClientService[]
+  // -- Restaurant module -------------------------------------------------------
+  restaurantConfigs RestaurantConfig[]
+  // -- Store module ------------------------------------------------------------
+  storeCarts      StoreCart[]
+  storeOrders     StoreOrder[]
+  storeCustomers  StoreCustomer[]
+  // -- Generic Catalog module --------------------------------------------------
+  catalogCategories CatalogCategory[]
+  catalogItems      CatalogItem[]
+  // -- Reservations module (restaurant tables, service appointments, viewings) --
+  reservations      Reservation[]
+  // -- CRM snapshot -----------------------------------------------------------
+  // Denormalized list of active service keys — updated on every ClientService change.
+  // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
+  // Example: ["booking", "gallery", "restaurant.menu"]
+  selected_services Json? @default("[]") @map("selected_services")
+
+  // -- Template & UX (Phase 49/50/51) -----------------------------------------
+  // pageType: "normal" → standard catalog/menu/store page
+  //           "showcase" → cinematic ShowcaseTemplate (GSAP + Framer Motion)
+  pageType    String  @default("normal") @map("page_type")
+  // templateKey: maps to TEMPLATE_REGISTRY in frontend (e.g. "beauty-salon-women")
+  // null = not yet assigned (trial tenants start without a template)
+  templateKey String? @map("template_key")
 
   @@map("clients")
   @@schema("public")
@@ -70,6 +96,14 @@ model User {
   fullName          String     @map("full_name")
   role              UserRole   @default(TENANT_ADMIN) @map("role")
   isActive          Boolean    @default(true) @map("is_active")
+  // -- Contact ----------------------------------------------------------------
+  phone             String?    @map("phone")
+  avatarUrl         String?    @map("avatar_url")
+  // -- Auth lifecycle ---------------------------------------------------------
+  lastLoginAt       DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  resetToken        String?    @map("reset_token")
+  resetTokenExp     DateTime?  @map("reset_token_exp") @db.Timestamptz(6)
+  // ---------------------------------------------------------------------------
   createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   managedProperties Property[] @relation("manager_properties")
@@ -128,21 +162,21 @@ model Unit {
   position_y  Float?   @map("position_y")
   images      String[] @default([]) @map("images")
 
-  // ── Dynamic Content (Block Builder) ─────────────────────────────────────────
-  category       String? @map("category") // villa | chalet | studio — filterable classification
+  // -- Dynamic Content (Block Builder) -----------------------------------------
+  category       String? @map("category") // villa | chalet | studio -- filterable classification
   description_ar String? @map("description_ar") // Arabic description (replaces single 'description')
   description_en String? @map("description_en") // English description
 
-  // Block Builder JSON — array of {type, content, style?, icon?, title?}
+  // Block Builder JSON -- array of {type, content, style?, icon?, title?}
   // Types: section_title, highlight_item, paragraph
   // Example: [{"type":"section_title","content":"Serenity 🌿","style":{"size":"large","color":"gold","bold":true}}]
   content_blocks Json? @map("content_blocks")
 
-  // Amenities — array of {icon, label, label_ar?}
+  // Amenities -- array of {icon, label, label_ar?}
   // Example: [{"icon":"wifi","label":"Free WiFi"},{"icon":"pool","label":"Private Pool"}]
   amenities Json? @map("amenities")
 
-  // Rules & Policies — {checkIn, checkOut, cancellation, rules[]}
+  // Rules & Policies -- {checkIn, checkOut, cancellation, rules[]}
   // Example: {"checkIn":"15:00","checkOut":"12:00","cancellation":"50% refund...","rules":["No Pets","Quiet hours"]}
   rules_policies Json? @map("rules_policies")
 
@@ -209,14 +243,15 @@ model Service {
 model Customer {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
   clientId  String    @map("client_id") @db.Uuid
-  phone     String    @unique @map("phone")
+  phone     String    @map("phone")
   name      String?   @map("name")
-  email     String?   @unique @map("email")
+  email     String?   @map("email")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookings  Booking[]
   client    Client    @relation(fields: [clientId], references: [id])
 
+  @@unique([clientId, phone])
   @@index([clientId])
   @@index([phone])
   @@map("customers")
@@ -272,21 +307,366 @@ model BookingService {
 }
 
 model GalleryImage {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId   String   @map("client_id") @db.Uuid
-  unitId     String?  @map("unit_id") @db.Uuid
-  url        String   @map("url")
-  sort_order Int      @default(0) @map("sort_order")
-  span_size  String   @default("small") @map("span_size")
-  caption_ar String?  @map("caption_ar")
-  caption_en String?  @map("caption_en")
-  isActive   Boolean  @default(true) @map("is_active")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  unit       Unit?    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId       String       @map("client_id") @db.Uuid
+  unitId         String?      @map("unit_id") @db.Uuid
+  catalogItemId  String?      @map("catalog_item_id") @db.Uuid
+  imageType      String       @default("gallery") @map("image_type")
+  // image_type values: gallery | cover | catalog | page_hero | page_logo
+  url            String       @map("url")
+  sort_order     Int          @default(0) @map("sort_order")
+  span_size      String       @default("small") @map("span_size")
+  caption_ar     String?      @map("caption_ar")
+  caption_en     String?      @map("caption_en")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  unit           Unit?        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  catalogItem    CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([unitId])
+  @@index([catalogItemId])
   @@map("gallery_images")
   @@schema("public")
 }
+
+// ================================================================================
+// PLATFORM SERVICES -- Master catalog of what SalmanSaaS sells to clients
+// One row per feature key. Linked to ClientService.serviceKey by convention.
+// Admin manages this table; clients cannot modify it.
+// ================================================================================
+
+model PlatformService {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key           String   @unique @map("key")           // "booking" | "restaurant.menu" | "store.products"
+  moduleKey     String   @map("module_key")            // "booking" | "restaurant" | "store"
+  nameAr        String   @map("name_ar")
+  nameEn        String   @map("name_en")
+  descriptionAr String?  @map("description_ar")
+  descriptionEn String?  @map("description_en")
+  icon          String?  @map("icon")
+  monthlyPrice  Decimal? @map("monthly_price") @db.Decimal(10, 2)
+  isActive      Boolean  @default(true) @map("is_active")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("platform_services")
+  @@schema("public")
+}
+
+// ================================================================================
+// CATALOG MODULE -- Generic Category -> Item system
+// Works for any module or tenant type (beauty salon, mechanic, general shop...).
+// moduleKey scopes categories to a specific module within the same tenant.
+// Use metadata Json for module-specific extra fields on items.
+// ================================================================================
+
+model CatalogCategory {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  moduleKey String   @default("catalog") @map("module_key") // "catalog" | "booking" | "restaurant" | "store"
+  nameAr    String   @map("name_ar")
+  nameEn    String?  @map("name_en")
+  imageUrl  String?  @map("image_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  parentId  String?  @map("parent_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // -- Display Template (Phase 49) ---------------------------------------------
+  // "grid"     → 2-4 col card grid (default — universal)
+  // "list"     → horizontal rows: image + name + desc + price (menus, price lists)
+  // "showcase" → large editorial cards, full desc + CTA (packages, VIP services)
+  displayTemplate String @default("grid") @map("display_template")
+
+  client   Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent   CatalogCategory?  @relation("CatalogCategoryTree", fields: [parentId], references: [id])
+  children CatalogCategory[] @relation("CatalogCategoryTree")
+  items    CatalogItem[]
+
+  @@index([clientId])
+  @@index([clientId, moduleKey])
+  @@map("catalog_categories")
+  @@schema("public")
+}
+
+model CatalogItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  categoryId    String   @map("category_id") @db.Uuid
+  nameAr        String   @map("name_ar")
+  nameEn        String?  @map("name_en")
+  descriptionAr String?  @map("description_ar")
+  descriptionEn String?  @map("description_en")
+  imageUrl      String?  @map("image_url")
+  price         Decimal? @map("price") @db.Decimal(10, 2)
+  currency      String   @default("USD") @map("currency")
+  isActive      Boolean  @default(true) @map("is_active")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  sortOrder     Int      @default(0) @map("sort_order")
+  // Module-specific extra fields (duration, unit, sku, weight, etc.)
+  metadata      Json?    @map("metadata")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client               Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category             CatalogCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  galleryImages        GalleryImage[]
+  restaurantOrderItems RestaurantOrderItem[]
+  storeCartItems       StoreCartItem[]
+  storeOrderItems      StoreOrderItem[]
+
+  @@index([clientId])
+  @@index([categoryId])
+  @@map("catalog_items")
+  @@schema("public")
+}
+
+// ================================================================================
+// CLIENT SERVICES -- Module Activation Gate
+// Every feature a tenant activates = one row here.
+// require_service(key) checks this before serving any module endpoint.
+//
+// service_type -> services seeded automatically:
+//   real_estate / hotel -> booking, gallery, whatsapp_ordering
+//   restaurant          -> restaurant, whatsapp_ordering
+//   ecommerce           -> store
+// ================================================================================
+
+model ClientService {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  serviceKey  String   @map("service_key") // booking|gallery|whatsapp_ordering|restaurant|store|...
+  isActive    Boolean  @default(true) @map("is_active")
+  activatedAt DateTime @default(now()) @map("activated_at") @db.Timestamptz(6)
+  config      Json?    @map("config")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, serviceKey])
+  @@index([clientId])
+  @@map("client_services")
+  @@schema("public")
+}
+
+// ================================================================================
+// RESTAURANT MODULE
+// Migrated from Multi-Cafe-Saas -- renamed to avoid conflicts with booking Service
+// ================================================================================
+
+model RestaurantConfig {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  nameAr       String   @map("name_ar")
+  nameEn       String?  @map("name_en")
+  description  String?  @map("description")
+  imageUrl     String?  @map("image_url")
+  coverImage   String?  @map("cover_image")
+  phone        String?  @map("phone")
+  workingHours Json?    @map("working_hours")
+  currency     String   @default("LBP") @map("currency")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders     RestaurantOrder[]
+
+  @@index([clientId])
+  @@map("restaurant_configs")
+  @@schema("public")
+}
+
+// MenuCategory + MenuItem removed — replaced by CatalogCategory/CatalogItem (module_key = 'restaurant')
+
+model RestaurantOrder {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  restaurantId  String   @map("restaurant_id") @db.Uuid
+  customerName  String   @map("customer_name")
+  customerPhone String   @map("customer_phone")
+  tableNumber   String?  @map("table_number")
+  totalPrice    Decimal  @map("total_price") @db.Decimal(10, 2)
+  currency      String   @default("LBP") @map("currency")
+  status        String   @default("pending") @map("status") // pending|preparing|ready|delivered|cancelled
+  notes         String?  @map("notes")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  restaurant RestaurantConfig      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items      RestaurantOrderItem[]
+
+  @@index([restaurantId])
+  @@index([status])
+  @@map("restaurant_orders")
+  @@schema("public")
+}
+
+model RestaurantOrderItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  quantity      Int      @default(1) @map("quantity")
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
+  notes         String?  @map("notes")
+
+  order       RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItem CatalogItem     @relation(fields: [catalogItemId], references: [id])
+
+  @@index([orderId])
+  @@map("restaurant_order_items")
+  @@schema("public")
+}
+
+// ================================================================================
+// STORE MODULE
+// Migrated from Multy_store -- clientSlug -> clientId (UUID FK) for consistency
+// ================================================================================
+
+model StoreCustomer {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId              String   @map("client_id") @db.Uuid
+  firstName             String   @map("first_name")
+  lastName              String?  @map("last_name")
+  email                 String   @map("email")
+  phone                 String?  @map("phone")
+  password              String   @map("password")
+  isEmailVerified       Boolean  @default(false) @map("is_email_verified")
+  hasUsedSignupDiscount Boolean  @default(false) @map("has_used_signup_discount")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders    StoreOrder[]
+
+  @@unique([clientId, email])
+  @@index([clientId])
+  @@map("store_customers")
+  @@schema("public")
+}
+
+// StoreBrand + StoreCategory + StoreProduct removed — replaced by CatalogCategory/CatalogItem (module_key = 'store')
+// Brand info moved to CatalogItem.metadata.brand
+// StoreReview + StoreWishlist removed — not replaced (no feature parity planned)
+
+model StoreCart {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  sessionId  String   @unique @map("session_id")
+  customerId String?  @map("customer_id") @db.Uuid
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items  StoreCartItem[]
+
+  @@index([clientId])
+  @@map("store_carts")
+  @@schema("public")
+}
+
+model StoreCartItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId        String   @map("cart_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  quantity      Int      @default(1) @map("quantity")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  cart        StoreCart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  catalogItem CatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, catalogItemId])
+  @@map("store_cart_items")
+  @@schema("public")
+}
+
+model StoreOrder {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String   @map("client_id") @db.Uuid
+  customerId      String?  @map("customer_id") @db.Uuid
+  customerName    String   @map("customer_name")
+  customerEmail   String?  @map("customer_email")
+  customerPhone   String?  @map("customer_phone")
+  totalPrice      Float    @map("total_price")
+  currency        String   @default("USD") @map("currency")
+  status          String   @default("pending") @map("status")
+  paymentMethod   String?  @map("payment_method")
+  shippingAddress Json?    @map("shipping_address")
+  notes           String?  @map("notes")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customer StoreCustomer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    StoreOrderItem[]
+
+  @@index([clientId])
+  @@index([status])
+  @@map("store_orders")
+  @@schema("public")
+}
+
+model StoreOrderItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  quantity      Int      @map("quantity")
+  unitPrice     Float    @map("unit_price")
+  totalPrice    Float    @map("total_price")
+  color         String?  @map("color")
+  size          String?  @map("size")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order       StoreOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItem CatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("store_order_items")
+  @@schema("public")
+}
+
+// ================================================================================
+// RESERVATIONS MODULE -- Generic slot-based reservation (table, appointment, viewing)
+// Works across all service types via moduleKey.
+// Gated by client_services.serviceKey = "reservations".
+//
+// moduleKey → use case:
+//   "restaurant"   → table reservation (metadata: table_label, party_size)
+//   "services"     → appointment booking (metadata: service_name, staff_id)
+//   "real_estate"  → property viewing (metadata: unit_id, guests, viewing_type)
+//   "hotel"        → check-in appointment or room viewing
+// ================================================================================
+
+model Reservation {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  moduleKey     String   @map("module_key")
+  // "restaurant" | "services" | "real_estate" | "hotel"
+
+  customerName  String   @map("customer_name")
+  customerPhone String   @map("customer_phone")
+  customerEmail String?  @map("customer_email")
+
+  reservedAt    DateTime @map("reserved_at") @db.Timestamptz(6)
+  durationMin   Int      @default(60) @map("duration_min")
+
+  status        String   @default("pending") @map("status")
+  // pending | confirmed | arrived | cancelled | no_show
+
+  notes         String?  @map("notes")
+
+  // module-specific payload:
+  // restaurant  → { "table_label": "A4", "party_size": 4 }
+  // services    → { "service_name": "قص شعر", "staff_id": "uuid" }
+  // real_estate → { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
+  metadata      Json?    @map("metadata")
+
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, moduleKey, reservedAt])
+  @@index([clientId, status])
+  @@map("reservations")
+  @@schema("public")
+}
+

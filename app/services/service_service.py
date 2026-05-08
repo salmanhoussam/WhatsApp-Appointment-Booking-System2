@@ -28,28 +28,27 @@ async def create_service(db: Prisma, data: ServiceCreate) -> dict:
     return await db.service.create(data=data_dict)
 
 async def update_service(db: Prisma, service_id: str, data: ServiceUpdate, client_id: str) -> Optional[dict]:
-    existing = await get_service(db, service_id, client_id)
-    if not existing:
-        return None
-        
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    
-    # تحويل الحقول لتطابق قاعدة البيانات
+    if not update_data:
+        return await get_service(db, service_id, client_id)
+
     if "client_id" in update_data:
         update_data["clientId"] = update_data.pop("client_id")
     if "property_id" in update_data:
         update_data["propertyId"] = update_data.pop("property_id")
     if "base_price" in update_data:
         update_data["basePrice"] = update_data.pop("base_price")
-        
-    return await db.service.update(
-        where={"id": service_id},
+
+    result = await db.service.update_many(
+        where={"id": service_id, "clientId": client_id},
         data=update_data
     )
+    if result.count == 0:
+        return None
+    return await get_service(db, service_id, client_id)
 
 async def delete_service(db: Prisma, service_id: str, client_id: str) -> bool:
-    existing = await get_service(db, service_id, client_id)
-    if not existing:
-        return False
-    await db.service.delete(where={"id": service_id})
-    return True
+    result = await db.service.delete_many(
+        where={"id": service_id, "clientId": client_id}
+    )
+    return result.count > 0

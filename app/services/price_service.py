@@ -40,24 +40,30 @@ async def create_price(db: Prisma, data: PriceCreate) -> dict:
     return await db.price.create(data=data_dict)
 
 async def update_price(db: Prisma, price_id: str, data: PriceUpdate, client_id: str) -> Optional[dict]:
-    existing = await get_price(db, price_id, client_id)
-    if not existing:
-        return None
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not update_data:
+        return await get_price(db, price_id, client_id)
+
     if "client_id" in update_data:
         update_data["clientId"] = update_data.pop("client_id")
     if "unit_id" in update_data:
         update_data["unitId"] = update_data.pop("unit_id")
     if "date" in update_data and isinstance(update_data["date"], date):
         update_data["date"] = to_datetime_start(update_data["date"])
-    return await db.price.update(where={"id": price_id}, data=update_data)
+
+    result = await db.price.update_many(
+        where={"id": price_id, "clientId": client_id},
+        data=update_data
+    )
+    if result.count == 0:
+        return None
+    return await get_price(db, price_id, client_id)
 
 async def delete_price(db: Prisma, price_id: str, client_id: str) -> bool:
-    existing = await get_price(db, price_id, client_id)
-    if not existing:
-        return False
-    await db.price.delete(where={"id": price_id})
-    return True
+    result = await db.price.delete_many(
+        where={"id": price_id, "clientId": client_id}
+    )
+    return result.count > 0
 
 async def set_bulk_prices(
     db: Prisma,

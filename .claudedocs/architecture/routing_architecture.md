@@ -1,142 +1,202 @@
-# Frontend Routing Architecture — Multi-Tenant System
-# Source: frontend/docs/architecture.md (updated to reflect current live state)
-
-## Overview
-
-Every tenant (e.g. `smar`, `vila`) gets its own isolated folder and routes file.
-The router reads the URL slug and dynamically loads the correct tenant experience —
-`App.jsx` and `TenantResolver.jsx` never need modification when adding a new tenant.
+# Routing Architecture — SalmanSaaS Platform
+**Last updated:** 2026-05-05 (Phase 52 — Self-Service Onboarding)
 
 ---
 
-## Folder Structure (Current)
+## Frontend Routing
 
+### Mode Detection (App.jsx)
+
+```js
+const IS_SUBDOMAIN_MODE  = hostname !== 'localhost' && hostname.split('.').length >= 3
+const IS_AUTH_SUBDOMAIN  = IS_SUBDOMAIN_MODE && hostname.startsWith('auth.')
+const IS_SHOWCASE_DOMAIN = !IS_SUBDOMAIN_MODE && hostname !== 'localhost'
 ```
-src/
-├── App.jsx                          ← Root router (static routes + /:slug/*)
-├── router/
-│   ├── TenantResolver.jsx           ← Reads slug → looks up registry → renders routes
-│   └── tenants/
-│       ├── index.js                 ← REGISTRY: add new tenants here only
-│       ├── smar.routes.jsx          ← All routes for "smar"
-│       └── [slug].routes.jsx        ← One file per tenant
-│
-├── pages/
-│   ├── admin/                       ← Global admin (Login.jsx)
-│   └── smar/                        ← Smar tenant
-│       ├── canvas/                  ← WebGL layer (FloatingRings, Scene3D, CameraManager)
-│       ├── sections/                ← Content sections (HeroSection, ShowcaseCards)
-│       ├── ui/                      ← Fixed overlays (Navigation, Preloader)
-│       ├── store/                   ← Zustand store (useSmarStore.js)
-│       ├── spatial/                 ← 2.5D parallax pages (SpatialHomePage, SpatialPropertyDetails)
-│       ├── showcase/                ← WebGL / special experiences (SmarLiquidRing)
-│       ├── normal/                  ← 2D booking flow (if needed)
-│       └── admin/                   ← Tenant admin (SmarAdminDashboard)
-│
-├── templates/                       ← Layout-only shells (no data fetching)
-│   ├── ShowcaseTemplate.jsx
-│   └── ListingsTemplate.jsx
-│
-└── design-system/                   ← Shared, tenant-agnostic components
-    ├── atoms/
-    ├── molecules/
-    └── organisms/
-```
+
+| Mode | Examples | Routing behavior |
+|------|----------|-----------------|
+| localhost dev | `localhost:5173` | `/:slug/*` → TenantResolver |
+| auth subdomain | `auth.salmansaas.com` | `/login` → SSOLoginPage, `/:slug/dashboard/*` → GenericAdminDashboard |
+| tenant subdomain | `smar.salmansaas.com` | `/*` → TenantResolver (no slug prefix) |
+| showcase domain | `salmansaas.com` | `/*` → ShowcaseRoutes |
 
 ---
 
-## How Routing Works
+### Static Routes (App.jsx)
 
-```
-URL: /smar/spatial
-        │
-        ▼
-App.jsx: <Route path="/:slug/*" element={<TenantResolver />} />
-        │
-        ▼
-TenantResolver.jsx: slug = "smar"
-  → tenantRegistry["smar"] → lazy(smar.routes.jsx)
-        │
-        ▼
-SmarRoutes: <Route path="spatial" element={<Lazy component={SpatialHomePage} />} />
-```
+| URL | Conditions | Component | Notes |
+|-----|-----------|-----------|-------|
+| `/` | localhost | redirect → `/smar` | root redirect |
+| `/` | auth subdomain | redirect → `/login` | |
+| `/` | tenant subdomain | redirect → `/showcase` | |
+| `/login` | auth subdomain | `SSOLoginPage` | SSO portal |
+| `/login` | localhost | `Login` | legacy dev form |
+| `/register?template=X` | any | `TenantRegisterPage` ← **Phase 52** | 4-step self-signup |
+| `/register` | auth subdomain | `SSOLoginPage` | |
+| `/register` | localhost (no template) | redirect → `/` | |
+| `/demo/:slug` | auth subdomain / localhost | `DemoPublicPage` ← **Phase 50/52** | public demo page |
+| `/:slug/dashboard/*` | auth subdomain / localhost | `GenericAdminDashboard` ← **Phase 52** | trial admin UI |
+| `/:slug/admin/*` | localhost | `SmarAdminDashboard` | legacy smar admin |
+| `/dashboard/:slug/*` | localhost | `SmarAdminDashboard` | legacy dev path |
+| `/admin/*` | subdomain mode | `SmarAdminDashboard` | smar.domain.com/admin |
+| `/dashboard/*` | subdomain mode | `SmarAdminDashboard` | smar.domain.com/dashboard |
+| `/super/*` | any | `ClientsManager` | Salman's control room |
+| `/showcase/*` | localhost | `ShowcaseRoutes` | dev preview of showcase site |
+| `/*` | showcase domain | `ShowcaseRoutes` | salmansaas.com marketing site |
+| `/404` | any | `NotFound` inline | |
+| `/:slug/*` | localhost / auth subdomain | `TenantResolver` | dynamic tenant routing |
+| `/*` | subdomain mode | `TenantResolver` | slug from hostname |
 
----
-
-## URL Map (Current — Live)
-
-| URL | Component | Import Strategy |
-|-----|-----------|-----------------|
-| `/` | redirect → `/smar` | — |
-| `/login` | `Login.jsx` | direct |
-| `/dashboard/:slug/*` | `SmarAdminDashboard` | lazy (Suspense) |
-| `/404` | `NotFound` inline | inline |
-| `/:slug/*` unknown | redirect → `/404` | — |
-| `/smar` | redirect → `/smar/showcase` | — |
-| `/smar/showcase` | `ShowcaseTemplate` | **direct** (no FM scroll hooks) |
-| `/smar/listings` | `ListingsTemplate` | **direct** (no FM scroll hooks) |
-| `/smar/spatial` | `SpatialHomePage` | **lazy** — FM scroll hooks |
-| `/smar/spatial/property/:id` | `SpatialPropertyDetails` | **lazy** — FM scroll hooks |
-| `/smar/ring` | `SmarLiquidRing` | **lazy** — WebGL |
-| `/smar/admin` | `SmarAdminDashboard` | **lazy** |
-
-> **Rule:** Pages that use `useScroll` / `useTransform` / MotionValue style bindings
-> MUST be lazy-loaded. Direct imports execute at chunk-load time and can cause
-> FM12 + React 19 StrictMode crashes that bypass any ErrorBoundary.
+All protected routes are wrapped in `<ProtectedRoute>` which checks `admin_access_token` in localStorage.
 
 ---
 
-## Adding a New Tenant — 3 Steps Only
+### Tenant Registry (router/tenants/index.js)
 
-### Step 1: Create tenant folder
-```
-src/pages/vila/
-├── canvas/   sections/   ui/   store/
-├── spatial/  normal/  showcase/  admin/
-└── vila.css  (scoped: body[data-slug="vila"] { ... })
-```
-
-### Step 2: Create routes file
-```jsx
-// src/router/tenants/vila.routes.jsx
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
-
-const VilaHomePage = lazy(() => import('../../pages/vila/spatial/VilaHomePage'));
-
-export default function VilaRoutes() {
-  return (
-    <Routes>
-      <Route path="home"  element={<Suspense fallback={null}><VilaHomePage /></Suspense>} />
-      <Route path=""      element={<Navigate to="home" replace />} />
-      <Route path="*"     element={<Navigate to="home" replace />} />
-    </Routes>
-  );
+```js
+export const tenantRegistry = {
+  smar:    { routes: lazy(./smar.routes),    defaultRedirect: 'home',  theme: 'gold-dark'   },
+  caracas: { routes: lazy(./caracas.routes), defaultRedirect: 'menu',  theme: 'red-dark'    },
+  footlab: { routes: lazy(./footlab.routes), defaultRedirect: 'store', theme: 'purple-dark' },
 }
 ```
 
-### Step 3: Register in registry
-```js
-// src/router/tenants/index.js — add ONE entry:
-vila: {
-  routes:          lazy(() => import('./vila.routes')),
-  defaultRedirect: 'home',
-  theme:           'green-nature',
-},
+**FM12 Rule:** Any page using `useScroll`, `useTransform`, or MotionValue bindings MUST be `lazy()`.
+Direct imports at chunk-load time crash React 19 StrictMode with FM12 (blank `div#root`).
+
+---
+
+### Smar Tenant Routes (smar.routes.jsx)
+
+| URL | Component | Import |
+|-----|-----------|--------|
+| `/smar` / `/smar/*` | redirect → `showcase` | — |
+| `/smar/showcase` | `ShowcaseTemplate` | direct |
+| `/smar/listings` | `ListingsTemplate` | direct |
+| `/smar/gallery` | `SmarGalleryPage` | **lazy** |
+| `/smar/spatial` | `SpatialHomePage` | **lazy** — FM scroll |
+| `/smar/spatial/property/:id` | `SpatialPropertyDetails` | **lazy** — FM scroll |
+| `/smar/challet` | `ChalletDemo` | **lazy** |
+| `/smar/ring` | `SmarLiquidRing` | **lazy** — WebGL |
+| `/smar/admin` | `SmarAdminDashboard` | **lazy** + ProtectedRoute |
+
+---
+
+### Folder Structure
+
 ```
+frontend/src/
+├── App.jsx                            ← Root router
+├── router/
+│   ├── TenantResolver.jsx             ← slug → tenantRegistry lookup
+│   ├── ProtectedRoute.jsx             ← JWT guard
+│   ├── showcase.routes.jsx            ← salmansaas.com marketing
+│   └── tenants/
+│       ├── index.js                   ← REGISTRY (only place to add tenants)
+│       ├── smar.routes.jsx
+│       ├── caracas.routes.jsx
+│       └── footlab.routes.jsx
+├── pages/
+│   ├── admin/Login.jsx                ← Dev-only login
+│   ├── auth/
+│   │   ├── SSOLoginPage.jsx           ← auth.salmansaas.com SSO portal
+│   │   └── TenantRegisterPage.jsx     ← 4-step tenant self-signup (Phase 52)
+│   ├── demo/DemoPublicPage.jsx        ← Trial tenant public preview (Phase 50)
+│   ├── generic-admin/
+│   │   └── GenericAdminDashboard.jsx  ← Trial admin: CatalogTab + SettingsTab (Phase 52)
+│   ├── super-admin/ClientsManager.jsx ← Super admin control room
+│   ├── smar/                          ← Smar-specific pages
+│   ├── caracas/                       ← Caracas-specific pages
+│   └── footlab/                       ← Footlab-specific pages
+└── design-system/                     ← Shared tenant-agnostic components
+```
+
+---
+
+## Backend Routing
+
+All routes are prefixed with `/api/v1`.
+
+### Auth — `/api/v1/auth`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/auth/login` | none | CLIENT JWT (`type=client`) for public API |
+| POST | `/auth/users/login` | none | USER JWT (`type=admin`, `role`) for admin dashboard |
+| POST | `/auth/register` | none | Create tenant + return USER JWT directly ← **updated Phase 52** |
+| GET | `/auth/me` | USER JWT | Current user info |
+| POST | `/auth/sso/token` | none | SSO token exchange |
+
+### Webhooks — `/api/v1/webhook`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/webhook/whatsapp` | webhook secret | WhatsApp booking confirmations |
+| POST | `/webhook/onboarding/process` | `x-onboarding-secret` header ← **new Phase 52** | Raw WhatsApp text → Claude Haiku → auto-register tenant |
+
+**Onboarding webhook flow:**
+1. n8n sends raw conversation text + `x-onboarding-secret` header
+2. Claude Haiku (`claude-haiku-4-5-20251001`) extracts structured JSON
+3. `register_new_tenant()` creates Client + User + seeds services
+4. Returns: `{ dashboard_url, trial_ends_at, temp_password, slug }`
+
+### Public — `/api/v1/public`
+No auth required. CLIENT JWT optional for personalization.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/public/client/{slug}/config` | Tenant config (branding, features) |
+| GET | `/public/client/{slug}/units` | Available units with filters |
+| POST | `/public/client/{slug}/book` | Create booking |
+| GET | `/public/{slug}/catalog` | Catalog categories + items |
+| GET | `/public/{slug}/restaurant` | Restaurant menu |
+| GET | `/public/{slug}/store` | Store products |
+
+### Admin — `/api/v1/admin`
+Requires USER JWT (`type=admin`).
+
+| Path group | Description |
+|-----------|-------------|
+| `/admin/bookings/*` | Booking CRUD + status updates |
+| `/admin/units/*` | Unit CRUD |
+| `/admin/services/*` | Add-on services CRUD |
+| `/admin/prices/*` | Price calendar management |
+| `/admin/gallery/*` | Gallery images CRUD |
+| `/admin/settings` | Tenant config PATCH |
+| `/admin/catalog/*` | CatalogCategory + CatalogItem CRUD ← **Phase 49/51** |
+| `/admin/restaurant/*` | Restaurant config + menu CRUD |
+| `/admin/store/*` | Store products + orders CRUD |
+| `/admin/upload` | Image upload → Supabase Storage ← **Phase 53 (pending)** |
+
+### Super Admin — `/api/v1/super`
+Requires USER JWT with `role=SUPER_ADMIN`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/super/clients` | List all tenants |
+| POST | `/super/clients` | Create new tenant manually |
+| PATCH | `/super/clients/{id}` | Update tenant |
+| GET/PATCH | `/super/clients/{id}/services` | Toggle tenant's active services |
+| GET/POST/PATCH | `/super/platform-services` | Manage SalmanSaaS product catalog |
+
+---
+
+## Adding a New Tenant (3 Steps)
+
+1. Create `src/pages/[slug]/` (canvas/, sections/, ui/, store/, spatial/, normal/, admin/)
+2. Create `src/router/tenants/[slug].routes.jsx`
+3. Add entry to `src/router/tenants/index.js`
 
 **Nothing else.** `App.jsx` and `TenantResolver.jsx` stay untouched.
 
 ---
 
-## Dependencies
+## Trial vs Production Routing
 
-| Package | Purpose |
-|---------|---------|
-| `react-router-dom` | Routing |
-| `zustand` | Tenant-scoped global state (scrollProgress, lang, booking) |
-| `framer-motion` | All UI animations |
-| `gsap` | ScrollTrigger, timeline animations |
-| `lenis` | Smooth scroll |
-| `three` + `@react-three/fiber` + `@react-three/drei` | WebGL scenes |
-| `lucide-react` | Icons (User, X, ShieldCheck, etc.) |
+```
+client.status = "trial"  → /{slug}/dashboard  (GenericAdminDashboard)
+client.status = "active" → {slug}.salmansaas.com/admin  (SmarAdminDashboard)
+```
+
+`SSOLoginPage.resolveRedirect()` reads `status` from the JWT response and routes accordingly.
+User role (`TENANT_ADMIN`) is the same for both — only `client.status` determines the URL.

@@ -1,0 +1,10 @@
+{
+  "_meta": {
+    "slug": "caracas",
+    "module_key": "restaurant",
+    "currency": "$",
+    "old_restaurant_id": "d00397c4-0c0c-430c-88ac-d610dd5cb4be",
+    "source": "categories_rows.json + menu_items_rows.json (exported 2026-05-07)",
+    "note": "Lebanese fast food restaurant — real menu from old Multi-Cafe-Saas DB"
+  }
+}

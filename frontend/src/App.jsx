@@ -23,10 +23,13 @@ import ProtectedRoute from './router/ProtectedRoute';
 import { LanguageProvider } from './context/LanguageContext';
 
 // Lazy — keeps heavy admin deps out of the main bundle
-const SmarAdminDashboard = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
-const SSOLoginPage        = lazy(() => import('./pages/auth/SSOLoginPage'));
+const SmarAdminDashboard    = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
+const GenericAdminDashboard = lazy(() => import('./pages/generic-admin/GenericAdminDashboard'));
+const SSOLoginPage          = lazy(() => import('./pages/auth/SSOLoginPage'));
+const TenantRegisterPage    = lazy(() => import('./pages/auth/TenantRegisterPage'));
 const ShowcaseRoutes      = lazy(() => import('./router/showcase.routes'));
 const ClientsManager      = lazy(() => import('./pages/super-admin/ClientsManager'));
+const DemoPublicPage      = lazy(() => import('./pages/demo/DemoPublicPage'));
 
 // Detect subdomain mode at module scope (stable across renders)
 const _h = window.location.hostname;
@@ -89,11 +92,13 @@ function App() {
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Login />
           } />
-          {/* auth.salmansaas.com/register → SSO portal (register mode) */}
+          {/* /register — tenant self-sign-up when ?template= param present, SSO otherwise */}
           <Route path="/register" element={
-            IS_AUTH_SUBDOMAIN
-              ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
-              : <Navigate to="/" replace />
+            new URLSearchParams(window.location.search).has('template')
+              ? <Suspense fallback={null}><TenantRegisterPage /></Suspense>
+              : IS_AUTH_SUBDOMAIN
+                ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
+                : <Navigate to="/" replace />
           } />
           {/* Subdomain mode: smar.domain.com/admin/units  (no slug in path) */}
           {IS_SUBDOMAIN_MODE && (
@@ -124,11 +129,20 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* ── Demo dashboard — auth subdomain + localhost (no tenant DNS needed) ── */}
+          {/* ── Trial public page — no auth, customers browse here ── */}
+          {/* auth.salmansaas.com/demo/:slug  OR  localhost/demo/:slug        */}
           {(IS_AUTH_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
-            <Route path="/demo/:slug/*" element={
+            <Route path="/demo/:slug" element={
+              <Suspense fallback={null}><DemoPublicPage /></Suspense>
+            } />
+          )}
+
+          {/* ── Trial admin — auth subdomain + localhost (no tenant DNS needed) ── */}
+          {/* /:slug/dashboard  =  generic dashboard for all new tenants */}
+          {(IS_AUTH_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
+            <Route path="/:slug/dashboard/*" element={
               <ProtectedRoute>
-                <Suspense fallback={null}><SmarAdminDashboard /></Suspense>
+                <Suspense fallback={null}><GenericAdminDashboard /></Suspense>
               </ProtectedRoute>
             } />
           )}

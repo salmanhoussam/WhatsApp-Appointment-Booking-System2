@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel
 from typing import List
 
-from . import properties, units, bookings, listings, registration
+from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations
 from app.db.client import prisma_client
+from app.db.dependencies import get_current_client
+from app.core.services import require_service
 from app.services import public_service
+from app.services import catalog_service
 
 router = APIRouter()
 
@@ -208,9 +211,52 @@ async def get_unit_calendar(slug: str, unit_id: str):
     }
 
 
+# ── Slug-in-path catalog endpoints ────────────────────────────────
+# Tenant resolved via ?client_slug= query param (get_current_client).
+# Service gate: require_service("catalog") → 403 if not active.
+
+@router.get("/{slug}/catalog/categories", tags=["Public Catalog"])
+async def list_catalog_categories(
+    slug:       str,
+    module_key: Optional[str] = Query(None),
+    parent_id:  Optional[str] = Query(None),
+    client_id:  str = Depends(get_current_client),
+    _svc=Depends(require_service("catalog")),
+):
+    data = await catalog_service.list_categories(client_id, module_key, parent_id)
+    return {"success": True, "data": data}
+
+
+@router.get("/{slug}/catalog/categories/{category_id}/items", tags=["Public Catalog"])
+async def list_catalog_category_items(
+    slug:        str,
+    category_id: str,
+    search:      Optional[str] = Query(None),
+    client_id:   str = Depends(get_current_client),
+    _svc=Depends(require_service("catalog")),
+):
+    data = await catalog_service.get_category_items(client_id, category_id, search)
+    return {"success": True, "data": data}
+
+
+@router.get("/{slug}/catalog/items/{item_id}", tags=["Public Catalog"])
+async def get_catalog_item(
+    slug:      str,
+    item_id:   str,
+    client_id: str = Depends(get_current_client),
+    _svc=Depends(require_service("catalog")),
+):
+    data = await catalog_service.get_item(client_id, item_id)
+    return {"success": True, "data": data}
+
+
 # ── Nested sub-routers ─────────────────────────────────────────────
-router.include_router(properties.router,   prefix="/properties", tags=["Public Properties"])
-router.include_router(units.router,        prefix="/units",       tags=["Public Units"])
-router.include_router(bookings.router,     prefix="/bookings",    tags=["Public Bookings"])
-router.include_router(listings.router,     prefix="/listings",    tags=["Public Listings"])
+router.include_router(properties.router,   prefix="/properties",  tags=["Public Properties"])
+router.include_router(units.router,        prefix="/units",        tags=["Public Units"])
+router.include_router(bookings.router,     prefix="/bookings",     tags=["Public Bookings"])
+router.include_router(listings.router,     prefix="/listings",     tags=["Public Listings"])
 router.include_router(registration.router)
+router.include_router(restaurant.router,   prefix="/restaurant",   tags=["Public Restaurant"])
+router.include_router(store.router,        prefix="/store",         tags=["Public Store"])
+router.include_router(catalog.router,        prefix="/catalog",       tags=["Public Catalog"])
+router.include_router(reservations.router,  prefix="/reservations",  tags=["Public Reservations"])

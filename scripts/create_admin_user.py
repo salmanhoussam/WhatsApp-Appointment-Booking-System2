@@ -1,12 +1,15 @@
 """
 scripts/create_admin_user.py
-Create (or reset) any admin User linked to the platform owner client (smar).
+Create (or reset) any admin User linked to a specific client.
 
 Usage:
-    python -m scripts.create_admin_user --email admin@salmansaas.com --role TENANT_ADMIN --password secret
-    python -m scripts.create_admin_user --email salman@salmansaas.com --role SUPER_ADMIN  --password secret
+    python scripts/create_admin_user.py --email admin@salmansaas.com --role TENANT_ADMIN --password secret
+    python scripts/create_admin_user.py --email salman@salmansaas.com --role SUPER_ADMIN  --password secret
+    python scripts/create_admin_user.py --email admin@caracas.com --slug caracas --role TENANT_ADMIN --password secret
+    python scripts/create_admin_user.py --email admin@footlab.com --slug footlab --role TENANT_ADMIN --password secret
 
 Roles: SUPER_ADMIN | TENANT_ADMIN | MANAGER_RESERVATIONS | MANAGER_UNITS
+--slug defaults to "smar" (platform owner) when omitted.
 """
 
 import asyncio
@@ -26,12 +29,11 @@ if _direct:
 
 from prisma import Prisma
 from app.core.security import get_password_hash
-from app.core.config import settings
 
 VALID_ROLES = {"SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS"}
 
 
-async def main(email: str, password: str, full_name: str, role: str):
+async def main(email: str, password: str, full_name: str, role: str, slug: str):
     if role not in VALID_ROLES:
         print(f"[ERROR] Invalid role '{role}'. Choose: {sorted(VALID_ROLES)}")
         return
@@ -44,10 +46,9 @@ async def main(email: str, password: str, full_name: str, role: str):
     print("==============================================\n")
 
     try:
-        owner_slug = getattr(settings, "SUPER_ADMIN_SLUG", "smar")
-        owner = await db.client.find_unique(where={"slug": owner_slug})
+        owner = await db.client.find_unique(where={"slug": slug})
         if not owner:
-            print(f"[ERROR] Platform owner client '{owner_slug}' not found.")
+            print(f"[ERROR] Client '{slug}' not found.")
             return
 
         print(f"[OK]  Client found: {owner.slug} (status={owner.status})")
@@ -97,6 +98,7 @@ async def main(email: str, password: str, full_name: str, role: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create/update admin user")
     parser.add_argument("--email",    required=True)
+    parser.add_argument("--slug",     default="smar", help="Client slug to link user to (default: smar)")
     parser.add_argument("--name",     default=None)
     parser.add_argument("--role",     default="TENANT_ADMIN", choices=sorted(VALID_ROLES))
     parser.add_argument("--password", default=None)
@@ -111,4 +113,4 @@ if __name__ == "__main__":
             print("[ERROR] Password must be at least 8 characters.")
             sys.exit(1)
 
-    asyncio.run(main(args.email, password, full_name, args.role))
+    asyncio.run(main(args.email, password, full_name, args.role, args.slug))

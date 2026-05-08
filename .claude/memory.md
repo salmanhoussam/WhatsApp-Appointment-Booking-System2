@@ -3288,3 +3288,60 @@ After starting start_dev.bat:
 
 http://localhost:5173/smar/admin
 Log in at http://localhost:5173/login first — the token is stored automatically and the dashboard redirects to itself.
+---
+
+## 2026-05-05 — Session Summary
+
+### ✅ Completed
+- Phase 54: DB Unification — حذف 7 جداول (MenuCategory, MenuItem, StoreCategory, StoreProduct, StoreBrand, StoreReview, StoreWishlist)، كل شيء الآن في CatalogCategory + CatalogItem بـ moduleKey
+- Phase 55: Generic Reservations — نموذج Reservation جديد + repo + service + 8 endpoints (public + admin)
+- Frontend Audit: إصلاح useCaracasStore + useFootlabStore + MenuPage + CartPage ← كانوا يستخدمون menuItemId/product_id بدل catalogItemId
+- توثيق قاعدة `.claude/rules/frontend/catalog-contract.md` — منع تكرار الخطأ
+
+### 🗄️ Schema Changes
+- Removed: MenuCategory, MenuItem, StoreCategory, StoreProduct, StoreBrand, StoreReview, StoreWishlist
+- Modified: RestaurantOrderItem → catalogItemId (was menuItemId)
+- Modified: StoreCartItem → catalogItemId (was productId), unique key updated
+- Modified: StoreOrderItem → catalogItemId (was productId)
+- Added: Reservation model (clientId, moduleKey, reservedAt, durationMin, status, metadata)
+
+### 🔧 Architecture Decisions
+- CatalogItem.moduleKey = 'restaurant' | 'store' | 'real_estate' | 'hotel' | 'catalog' — فلترة على مستوى الـ query
+- Reservation conflict detection: ±4h window query ثم Python overlap check (Prisma لا يدعم duration arithmetic)
+- serviceKey "reservations" منفصل عن "booking" — booking = multi-night Unit-based, reservations = datetime slot generic
+
+### 🐛 Bugs Fixed
+- useCaracasStore: addItem/removeItem/updateQuantity كانوا يستخدمون menuItemId → أصبح catalogItemId
+- useFootlabStore: addItem كان يستخدم product_id → أصبح catalog_item_id
+- MenuPage.jsx: API payload كان يرسل menu_item_id → أصبح catalog_item_id
+- CartPage.jsx (footlab): item.product_id → item.catalog_item_id
+
+### 📋 Next Session Should Start With
+1. Generic Pages: src/pages/generic/ (CatalogPage + CartPage + ReservePage)
+2. Phase 56: Tenant Admin Dashboard v2 — rebuild GenericAdminDashboard.jsx
+
+---
+
+## 2026-05-06 — Session Summary
+
+### ✅ Completed
+- template-registry.js v3: أضيف module_key + services[] لكل الـ 20 template
+- Helper functions: getServicesForTemplate() + getModuleKey() في template-registry.js
+- Session file 2026-05-06.md: Phase 56 plan كامل مع checklist التحقق
+
+### 🔧 Architecture Decisions
+- module_key mapping: fashion/grocery/pharmacy/cosmetics → "store" | restaurant/cafe/bakery/fastfood → "restaurant" | barber/salon/spa/clinic/gym/services → "catalog"
+- services[] seeded من template عند التسجيل — يُحدد client_services rows
+- Gym استثناء: services: ["store", "reservations"] — يبيع اشتراكات ويحجز حصص
+
+### 🚧 In Progress (carry to next session)
+- Phase 56: Tenant Admin Dashboard v2 (جلسة A — Layout + Stats)
+- Generic Pages: src/pages/generic/ لم تُبنَ بعد
+- Hooks: .claude/hooks/ غير مربوطة في settings.json
+- TenantRegisterPage: لا تمرر module_key للـ seed بعد
+- Backend endpoint: POST /admin/services/activate غير موجود
+
+### 📋 Next Session Should Start With
+1. npm install recharts @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+2. Rebuild GenericAdminDashboard.jsx — Sidebar layout + OverviewTab
+3. تحقق من وجود PATCH /admin/restaurant/orders/{id}/status

@@ -24,8 +24,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import publicApi     from '../utils/publicApi';
-import useTenantSlug from '../utils/useTenantSlug';
+import publicApi          from '../utils/publicApi';
+import useTenantSlug      from '../utils/useTenantSlug';
+import { getNavItems }    from '../config/service-catalog';
 
 // ─── Default fallback (prevents white screen if API is unreachable) ──────────
 const DEFAULT_CONFIG = {
@@ -48,6 +49,8 @@ const DEFAULT_CONFIG = {
   config:          {},
   unit_types:      [],
   payment_methods: ['cash'],
+  service_type:    null,
+  active_services: [],
 };
 
 // ─── In-memory session cache — one fetch per slug per page load ───────────────
@@ -102,8 +105,11 @@ export default function useTenantConfig(slugOverride) {
     return () => controller.abort();
   }, [slug]);
 
+  const resolved = config ?? DEFAULT_CONFIG;
+
   return {
-    config:    config ?? DEFAULT_CONFIG,
+    config:    resolved,
+    navItems:  getNavItems(resolved.active_services ?? [], resolved.slug ?? slug),
     isLoading,
     error,
   };

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # 👑 Super admin — slug of the platform owner's client account
     SUPER_ADMIN_SLUG: str = os.getenv("SUPER_ADMIN_SLUG", "smar")
 
+    # 🤖 إعدادات الـ AI
+    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    ONBOARDING_SECRET: Optional[str] = os.getenv("ONBOARDING_SECRET")  # ASCII only
+
     # 📱 إعدادات واتساب
     WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "my_secure_token")
     WHATSAPP_ACCESS_TOKEN: Optional[str] = os.getenv("WHATSAPP_ACCESS_TOKEN")

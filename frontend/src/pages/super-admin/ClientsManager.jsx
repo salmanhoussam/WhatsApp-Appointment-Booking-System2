@@ -154,6 +154,55 @@ function ActionMenu({ clientId, current, onUpdate }) {
   );
 }
 
+// ── PageType radio ─────────────────────────────────────────────────────────────
+const PAGE_TYPES = [
+  { value: 'normal',   label: 'عادية',    desc: 'GlassCard + CTA' },
+  { value: 'showcase', label: 'Showcase', desc: 'Split editorial'  },
+];
+
+function PageTypeRadio({ clientId, currentPageType, onUpdate }) {
+  const [saving, setSaving] = useState(false);
+
+  async function apply(pageType) {
+    if (pageType === currentPageType || saving) return;
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('admin_access_token') || '';
+      await axios.patch(
+        `${API_BASE}/api/v1/super/clients/${clientId}/settings`,
+        { page_type: pageType },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      onUpdate(clientId, pageType);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {PAGE_TYPES.map(pt => (
+        <button
+          key={pt.value}
+          onClick={() => apply(pt.value)}
+          disabled={saving}
+          title={pt.desc}
+          style={{
+            padding: '4px 10px', borderRadius: 6, cursor: saving ? 'wait' : 'pointer',
+            background: pt.value === currentPageType ? 'rgba(212,168,83,0.12)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${pt.value === currentPageType ? 'rgba(212,168,83,0.35)' : C.border}`,
+            color: pt.value === currentPageType ? C.gold : C.textMuted,
+            fontSize: 11, fontWeight: pt.value === currentPageType ? 700 : 400,
+            fontFamily: 'inherit', transition: 'all 0.15s',
+          }}
+        >
+          {pt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ClientsManager() {
   const navigate = useNavigate();
@@ -164,6 +213,11 @@ export default function ClientsManager() {
   const [error,     setError]     = useState('');
   const [filter,    setFilter]    = useState('all');  // all | trial | active | suspended
   const [toastMsg,  setToastMsg]  = useState('');
+
+  function handlePageTypeUpdate(clientId, pageType) {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, page_type: pageType } : c));
+    showToast(`🎨 page_type → ${pageType}`);
+  }
 
   // Redirect non-super-admins immediately
   useEffect(() => {
@@ -319,12 +373,12 @@ export default function ClientsManager() {
         {/* Table header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '2fr 1.2fr 1fr 1fr 0.8fr 0.9fr',
+          gridTemplateColumns: '2fr 1.2fr 1fr 1fr 0.8fr 1.1fr 0.9fr',
           padding: '12px 20px',
           borderBottom: `1px solid ${C.border}`,
           background: 'rgba(255,255,255,0.02)',
         }}>
-          {['اسم المنشأة', 'الرابط (Slug)', 'نوع الخدمة', 'الحالة', 'الأيام المتبقية', 'إجراء'].map(h => (
+          {['اسم المنشأة', 'الرابط (Slug)', 'نوع الخدمة', 'الحالة', 'الأيام المتبقية', 'نوع الصفحة', 'إجراء'].map(h => (
             <div key={h} style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: '0.08em' }}>
               {h}
             </div>
@@ -350,7 +404,7 @@ export default function ClientsManager() {
                 exit={{ opacity: 0 }}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '2fr 1.2fr 1fr 1fr 0.8fr 0.9fr',
+                  gridTemplateColumns: '2fr 1.2fr 1fr 1fr 0.8fr 1.1fr 0.9fr',
                   padding: '14px 20px',
                   borderBottom: i < filtered.length - 1 ? `1px solid ${C.border}` : 'none',
                   alignItems: 'center',
@@ -396,6 +450,15 @@ export default function ClientsManager() {
                   {c.status === 'active' || c.status === 'demo'
                     ? <span style={{ color: C.green }}>∞</span>
                     : c.days_left !== null ? `${c.days_left}d` : '—'}
+                </div>
+
+                {/* Page type */}
+                <div>
+                  <PageTypeRadio
+                    clientId={c.id}
+                    currentPageType={c.page_type || 'normal'}
+                    onUpdate={handlePageTypeUpdate}
+                  />
                 </div>
 
                 {/* Actions */}

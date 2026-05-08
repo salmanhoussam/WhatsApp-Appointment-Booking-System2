@@ -16,3 +16,13 @@ class RegistrationRepository:
 
     async def create_user(self, data: dict):
         return await self.db.user.create(data=data)
+
+    async def seed_default_services(self, client_id: str, service_keys: list[str]) -> None:
+        for key in service_keys:
+            await self.db.clientservice.upsert(
+                where={"clientId_serviceKey": {"clientId": client_id, "serviceKey": key}},
+                data={
+                    "create": {"clientId": client_id, "serviceKey": key, "isActive": True},
+                    "update": {"isActive": True},
+                },
+            )

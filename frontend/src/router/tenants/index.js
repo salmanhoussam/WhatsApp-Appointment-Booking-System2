@@ -17,10 +17,15 @@ export const tenantRegistry = {
     theme:           'gold-dark',
   },
 
-  // ── Add future tenants here ──────────────────────────────────────────────
-  // vila: {
-  //   routes:          lazy(() => import('./vila.routes')),
-  //   defaultRedirect: 'home',
-  //   theme:           'green-nature',
-  // },
+  caracas: {
+    routes:          lazy(() => import('./caracas.routes')),
+    defaultRedirect: 'menu',
+    theme:           'red-dark',
+  },
+
+  footlab: {
+    routes:          lazy(() => import('./footlab.routes')),
+    defaultRedirect: 'store',
+    theme:           'purple-dark',
+  },
 };

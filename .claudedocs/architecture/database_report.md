@@ -1,437 +1,296 @@
-# تقرير قاعدة البيانات — Beit Smar PMS
-**تاريخ التحديث:** 21 أبريل 2026
-**التقنيات:** PostgreSQL (Supabase) + Prisma ORM (Python Client) + FastAPI
-**الملفات المُفحوصة:** `prisma/schema.prisma` + 8 repositories + 15 services + 20 API routes
+# Database Report — SalmanSaaS Platform
+**Last updated:** 2026-05-05 (auto-generated from `prisma/schema.prisma`)
+**Models:** 29 | **Schema:** `public` | **DB:** Supabase / PostgreSQL
 
 ---
 
-## البنية المعمارية (4-Layer Architecture)
-
-```
-HTTP Request
-    ↓
-Routes (app/api/v1/)          ← HTTP transport only. Zero business logic.
-    ↓
-Services (app/services/)      ← Business logic, orchestration, calculations.
-    ↓
-Repositories (app/repositories/) ← The ONLY layer allowed to call prisma.*
-    ↓
-DB (PostgreSQL / Supabase)    ← Managed via Prisma schema
-```
-
-**Multi-Tenancy:** كل استعلام في الـ Repository يحتوي على `clientId` داخل الـ `where` clause — لا استثناءات.
-
-**اتصال قاعدة البيانات (`app/db/client.py`):**
-```
-DATABASE_URL  → Transaction Pooler (port 6543 + pgbouncer=true)  — Runtime queries
-DIRECT_URL    → Direct Connection  (port 5432)                   — prisma migrate / db push
-```
-Client Singleton: `prisma_client = Prisma()` — يتصل عند startup ويقطع عند shutdown.
+## Multi-Tenancy Rule
+Every table with tenant-owned data has a `client_id UUID FK → clients.id`.
+All queries MUST include `clientId` in the `where` clause. No exceptions.
 
 ---
 
-## الجداول (9 Models)
+## Model Index
 
-### 1. `Client` — جدول الجذر (Multi-Tenancy Root)
-
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | auto-generated |
-| `slug` | String UNIQUE | معرف URL مثل `smar` |
-| `phone` | String UNIQUE | رقم الهاتف |
-| `name` / `name_ar` / `name_en` | String | الاسم ثلاثي |
-| `email` / `password_hash` | String? | للـ SSO login |
-| `isActive` | Boolean | default true |
-| `primary_color` | String? | `#d4a853` |
-| `hero_video_url` | String? | فيديو الهيرو |
-| `whatsapp_number` | String? | للإشعارات |
-| `instagram_url` / `maps_url` | String? | روابط خارجية |
-| `currency` | String | default `"USD"` ⚠️ |
-| `features` | Json? | `{spatial, listings, booking, payment}` |
-| `unit_types` | String[] | `["villa","chalet"]` |
-| `payment_methods` | String[] | `["cash","card","whish","omt"]` |
-
-> **Auto-Seed:** عند أول طلب `/{slug}/config` إذا كان `slug == "smar"` ولا يوجد row → يُنشئ تلقائياً عبر `public_service.get_tenant_config()`.
-
-**العلاقات:** `Client → has many → [User, Property, Unit, Customer, Booking, Price, Service]`
+| # | Model | Table | Module | Notes |
+|---|-------|-------|--------|-------|
+| 1 | `Client` | `clients` | Core | Main tenant row |
+| 2 | `User` | `users` | Auth | TENANT_ADMIN, SUPER_ADMIN, managers |
+| 3 | `Property` | `properties` | Booking | Container for Units |
+| 4 | `Unit` | `units` | Booking | Bookable unit (chalet/villa/room) |
+| 5 | `Price` | `prices` | Booking | Daily price calendar |
+| 6 | `Service` | `services` | Booking | Add-on services (pool, breakfast...) |
+| 7 | `Customer` | `customers` | Booking | End-customers who make bookings |
+| 8 | `Booking` | `bookings` | Booking | Reservation |
+| 9 | `BookingService` | `booking_services` | Booking | Join: Booking ↔ Service |
+| 10 | `GalleryImage` | `gallery_images` | Shared | Images for units & catalog items |
+| 11 | `ClientService` | `client_services` | Platform | Module activation gate |
+| 12 | `PlatformService` | `platform_services` | Platform | SalmanSaaS product catalog |
+| 13 | `CatalogCategory` | `catalog_categories` | Catalog | Generic category tree |
+| 14 | `CatalogItem` | `catalog_items` | Catalog | Item inside a category |
+| 15 | `RestaurantConfig` | `restaurant_configs` | Restaurant | Per-tenant restaurant settings |
+| 16 | `MenuCategory` | `menu_categories` | Restaurant | Menu category |
+| 17 | `MenuItem` | `menu_items` | Restaurant | Menu item with price |
+| 18 | `RestaurantOrder` | `restaurant_orders` | Restaurant | Customer order |
+| 19 | `RestaurantOrderItem` | `restaurant_order_items` | Restaurant | Line item in order |
+| 20 | `StoreCustomer` | `store_customers` | Store | Store-specific customer account |
+| 21 | `StoreBrand` | `store_brands` | Store | Product brand |
+| 22 | `StoreCategory` | `store_categories` | Store | Product category (tree) |
+| 23 | `StoreProduct` | `store_products` | Store | Product with variants |
+| 24 | `StoreCart` | `store_carts` | Store | Session-based cart |
+| 25 | `StoreCartItem` | `store_cart_items` | Store | Cart line item |
+| 26 | `StoreOrder` | `store_orders` | Store | Completed order |
+| 27 | `StoreOrderItem` | `store_order_items` | Store | Order line item |
+| 28 | `StoreReview` | `store_reviews` | Store | Product review |
+| 29 | `StoreWishlist` | `store_wishlists` | Store | Saved product |
 
 ---
 
-### 2. `User` — مستخدمو النظام الإداري
+## Core Models
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
+### `Client` → `clients`
+Main tenant record. One row per business.
+
+| Field | Type | Notes |
+|-------|------|-------|
 | `id` | UUID PK | |
-| `clientId` | UUID FK → Client | Cascade delete |
-| `email` | String UNIQUE | |
-| `password_hash` | String | bcrypt |
+| `name` | String | Display name |
+| `name_ar` / `name_en` | String? | Localized names |
+| `slug` | String UNIQUE | URL identifier |
+| `phone` | String UNIQUE | Global unique (unlike Customer.phone) |
+| `email` / `password_hash` | String? | |
+| `primary_color` | String? | Hex color |
+| `hero_video_url` | String? | |
+| `whatsapp_number` | String? | |
+| `currency` | String DEFAULT "SAR" | |
+| `features` | Json? | Feature flags |
+| `config` | Json DEFAULT "{}" | Misc config |
+| `unit_types` | String[] | villa/chalet/restaurant/pool |
+| `payment_methods` | String[] | cash/card/whatsapp/whish/omt |
+| `status` | String DEFAULT "trial" | **trial** \| **active** |
+| `trial_ends_at` | DateTime? | |
+| `service_type` | String? DEFAULT "real_estate" | real_estate\|restaurant\|store\|services |
+| `pageType` | String DEFAULT "normal" | normal \| showcase |
+| `templateKey` | String? | maps to TEMPLATE_REGISTRY |
+| `selected_services` | Json DEFAULT "[]" | Denormalized active service keys |
+
+### `User` → `users`
+Admin/staff accounts. Separate from `Customer`.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | UUID PK | |
+| `clientId` | UUID FK → clients | |
+| `email` | String UNIQUE | Global unique |
+| `password_hash` | String | |
 | `fullName` | String | |
-| `role` | Enum UserRole | |
-| `isActive` | Boolean | default true |
+| `role` | UserRole | SUPER_ADMIN \| TENANT_ADMIN \| MANAGER_RESERVATIONS \| MANAGER_UNITS |
+| `isActive` | Boolean | |
+| `lastLoginAt` / `resetToken` | | Auth lifecycle |
 
-**Enum UserRole:** `SUPER_ADMIN | TENANT_ADMIN | MANAGER_RESERVATIONS | MANAGER_UNITS`
-
----
-
-### 3. `Property` — المنشآت العقارية
-
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `clientId` | UUID FK → Client | Cascade delete |
-| `managerId` | UUID? FK → User | اختياري |
-| `name` / `description` / `image_url` | String? | |
-| `max_guests` / `bedrooms` / `bathrooms` | Int | |
-| `isActive` | Boolean | default true |
-
-**العلاقات:** `Property → has many → [Unit, Service]`
+**JWT type:** `type=admin` — required for all `/admin/*` endpoints.
 
 ---
 
-### 4. `Unit` — الوحدات السكنية ⭐
+## Booking Module
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `propertyId` | UUID FK → Property | Cascade delete |
-| `clientId` | UUID FK → Client | |
-| `unitNumber` | String? | رقم تعريفي اختياري |
-| `unit_type` | String? | `villa / chalet / restaurant / pool` — default `"chalet"` |
-| `name_ar` / `name_en` | String? | ثنائي اللغة |
-| `description` | String? | حقل legacy |
-| `description_ar` / `description_en` | String? | **الحقول الجديدة** — ثنائي اللغة |
-| `category` | String? | **حقل جديد** — فلترة مستقلة عن `unit_type` |
-| `image_url` | String? | الصورة الرئيسية (= `images[0]`) |
-| `images` | String[] | مصفوفة Supabase URLs — default `[]` |
-| `capacity` | Int | عدد الضيوف |
-| `bedrooms` / `bathrooms` | Int? | |
-| `price` | Decimal(10,2)? | السعر الأساسي |
-| `price_label` | String? | مثل "يبدأ من" |
-| `isActive` / `isAvailable` | Boolean | default true |
-| `sort_order` | Int? | ترتيب العرض — default 0 |
-| `position_x` / `position_y` | Float? | موقع على خريطة الـ canvas |
-| `content_blocks` | Json? | **Block Builder** — مصفوفة `{type, content, style?, icon?, title?}` |
-| `amenities` | Json? | **مصفوفة المرافق** — `{icon, label, label_ar?}` |
-| `rules_policies` | Json? | **القواعد والسياسات** — `{checkIn, checkOut, cancellation, rules[]}` |
+### `Property` → `properties`
+Container for units. One property can have many units.
 
-**JSON Schemas:**
+| Field | Notes |
+|-------|-------|
+| `clientId` | FK → clients |
+| `managerId` | FK → users (optional manager) |
+| `property_type` | "Bed & Breakfast" \| "Chalet" \| "Villa" |
+| `location` | Json: {area, region, distance_info} |
+| `facilities` | Json: String[] |
 
-```json
-// content_blocks
-[
-  {"type": "section_title", "content": "الطبيعة والهدوء", "style": {"size": "large", "color": "gold", "bold": true}},
-  {"type": "highlight_item", "icon": "mountain", "title": "إطلالة جبلية", "content": "من 800م فوق سطح البحر"},
-  {"type": "paragraph", "content": "نص وصفي...", "style": {"color": "gray"}}
-]
+### `Unit` → `units`
+The bookable entity. 4 types for smar: villa, chalet, restaurant, pool.
 
-// amenities
-[{"icon": "wifi", "label": "Free WiFi", "label_ar": "واي فاي مجاني"}, {"icon": "pool", "label": "Private Pool"}]
+| Field | Notes |
+|-------|-------|
+| `unit_type` | villa \| chalet \| restaurant \| pool |
+| `category` | filterable classification |
+| `description_ar` / `description_en` | localized |
+| `content_blocks` | Json: Block Builder [{type, content, style?, icon?}] |
+| `amenities` | Json: [{icon, label, label_ar?}] |
+| `rules_policies` | Json: {checkIn, checkOut, cancellation, rules[]} |
+| `images` | String[] | direct image URLs |
+| `position_x/y` | Float? | spatial map coordinates |
 
-// rules_policies
-{"checkIn": "15:00", "checkOut": "12:00", "cancellation": "استرداد 50%...", "rules": ["ممنوع التدخين", "ممنوع الحيوانات"]}
-```
+### `Price` → `prices`
+Daily price calendar per unit.
 
-> **تمرير Json لـ Prisma:** يجب دائماً استخدام `from prisma import Json` ثم `Json(value)` — بدونها تعطي `DataError: Unable to match input value`.
+| Field | Notes |
+|-------|-------|
+| `@@unique([unitId, date])` | one price per unit per day |
+| `price` | Decimal(10,2) |
+| `available` | Boolean — marks blackout dates |
+| `minStay` | minimum nights |
 
-**العلاقات:** `Unit → has many → [Booking, Price]`
+### `Customer` → `customers`
+End-customers (guests). NOT the same as `User`.
 
----
+| Field | Notes |
+|-------|-------|
+| `@@unique([clientId, phone])` | phone unique per tenant only |
+| `phone` | required |
 
-### 5. `Price` — التسعير الديناميكي
+### `Booking` → `bookings`
+| Field | Notes |
+|-------|-------|
+| `status` | pending\|confirmed\|cancelled\|completed |
+| `bookingRef` | UNIQUE across system |
+| `paymentMethod` | cash\|card\|whatsapp\|whish\|omt |
+| `services` | via `BookingService` join |
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `unitId` | UUID FK → Unit | Cascade delete |
-| `clientId` | UUID FK → Client | |
-| `date` | DateTime `@db.Date` | تاريخ اليوم |
-| `price` | Decimal(10,2) | |
-| `currency` | String | default `"SAR"` |
-| `minStay` | Int | default 1 |
-| `available` | Boolean | default true |
-
-**Constraints:** `@@unique([unitId, date])` — سعر واحد فقط لكل وحدة في كل يوم.
-
-**Indexes:** `date`, `clientId`
-
-> **تحويل التاريخ:** الحقل من نوع `@db.Date` لكن Prisma يتوقع `datetime` — دائماً استخدم `to_datetime_start(d)` من `price_service.py`.
-
-**استخدامات:**
-- `available=False` → يوم محجوب من قِبَل الأدمن
-- `available=True + price > 0` → تسعير مخصص
-- حذف+إعادة إنشاء عبر `date_overrides` endpoint (delete_many → create_many)
+### `BookingService` → `booking_services`
+Join table: Booking ↔ Service. PK = `[bookingId, serviceId]`.
 
 ---
 
-### 6. `Service` — الخدمات الإضافية
+## Shared
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `clientId` | UUID FK → Client | |
-| `propertyId` | UUID? FK → Property | اختياري |
-| `name_ar` / `name_en` | String | إلزامي |
-| `description` / `image_url` | String? | |
-| `duration` | Int? | بالدقائق |
-| `basePrice` | Decimal(10,2) | |
-| `currency` | String | default `"SAR"` |
-| `isActive` / `sort_order` | Boolean / Int? | |
+### `GalleryImage` → `gallery_images`
+Multi-module image store. One table for booking units AND catalog items.
 
----
-
-### 7. `Customer` — العملاء
-
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `clientId` | UUID FK → Client | |
-| `phone` | String UNIQUE | مفتاح التعرف |
-| `name` | String? | |
-| `email` | String? UNIQUE | |
-
-**Auto-create:** يُنشأ تلقائياً عند `create_public_booking()` إذا لم يكن موجوداً.
-
-**Customer النظامي:** `phone = "__block__{clientId}"` — يُنشأ عبر `upsert` لتلبية قيد `NOT NULL customerId` عند حجب التواريخ.
+| Field | Notes |
+|-------|-------|
+| `clientId` | FK → clients |
+| `unitId` | FK → units (nullable — booking module) |
+| `catalogItemId` | FK → catalog_items (nullable — catalog module) ← **added 2026-05-05** |
+| `imageType` | DEFAULT "gallery" — gallery\|cover\|catalog\|page_hero\|page_logo ← **added 2026-05-05** |
+| `url` | Full Supabase storage URL |
+| `span_size` | small\|medium\|large (masonry grid) |
+| `sort_order` | Int |
+| `caption_ar` / `caption_en` | optional captions |
 
 ---
 
-### 8. `Booking` — الحجوزات ⭐
+## Platform
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `id` | UUID PK | |
-| `clientId` | UUID FK → Client | |
-| `unitId` | UUID FK → Unit | |
-| `customerId` | UUID FK → Customer | |
-| `checkIn` / `checkOut` | DateTime `@db.Date` | |
-| `guests` | Int | |
-| `totalPrice` | Decimal(10,2) | |
-| `currency` | String | default `"SAR"` |
-| `status` | String | `pending / confirmed / cancelled / blocked / rejected` |
-| `source` | String? | `website / admin / whatsapp` |
-| `bookingRef` | String? UNIQUE | |
-| `notes` | String? | |
-| `paymentMethod` | String? | default `"cash"` |
-| `paymentReference` | String? | |
-| `arrivalTime` | String? | |
+### `ClientService` → `client_services`
+**The module gate.** Every feature a tenant has = one row here.
+`require_service(key)` checks this before serving any module endpoint.
 
-**Indexes:** `clientId`, `unitId`, `customerId`, `status`, `(checkIn, checkOut)`
+| Field | Notes |
+|-------|-------|
+| `serviceKey` | booking\|gallery\|whatsapp_ordering\|restaurant\|store\|... |
+| `isActive` | Boolean — toggle without deleting |
+| `config` | Json — per-service overrides |
+| `@@unique([clientId, serviceKey])` | one row per tenant per feature |
 
-**تحقق التداخل (Overlap Check) في `booking_repo.check_availability()`:**
-```python
-# 3 حالات تداخل:
-# 1. الحجز الجديد يبدأ أثناء حجز قائم
-# 2. الحجز الجديد ينتهي أثناء حجز قائم
-# 3. الحجز الجديد يُغطي حجزاً قائماً بالكامل
-# يفحص فقط status IN ["pending", "confirmed"]
-# ⚠️ "blocked" لا يُفحص هنا — لكنه يُستبعد في get_client_catalog
-```
+### `PlatformService` → `platform_services`
+SalmanSaaS product catalog (Salman manages this, not tenants).
+
+| Field | Notes |
+|-------|-------|
+| `key` | UNIQUE — matches `ClientService.serviceKey` |
+| `moduleKey` | booking\|restaurant\|store |
+| `monthlyPrice` | Decimal? |
 
 ---
 
-### 9. `BookingService` — Pivot Table (حجز ↔ خدمة)
+## Catalog Module
 
-| الحقل | النوع | ملاحظة |
-|---|---|---|
-| `bookingId` | UUID FK → Booking | Cascade delete |
-| `serviceId` | UUID FK → Service | |
-| `quantity` | Int | default 1 |
-| `price` | Decimal(10,2) | السعر وقت الحجز |
-| `notes` | String? | |
+### `CatalogCategory` → `catalog_categories`
+Generic category tree. Works for any `service_type`.
 
-**PK:** `@@id([bookingId, serviceId])` — مفتاح مركب.
+| Field | Notes |
+|-------|-------|
+| `moduleKey` | DEFAULT "catalog" — scopes to module within tenant |
+| `parentId` | FK → self (tree structure) |
+| `displayTemplate` | DEFAULT "grid" — **grid\|list\|showcase** |
+| `@@index([clientId, moduleKey])` | fast per-module queries |
 
----
-
-## مخطط العلاقات الكامل (ERD)
-
-```
-Client ──────────────────────────────────────────────────────┐
-  │                                                           │
-  ├──● User (RBAC: SUPER_ADMIN, TENANT_ADMIN,                │
-  │         MANAGER_RESERVATIONS, MANAGER_UNITS)             │
-  │          │                                               │
-  ├──● Property ←── managed by User (optional)              │
-  │    │                                                      │
-  │    ├──● Unit ──────● Price (@@unique unitId+date)        │
-  │    │    │                                                 │
-  │    │    └──────────● Booking ──● BookingService          │
-  │    │                    │             │                   │
-  │    └──● Service ────────┘─────────────┘                  │
-  │                                                           │
-  └──● Customer ──● Booking                                  │
-                                                              │
-  ←── Multi-Tenancy: clientId on EVERY model ───────────────┘
-```
+### `CatalogItem` → `catalog_items`
+| Field | Notes |
+|-------|-------|
+| `categoryId` | FK → catalog_categories |
+| `nameAr` / `nameEn` | localized |
+| `price` | Decimal? |
+| `metadata` | Json? — module-specific extras (duration, sku, weight...) |
+| `isFeatured` | Boolean |
+| `galleryImages` | relation → GalleryImage (via catalogItemId) |
 
 ---
 
-## طبقة الـ Services — منطق الأعمال
+## Restaurant Module
 
-### `public_service.py`
-| الدالة | الوصف |
-|---|---|
-| `get_tenant_config(slug)` | Config + auto-seed للـ smar client |
-| `get_client_catalog(slug, check_in, check_out, guests, unit_type)` | كتالوج الوحدات المتاحة مع استبعاد المحجوزة |
-| `create_public_booking(slug, data)` | Customer upsert → price calc → booking create → WhatsApp notification |
-| `get_unit_calendar_data(slug, unit_id)` | Disabled dates (bookings + price rows) + price overrides |
-| `get_tenant_gallery_images(slug)` | قائمة صور من Supabase Storage |
+### `RestaurantConfig` → `restaurant_configs`
+One row per restaurant tenant.
 
-### `price_service.py`
-| الدالة | الوصف |
-|---|---|
-| `get_prices(client_id, unit_id, date_from, date_to)` | جلب سجلات الأسعار |
-| `set_bulk_prices(unit_id, start, end, price, weekend_price)` | delete_many ثم create_many لنطاق تواريخ |
-| `to_datetime_start(d)` / `to_datetime_end(d)` | تحويل `date` → `datetime` لتوافق Prisma `@db.Date` |
+### `MenuCategory` → `menu_categories`
+FK → `RestaurantConfig`. Holds menu sections.
 
-### `booking_service.py`
-```
-create_booking():
-  1. customer_repo.get_by_phone() → إنشاء إذا لم يكن موجوداً
-  2. booking_repo.check_availability() → 3-case overlap check
-  3. booking_repo.create()
+### `MenuItem` → `menu_items`
+FK → `RestaurantConfig` + `MenuCategory`. Has price, availability.
 
-get_client_bookings(): paginated, filterable (status, date range)
-update_booking_status(): valid statuses: pending/confirmed/cancelled/completed
-```
+### `RestaurantOrder` → `restaurant_orders`
+| Field | Notes |
+|-------|-------|
+| `status` | pending\|preparing\|ready\|delivered\|cancelled |
+| `tableNumber` | String? |
 
-### `availability_service.py`
-```
-get_monthly_availability():
-  - يجري استعلامين بالتوازي: get_prices_for_range + get_overlapping_bookings
-  - أولوية الحالات: booked > blocked > available > no_price
-  - يُرجع قائمة بكل أيام الشهر مع: status, price, min_stay, currency
-```
-
-### `storage_service.py`
-- `upload_unit_image(slug, unit_id, bytes, content_type)` → Supabase Storage → public URL
-- `delete_unit_image(url)` → Supabase Storage delete
-- المسار: `properties/{slug}/{unit_id}/{uuid}.{ext}`
+### `RestaurantOrderItem` → `restaurant_order_items`
+Join: Order ↔ MenuItem with quantity + unit price.
 
 ---
 
-## طبقة الـ Repositories
+## Store Module
 
-| الـ Repository | الاستعلامات |
-|---|---|
-| `UnitRepository` | get_all_by_property, get_all_by_client (type/capacity filter), get_by_id, create, update |
-| `BookingRepository` | count_by_client, get_all_by_client (paginated), get_by_unit, create, check_availability (3-case), update_status |
-| `DashboardRepository` | get_monthly_booking_stats (revenue by status), get_upcoming_checkins (next N days), get_occupancy_data (overlapping bookings), get_properties_with_units |
-| `AvailabilityRepository` | get_prices_for_range, get_overlapping_bookings |
-| `ClientRepository` | CRUD على جدول clients |
-| `CustomerRepository` | get_by_phone, create |
-| `PropertyRepository` | CRUD على جدول properties |
+### `StoreCustomer` → `store_customers`
+Store-specific customer (email-based auth, separate from booking `Customer`).
+`@@unique([clientId, email])` — email unique per tenant.
 
----
+### `StoreBrand` / `StoreCategory` → brands / categories
+`StoreCategory` supports tree (self-referential `parentId`).
 
-## API Endpoints الكاملة
+### `StoreProduct` → `store_products`
+| Field | Notes |
+|-------|-------|
+| `name` / `description` | Json: {ar, en} — multilingual |
+| `variants` | Json DEFAULT "[]" |
+| `images` | Json (String[]) |
+| `compareAtPrice` | Float? — strike-through price |
+| `discount` | Int (percentage) |
 
-### Public API (`/api/v1/public/{slug}/`)
+### `StoreCart` → `store_carts`
+Session-based (no login required). `sessionId` UNIQUE. `expiresAt` for 7-day TTL.
 
-| Endpoint | Method | الوصف |
-|---|---|---|
-| `/config` | GET | إعدادات المستأجر + برندنغ |
-| `/listings` | GET | كتالوج الوحدات (مع date/guests/type filter) |
-| `/bookings` | POST | إنشاء حجز جديد |
-| `/price` | GET | حساب سعر نطاق تواريخ |
-| `/services` | GET | الخدمات الإضافية |
-| `/units/{id}/calendar` | GET | تقويم التوفر + price overrides |
-| `/gallery` | GET | صور المعرض من Supabase Storage |
+### `StoreOrder` → `store_orders`
+Guest checkout supported (`customerId` nullable).
 
-### Admin API (`/api/v1/admin/`)
+### `StoreReview` → `store_reviews`
+`@@unique([customerId, productId])` — one review per customer per product.
 
-| Endpoint | Method | الوصف |
-|---|---|---|
-| `/units/` | GET, POST | قائمة الوحدات + إنشاء |
-| `/units/{id}` | PATCH | تحديث (name, type, capacity, images, amenities, blocks, rules) |
-| `/units/{id}/images` | POST, DELETE | رفع/حذف صورة |
-| `/units/{id}/block-dates` | POST | حجب نطاق تواريخ (booking status=blocked) |
-| `/units/{id}/date-overrides` | POST | تسعير مخصص أو حجب عبر Price table |
-| `/bookings/` | GET, POST | قائمة + إنشاء حجوزات |
-| `/bookings/{id}/status` | PATCH | تحديث الحالة |
-| `/dashboard` | GET | إحصائيات شهرية + قادمين + إشغال |
-| `/dashboard/stats` | GET | KPI سريع (4 أرقام) |
-| `/settings` | GET, PATCH | إعدادات المستأجر |
-| `/team` | GET, POST, DELETE | إدارة المستخدمين |
-| `/auth/login` | POST | تسجيل دخول + JWT |
+### `StoreWishlist` → `store_wishlists`
+`@@unique([customerId, productId])` — one entry per customer per product.
 
 ---
 
-## إحصائيات النظام
+## Key Constraints Summary
 
-| المقياس | القيمة |
-|---|---|
-| عدد الجداول | 9 models + 1 Enum |
-| عدد الـ Indexes | 14 |
-| عدد الـ Unique Constraints | 5 (`slug`, `phone` على Customer, `email` على Customer, `bookingRef`, `unitId+date`) |
-| نوع المفاتيح | UUID v4 (`gen_random_uuid()` في PostgreSQL) |
-| حالات الحجز | 5: `pending`, `confirmed`, `cancelled`, `blocked`, `rejected` |
-| أنواع الوحدات | `villa`, `chalet`, `restaurant`, `pool` |
-| طرق الدفع | `cash`, `card`, `whatsapp`, `whish`, `omt` |
-| أدوار المستخدمين | 4: `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_RESERVATIONS`, `MANAGER_UNITS` |
-| Supabase Storage Bucket | `properties/{slug}/{unit_id}/` |
-
----
-
-## مشاكل قائمة وتحذيرات
-
-### حرجة
-
-| # | المشكلة | الملف | الحل |
-|---|---|---|---|
-| 1 | `set_bulk_prices` يكتب `"currency": "USD"` بدلاً من `"SAR"` | `price_service.py:71` | تغيير إلى `"SAR"` أو أخذها من إعدادات الـ Client |
-| 2 | `UnitRepository.update()` يستخدم `update_many` بدلاً من `update` — فشل صامت إذا لم يتطابق | `unit_repo.py:68` | تغيير لـ `update` مع `findFirst` أولاً للـ 404 |
-| 3 | `check_availability()` يفحص فقط `["pending", "confirmed"]` — لا يشمل `"blocked"` | `booking_repo.py:79` | صحيح من الناحية الوظيفية لأن `get_client_catalog` يستبعد الـ blocked — لكن يجب توثيقه |
-
-### متوسطة
-
-| # | المشكلة | الملف | الحل |
-|---|---|---|---|
-| 4 | `Client.currency` default هو `"USD"` لكن `Price.currency` default هو `"SAR"` — تناقض | `schema.prisma:32,153` | توحيد إلى `"SAR"` |
-| 5 | `public_service.get_unit_services_data()` يستخدم `find_unique` بدون `clientId` — فجوة أمنية نظرية | `public_service.py:91` | إضافة `clientId` للـ where |
-| 6 | `get_client_catalog` يسترجع كل الخدمات بـ `include` ثم يُضمّنها في كل response — N+1 محتمل عند الـ cache miss | `public_service.py:263` | تُعاد مرة واحدة فقط per request — مقبول |
-
-### منخفضة (بعد الإطلاق)
-
-| # | المشكلة |
-|---|---|
-| 7 | لا يوجد Full-text search على الحجوزات |
-| 8 | لا يوجد CSV/Excel export |
-| 9 | لا يوجد Audit log لتتبع تغييرات الأدمن |
-| 10 | `bookingRef` يُعاد فارغاً — لا يُولَّد تلقائياً |
+| Constraint | Model | Note |
+|-----------|-------|------|
+| `Customer.@@unique([clientId, phone])` | Customer | Phone unique per tenant only |
+| `StoreCustomer.@@unique([clientId, email])` | StoreCustomer | Email unique per tenant only |
+| `User.email UNIQUE` | User | Global unique across all tenants |
+| `Client.slug UNIQUE` | Client | Global unique — URL identifier |
+| `Client.phone UNIQUE` | Client | Global unique — tenant phone |
+| `Price.@@unique([unitId, date])` | Price | One price per unit per day |
+| `ClientService.@@unique([clientId, serviceKey])` | ClientService | One activation per feature per tenant |
+| `PlatformService.key UNIQUE` | PlatformService | One entry per feature in master catalog |
 
 ---
 
-## نمط إضافة حقل جديد للـ Schema (5 خطوات)
+## Schema Changes Log
 
-```bash
-# 1. أضف الحقل لـ prisma/schema.prisma
-# 2. شغّل:
-npx prisma generate
-
-# 3. نفّذ SQL مباشرة في Supabase SQL Editor:
-ALTER TABLE units ADD COLUMN new_field TEXT;
-
-# 4. حدّث الـ Pydantic schema (UnitCreate + UnitUpdate في units.py)
-# 5. حدّث _fmt() في units.py لإرجاع الحقل الجديد
-```
-
-> ⚠️ لا تستخدم `prisma migrate deploy` على production — استخدم Supabase SQL Editor مباشرة.
-
----
-
-## ملاحظات تقنية مهمة
-
-1. **تحويل التاريخ:** `checkIn/checkOut` و `Price.date` من نوع `@db.Date` — Prisma يتوقع `datetime` objects. الحل الموحد: `to_datetime_start(d)` في `price_service.py`.
-
-2. **حجب التواريخ — طريقتان:**
-   - عبر Booking بحالة `"blocked"` (endpoint: `/block-dates`) → يظهر في تقرير الحجوزات
-   - عبر Price record بـ `available=False` (endpoint: `/date-overrides`) → تحكم دقيق يومي
-
-3. **WhatsApp Notification:** Fire-and-forget في `create_public_booking()` — إذا فشل لا يُلغي الحجز.
-
-4. **Gallery Images:** تُجلب من Supabase Storage مباشرة (ليست في DB) — الـ category تُستنتج من اسم الملف (`beitsmar1-3` → chalet, `4-6` → nature, `7-9` → pool, `10-12` → chalet).
-
-5. **Availability Priority:** `booked > blocked > available > no_price` — إذا كان يوم محجوزاً AND له Price row بـ available=False، يُعاد كـ "booked".
-
-6. **Prisma Json() Wrapper:** حقول `content_blocks`, `amenities`, `rules_policies` تتطلب `from prisma import Json` ثم `Json(value)` عند الكتابة. القراءة تُرجع Python objects مباشرة.
+| Date | Change | Impact |
+|------|--------|--------|
+| 2026-04-21 | Initial 9-model schema | Booking module only |
+| 2026-04-24 | Added restaurant + store modules | +10 models |
+| 2026-04-27 | Added CatalogCategory, CatalogItem, PlatformService, ClientService | +4 models |
+| 2026-04-30 | Client gains: status, trial_ends_at, service_type, pageType, templateKey | Field additions |
+| 2026-05-05 | GalleryImage: +catalogItemId FK + imageType field | `npx prisma db push` ✅ |

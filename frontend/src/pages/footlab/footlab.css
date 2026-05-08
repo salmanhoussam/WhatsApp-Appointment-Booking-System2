@@ -1,0 +1,7 @@
+/* Footlab — tenant accent vars only. Layout/components handled by Tailwind + design system. */
+body[data-slug="footlab"] {
+  --accent:      #6c63ff;
+  --accent-dim:  rgba(108, 99, 255, 0.12);
+  --accent-glow: rgba(108, 99, 255, 0.35);
+  background: #0a0a0f;
+}

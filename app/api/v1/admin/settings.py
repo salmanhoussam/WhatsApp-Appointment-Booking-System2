@@ -27,6 +27,8 @@ class SettingsUpdateRequest(BaseModel):
     name_ar:         Optional[str]       = None
     name_en:         Optional[str]       = None
     primary_color:   Optional[str]       = None
+    page_type:       Optional[str]       = None
+    template_key:    Optional[str]       = None
     hero_video_url:  Optional[str]       = None
     whatsapp_number: Optional[str]       = None
     instagram_url:   Optional[str]       = None
@@ -81,7 +83,9 @@ async def update_settings(
     Partial update — only fields explicitly set in the request body are written.
     Clears the tenant cache so the next /public/config request picks up changes.
     """
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
+    _CAMEL = {"page_type": "pageType", "template_key": "templateKey"}
+    raw = {k: v for k, v in body.model_dump().items() if v is not None}
+    update_data = {_CAMEL.get(k, k): v for k, v in raw.items()}
     if not update_data:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
 

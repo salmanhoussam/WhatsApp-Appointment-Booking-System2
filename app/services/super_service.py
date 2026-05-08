@@ -32,6 +32,8 @@ async def list_clients(db: Prisma) -> list[dict]:
             "days_left":    days_left,
             "is_active":    getattr(c, "isActive", True),
             "created_at":   c.createdAt.isoformat() if getattr(c, "createdAt", None) else None,
+            "page_type":    getattr(c, "pageType",    "normal"),
+            "template_key": getattr(c, "templateKey", None),
         })
 
     return result

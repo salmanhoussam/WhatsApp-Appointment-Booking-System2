@@ -44,11 +44,11 @@ function resolveRedirect(slug, token, status) {
       ? 'https://auth.salmansaas.com/super/clients'
       : '/super/clients';
   }
-  // Trial tenants → auth subdomain demo path (no new DNS per tenant)
+  // Trial tenants → /{slug}/dashboard on auth subdomain (no new DNS per tenant)
   if (status === 'trial') {
     return import.meta.env.PROD
-      ? `https://auth.salmansaas.com/demo/${slug}/units`
-      : `http://localhost:5173/demo/${slug}/units`;
+      ? `https://auth.salmansaas.com/${slug}/dashboard?token=${token}`
+      : `http://localhost:5173/${slug}/dashboard?token=${token}`;
   }
   // Active / demo tenants → their own subdomain admin dashboard
   // ProtectedRoute handles the ?token= handoff to that subdomain's localStorage

@@ -1,0 +1,414 @@
+[
+  {
+    "id": "fd00b60c-5c2a-4b66-a9cf-e559ed70d193",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "كلاود زون",
+    "name_en": "Cloudzone",
+    "description_ar": "أون كلاود زون — حذاء يومي بتقنية CloudTec® ونعل Helion™ وجزء علوي من نسيج قابل للتنفس.",
+    "description_en": "On Cloudzone Alloy/Rock — minimalist daily trainer with CloudTec® cushioning, Helion™ superfoam midsole and breathable woven textile upper.",
+    "price": 150.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/stores/footlab/Cloudzone/Cloudzone1.png",
+    "metadata": {
+      "brand": "On Running",
+      "variants": [
+        {
+          "color": "ALLOY/ROCK",
+          "size": "40",
+          "stock": 8
+        },
+        {
+          "color": "ALLOY/ROCK",
+          "size": "41",
+          "stock": 12
+        },
+        {
+          "color": "ALLOY/ROCK",
+          "size": "42",
+          "stock": 15
+        },
+        {
+          "color": "ALLOY/ROCK",
+          "size": "43",
+          "stock": 10
+        },
+        {
+          "color": "ALLOY/ROCK",
+          "size": "44",
+          "stock": 5
+        }
+      ],
+      "images": [
+        "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/stores/footlab/Cloudzone/Cloudzone2.png",
+        "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/stores/footlab/Cloudzone/Cloudzone3.png"
+      ]
+    }
+  },
+  {
+    "id": "1250b97e-f3c1-4a3c-8168-2ce46dca9744",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "اير ماكس 270",
+    "name_en": "Air Max 270",
+    "description_ar": "وحدة هواء نايكي الأعلى تمنحك راحة طوال اليوم وأناقة جريئة.",
+    "description_en": "Nike's tallest Air unit yet delivers all-day comfort and bold style.",
+    "price": 149.99,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=600",
+    "metadata": {
+      "brand": "Nike",
+      "variants": [
+        {
+          "color": "RED",
+          "size": "41",
+          "stock": 10
+        },
+        {
+          "color": "RED",
+          "size": "42",
+          "stock": 3
+        },
+        {
+          "color": "RED",
+          "size": "43",
+          "stock": 8
+        },
+        {
+          "color": "BLACK",
+          "size": "41",
+          "stock": 12
+        },
+        {
+          "color": "BLACK",
+          "size": "42",
+          "stock": 13
+        }
+      ]
+    }
+  },
+  {
+    "id": "6ccbebf4-fa28-48e4-a1b6-0005beba70d3",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "ألترا بوست 23",
+    "name_en": "Ultra Boost 23",
+    "description_ar": "جزء علوي من Primeknit مع نعل BOOST لعودة طاقة مذهلة.",
+    "description_en": "Primeknit upper with BOOST midsole for incredible energy return.",
+    "price": 189.99,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=601",
+    "metadata": {
+      "brand": "Adidas",
+      "discount": 10,
+      "variants": [
+        {
+          "color": "CORE BLACK",
+          "size": "40",
+          "stock": 6
+        },
+        {
+          "color": "CORE BLACK",
+          "size": "41",
+          "stock": 9
+        },
+        {
+          "color": "CORE BLACK",
+          "size": "42",
+          "stock": 14
+        },
+        {
+          "color": "WHITE",
+          "size": "42",
+          "stock": 7
+        },
+        {
+          "color": "WHITE",
+          "size": "43",
+          "stock": 5
+        }
+      ]
+    }
+  },
+  {
+    "id": "86e564be-6d0a-42be-84d7-3c62734aa762",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "نيو بالانس 990 في6",
+    "name_en": "990v6",
+    "description_ar": "صُنع في الولايات المتحدة. السلسلة الأيقونية 990 بتقنية ENCAP ونعل من الجلد الخنزيري.",
+    "description_en": "Made in USA. The iconic 990 series with ENCAP midsole and pigskin suede upper.",
+    "price": 210.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=602",
+    "metadata": {
+      "brand": "New Balance",
+      "variants": [
+        {
+          "color": "GREY",
+          "size": "41",
+          "stock": 4
+        },
+        {
+          "color": "GREY",
+          "size": "42",
+          "stock": 8
+        },
+        {
+          "color": "GREY",
+          "size": "43",
+          "stock": 6
+        },
+        {
+          "color": "NAVY",
+          "size": "42",
+          "stock": 10
+        },
+        {
+          "color": "NAVY",
+          "size": "44",
+          "stock": 3
+        }
+      ]
+    }
+  },
+  {
+    "id": "618153c0-a933-455c-b5a2-24e3cd004a2c",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "تشاك تايلور أول ستار",
+    "name_en": "Chuck Taylor All Star",
+    "description_ar": "الحذاء القماشي الأصلي. خالد منذ عام 1917.",
+    "description_en": "The original canvas sneaker. Timeless since 1917.",
+    "price": 65.0,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=603",
+    "metadata": {
+      "brand": "Converse",
+      "variants": [
+        {
+          "color": "WHITE",
+          "size": "39",
+          "stock": 20
+        },
+        {
+          "color": "WHITE",
+          "size": "40",
+          "stock": 18
+        },
+        {
+          "color": "WHITE",
+          "size": "41",
+          "stock": 15
+        },
+        {
+          "color": "BLACK",
+          "size": "40",
+          "stock": 22
+        },
+        {
+          "color": "BLACK",
+          "size": "42",
+          "stock": 12
+        }
+      ]
+    }
+  },
+  {
+    "id": "33c64525-f45b-40d2-ac2c-35ce35e82e49",
+    "old_id": null,
+    "category": "Shoes",
+    "name_ar": "أولد سكول",
+    "name_en": "Old Skool",
+    "description_ar": "أول حذاء من فانز بالشريط الجانبي الأيقوني. جزء علوي من الجلد السويدي والقماش.",
+    "description_en": "Vans' first shoe with the iconic sidestripe. Suede and canvas upper.",
+    "price": 75.0,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=604",
+    "metadata": {
+      "brand": "Vans",
+      "discount": 15,
+      "variants": [
+        {
+          "color": "BLACK/WHITE",
+          "size": "39",
+          "stock": 18
+        },
+        {
+          "color": "BLACK/WHITE",
+          "size": "40",
+          "stock": 14
+        },
+        {
+          "color": "BLACK/WHITE",
+          "size": "41",
+          "stock": 10
+        },
+        {
+          "color": "RED/WHITE",
+          "size": "40",
+          "stock": 8
+        },
+        {
+          "color": "RED/WHITE",
+          "size": "42",
+          "stock": 5
+        }
+      ]
+    }
+  },
+  {
+    "id": "a6642bce-ce74-4b52-94ee-d311ed5a8ec7",
+    "old_id": null,
+    "category": "Clothing",
+    "name_ar": "هودي بولوفر أساسي",
+    "name_en": "Essential Pullover Hoodie",
+    "description_ar": "فليس قطني ثقيل 400 جرام. أكمام محكمة وجيب كنغر.",
+    "description_en": "Heavyweight 400gsm cotton-blend fleece. Ribbed cuffs, kangaroo pocket.",
+    "price": 89.99,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=600",
+    "metadata": {
+      "brand": "Nike",
+      "discount": 20,
+      "variants": [
+        {
+          "color": "GREY",
+          "size": "S",
+          "stock": 15
+        },
+        {
+          "color": "GREY",
+          "size": "M",
+          "stock": 20
+        },
+        {
+          "color": "GREY",
+          "size": "L",
+          "stock": 18
+        },
+        {
+          "color": "BLACK",
+          "size": "M",
+          "stock": 12
+        },
+        {
+          "color": "BLACK",
+          "size": "XL",
+          "stock": 8
+        }
+      ]
+    }
+  },
+  {
+    "id": "c438b7e8-c64a-44ee-965f-574d3cae82b4",
+    "old_id": null,
+    "category": "Clothing",
+    "name_ar": "جاكيت تيرو الرياضي",
+    "name_en": "Tiro Track Jacket",
+    "description_ar": "جاكيت رياضي ضيق مع قماش AEROREADY لامتصاص الرطوبة.",
+    "description_en": "Slim-fit track jacket with moisture-absorbing AEROREADY fabric.",
+    "price": 79.99,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=601",
+    "metadata": {
+      "brand": "Adidas",
+      "variants": [
+        {
+          "color": "NAVY",
+          "size": "S",
+          "stock": 10
+        },
+        {
+          "color": "NAVY",
+          "size": "M",
+          "stock": 14
+        },
+        {
+          "color": "NAVY",
+          "size": "L",
+          "stock": 11
+        },
+        {
+          "color": "BLACK",
+          "size": "M",
+          "stock": 9
+        },
+        {
+          "color": "BLACK",
+          "size": "XL",
+          "stock": 6
+        }
+      ]
+    }
+  },
+  {
+    "id": "69959d10-5cb5-4d37-8c50-cf2509936fd2",
+    "old_id": null,
+    "category": "Accessories",
+    "name_ar": "حقيبة ظهر أوربان برو",
+    "name_en": "Urban Pro Backpack",
+    "description_ar": "حقيبة ظهر حضرية 30 لتر مقاومة للماء مع جيب لابتوب ومنفذ USB.",
+    "description_en": "30L waterproof urban backpack with laptop sleeve and USB charging port.",
+    "price": 120.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=600",
+    "metadata": {
+      "brand": "Nike",
+      "variants": [
+        {
+          "color": "BLACK",
+          "size": "ONE SIZE",
+          "stock": 25
+        },
+        {
+          "color": "DARK GREY",
+          "size": "ONE SIZE",
+          "stock": 15
+        }
+      ]
+    }
+  },
+  {
+    "id": "06dd847d-7da7-4404-ba69-e00be21170ff",
+    "old_id": null,
+    "category": "Accessories",
+    "name_ar": "كاب 9FORTY كلاسيك",
+    "name_en": "Classic 9FORTY Cap",
+    "description_ar": "كاب قابل للتعديل مع شعار مطرز وقماش قطني خفيف.",
+    "description_en": "Adjustable strapback cap with embroidered logo and lightweight cotton twill.",
+    "price": 35.0,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=601",
+    "metadata": {
+      "brand": "Nike",
+      "variants": [
+        {
+          "color": "BLACK",
+          "size": "ONE SIZE",
+          "stock": 40
+        },
+        {
+          "color": "WHITE",
+          "size": "ONE SIZE",
+          "stock": 30
+        },
+        {
+          "color": "NAVY",
+          "size": "ONE SIZE",
+          "stock": 25
+        }
+      ]
+    }
+  }
+]

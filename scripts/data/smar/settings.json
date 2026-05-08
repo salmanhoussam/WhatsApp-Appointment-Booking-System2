@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "slug": "smar",
+    "module_key": "booking",
+    "currency": "USD",
+    "client_name_en": "Beit Smar",
+    "client_name_ar": "بيت سمار",
+    "primary_color": "#d4a853",
+    "source": "seed_beit_smar_units.py UNITS array (hardcoded roster)",
+    "note": "Booking module — units seeded via Prisma directly (not catalog API). Use seed_units.py."
+  }
+}

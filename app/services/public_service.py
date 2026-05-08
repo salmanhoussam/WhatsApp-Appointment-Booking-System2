@@ -209,6 +209,7 @@ _SMAR_CREATE = {
 
 
 def _record_to_dict(record) -> Dict[str, Any]:
+    client_services = getattr(record, "clientServices", None) or []
     return {
         "slug":            record.slug,
         "name_ar":         getattr(record, "name_ar",  None) or record.name,
@@ -223,6 +224,10 @@ def _record_to_dict(record) -> Dict[str, Any]:
         "config":          getattr(record, "config",   {}) or {},
         "unit_types":      getattr(record, "unit_types", []),
         "payment_methods": getattr(record, "payment_methods", []),
+        "service_type":    getattr(record, "service_type", None),
+        "active_services": [s.serviceKey for s in client_services if s.isActive],
+        "page_type":       getattr(record, "pageType",    "normal"),
+        "template_key":    getattr(record, "templateKey", None),
     }
 
 
@@ -233,7 +238,10 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
     SMAR defaults so the 404 vanishes on first deploy — no manual DB seed needed.
     """
     try:
-        record = await db.client.find_first(where={"slug": slug, "isActive": True})
+        record = await db.client.find_first(
+            where={"slug": slug, "isActive": True},
+            include={"clientServices": {"where": {"isActive": True}}},
+        )
 
         if not record and slug == "smar":
             logger.info("🌱 Auto-creating smar Client row with default styling")

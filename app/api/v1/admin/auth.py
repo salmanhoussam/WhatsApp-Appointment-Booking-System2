@@ -330,23 +330,31 @@ async def register_tenant(request: TenantRegistrationRequest, response: Response
     except Exception:
         raise  # ConflictError is handled by the global exception handler
 
-    # Issue JWT identical to client_login
+    # Fetch the created client + user in one go
     client = await prisma_client.client.find_unique(where={"slug": slug})
+    user   = await prisma_client.user.find_first(
+        where={"clientId": client.id, "role": "TENANT_ADMIN"}
+    )
+
+    # Issue USER JWT (type="admin") — works directly with GenericAdminDashboard
+    # and all /admin/* routes without a separate login step.
     token = create_access_token(data={
-        "type":      "client",
+        "type":      "admin",
+        "user_id":   user.id,
         "client_id": client.id,
         "slug":      client.slug,
-        "phone":     client.phone,
+        "role":      user.role,
     })
 
     _set_auth_cookie(response, token)
-    logger.info("✅ New tenant registered: %s", slug)
+    logger.info("✅ New tenant registered: %s (role=%s)", slug, user.role)
 
     return {
         "success": True,
         "data": {
             "token":         token,
             "slug":          slug,
+            "role":          user.role,
             "status":        "trial",
             "venue_type":    request.venue_type,
             "trial_ends_at": result["data"]["trial_ends_at"],
