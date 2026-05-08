@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion }       from 'framer-motion'
 import adminApi         from '../../../utils/admin.config'
 import StatCard         from '../components/StatCard'
+import ActivityFeed    from '../components/ActivityFeed'
+import TopItemsWidget  from '../components/TopItemsWidget'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell,
@@ -663,6 +665,26 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
           <RevenueChart orders={orders} color={color} currency={currency} />
           <StatusDonut  orders={orders} color={color} />
         </motion.div>
+      )}
+
+      {/* ── Activity Feed + Top Items ───────────────────────────────────── */}
+      {hasOrders && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 14,
+        }}>
+          <ActivityFeed
+            orders={orders}
+            hasReservations={hasReservations}
+            color={color}
+          />
+          <TopItemsWidget
+            orders={orders}
+            loading={ordersLoading}
+            color={color}
+          />
+        </div>
       )}
 
       {/* ── Bottom panels ──────────────────────────────────────────────── */}
