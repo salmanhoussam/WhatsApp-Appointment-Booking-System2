@@ -56,6 +56,7 @@ async def get_settings(tenant: dict = Depends(get_current_tenant)):
             "name_ar":         client.name_ar,
             "name_en":         client.name_en,
             "primary_color":   client.primary_color,
+            "page_type":       getattr(client, "pageType", None) or "normal",
             "hero_video_url":  client.hero_video_url,
             "whatsapp_number": client.whatsapp_number,
             "instagram_url":   getattr(client, "instagram_url", None),

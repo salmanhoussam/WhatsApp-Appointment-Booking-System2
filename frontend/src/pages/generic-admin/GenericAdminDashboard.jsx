@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { AnimatePresence, motion }           from 'framer-motion'
 import adminApi          from '../../utils/admin.config'
 import useTenantConfig   from '../../hooks/useTenantConfig'
@@ -211,10 +211,12 @@ const SPRING_SNAPPY = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
 const SIDEBAR_W = 240
 
 export default function GenericAdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview')
-  const [settings,  setSettings]  = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [isMobile,  setIsMobile]  = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  const [activeTab,    setActiveTab]    = useState('overview')
+  const [settings,     setSettings]     = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [isMobile,     setIsMobile]     = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  const [previewForm,  setPreviewForm]  = useState(null)
+  const iframeRef = useRef(null)
 
   // ── Public config — for active_services (admin/settings doesn't return it) ──
   const { config } = useTenantConfig()
@@ -240,6 +242,17 @@ export default function GenericAdminDashboard() {
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
+
+  // ── Send live preview updates to iframe via postMessage ─────────────────────
+  useEffect(() => {
+    if (!previewForm || !iframeRef.current) return
+    iframeRef.current.contentWindow?.postMessage({
+      type:          'PREVIEW_UPDATE',
+      heroType:      previewForm.page_type,
+      catalogLayout: previewForm.catalog_layout,
+      accent:        previewForm.primary_color,
+    }, '*')
+  }, [previewForm])
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const color           = settings?.primary_color  ?? '#6366f1'
@@ -429,23 +442,107 @@ export default function GenericAdminDashboard() {
         )}
 
         {/* ── Tab content ──────────────────────────────────────────── */}
-        <div style={{
-          flex: 1,
-          padding: isMobile ? '20px 16px 100px' : '28px 32px',
-          direction: 'rtl',
-        }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0  }}
-              exit={{    opacity: 0, y: -6  }}
-              transition={SPRING_SNAPPY}
-            >
-              {renderTab()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        {activeTab === 'settings' && !isMobile ? (
+
+          /* ── Settings: split preview layout ────────────────────── */
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+
+            {/* Left: live iframe preview */}
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              background: '#060609', borderRight: '1px solid rgba(255,255,255,0.06)',
+              minWidth: 0,
+            }}>
+              {/* Fake browser chrome */}
+              <div style={{
+                padding: '10px 16px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                flexShrink: 0,
+              }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
+                <div style={{
+                  marginRight: 10, flex: 1, padding: '4px 12px', borderRadius: 6,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  fontSize: 11, color: 'rgba(255,255,255,0.2)',
+                  fontFamily: 'monospace', direction: 'ltr',
+                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                }}>
+                  /demo/{settings?.slug}
+                </div>
+                <div style={{
+                  fontSize: 10, color: 'rgba(255,255,255,0.2)',
+                  letterSpacing: '0.06em',
+                }}>
+                  LIVE
+                  <span style={{
+                    display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                    background: color, marginRight: 5, marginBottom: -1,
+                    boxShadow: `0 0 6px ${color}`,
+                    animation: 'livePulse 2s ease-in-out infinite',
+                  }} />
+                </div>
+              </div>
+              <style>{`@keyframes livePulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
+
+              {/* The iframe */}
+              {settings?.slug ? (
+                <iframe
+                  ref={iframeRef}
+                  src={`/demo/${settings.slug}`}
+                  title="live-preview"
+                  style={{ flex: 1, border: 'none', width: '100%' }}
+                />
+              ) : (
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'rgba(255,255,255,0.15)', fontSize: 13,
+                }}>
+                  جاري التحميل...
+                </div>
+              )}
+            </div>
+
+            {/* Right: settings controls */}
+            <div style={{
+              width: 420, flexShrink: 0,
+              overflowY: 'auto', padding: '28px 24px',
+              direction: 'rtl',
+            }}>
+              <SettingsTab
+                settings={settings}
+                onUpdated={setSettings}
+                color={color}
+                onFormChange={setPreviewForm}
+              />
+            </div>
+          </div>
+
+        ) : (
+
+          /* ── All other tabs (and mobile settings) ───────────────── */
+          <div style={{
+            flex: 1,
+            padding: isMobile ? '20px 16px 100px' : '28px 32px',
+            direction: 'rtl',
+          }}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0  }}
+                exit={{    opacity: 0, y: -6  }}
+                transition={SPRING_SNAPPY}
+              >
+                {renderTab()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+        )}
       </main>
 
       {/* ════════════════════════════════════════════════════════════════
