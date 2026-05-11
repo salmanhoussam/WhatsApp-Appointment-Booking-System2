@@ -41,7 +41,7 @@ SCRIPT_DIR   = Path(__file__).parent
 DATA_DIR     = SCRIPT_DIR / "data"
 DEFAULT_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
-KNOWN_TENANTS = ["caracas", "footlab"]
+KNOWN_TENANTS = ["caracas", "footlab", "roz"]
 
 
 # ---- API helpers -------------------------------------------------------------
