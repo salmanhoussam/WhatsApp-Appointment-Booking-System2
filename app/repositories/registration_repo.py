@@ -11,6 +11,9 @@ class RegistrationRepository:
     async def user_email_exists(self, email: str) -> bool:
         return await self.db.user.find_first(where={"email": email}) is not None
 
+    async def phone_exists(self, phone: str) -> bool:
+        return await self.db.client.find_unique(where={"phone": phone}) is not None
+
     async def create_client(self, data: dict):
         return await self.db.client.create(data=data)
 

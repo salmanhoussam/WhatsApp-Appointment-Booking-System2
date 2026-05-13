@@ -41,9 +41,11 @@ VENUE_TYPE_MAP: dict[str, list[str]] = {
 }
 
 # Maps venue_type → which client_services to seed at registration
+# Note: "catalog" is always included for store/restaurant to gate admin catalog endpoints.
+# The module-specific key ("store"/"restaurant") gates the public-facing endpoints.
 _SERVICE_SEED_MAP: dict[str, list[str]] = {
-    "store":       ["store"],
-    "restaurant":  ["restaurant"],
+    "store":       ["store", "catalog"],
+    "restaurant":  ["restaurant", "catalog"],
     "real_estate": ["catalog"],
     "hotel":       ["catalog"],
     "sports":      ["catalog"],
@@ -84,6 +86,11 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         )
     if await repo.user_email_exists(data["email"]):
         raise ConflictError("An account with this email address already exists.")
+    if await repo.phone_exists(data["whatsapp_number"]):
+        raise ConflictError(
+            f"The phone number '{data['whatsapp_number']}' is already registered. "
+            "Please use a different number."
+        )
 
     venue_type    = data.get("venue_type", "real_estate")
     trial_ends_at = datetime.now(timezone.utc) + timedelta(days=14)
