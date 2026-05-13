@@ -93,6 +93,13 @@ export default function Login() {
             {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
           </button>
         </form>
+
+        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#6b7280' }}>
+          ليس لديك حساب؟{' '}
+          <a href="/register" style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>
+            إنشاء حساب جديد
+          </a>
+        </p>
       </div>
     </div>
   );

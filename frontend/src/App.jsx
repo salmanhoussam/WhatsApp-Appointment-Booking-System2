@@ -98,13 +98,9 @@ function App() {
             <Suspense fallback={null}><SetupPage /></Suspense>
           } />
 
-          {/* /register — tenant self-sign-up when ?template= param present, SSO otherwise */}
+          {/* /register — tenant self-sign-up (always accessible) */}
           <Route path="/register" element={
-            new URLSearchParams(window.location.search).has('template')
-              ? <Suspense fallback={null}><TenantRegisterPage /></Suspense>
-              : IS_AUTH_SUBDOMAIN
-                ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
-                : <Navigate to="/" replace />
+            <Suspense fallback={null}><TenantRegisterPage /></Suspense>
           } />
           {/* Subdomain mode: smar.domain.com/admin/units  (no slug in path) */}
           {IS_SUBDOMAIN_MODE && (
