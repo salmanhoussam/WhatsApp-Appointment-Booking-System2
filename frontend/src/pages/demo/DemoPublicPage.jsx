@@ -318,6 +318,11 @@ export default function DemoPublicPage() {
   const [catalogLayout, setCatalogLayout] = useState('grid');
   const [accent,        setAccent]        = useState('#6d28d9');
 
+  // TemplatePicker is admin-only: show only when admin token exists in localStorage
+  // OR when page is rendered inside the dashboard iframe (postMessage source)
+  const isAdminPreview = !!localStorage.getItem('admin_access_token')
+    || window.self !== window.top;
+
   useEffect(() => {
     axios.get(`${API_BASE}/api/v1/public/${slug}/config`)
       .then(({ data }) => {
@@ -413,14 +418,16 @@ export default function DemoPublicPage() {
         )}
       </div>
 
-      {/* Floating template picker */}
-      <TemplatePicker
-        accent={accent}
-        heroType={heroType}
-        catalogLayout={catalogLayout}
-        onHeroChange={handleHeroChange}
-        onCatalogChange={handleCatalogChange}
-      />
+      {/* Floating template picker — admin dashboard only */}
+      {isAdminPreview && (
+        <TemplatePicker
+          accent={accent}
+          heroType={heroType}
+          catalogLayout={catalogLayout}
+          onHeroChange={handleHeroChange}
+          onCatalogChange={handleCatalogChange}
+        />
+      )}
     </div>
   );
 }

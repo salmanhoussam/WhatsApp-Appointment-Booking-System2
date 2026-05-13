@@ -27,6 +27,7 @@ const SmarAdminDashboard    = lazy(() => import('./pages/smar/admin/SmarAdminDas
 const GenericAdminDashboard = lazy(() => import('./pages/generic-admin/GenericAdminDashboard'));
 const SSOLoginPage          = lazy(() => import('./pages/auth/SSOLoginPage'));
 const TenantRegisterPage    = lazy(() => import('./pages/auth/TenantRegisterPage'));
+const SetupPage             = lazy(() => import('./pages/auth/SetupPage'));
 const ShowcaseRoutes        = lazy(() => import('./router/showcase.routes'));
 const ClientsManager        = lazy(() => import('./pages/super-admin/ClientsManager'));
 const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'));
@@ -92,6 +93,11 @@ function App() {
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Login />
           } />
+          {/* /setup?token=xxx — one-time magic link login from onboarding pipeline */}
+          <Route path="/setup" element={
+            <Suspense fallback={null}><SetupPage /></Suspense>
+          } />
+
           {/* /register — tenant self-sign-up when ?template= param present, SSO otherwise */}
           <Route path="/register" element={
             new URLSearchParams(window.location.search).has('template')

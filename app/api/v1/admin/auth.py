@@ -200,6 +200,57 @@ async def user_login(request: UserLoginRequest, response: Response):
         raise  # Let the global catch-all handler return the standard envelope
 
 
+# ── Magic link — one-time setup login ─────────────────────────────────────────
+
+@router.get("/setup", tags=["Authentication"])
+async def magic_link_login(token: str, response: Response):
+    """
+    One-time setup link sent to new tenants after pipeline onboarding.
+    Validates the token, issues a TENANT_ADMIN JWT, and invalidates the token.
+    Frontend: /setup?token=xxx → stores JWT → redirects to /{slug}/dashboard
+    """
+    from datetime import datetime, timezone as tz
+
+    user = await prisma_client.user.find_first(
+        where={"setupToken": token},
+        include={"client": True},
+    )
+
+    if not user:
+        raise HTTPException(status_code=404, detail="رابط غير صالح أو منتهي الصلاحية")
+
+    if user.setupTokenExp and user.setupTokenExp < datetime.now(tz.utc):
+        raise HTTPException(status_code=410, detail="انتهت صلاحية الرابط — يُستخدم لمرة واحدة خلال 7 أيام")
+
+    if not user.isActive:
+        raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
+
+    # Invalidate token immediately (one-time use)
+    await prisma_client.user.update(
+        where={"id": user.id},
+        data={"setupToken": None, "setupTokenExp": None},
+    )
+
+    jwt = create_access_token(data={
+        "type":      "admin",
+        "user_id":   user.id,
+        "client_id": user.clientId,
+        "slug":      user.client.slug,
+        "role":      user.role,
+    })
+    _set_auth_cookie(response, jwt)
+
+    return {
+        "success": True,
+        "data": {
+            "token":         jwt,
+            "slug":          user.client.slug,
+            "role":          user.role,
+            "dashboard_url": f"/{user.client.slug}/dashboard",
+        },
+    }
+
+
 # ── Tenant self-registration ───────────────────────────────────────────────────
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$")

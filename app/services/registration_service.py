@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from prisma import Prisma
@@ -114,12 +115,17 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "service_type":    venue_type,
     })
 
+    setup_token     = secrets.token_urlsafe(32)
+    setup_token_exp = datetime.now(timezone.utc) + timedelta(days=7)
+
     user = await repo.create_user({
-        "clientId":      client.id,
-        "email":         data["email"],
-        "password_hash": get_password_hash(data["password"]),
-        "fullName":      data.get("owner_name") or data.get("business_name_ar") or data.get("business_name", ""),
-        "role":          "TENANT_ADMIN",
+        "clientId":       client.id,
+        "email":          data["email"],
+        "password_hash":  get_password_hash(data["password"]),
+        "fullName":       data.get("owner_name") or data.get("business_name_ar") or data.get("business_name", ""),
+        "role":           "TENANT_ADMIN",
+        "setupToken":     setup_token,
+        "setupTokenExp":  setup_token_exp,
     })
 
     # Service seeding strategy (BUG-08 permanent fix):
@@ -150,6 +156,7 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "selected_services": [],
     })
 
+    base_url = os.getenv("FRONTEND_URL", "https://salmansaas.com")
     return {
         "success": True,
         "data": {
@@ -157,6 +164,7 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
             "client_id":     client.id,
             "admin_email":   user.email,
             "trial_ends_at": trial_ends_at.isoformat(),
-            "dashboard_url": f"https://{client.slug}.salmansaas.com/dashboard",
+            "dashboard_url": f"{base_url}/{client.slug}/dashboard",
+            "setup_url":     f"{base_url}/setup?token={setup_token}",
         },
     }
