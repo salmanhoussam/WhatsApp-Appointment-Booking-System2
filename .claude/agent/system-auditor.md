@@ -8,6 +8,15 @@ Run silently, scan everything, write a structured report, update memory — no u
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/shared/project-health/SKILL.md    ← 5 health dimensions + deploy readiness
+.claude/skills/shared/auto-reporting/SKILL.md    ← report format + when to auto-generate
+```
+
+---
+
 ## Trigger
 
 - Before any deployment (`/audit --pre-deploy`)

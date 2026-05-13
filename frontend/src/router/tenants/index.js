@@ -28,4 +28,10 @@ export const tenantRegistry = {
     defaultRedirect: 'store',
     theme:           'purple-dark',
   },
+
+  'sneakers-lb': {
+    routes:          lazy(() => import('./sneakers-lb.routes')),
+    defaultRedirect: 'store',
+    theme:           'silver-dark',
+  },
 };

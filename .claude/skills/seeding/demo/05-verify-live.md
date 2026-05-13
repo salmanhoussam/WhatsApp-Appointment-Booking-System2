@@ -33,24 +33,25 @@ GET /api/v1/public/{slug}/config
 
 ---
 
-### ✅ 2. Catalog Categories
-```
-GET /api/v1/public/catalog/categories?client_slug={slug}
+### ✅ 2. Catalog Categories (endpoint يختلف حسب module_key)
+
+```python
+# BUG-FIX: استخدم الـ endpoint الصحيح بناءً على module_key
+if module_key == "store":
+    url = f"/api/v1/public/store/categories?client_slug={slug}"
+elif module_key == "restaurant":
+    url = f"/api/v1/public/restaurant/menu/categories?client_slug={slug}"
+else:  # "catalog"
+    url = f"/api/v1/public/{slug}/catalog/categories"
 ```
 
-**يجب أن يرجع:**
+**يجب أن يرجع 200** — وجود `data: []` مقبول (tenant جديد ما عنده items بعد، الـ endpoint شغّال):
 ```json
-{
-  "success": true,
-  "data": [
-    { "name_ar": "...", "name_en": "...", "display_template": "grid|list|showcase" },
-    ...
-  ]
-}
+{ "success": true, "data": [...] }
 ```
 
-**إذا جاء `data: []`** → الـ seeding ما نجح، أعِد Step 4 مع `clear_existing: false`
-**إذا جاء `403`** → catalog service مش مفعّل
+**إذا جاء `403`** → الـ service مش مفعّل → راجع `active_services` في config
+**إذا جاء `404`** → الـ endpoint غير مسجّل أو الـ slug خاطئ
 
 ---
 

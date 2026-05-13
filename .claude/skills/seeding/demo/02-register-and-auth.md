@@ -45,7 +45,13 @@ Content-Type: application/json
 - ✅ يُزرع `ClientService` بـ serviceKey: "catalog", isActive: true
 - ✅ يُضاف صف للـ Google Sheets
 
-**إذا جاء 409 Conflict** → المستأجر موجود مسبقاً → انتقل مباشرة لـ 2B
+**إذا جاء 409 Conflict** → المستأجر موجود مسبقاً:
+```
+هل الـ slug موجود لنفس المالك (email نفسه)؟
+  YES → تخطى التسجيل، انتقل مباشرة لـ 2B (login فقط)
+  NO  → slug محجوز من مالك آخر → ESCALATE لسلمان فوراً
+        "⚠️ slug {slug} محجوز — يحتاج موافقة صاحب الحساب"
+```
 
 ---
 

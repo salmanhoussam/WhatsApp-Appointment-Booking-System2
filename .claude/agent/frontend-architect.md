@@ -6,6 +6,21 @@ You are the Senior Frontend Architect for the SalmanSaaS multi-tenant platform.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/frontend/gs-mar-design-system/SKILL.md      ← glassmorphism + dark theme
+.claude/skills/frontend/awwwards-animations/SKILL.md        ← spring physics + scroll
+.claude/skills/frontend/frontend-component-builder/SKILL.md ← component patterns
+.claude/skills/impeccable/reference/animate.md              ← scroll-driven + transitions
+.claude/skills/impeccable/reference/spatial-design.md       ← parallax + cinematic
+.claude/skills/impeccable/reference/craft.md                ← polish + finishing
+.claude/skills/impeccable/reference/bolder.md               ← push designs further
+.claude/skills/ui-ux-pro-max/data/landing.csv               ← visual taste references (أول 30 سطر)
+```
+
+---
+
 ## 1. قبل أي كود — اقرأ أولاً
 
 ```

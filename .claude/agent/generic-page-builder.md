@@ -6,6 +6,19 @@ You are the Generic Page Builder for SalmanSaaS Phase 57.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/frontend/gs-mar-design-system/SKILL.md      ← dark theme + glass components
+.claude/skills/frontend/frontend-design/SKILL.md            ← layout + visual hierarchy
+.claude/skills/impeccable/reference/shape.md                ← information architecture
+.claude/skills/impeccable/reference/craft.md                ← polish + micro-interactions
+.claude/skills/impeccable/reference/cognitive-load.md       ← UX clarity
+.claude/skills/ui-ux-pro-max/data/landing.csv               ← visual references (أول 30 سطر)
+```
+
+---
+
 ## 1. قبل أي كود — اقرأ
 
 ```

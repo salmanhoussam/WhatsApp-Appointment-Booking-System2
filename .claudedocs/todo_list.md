@@ -1,5 +1,5 @@
 # Project Todo List — Beit Smar / Salman SaaS
-# Last updated: 2026-04-24
+# Last updated: 2026-05-13
 
 ## Completed Phases
 
@@ -19,25 +19,31 @@
 - BUG-02: Customer CRM Linkage Failure — cross-tenant phone lookup — FIXED
 - BUG-03: Bookings Tab Empty Table — response shape mismatch — FIXED
 
-## In Progress
+## Completed Phases (continued)
 
-- Phase 30 (remaining tasks): ShowcaseTemplate → wire to DB assets (30.2–30.5)
-  - 30.2: Asset preparation (user task — upload to Supabase)
-  - 30.3: DB Migration — homepage_assets + social_links
-  - 30.4: Backend — return homepage_assets in /config
-  - 30.5: Frontend — wire ShowcaseTemplate to useTenantConfig
+- Phase 52: Self-Service Onboarding (TenantRegisterPage + GenericAdminDashboard + CatalogTab) — ✅ Done 2026-05-08
+- Phase 53: Image Upload (`POST /admin/upload` + `useImageUpload.js`) — ✅ Done 2026-05-05
+- Phase 54: DB Unification (menu+store → catalog, 29→23 tables) — ✅ Done 2026-05-05
+- Phase 56-A/B/C/D/E: Dashboard v2 (OverviewTab + Activity Feed + ReservationsTab + mobile) — ✅ Done 2026-05-08/09
+- Phase 59 + 60-A: Template Picker System + Dashboard Live Preview — ✅ Done 2026-05-11 (commit: ed2661b)
+- Phase 60-B: TemplatePicker saves to DB via persistToDb() — ✅ Done 2026-05-13
+- Phase 61: WhatsApp AI Settings Agent endpoint — ✅ Backend done 2026-05-13
 
-- Phase 35: Backend Config Endpoint + Smar Migration
-  - 35.1: GET /api/v1/public/{slug}/config
-  - 35.2: Smar migration to ShowcaseTemplate
-  - 35.3+: remaining tasks
+## In Progress / Carry Forward
+
+- [ ] **COMMIT + PUSH** — 8 agent files + Phase 60-B + Phase 61 + skills + SpatialHomePage (nothing committed since ed2661b)
+- [ ] **Deploy to Railway** — after commit
+- [ ] **PRODUCT.md + DESIGN.md** — required by impeccable skill at project root
+- [ ] **Phase 61 n8n wiring** — backend done, n8n workflow not built yet
+- [ ] **Footlab SpatialHomePage polish** — product strip below pinned area (needs real API test)
 
 ## Upcoming
 
-- Phase 36: components/ Folder Cleanup — Tech Debt (delete 13 orphan components)
-- Phase 37: ShowcaseTemplate Portrait Mobile Optimization
-- Phase 38: Admin Settings — homepage_assets Editor
-- Phase 39: Gallery Page — /smar/gallery (Masonry Grid + Lightbox)
+- Phase 62: Footlab store migration (catalog API wiring + CartPage + checkout)
+- Phase 63: Caracas restaurant migration (catalog API wiring + order flow)
+- ARCH-01: Prisma calls in Routes/Auth files (20 files) — Phase 60+ refactor
+- PRODUCT.md + DESIGN.md creation for impeccable context loading
+- n8n workflow: Konaan → webhook → WhatsApp AI settings
 
 ## Sprint 2 — Code Review Findings (all Pending)
 

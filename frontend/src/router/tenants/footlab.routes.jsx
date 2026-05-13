@@ -17,6 +17,8 @@ import ProtectedRoute from '../ProtectedRoute';
 import { TenantConfigProvider, useTenantConfigContext } from '../../context/TenantConfigContext';
 
 // ── Lazy page imports ─────────────────────────────────────────────────────────
+// FM12: SpatialHomePage uses useScroll/useTransform → MUST be lazy()
+const SpatialHomePage       = lazy(() => import('../../pages/footlab/spatial/SpatialHomePage'));
 const CatalogPage           = lazy(() => import('../../pages/generic/normal/CatalogPage'));
 const CartPage              = lazy(() => import('../../pages/generic/normal/CartPage'));
 const ReservePage           = lazy(() => import('../../pages/generic/normal/ReservePage'));
@@ -73,8 +75,9 @@ export default function FootlabRoutes() {
           </ProtectedRoute>
         } />
 
-        <Route path=""  element={<Navigate to="store" replace />} />
-        <Route path="*" element={<Navigate to="store" replace />} />
+        <Route path=""      element={<Lazy component={SpatialHomePage} />} />
+        <Route path="home"  element={<Lazy component={SpatialHomePage} />} />
+        <Route path="*"     element={<Navigate to="" replace />} />
       </Routes>
     </TenantConfigProvider>
   );

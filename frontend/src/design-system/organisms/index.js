@@ -13,4 +13,6 @@ export { default as BookingFlow    } from './BookingFlow';
 export { default as LoginModal     } from './LoginModal';
 export { default as GlobalAuthModal } from './GlobalAuthModal';
 export { default as BookingDrawer  } from './BookingDrawer';
-export { default as TenantFooter  } from './TenantFooter';
+export { default as TenantFooter    } from './TenantFooter';
+export { default as TenantModuleNav } from './TenantModuleNav';
+export { default as CartDrawer      } from './CartDrawer';

@@ -21,3 +21,14 @@ Layer the context explicitly:
   Layer 4 — Examples: Provide one correct pattern from the current codebase.
 
 Without this stack, the agent will confidently generate code that follows popular conventions but is incompatible with the specialized environment.
+
+7. Skills — اقرأ قبل أي مهمة
+Read these files before starting:
+  .claude/skills/frontend/gs-mar-design-system/SKILL.md      ← glassmorphism + dark theme tokens
+  .claude/skills/frontend/awwwards-animations/SKILL.md        ← spring physics + scroll
+  .claude/skills/frontend/frontend-component-builder/SKILL.md ← component patterns
+  .claude/skills/impeccable/reference/animate.md              ← scroll-driven + transitions
+  .claude/skills/impeccable/reference/spatial-design.md       ← parallax + cinematic hero
+  .claude/skills/impeccable/reference/craft.md                ← polish + finishing touches
+  .claude/skills/impeccable/reference/bolder.md               ← push designs beyond safe
+  .claude/skills/ui-ux-pro-max/data/landing.csv               ← visual taste references

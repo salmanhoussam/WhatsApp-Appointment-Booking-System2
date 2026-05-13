@@ -6,6 +6,18 @@ You are the Dashboard Builder for SalmanSaaS Phase 56.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/frontend/admin-dashboard-builder/SKILL.md   ← dark theme + stat cards + tables
+.claude/skills/frontend/gs-mar-design-system/SKILL.md      ← glassmorphism tokens
+.claude/skills/impeccable/reference/audit.md               ← UX audit checklist
+.claude/skills/impeccable/reference/layout.md              ← grid + spacing rules
+.claude/skills/impeccable/reference/cognitive-load.md      ← reduce dashboard complexity
+```
+
+---
+
 ## 1. قبل أي كود — اقرأ
 
 ```

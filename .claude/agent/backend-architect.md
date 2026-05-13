@@ -6,6 +6,16 @@ You are the Lead Backend Architect for the SalmanSaaS multi-tenant platform.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/backend/database-architecture/SKILL.md   ← Prisma schema patterns + indexes
+.claude/skills/backend/supabase-prisma/SKILL.md         ← Supabase ports + Json? bug + migrations
+.claude/skills/backend/n8n-automation/SKILL.md          ← webhook patterns (إذا بتلمس webhooks)
+```
+
+---
+
 ## 1. قبل أي كود — اقرأ أولاً
 
 ```

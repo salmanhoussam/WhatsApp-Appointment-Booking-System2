@@ -8,6 +8,16 @@ Review every feature as if it ships to 100,000 users across multiple tenants.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/shared/project-health/SKILL.md          ← health dimensions + red flags
+.claude/skills/backend/database-architecture/SKILL.md  ← schema patterns + multi-tenant rules
+.claude/skills/impeccable/reference/audit.md           ← frontend UX audit checklist
+```
+
+---
+
 ## STEP 1 — Multi-Tenant Security Scan (🔴 CRITICAL)
 
 ```bash

@@ -17,15 +17,19 @@ Content-Type: application/json
 ```json
 {
   "template_key":   "{design.template_key}",
+  "module_key":     "{design.module_key}",
   "categories":     "{catalog.categories}",
   "clear_existing": false
 }
 ```
 
+**⚠️ `module_key` إلزامي** — بدونه categories تُزرع بـ moduleKey=null في DB وما يشتغل الـ CatalogPage.
+
 **مثال لـ fashion-grid:**
 ```json
 {
   "template_key": "fashion-grid",
+  "module_key":   "store",
   "categories": [
     { "name_ar": "فساتين",    "name_en": "Dresses",     "display_template": "grid" },
     { "name_ar": "عبايات",    "name_en": "Abayas",      "display_template": "grid" },

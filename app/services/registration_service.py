@@ -40,6 +40,15 @@ VENUE_TYPE_MAP: dict[str, list[str]] = {
     "sports":      ["court", "field", "gym"],
 }
 
+# Maps venue_type → which client_services to seed at registration
+_SERVICE_SEED_MAP: dict[str, list[str]] = {
+    "store":       ["store"],
+    "restaurant":  ["restaurant"],
+    "real_estate": ["catalog"],
+    "hotel":       ["catalog"],
+    "sports":      ["catalog"],
+}
+
 
 def _init_tenant_storage(slug: str) -> None:
     """Upload .keep placeholders to create the tenant's folder tree in Supabase."""
@@ -106,7 +115,8 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "role":          "TENANT_ADMIN",
     })
 
-    await repo.seed_default_services(client.id, ["catalog"])
+    services_to_seed = _SERVICE_SEED_MAP.get(venue_type, ["catalog"])
+    await repo.seed_default_services(client.id, services_to_seed)
 
     # Non-blocking: create tenant folder structure in Supabase Storage
     asyncio.get_event_loop().run_in_executor(None, _init_tenant_storage, client.slug)

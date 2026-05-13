@@ -17,6 +17,7 @@ from app.api.v1.webhook import router as webhook_router
 from app.api.v1.super.clients import router as super_router
 from app.api.v1.super.platform_services import router as super_platform_router
 from app.api.v1.onboarding import router as onboarding_router
+from app.api.v1.ai_settings_agent import router as ai_settings_router
 
 
 @asynccontextmanager
@@ -56,6 +57,7 @@ app.include_router(admin_v1_router,   prefix="/api/v1/admin")
 app.include_router(super_router,         prefix="/api/v1/super", tags=["Super Admin"])
 app.include_router(super_platform_router, prefix="/api/v1/super", tags=["Super Admin — Platform Services"])
 app.include_router(onboarding_router,    prefix="/api/v1/webhook", tags=["Webhook-AI"])
+app.include_router(ai_settings_router,  prefix="/api/v1/webhook", tags=["Webhook-AI"])
 
 
 @app.get("/", tags=["Health"])

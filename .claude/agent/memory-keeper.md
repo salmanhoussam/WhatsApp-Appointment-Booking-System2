@@ -8,6 +8,14 @@ Your only job: keep memory accurate, current, and non-redundant.
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/shared/auto-reporting/SKILL.md   ← report format + when/how to write
+```
+
+---
+
 ## When to Run
 
 - At the END of every coding session (`/session-close`)

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ConfigurableHero from '../../components/ConfigurableHero';
 import TemplatePicker from '../../components/TemplatePicker';
+import adminApi from '../../utils/admin.config';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -342,14 +343,21 @@ export default function DemoPublicPage() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  const persistToDb = async (patch) => {
+    if (!localStorage.getItem('admin_access_token')) return;
+    try { await adminApi.patch('/settings', patch); } catch {}
+  };
+
   const handleHeroChange = (type) => {
     setHeroType(type);
     savePref(slug, 'heroType', type);
+    persistToDb({ page_type: type });
   };
 
   const handleCatalogChange = (layout) => {
     setCatalogLayout(layout);
     savePref(slug, 'catalogLayout', layout);
+    persistToDb({ config: { ...(config?.config ?? {}), catalog_layout: layout } });
   };
 
   if (loading) return <LoadingScreen />;

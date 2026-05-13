@@ -1,6 +1,354 @@
 # Roadmap Audit — May 2026
-**Last updated:** 2026-05-06 (Phase 56 planned)
+**Last updated:** 2026-05-13 (Multi-Agent System Plan added)
 **Author:** Claude
+
+---
+
+# Multi-Agent System — Tenant Page Builder
+## نظام بناء صفحات العملاء — الخطة الكاملة
+## تاريخ: 2026-05-13
+
+---
+
+## SECTION A — لماذا فشل tenant-seeder الحالي
+
+| # | المشكلة | الملف | الخطورة |
+|---|---------|-------|---------|
+| BUG-01 | **Schema mismatch** — كونان يُخرج `template.template_key` لكن tenant-seeder يقرأ `design.template_key` | `konaan.md` vs `01-parse-tenant-json.md` | 🔴 مانع كامل |
+| BUG-02 | **`module_key` غائب** عن body الـ `seed-from-template` في `04-seed-catalog.md` | `04-seed-catalog.md` | 🔴 categories تُزرع بـ module_key=null |
+| BUG-03 | **Base URL خطأ** — الـ skills تقول `localhost:8000` والـ backend على `8080` | كل ملفات `demo/` | 🟠 كل الـ API calls تفشل locally |
+| BUG-04 | **لا frontend scaffold** — بعد الـ seed ما في agent يبني أو يختار الـ pages | الـ pipeline كلها | 🟠 demo يُزرع لكن ما يُبنى |
+| BUG-05 | **`## 0. Skills` غائب** عن `tenant-seeder.md` | `tenant-seeder.md` | 🟡 قراءة Skills غير مضمونة |
+| BUG-06 | **Verification endpoint خطأ** — store يحتاج `/store/categories` لا `/catalog/categories` | `05-verify-live.md` | 🟡 false negative |
+| BUG-07 | **لا feedback loop** — إذا فشل step ما في retry أو escalation | الـ pipeline كلها | 🟡 يتوقف صامت |
+| BUG-08 | **لا migration script** — tenants قديمة مزروعة بـ schema قديم (template.template_key) ستحتاج تنظيف يدوي | DB + JSON files في scripts/data/ | 🟡 بيانات قديمة تتعارض |
+
+---
+
+## SECTION B — الـ Architecture المطلوبة
+
+```
+                    ┌─────────────────────────────────────────────────┐
+                    │         TENANT ONBOARDING PIPELINE               │
+                    └─────────────────────────────────────────────────┘
+
+  [WhatsApp/Manual]
+        │
+        ▼
+  ┌───────────┐     confidence < medium
+  │  KONAAN   │──────────────────────────► [SALMAN REVIEW] ──► STOP
+  │ Extractor │
+  └─────┬─────┘
+        │ JSON v2.1 (unified schema)
+        ▼
+  ┌─────────────┐    validation fails
+  │  VALIDATOR  │──────────────────────────► [ALERT] ──► STOP
+  └──────┬──────┘
+         │ clean payload
+         │
+         │
+         │ (SEQUENTIAL — Backend أولاً، Frontend بعده)
+         ▼
+  ┌──────────────┐
+  │   BACKEND    │
+  │   SEEDER     │
+  │   (Steps 1-4)│
+  └──────┬───────┘
+         │ نجح → slug + token متاح
+         ▼
+  ┌──────────────────┐
+  │    FRONTEND      │
+  │    ARCHITECT     │
+  │                  │
+  │ 1. Read registry │
+  │ 2. Check routes  │
+  │ 3. Wire/create   │
+  │ 4. Fix index.js  │
+  └────────┬─────────┘
+           │ نجح
+                                    │ (SEQUENTIAL DONE)
+                                    ▼
+                             ┌─────────────┐    any failure
+                             │  QA AGENT   │──────────────► [RETRY or ALERT]
+                             └──────┬──────┘
+                                    │ all green
+                                    ▼
+                             ┌─────────────┐
+                             │   MEMORY    │
+                             │   KEEPER    │
+                             └──────┬──────┘
+                                    │
+                                    ▼
+                             ✅ DEMO LIVE
+                             🔗 /demo/{slug}
+```
+
+---
+
+## SECTION C — الـ Unified JSON Schema v2.1
+
+> هذا هو الـ schema الوحيد — كونان يُخرجه، tenant-seeder يقرأه.
+
+```json
+{
+  "_schema_version": "2.1",
+  "meta": {
+    "extracted_by":   "konaan | manual",
+    "extracted_at":   "ISO timestamp",
+    "confidence":     "high | medium | low",
+    "needs_review":   false,
+    "missing_fields": []
+  },
+  "client": {
+    "slug":         "sneakers-lb",
+    "name_ar":      "سنيكرز",
+    "name_en":      "Sneakers LB",
+    "service_type": "store",
+    "status":       "trial",
+    "currency":     "USD",
+    "country_code": "LB"
+  },
+  "owner": {
+    "name":          "أحمد",
+    "whatsapp":      "+96170000000",
+    "email":         "owner@sneakers.com",
+    "password_temp": "Temp@1234"
+  },
+  "design": {
+    "template_key":  "fashion-grid",
+    "module_key":    "store",
+    "services":      ["store"],
+    "primary_color": "#E8E8E8",
+    "page_type":     "showcase"
+  },
+  "catalog": {
+    "seed_from_template": true,
+    "clear_existing":     false,
+    "categories":         []
+  }
+}
+```
+
+**التغييرات عن v2.0:**
+- `template.template_key` → نُقل إلى `design.template_key`
+- `design.services` جديد (كان في `services_config.active_services`)
+- `services_config` محذوف
+
+---
+
+## SECTION D — Agent Specs
+
+### D1. KONAAN — محقق الأونبوردينغ
+| | |
+|---|---|
+| **المدخل** | نص محادثة WhatsApp |
+| **المخرج** | JSON v2.1 |
+| **الملف** | `.claude/agent/المحقق كونان.md` |
+
+**منطق القرار:**
+```
+نص → استخرج client + owner + design
+→ map نوع النشاط → template_key من template-registry.js
+→ confidence: high (كل الأساسيات موجودة) | medium (حقل ناقص) | low (غير واضح)
+→ low أو needs_review → توقف + أبلغ سلمان
+```
+
+### D2. VALIDATOR — حارس الـ Schema
+| | |
+|---|---|
+| **المدخل** | JSON v2.1 |
+| **المخرج** | `{valid: true, payload}` أو `{valid: false, errors[]}` |
+
+**تحقق من:**
+```
+client.slug          → ^[a-z0-9-]{3,50}$
+owner.email          → valid email
+owner.password_temp  → >= 8 chars
+design.template_key  → موجود في template-registry.js
+design.module_key    → يطابق getModuleKey(template_key)
+design.page_type     → normal | showcase
+```
+
+### D3. BACKEND SEEDER
+| | |
+|---|---|
+| **المدخل** | Validated payload |
+| **المخرج** | `{slug, adminToken, clientId, categoriesCreated}` |
+| **Base URL** | `localhost:8080` (dev) / `api.salmansaas.com` (prod) |
+
+**Steps (Sequential):**
+```
+Step 1: POST /api/v1/auth/register
+Step 2: PATCH /api/v1/admin/settings  (primary_color, page_type, template_key)
+Step 3: POST /api/v1/admin/catalog/seed-from-template
+  Body: { template_key, module_key ← إلزامي!, categories, clear_existing: false }
+Step 4: GET /{slug}/config → تأكد active_services صحيح
+```
+
+**Failure:** أي step يفشل → أوقف + أرسل {step, status_code, response_body}
+
+### D4. FRONTEND ARCHITECT
+| | |
+|---|---|
+| **يعمل** | بالتوازي مع Backend Seeder |
+| **المدخل** | `{slug, template_key, module_key, page_type}` |
+| **المخرج** | Routes مسجلة + pages مؤكدة |
+
+**شجرة القرار:**
+```
+هل /{slug}.routes.jsx موجود؟
+  YES → تحقق فقط (slug في index.js؟)
+  NO  → أنشئ من _template.routes.jsx (ملف template جديد)
+
+هل هو slug خاص (smar/footlab/caracas)?
+  YES → custom pages موجودة → تحقق فقط
+  NO  → generic pages كافية (CatalogPage/CartPage/ReservePage)
+```
+
+### D5. QA AGENT
+```
+QA-01: GET /{slug}/config → 200 + active_services صحيح
+QA-02: GET /public/{module}/categories?client_slug={slug} → ≥1 category
+QA-03: items endpoint → success
+QA-04: /demo/{slug} → accessible
+QA-05: /{slug}/store → accessible
+QA-06: tenants/index.js → يحتوي على slug
+
+فشل → retry once → فشل مرة ثانية → escalate لسلمان
+```
+
+### D6. MEMORY KEEPER
+```
+يكتب في platform_saas_merge.md:
+  ## {slug} — {name_ar} ✅ ({date})
+  - template: {template_key}
+  - Demo: /demo/{slug}
+  - Categories: {count}
+```
+
+---
+
+## SECTION E — Detailed Flowchart
+
+```
+INPUT: WhatsApp text OR manual JSON
+            │
+            ▼
+    ┌───────────────┐
+    │   KONAAN      │
+    └───────┬───────┘
+    confidence?
+    ├─ low ──────────────────────► [SALMAN ALERT] STOP
+    └─ medium/high ──────────────► continue
+            │
+            ▼
+    ┌───────────────┐
+    │   VALIDATOR   │
+    └───────┬───────┘
+    valid?
+    ├─ NO ───────────────────────► [ERROR + missing fields] STOP
+    └─ YES
+            │
+            ├──────────────────────────────────────────────
+            │ PARALLEL                                      │ PARALLEL
+            ▼                                               ▼
+    ┌──────────────┐                             ┌──────────────────┐
+    │   BACKEND    │                             │  FRONTEND        │
+    │   SEEDER     │                             │  ARCHITECT       │
+    └──────┬───────┘                             └────────┬─────────┘
+           │                                              │
+    Step 1 register?                             Routes exist?
+    ├─ 409 → slug exists → rename or skip        ├─ YES → verify only
+    ├─ 422 → fix + retry once                    └─ NO  → create from template
+    └─ 201 ✅
+                                                 index.js registered?
+    Step 2 settings?                             ├─ YES → skip
+    ├─ 401 → re-auth                             └─ NO  → add lazy() entry
+    └─ 200 ✅
+
+    Step 3 seed-from-template?
+    ├─ 403 → catalog service missing → fix registration_service
+    ├─ 400 → bad display_template → fallback to 'grid'
+    └─ 201 ✅
+           │                                              │
+           └──────────────────┬───────────────────────────┘
+                              │ BOTH DONE
+                              ▼
+                       ┌─────────────┐
+                       │  QA AGENT   │
+                       └──────┬──────┘
+                       all 6 checks:
+                       all pass?
+                       ├─ NO (retry 1) → re-trigger failed agent
+                       ├─ NO (retry 2) → SALMAN ESCALATION
+                       └─ YES ✅
+                              │
+                              ▼
+                       ┌─────────────┐
+                       │   MEMORY    │
+                       └──────┬──────┘
+                              ▼
+                       ✅ DEMO LIVE
+                       🔗 /demo/{slug}
+```
+
+---
+
+## SECTION F — Implementation Roadmap
+
+### Phase A — Schema Fix ✅ DONE (2026-05-13)
+
+| # | الإصلاح | الملف | الحالة |
+|---|---------|-------|--------|
+| A1 | كونان: output → schema v2.1 (`design.template_key`) + whatsapp→needs_review rule | `.claude/agent/المحقق كونان.md` | ✅ |
+| A2 | Validator: اقرأ `design.template_key` + `validateModuleServicesConsistency()` + page_type fallback | `.claude/skills/seeding/demo/01-parse-tenant-json.md` | ✅ |
+| A3 | أضف `module_key` إلزامي في seed-from-template body | `.claude/skills/seeding/demo/04-seed-catalog.md` | ✅ |
+| A4 | Base URL: `8000` → `8080` | `.claude/agent/tenant-seeder.md` | ✅ |
+| A5 | Verification: endpoint صحيح per module_key + items=200 (لا يشترط وجود عناصر) | `.claude/skills/seeding/demo/05-verify-live.md` | ✅ |
+| A6 | 409 logic: نفس المالك → skip | مختلف → escalate | `.claude/skills/seeding/demo/02-register-and-auth.md` | ✅ |
+
+### Phase B — Agent Wiring ✅ DONE (2026-05-13)
+
+| # | الإصلاح | الملف | الحالة |
+|---|---------|-------|--------|
+| B1 | `## 0. Skills` لـ tenant-seeder | `.claude/agent/tenant-seeder.md` | ✅ |
+| B2 | Step 5 (Frontend Architect) + Step 6 في pipeline | `.claude/agent/tenant-seeder.md` | ✅ |
+| B3 | Sequential flow documented (Backend → Frontend ليس parallel) | `.claude/agent/tenant-seeder.md` | ✅ |
+
+### Phase C — QA Skill ✅ DONE (2026-05-13)
+
+| # | الإضافة | الملف | الحالة |
+|---|---------|-------|--------|
+| C1 | `06-qa-verify.md` — 6 checks + retry(3s) + escalation report format | `.claude/skills/seeding/demo/06-qa-verify.md` | ✅ |
+
+### Phase D — Still Needed
+
+| # | الإضافة | الملف | الحالة |
+|---|---------|-------|--------|
+| D1 | `_template.routes.jsx` — للـ slugs الجديدة | `frontend/src/router/tenants/` | ⏳ |
+| D2 | BUG-08: migration script لـ JSON files القديمة في `scripts/data/` | `scripts/migrate_json_schema.py` | ⏳ |
+| D3 | Integration test — tenant جديد من الصفر | test script | ⏳ |
+
+---
+
+## SECTION G — Scalability
+
+```
+كل tenant مستقل تماماً:
+  ✅ Generic pages = 17/20 template — لا كود جديد
+  ✅ slug جديد = routes file + index.js فقط
+  ✅ clientId isolation في كل DB query
+  ✅ Storage: properties/{slug}/ منفصل
+
+Custom pages (للـ 3/20 الخاصة):
+  → footlab: SpatialHomePage + CatalogPage
+  → caracas: CatalogPage
+  → smar: SpatialHomePage + booking
+```
+
+**الهدف:** من WhatsApp message → demo page حية في أقل من 5 دقائق تلقائياً.
+
+---
 
 ---
 

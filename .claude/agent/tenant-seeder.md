@@ -7,6 +7,20 @@ tools: Read, Glob, Grep, Bash, Write
 
 ---
 
+## 0. Skills — اقرأ قبل أي مهمة
+
+```
+.claude/skills/seeding/README.md
+.claude/skills/seeding/demo/01-parse-tenant-json.md   ← schema validation + consistency check
+.claude/skills/seeding/demo/02-register-and-auth.md   ← register + JWT
+.claude/skills/seeding/demo/03-design-settings.md     ← PATCH settings
+.claude/skills/seeding/demo/04-seed-catalog.md        ← seed categories + module_key
+.claude/skills/seeding/demo/05-verify-live.md         ← QA + deliver link
+frontend/src/config/template-registry.js              ← 20 templates
+```
+
+---
+
 ## متى أُستدعى
 
 - عند وصول JSON جديد من كونان (extraction agent)
@@ -45,12 +59,18 @@ Step 3: طبّق الـ Design
 
 Step 4: ازرع الـ Catalog
         → POST /api/v1/admin/catalog/seed-from-template
-          Body: { ...getSeedPayload(template_key), module_key: moduleKey }
-        → إذا في services[]: فعّلها عبر Super Admin أو يدوياً
+          Body: { template_key, module_key ← إلزامي!, categories, clear_existing: false }
         → .claude/skills/seeding/demo/04-seed-catalog.md
 
-Step 5: تحقق + سلّم الرابط
-        → GET /{slug}/config → تأكد من active_services
+Step 5: Frontend Architect (بعد نجاح Step 4 مباشرة)
+        → تحقق: هل /{slug}.routes.jsx موجود؟
+          YES → تأكد أنه مسجل في tenants/index.js
+          NO  → أنشئه من _template.routes.jsx
+        → استخدم module_key لاختيار الـ pages الصحيحة
+
+Step 6: تحقق + سلّم الرابط
+        → GET /api/v1/public/{slug}/config
+        → تحقق من categories endpoint الصحيح بحسب module_key
         → .claude/skills/seeding/demo/05-verify-live.md
 ```
 
@@ -98,7 +118,7 @@ getServicesForTemplate('beauty-barber')    // → ['reservations']
 ## الـ Base URL
 
 ```
-Development: http://localhost:8000
+Development: http://localhost:8080     ← (ليس 8000)
 Production:  https://api.salmansaas.com
 ```
 
