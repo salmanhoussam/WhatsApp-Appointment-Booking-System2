@@ -226,6 +226,7 @@ class TenantRegistrationRequest(BaseModel):
     currency:         str = "USD"
     payment_methods:  list[str] = ["cash", "card"]
     primary_color:    str = "#6d28d9"
+    services:         list[str] | None = None  # from Validator-corrected pipeline payload
 
     @field_validator("password")
     @classmethod

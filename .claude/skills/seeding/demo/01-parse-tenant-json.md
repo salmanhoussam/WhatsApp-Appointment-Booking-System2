@@ -106,6 +106,31 @@ if expected_module != "catalog" and expected_module not in services:
     raise ValueError(f"services ناقصة: يجب أن تحتوي على '{expected_module}'")
 ```
 
+### 4C. إصلاح تلقائي لـ BUG-08 — ضمان وجود "catalog" (AUTO-CORRECTION)
+```python
+# قاعدة إلزامية (BUG-08 permanent fix):
+# كل module_key = "store" أو "restaurant" يحتاج "catalog" في services
+# لأن admin catalog endpoints تتطلب require_service("catalog")
+# إذا "catalog" مفقود → يُضاف تلقائياً — لا يوقف الـ Pipeline، يُسجَّل فقط
+
+MODULE_REQUIRES_CATALOG = {"store", "restaurant"}
+
+if expected_module in MODULE_REQUIRES_CATALOG:
+    if "catalog" not in services:
+        services.append("catalog")
+        payload["design"]["services"] = services
+        print(f"⚡ AUTO-CORRECTION: 'catalog' أُضيف تلقائياً إلى services "
+              f"(module_key={expected_module} يتطلبه)")
+        # لا raise — Pipeline يكمل، فقط نسجّل التصحيح
+```
+
+**متى يحدث هذا؟**
+- Konaan يُرجع `services: ["store"]` بدون "catalog" (النسيان الشائع)
+- الـ Validator يُصحح: `["store"] → ["store", "catalog"]`
+- الـ Backend يتلقى قائمة مكتملة → seed-from-template يمر بدون 403
+
+**قاعدة الذهب:** "catalog" دائماً موجود لأي tenant يستخدم `store` أو `restaurant`.
+
 ### 5. تحقق من needs_review
 ```python
 needs_review = payload.get("meta", {}).get("needs_review", False)

@@ -122,7 +122,13 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "role":          "TENANT_ADMIN",
     })
 
-    services_to_seed = _SERVICE_SEED_MAP.get(venue_type, ["catalog"])
+    # Service seeding strategy (BUG-08 permanent fix):
+    # - Payload services come pre-validated by the Validator skill (auto-adds "catalog")
+    # - _SERVICE_SEED_MAP is the safety net for direct API calls (no pipeline)
+    # - Union of both ensures we never miss a required service regardless of call origin
+    payload_services = set(data.get("services") or [])
+    map_services     = set(_SERVICE_SEED_MAP.get(venue_type, ["catalog"]))
+    services_to_seed = list(payload_services | map_services)
     await repo.seed_default_services(client.id, services_to_seed)
 
     # Non-blocking: create tenant folder structure in Supabase Storage
