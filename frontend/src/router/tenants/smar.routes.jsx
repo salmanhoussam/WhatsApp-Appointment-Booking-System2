@@ -39,6 +39,7 @@ const SmarLiquidRing         = lazy(() => import('../../pages/smar/showcase/Smar
 const SmarGalleryPage        = lazy(() => import('../../pages/smar/gallery/SmarGalleryPage'));
 const ChalletDemo            = lazy(() => import('../../pages/smar/showcase/ChalletDemo'));
 const HamoudiDemo            = lazy(() => import('../../pages/smar/showcase/HamoudiDemo'));
+const AbdouDemo              = lazy(() => import('../../pages/smar/showcase/AbdouDemo'));
 
 // ── Shared loading fallback ───────────────────────────────────────────────────
 function PageFallback() {
@@ -88,6 +89,9 @@ export default function SmarRoutes() {
 
       {/* ── Hamoudi Special Page ── */}
       <Route path="hamoudi"  element={<Lazy component={HamoudiDemo} />} />
+
+      {/* ── Abdou Special Page ── */}
+      <Route path="abdou"    element={<Lazy component={AbdouDemo} />} />
 
       {/* ── Liquid ring hero ── */}
       <Route path="ring"  element={<Lazy component={SmarLiquidRing} />} />
