@@ -75,6 +75,8 @@ export default function DynamicTenantResolver() {
         <Route path="menu"      element={<DemoCatalogPage />} />
         <Route path="store"     element={<DemoCatalogPage />} />
         <Route path="legacy"    element={<DemoPublicPage />}  />
+        {/* Static test pages — served under any demo slug, e.g. /demo/sneakers-beirut/hamoudi */}
+        <Route path="hamoudi"   element={<iframe src="/hamoudi.html" style={{ width:'100vw', height:'100vh', border:'none', display:'block' }} title="hamoudi" />} />
         <Route path="*"         element={<DynamicPage />}     />
       </Routes>
     </Suspense>
