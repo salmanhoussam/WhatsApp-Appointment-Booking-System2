@@ -131,6 +131,11 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* ── Static test pages served via iframe (no tenant config needed) ── */}
+          <Route path="/demo/hamoudi" element={
+            <iframe src="/hamoudi.html" style={{ width:'100vw', height:'100vh', border:'none', display:'block' }} title="hamoudi" />
+          } />
+
           {/* ── Trial public page — no auth, customers browse here ── */}
           {/* salmansaas.com/demo/:slug/*  or  auth.salmansaas.com/demo/:slug/*  or  localhost/demo/:slug/* */}
           {/* More specific than /* so it wins on showcase domain without any condition. */}

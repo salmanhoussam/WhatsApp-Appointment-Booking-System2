@@ -45,11 +45,18 @@ export default function ChalletPagePreview({ data }) {
         position:       'relative',
         minHeight:      '58vh',
         padding:        '14vh 8% 10vh',
-        background:     `
-          radial-gradient(ellipse 80% 60% at 70% 30%, rgba(201,169,110,0.12) 0%, transparent 60%),
-          radial-gradient(ellipse 50% 80% at 20% 80%, rgba(181,103,61,0.09) 0%, transparent 55%),
-          linear-gradient(160deg, #1e1710 0%, #2a1f14 40%, #1a130c 100%)
-        `,
+        background:     hero.bg_image
+          ? `
+            radial-gradient(ellipse 80% 60% at 70% 30%, rgba(201,169,110,0.22) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 80% at 20% 80%, rgba(181,103,61,0.18) 0%, transparent 55%),
+            linear-gradient(160deg, rgba(30,23,16,0.80) 0%, rgba(42,31,20,0.65) 40%, rgba(26,19,12,0.82) 100%),
+            url('${hero.bg_image}') center / cover no-repeat
+          `
+          : `
+            radial-gradient(ellipse 80% 60% at 70% 30%, rgba(201,169,110,0.12) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 80% at 20% 80%, rgba(181,103,61,0.09) 0%, transparent 55%),
+            linear-gradient(160deg, #1e1710 0%, #2a1f14 40%, #1a130c 100%)
+          `,
         display:        'flex',
         flexDirection:  'column',
         justifyContent: 'flex-end',

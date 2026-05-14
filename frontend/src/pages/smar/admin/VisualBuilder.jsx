@@ -42,6 +42,7 @@ const DEFAULT_CONTENT = {
     title_em:    'Smar',
     subtitle:    'Where Phoenician heritage meets contemporary luxury — eleven private cottages nestled in the midlands of Batroun, between ancient citadels and the Mediterranean horizon.',
     cta_text:    'Explore Cottages',
+    bg_image:    '',
   },
   story: {
     heading_line1: 'A Resort Rooted in',
@@ -145,6 +146,7 @@ export default function VisualBuilder() {
   const [storedConfig, setStoredConfig] = useState({});
   const [isLoading,    setIsLoading]    = useState(true);
   const [isSaving,     setIsSaving]     = useState(false);
+  const [uploading,    setUploading]    = useState(false);
   const [toast,        setToast]        = useState(null);
   const [zoom,         setZoom]         = useState(0.85);
 
@@ -171,7 +173,7 @@ export default function VisualBuilder() {
         const cfg = res.data?.config ?? {};
         setStoredConfig(cfg);
         const c = cfg.content ?? {};
-        if (c.hero)       setHero(s => ({ ...s, ...c.hero }));
+        if (c.hero)       setHero(s => ({ ...s, ...c.hero, bg_image: c.hero.bg_image ?? s.bg_image }));
         if (c.story)      setStory(s => ({ ...s, ...c.story, stats: c.story.stats ?? s.stats }));
         if (c.facilities?.length) setFacilities(c.facilities);
         if (c.location)   setLocation(s => ({ ...s, ...c.location }));
@@ -183,6 +185,28 @@ export default function VisualBuilder() {
 
   // Live preview data — recomputed on every render
   const previewData = { hero, story, facilities, location, footer };
+
+  // Hero image upload
+  const handleHeroImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('context', 'page_hero');
+      const res = await adminApi.post('/upload/', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setHero(s => ({ ...s, bg_image: res.data.url }));
+      showToast(true, '✅  Hero image uploaded.');
+    } catch {
+      showToast(false, '❌  Upload failed — check connection.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   // Publish
   const handlePublish = async () => {
@@ -297,6 +321,48 @@ export default function VisualBuilder() {
             <Field label="Title — Italic Accent" value={hero.title_em}   onChange={v => setHero(s => ({ ...s, title_em: v }))} />
             <Field label="Subtitle Paragraph"   value={hero.subtitle}    onChange={v => setHero(s => ({ ...s, subtitle: v }))} multiline rows={3} />
             <Field label="CTA Button Text"      value={hero.cta_text}    onChange={v => setHero(s => ({ ...s, cta_text: v }))} />
+
+            {/* Hero background image upload */}
+            <div style={{ marginBottom: 13 }}>
+              <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.textMuted, marginBottom: 8, fontWeight: 600 }}>
+                Hero Background Image
+              </label>
+              {hero.bg_image && (
+                <div style={{ position: 'relative', marginBottom: 10, borderRadius: 7, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                  <img src={hero.bg_image} alt="Hero background" style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                  <button
+                    onClick={() => setHero(s => ({ ...s, bg_image: '' }))}
+                    style={{
+                      position: 'absolute', top: 7, right: 7,
+                      background: 'rgba(10,10,15,0.80)', border: `1px solid ${C.border}`,
+                      borderRadius: 5, color: C.red, cursor: 'pointer',
+                      fontSize: 11, padding: '3px 8px', fontWeight: 700,
+                    }}
+                  >✕ Remove</button>
+                </div>
+              )}
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 13px',
+                background: uploading ? C.goldDim : 'rgba(255,255,255,0.04)',
+                border: `1px dashed ${uploading ? C.gold : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 7, cursor: uploading ? 'not-allowed' : 'pointer',
+                color: uploading ? C.gold : C.textMuted, fontSize: 12, fontWeight: 600,
+                transition: 'all 0.2s',
+              }}>
+                <span>{uploading ? '⏳ Uploading…' : '📷 Choose Image'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploading}
+                  onChange={handleHeroImageUpload}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <p style={{ margin: '5px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                Recommended: 1920×1080 or wider · JPG/WebP
+              </p>
+            </div>
           </SectionBody>
 
           {/* ── STORY ──────────────────────────────────────────────────── */}
