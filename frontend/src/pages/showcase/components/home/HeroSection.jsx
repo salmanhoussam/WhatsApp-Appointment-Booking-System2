@@ -1,140 +1,200 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-// In prod: route to auth subdomain; in dev: stay on showcase /register
+gsap.registerPlugin(ScrollTrigger);
+
 const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
   ? 'https://auth.salmansaas.com/register'
   : '/register';
 
-const HeroSection = () => {
+export default function HeroSection() {
   const { t, lang } = useTranslation();
+  const isAr = lang === 'ar';
+  const [emailInput, setEmailInput] = useState('');
+  const heroRef = useRef();
+  const h1Ref   = useRef();
+  const subRef  = useRef();
+  const ctaRef  = useRef();
 
-  const [activeService, setActiveService] = useState("bookings");
-  const [emailInput, setEmailInput] = useState("");
+  const whatsappNumber = '96178727986';
 
-  const whatsappNumber = "96178727986";
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      tl.from(h1Ref.current,  { opacity: 0, y: 60, duration: 1,    delay: 0.3  })
+        .from(subRef.current,  { opacity: 0, y: 30, duration: 0.8              }, '-=0.5')
+        .from(ctaRef.current,  { opacity: 0, y: 20, duration: 0.7              }, '-=0.4');
+    }, heroRef);
+    return () => ctx.revert();
+  }, []);
 
   const handleEmailSend = () => {
-    if (!emailInput) {
-      alert(lang === 'ar' ? "يرجى إدخال بريدك الإلكتروني" : "Please enter your email");
-      return;
-    }
+    if (!emailInput) return;
     window.location.href = `mailto:salman.houssam@gmail.com?subject=Inquiry&body=Email: ${emailInput}`;
   };
 
-  const getActiveImage = () => {
-    switch(activeService) {
-      case 'menu':  return '/menu-mockup.png';
-      case 'store': return '/store-mockup.png';
-      case 'bookings':
-      default:      return '/booking-mockup.png';
-    }
-  };
-
   return (
-    <header className="container mx-auto px-6 py-12 md:py-20 flex flex-col-reverse md:flex-row items-center justify-between relative z-10">
+    <section
+      ref={heroRef}
+      dir={isAr ? 'rtl' : 'ltr'}
+      style={{
+        minHeight: '100vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '8rem 2rem 4rem',
+        position: 'relative',
+        textAlign: 'center',
+      }}
+    >
+      {/* Faint radial glow behind text */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 60% 50% at 50% 55%, rgba(255,26,85,0.09) 0%, transparent 70%)',
+      }} />
 
-      {/* Text & CTA */}
-      <div className="md:w-1/2 mt-12 md:mt-0">
-        <h1 className="text-5xl md:text-7xl font-extrabold mb-8 leading-[1.1] tracking-tight text-white">
-          {t.heroTitle1} <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-purple-300 to-slate-200">
+      <div style={{ maxWidth: 860, position: 'relative' }}>
+
+        {/* Mono tag */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 10,
+          fontFamily: "'Space Mono', monospace",
+          fontSize: '0.72rem', letterSpacing: '0.18em',
+          textTransform: 'uppercase', color: '#ff1a55',
+          marginBottom: '1.6rem',
+        }}>
+          <span style={{ width: 28, height: 2, background: '#ff1a55', display: 'inline-block' }} />
+          {isAr ? 'حلول برمجية مبتكرة' : 'Innovative SaaS Solutions'}
+          <span style={{ width: 28, height: 2, background: '#ff1a55', display: 'inline-block' }} />
+        </div>
+
+        {/* Main heading */}
+        <h1
+          ref={h1Ref}
+          style={{
+            fontFamily: "'Cairo', sans-serif",
+            fontWeight: 900,
+            fontSize: 'clamp(3rem, 8vw, 7rem)',
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            color: '#ffffff',
+            marginBottom: '1.6rem',
+          }}
+        >
+          {t.heroTitle1}
+          <br />
+          <span style={{ color: 'rgba(255,255,255,0.35)' }}>
             {t.heroTitle2}
           </span>
         </h1>
 
-        <p className="text-xl text-slate-400 mb-10 max-w-lg leading-relaxed">
-          {t.heroSubDesc || t.heroDesc}
+        {/* Sub-description */}
+        <p
+          ref={subRef}
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 'clamp(0.78rem, 1.8vw, 0.92rem)',
+            lineHeight: 1.85,
+            color: 'rgba(255,255,255,0.45)',
+            maxWidth: 640,
+            margin: '0 auto 2.8rem',
+          }}
+        >
+          // {t.heroSubDesc || t.heroDesc}
         </p>
 
-        <div className="flex flex-col gap-4 max-w-md">
-          {/* Primary CTA — self-onboarding */}
+        {/* CTAs */}
+        <div
+          ref={ctaRef}
+          style={{
+            display: 'flex', flexDirection: 'column', gap: '0.9rem',
+            alignItems: 'center',
+          }}
+        >
+          {/* Primary: Register */}
           <a
             href={REGISTER_URL}
-            className="bg-gradient-to-r from-purple-600 to-purple-500 text-white px-6 py-4 rounded-xl font-bold text-center flex items-center justify-center gap-3 transition-all hover:scale-[1.02] hover:from-purple-500 hover:to-purple-400 shadow-[0_0_24px_rgba(147,51,234,0.35)]"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              gap: 10,
+              fontFamily: "'Space Mono', monospace",
+              fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+              background: '#ff1a55',
+              color: '#fff',
+              padding: '0.9rem 2.6rem',
+              textDecoration: 'none',
+              transition: 'all 0.25s',
+              boxShadow: '0 0 28px rgba(255,26,85,0.45)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#ff3366';
+              e.currentTarget.style.boxShadow = '0 0 40px rgba(255,26,85,0.7)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ff1a55';
+              e.currentTarget.style.boxShadow = '0 0 28px rgba(255,26,85,0.45)';
+            }}
           >
-            {lang === 'ar' ? '← ابدأ مجاناً الآن' : 'Start for Free →'}
+            {isAr ? '← ابدأ مجاناً الآن' : 'Start for Free →'}
           </a>
 
-          {/* Secondary — email updates */}
-          <div className="bg-white/5 p-1.5 rounded-xl flex items-center border border-slate-700/50 focus-within:border-purple-500/50 backdrop-blur-md">
+          {/* Email input */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)',
+            backdropFilter: 'blur(8px)',
+            width: '100%', maxWidth: 420,
+          }}>
             <input
               type="email"
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               placeholder={t.emailPlaceholder}
-              className="bg-transparent px-4 py-3 outline-none text-white w-full text-sm"
+              style={{
+                flex: 1, padding: '0.75rem 1rem',
+                background: 'transparent', border: 'none', outline: 'none',
+                fontFamily: "'Space Mono', monospace",
+                fontSize: '0.72rem', color: '#fff',
+              }}
             />
             <button
               onClick={handleEmailSend}
-              className="bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white px-5 py-2 rounded-lg text-xs font-bold transition-all"
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(255,26,85,0.15)',
+                border: 'none',
+                borderLeft: '1px solid rgba(255,255,255,0.1)',
+                fontFamily: "'Space Mono', monospace",
+                fontSize: '0.65rem', letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: '#ff1a55',
+                cursor: 'pointer', transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,26,85,0.3)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,26,85,0.15)'; }}
             >
-              {lang === 'ar' ? 'إرسال' : 'Send'}
+              {isAr ? 'إرسال' : 'Send'}
             </button>
           </div>
 
-          {/* Tertiary — WhatsApp contact */}
-          <p className="text-center text-xs text-slate-600">
-            {lang === 'ar' ? 'أو تواصل معنا عبر ' : 'Or reach us via '}
+          {/* WhatsApp link */}
+          <p style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: '0.65rem', color: 'rgba(255,255,255,0.28)',
+            letterSpacing: '0.05em',
+          }}>
+            {isAr ? 'أو تواصل عبر ' : 'Or reach us on '}
             <a
               href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(t.whatsappText)}`}
               target="_blank"
               rel="noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 font-bold transition"
+              style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 700 }}
             >
               WhatsApp
             </a>
           </p>
         </div>
       </div>
-
-      {/* Interactive mockup */}
-      <div className="md:w-1/2 relative w-full flex justify-center items-center perspective-1000">
-        <div className="w-[100%] md:w-[115%] aspect-[4/3.2] bg-[#0d0718]/90 backdrop-blur-xl rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col overflow-hidden relative z-10 group">
-
-          <div className="h-14 bg-white/5 border-b border-white/5 flex items-center px-6 justify-between">
-            <div className="flex gap-2">
-              {['bookings', 'menu', 'store'].map((service) => (
-                <button
-                  key={service}
-                  onClick={() => setActiveService(service)}
-                  className={`text-[10px] px-3 py-1.5 rounded-full font-bold border transition-all duration-300 ${
-                    activeService === service
-                      ? "bg-purple-600 text-white border-purple-400/30 shadow-[0_0_10px_rgba(168,85,247,0.4)]"
-                      : "bg-white/5 text-slate-400 border-white/5 hover:text-white"
-                  }`}
-                >
-                  {t[`dash${service.charAt(0).toUpperCase() + service.slice(1)}`]}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-tighter">
-                {t.dashStatus || 'Online'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex-1 p-4 flex flex-col justify-center items-center bg-black/20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-purple-600/10 blur-[80px] rounded-full pointer-events-none"></div>
-            <img
-              key={activeService}
-              src={getActiveImage()}
-              alt={`${activeService} preview`}
-              className="w-full h-full object-contain max-h-[300px] drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] showcase-fade-in transition-all duration-500 hover:scale-[1.02]"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23130924'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='40' font-weight='bold' fill='%23a855f7'%3EImage Not Found%3C/text%3E%3C/svg%3E";
-              }}
-            />
-          </div>
-
-        </div>
-      </div>
-    </header>
+    </section>
   );
-};
-
-export default HeroSection;
+}

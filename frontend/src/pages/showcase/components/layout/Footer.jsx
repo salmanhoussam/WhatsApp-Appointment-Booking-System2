@@ -1,36 +1,63 @@
-import React from 'react';
-import { useLanguage } from '../../context/LanguageContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
-const Footer = () => {
-  const { t, lang } = useLanguage();
+export default function Footer() {
+  const { t, lang } = useTranslation();
   const isAr = lang === 'ar';
 
   return (
-    <footer className="bg-[#090412] pt-12 pb-8 border-t border-purple-900/30 relative z-20">
-      <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+    <footer
+      dir={isAr ? 'rtl' : 'ltr'}
+      style={{
+        padding: '2.5rem 2rem',
+        borderTop: '1px solid rgba(255,26,85,0.15)',
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <div style={{
+        maxWidth: 1100, margin: '0 auto',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: '1.2rem',
+      }}>
+        {/* Terminal signature */}
+        <p style={{
+          fontFamily: "'Space Mono', monospace",
+          fontSize: '0.65rem', letterSpacing: '0.1em',
+          color: 'rgba(255,255,255,0.3)',
+          textTransform: 'uppercase',
+        }}>
+          <span style={{ color: '#ff1a55' }}>INITIALIZING PROTOCOL...</span> DONE.
+          <br />
+          © {new Date().getFullYear()} SALMANSAAS — {t.footerRights}
+        </p>
 
-        <div className="text-slate-500 text-sm font-medium">
-          {isAr ? 'جميع الحقوق محفوظة لـ SalmanSaaS © 2026.' : 'All rights reserved to SalmanSaaS © 2026.'}
+        {/* Links */}
+        <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+          {[
+            { href: '/privacy',          label: t.footerPrivacy  },
+            { href: '/whatsapp-privacy', label: t.footerSpecific },
+            { href: '/terms',            label: t.footerTerms    },
+            { href: '/contact',          label: isAr ? 'تواصل معنا' : 'Contact' },
+          ].map(({ href, label }) => (
+            <a
+              key={href}
+              href={href}
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: '0.62rem', letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.3)',
+                textDecoration: 'none',
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ff1a55'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+            >
+              {label}
+            </a>
+          ))}
         </div>
-
-        <div className="flex flex-wrap justify-center gap-6 text-xs md:text-sm font-bold uppercase tracking-widest text-slate-400">
-          <a href="/privacy" className="hover:text-purple-400 transition">
-            {t.footerPrivacy || (isAr ? 'سياسة الخصوصية' : 'General Privacy')}
-          </a>
-          <a href="/whatsapp-privacy" className="hover:text-purple-400 transition">
-            {t.footerSpecific || (isAr ? 'خصوصية البيانات' : 'Data Privacy')}
-          </a>
-          <a href="/terms" className="hover:text-purple-400 transition">
-            {t.footerTerms || (isAr ? 'شروط الخدمة' : 'Terms of Service')}
-          </a>
-          <a href="/contact" className="hover:text-purple-400 transition">
-            {isAr ? 'تواصل معنا' : 'Contact Us'}
-          </a>
-        </div>
-
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

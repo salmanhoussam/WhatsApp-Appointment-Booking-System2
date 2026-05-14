@@ -1,39 +1,97 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from '../../hooks/useTranslation';
 
-const Navbar = () => {
-  const { t } = useTranslation();
-  const whatsappNumber = "96178727986";
+const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
+  ? 'https://auth.salmansaas.com/register'
+  : '/register';
+
+export default function Navbar() {
+  const { t, lang } = useTranslation();
+  const isAr = lang === 'ar';
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const navStyle = {
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+    padding: '1.2rem 2rem',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    transition: 'background 0.4s',
+    background: scrolled
+      ? 'rgba(5,5,5,0.92)'
+      : 'transparent',
+    borderBottom: scrolled ? '1px solid rgba(255,26,85,0.15)' : 'none',
+    backdropFilter: scrolled ? 'blur(16px)' : 'none',
+  };
 
   return (
-    <nav className="container mx-auto px-6 py-6 flex justify-between items-center relative z-20">
-      <div className="flex flex-col gap-2">
-        <div className="text-2xl font-bold flex items-center gap-2 text-slate-100 uppercase tracking-tighter">
-          <span className="text-purple-500 text-3xl">✦</span> SalmanSaaS
-        </div>
-        <LanguageSwitcher />
+    <nav style={navStyle} dir={isAr ? 'rtl' : 'ltr'}>
+
+      {/* Logo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 8, height: 28,
+          background: '#ff1a55',
+          transform: 'skewX(-16deg)',
+          boxShadow: '0 0 12px rgba(255,26,85,0.7)',
+        }} />
+        <span style={{
+          fontFamily: "'Cairo', sans-serif",
+          fontWeight: 900, fontSize: '1.4rem',
+          letterSpacing: '-0.02em', color: '#fff',
+        }}>
+          Salman<span style={{ color: '#ff1a55' }}>SaaS</span>
+        </span>
       </div>
 
-      <div className="flex gap-8 items-center text-sm font-medium">
+      {/* Desktop links */}
+      <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'center' }}>
         <a
-          href="#bookings-section"
-          className="hover:text-purple-400 transition hidden md:block cursor-pointer"
+          href="#services-section"
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: '0.72rem', letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)',
+            textDecoration: 'none', transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#ff1a55'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; }}
         >
           {t.navServices}
         </a>
 
+        <LanguageSwitcher />
+
         <a
-          href={`https://wa.me/${whatsappNumber}`}
-          target="_blank"
-          rel="noreferrer"
-          className="px-5 py-2.5 border border-purple-500/40 text-purple-400 rounded-xl hover:bg-purple-500/10 transition shadow-[0_0_15px_rgba(168,85,247,0.1)] font-bold"
+          href={REGISTER_URL}
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            fontSize: '0.72rem', letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            border: '1px solid rgba(255,26,85,0.5)',
+            color: '#ff1a55',
+            padding: '0.55rem 1.4rem',
+            textDecoration: 'none',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#ff1a55';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = '#ff1a55';
+          }}
         >
-          {t.navContact}
+          {isAr ? 'ابدأ مجاناً' : 'Start Free'}
         </a>
       </div>
     </nav>
   );
-};
-
-export default Navbar;
+}
