@@ -14,7 +14,10 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# nginx:alpine auto-processes *.conf.template files in /etc/nginx/templates/
+# using envsubst — substitutes $PORT at container startup
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
 

@@ -1,14 +1,19 @@
 server {
-    listen 80;
+    listen ${PORT};
     root /usr/share/nginx/html;
     index index.html;
 
-    # SPA fallback — all unknown paths → index.html (React Router handles routing)
+    # Static test pages — served directly by nginx, bypass React Router
+    location = /demo/hamoudi {
+        try_files /hamoudi.html =404;
+    }
+
+    # SPA fallback — all other paths → index.html
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # Cache static assets aggressively (Vite adds content hashes to filenames)
+    # Cache hashed static assets (Vite adds content hashes)
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2|woff|ttf|webp)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
