@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="am" dir="ltr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ለሴዮን ውዴ ❤️</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;700;900&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans Ethiopic', sans-serif;
+            background: linear-gradient(135deg, #1a0533 0%, #3b0764 40%, #6b21a8 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .love-font {
+            font-family: 'Dancing Script', cursive;
+        }
+
+        .parallax-wrapper {
+            perspective: 1px;
+            height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .bg-star {
+            position: fixed;
+            color: rgba(216, 180, 254, 0.4);
+            animation: floatUp 18s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes floatUp {
+            0%   { transform: translateY(100vh) scale(0.5) rotate(0deg); opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 1; }
+            100% { transform: translateY(-20vh) scale(1.5) rotate(360deg); opacity: 0; }
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 1s ease-out;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .pulse-text {
+            animation: pulse 2.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.05); text-shadow: 0 0 30px rgba(216,180,254,0.9); }
+            100% { transform: scale(1); }
+        }
+
+        .interactive-star {
+            position: fixed;
+            pointer-events: none;
+            animation: popAndFade 1.5s ease-out forwards;
+            z-index: 50;
+            font-size: 1.8rem;
+        }
+
+        @keyframes popAndFade {
+            0%   { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 1; }
+            50%  { transform: translate(-50%, -100px) scale(1.2) rotate(10deg); opacity: 0.8; }
+            100% { transform: translate(-50%, -160px) scale(1.5) rotate(25deg); opacity: 0; }
+        }
+
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 30px;
+            animation: bounce 2s infinite;
+            color: #d8b4fe;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40%  { transform: translateY(-20px); }
+            60%  { transform: translateY(-10px); }
+        }
+
+        .glow-border {
+            box-shadow: 0 0 30px rgba(168,85,247,0.4), inset 0 0 20px rgba(168,85,247,0.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="background-stars"></div>
+
+    <div class="parallax-wrapper" id="scroll-container">
+
+        <!-- Hero -->
+        <section class="hero-section px-4">
+            <div class="mb-4 text-5xl">✦</div>
+            <h1 class="text-5xl md:text-7xl font-black text-purple-200 mb-6 drop-shadow-lg pulse-text">
+                ሴዮን ውዴ እንኳን ደህና መጣሽ
+            </h1>
+            <p class="text-2xl md:text-3xl text-purple-300 font-bold mb-12 drop-shadow-md">
+                አስፈላጊ ነገር መናገር አለብኝ...
+            </p>
+            <div class="scroll-indicator text-4xl">👇</div>
+        </section>
+
+        <!-- Section 2 -->
+        <section class="min-h-[80vh] flex items-center justify-center p-6 text-center">
+            <div class="reveal bg-purple-900/40 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl max-w-2xl border border-purple-400/30 glow-border">
+                <p class="text-2xl md:text-3xl leading-loose font-bold text-purple-100">
+                    አንቺ ብቻ ወዳጅ አይደለሽም።<br>
+                    ቀኖቼን የምታበሪ ብርሃን ነሽ። ✨<br><br>
+                    ከአንቺ ጋር እያንዳንዱ ቅጽበት<br>
+                    ልዩና ውብ ነው።
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 3 -->
+        <section class="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
+            <div class="reveal">
+                <p class="text-3xl md:text-4xl font-bold text-purple-200 drop-shadow-md mb-8">
+                    ስለዚህ ልነግርሽ ፈልጌ ነበር...
+                </p>
+            </div>
+        </section>
+
+        <!-- Big Reveal -->
+        <section class="min-h-screen flex items-center justify-center relative overflow-hidden">
+            <div class="reveal z-10 text-center">
+                <h2 class="text-6xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-400 drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)] mb-4 love-font">
+                    I Love U
+                </h2>
+                <h3 class="text-5xl md:text-8xl font-black text-purple-100 drop-shadow-xl pulse-text">
+                    ሴዮን ❤️
+                </h3>
+            </div>
+            <div class="absolute inset-0 z-0 opacity-30 pointer-events-none flex items-center justify-center">
+                <div class="w-96 h-96 bg-purple-600 rounded-full mix-blend-screen filter blur-3xl opacity-50"></div>
+                <div class="w-96 h-96 bg-pink-500 rounded-full mix-blend-screen filter blur-3xl opacity-40 ml-20"></div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <section class="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center pb-20">
+            <div class="reveal bg-purple-950/60 backdrop-blur-sm p-8 rounded-2xl shadow-xl max-w-lg border border-purple-500/20 glow-border">
+                <p class="text-lg md:text-xl font-bold text-purple-200 leading-relaxed italic">
+                    "she so hot and i can't control myself<br>
+                    when i'm closer —<br>
+                    this is why we can't be friends."
+                </p>
+                <p class="text-sm mt-6 text-purple-400">
+                    (ወደ ታች ቀጥሉ ወይም ማስክሪኑን ይጫኑ!)
+                </p>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('background-stars');
+            const symbols = ['✦', '✧', '★', '💜', '✨', '💫'];
+
+            for (let i = 0; i < 30; i++) {
+                const el = document.createElement('div');
+                el.classList.add('bg-star');
+                el.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                el.style.left = `${Math.random() * 100}vw`;
+                el.style.fontSize = `${Math.random() * 1.5 + 0.8}rem`;
+                el.style.animationDelay = `-${Math.random() * 18}s`;
+                el.style.animationDuration = `${Math.random() * 10 + 12}s`;
+                container.appendChild(el);
+            }
+
+            const scrollContainer = document.getElementById('scroll-container');
+            const reveals = document.querySelectorAll('.reveal');
+
+            function checkReveal() {
+                reveals.forEach(r => {
+                    if (r.getBoundingClientRect().top < window.innerHeight - 150)
+                        r.classList.add('active');
+                });
+            }
+
+            scrollContainer.addEventListener('scroll', checkReveal);
+            checkReveal();
+
+            let lastScrollTop = 0;
+
+            function spawnStar(x, y) {
+                const el = document.createElement('div');
+                el.classList.add('interactive-star');
+                el.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 1500);
+            }
+
+            scrollContainer.addEventListener('scroll', () => {
+                const cur = scrollContainer.scrollTop;
+                if (Math.abs(cur - lastScrollTop) > 20 && Math.random() > 0.7)
+                    spawnStar(Math.random() * window.innerWidth, window.innerHeight - Math.random() * 200);
+                lastScrollTop = cur;
+            });
+
+            document.addEventListener('click', (e) => {
+                for (let i = 0; i < 3; i++)
+                    setTimeout(() => spawnStar(e.clientX + (Math.random()-0.5)*40, e.clientY + (Math.random()-0.5)*40), i * 100);
+            });
+
+            document.addEventListener('touchstart', (e) => {
+                spawnStar(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+        });
+    </script>
+</body>
+</html>
