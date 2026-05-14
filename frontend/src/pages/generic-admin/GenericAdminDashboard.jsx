@@ -7,6 +7,7 @@ import SettingsTab       from './tabs/SettingsTab'
 import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
+import PageBuilderTab    from './tabs/PageBuilderTab'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icons
@@ -57,6 +58,18 @@ function IconCatalog({ size = 18, color }) {
       <circle cx="3"  cy="6"  r="1" fill={color}/>
       <circle cx="3"  cy="12" r="1" fill={color}/>
       <circle cx="3"  cy="18" r="1" fill={color}/>
+    </svg>
+  )
+}
+
+function IconPageBuilder({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="5" rx="1.5"/>
+      <rect x="3" y="11" width="8" height="10" rx="1.5"/>
+      <rect x="14" y="11" width="7" height="4" rx="1.5"/>
+      <rect x="14" y="18" width="7" height="3" rx="1.5"/>
     </svg>
   )
 }
@@ -115,8 +128,9 @@ function buildNav(hasReservations) {
   const base = [
     { id: 'overview',  labelAr: 'نظرة عامة', Icon: IconOverview  },
     { id: 'orders',    labelAr: 'الطلبات',   Icon: IconOrders    },
-    { id: 'catalog',   labelAr: 'الكتالوج',  Icon: IconCatalog   },
-    { id: 'settings',  labelAr: 'الإعدادات', Icon: IconSettings  },
+    { id: 'catalog',      labelAr: 'الكتالوج',    Icon: IconCatalog      },
+    { id: 'pagebuilder',  labelAr: 'بناء الصفحة', Icon: IconPageBuilder  },
+    { id: 'settings',     labelAr: 'الإعدادات',   Icon: IconSettings     },
   ]
   if (hasReservations) {
     base.splice(2, 0, { id: 'reservations', labelAr: 'الحجوزات', Icon: IconCalendar })
@@ -286,6 +300,8 @@ export default function GenericAdminDashboard() {
         return <ReservationsTab color={color} />
       case 'catalog':
         return <CatalogTab color={color} />
+      case 'pagebuilder':
+        return <PageBuilderTab color={color} settings={settings} />
       case 'settings':
         return <SettingsTab settings={settings} onUpdated={setSettings} color={color} />
       default:

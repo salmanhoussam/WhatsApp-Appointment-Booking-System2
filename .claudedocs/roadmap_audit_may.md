@@ -1,5 +1,5 @@
 # Roadmap Audit — May 2026
-**Last updated:** 2026-05-13 (Multi-Agent System Plan added)
+**Last updated:** 2026-05-14 (Phase D complete · Page Builder · Dynamic Routing · Production-ready)
 **Author:** Claude
 
 ---
@@ -321,13 +321,36 @@ INPUT: WhatsApp text OR manual JSON
 |---|---------|-------|--------|
 | C1 | `06-qa-verify.md` — 6 checks + retry(3s) + escalation report format | `.claude/skills/seeding/demo/06-qa-verify.md` | ✅ |
 
-### Phase D — Still Needed
+### Phase D — Pipeline Finalization ✅ COMPLETE (2026-05-13/14)
 
 | # | الإضافة | الملف | الحالة |
 |---|---------|-------|--------|
-| D1 | `_template.routes.jsx` — للـ slugs الجديدة | `frontend/src/router/tenants/` | ⏳ |
-| D2 | BUG-08: migration script لـ JSON files القديمة في `scripts/data/` | `scripts/migrate_json_schema.py` | ⏳ |
-| D3 | Integration test — tenant جديد من الصفر | test script | ⏳ |
+| D1 | `_template.routes.jsx` — للـ slugs الجديدة | `frontend/src/router/tenants/` | ✅ Done 2026-05-13 |
+| D2 | BUG-08: migration script لـ JSON files القديمة | `scripts/migrate_bug08_services.py` | ✅ Done 2026-05-13 |
+| D3 | Integration test — tenant جديد من الصفر | `scripts/test_tenant_integration.py` | ✅ Done 2026-05-13 (live: sneakers-beirut 6/6 QA pass) |
+
+### Phase D-Extra — Page Builder + Dynamic Routing ✅ COMPLETE (2026-05-14)
+
+| # | الإضافة | الملف | الحالة |
+|---|---------|-------|--------|
+| D4 | Backend Pydantic schema for `config.content` | `app/schemas/page_content.py` | ✅ Done 2026-05-14 |
+| D5 | PageBuilderTab v2 — dnd-kit drag + DS atoms | `frontend/.../tabs/PageBuilderTab.jsx` | ✅ Done 2026-05-14 |
+| D6 | 7 dynamic section renderers | `frontend/src/components/dynamic-sections/` | ✅ Done 2026-05-14 |
+| D7 | DynamicPage.jsx — sections orchestrator + cart + page_type fallback | `frontend/.../generic/normal/DynamicPage.jsx` | ✅ Done 2026-05-14 |
+| D8 | `_dynamic.routes.jsx` — generic fallback for unregistered tenants | `frontend/src/router/tenants/` | ✅ Done 2026-05-14 |
+| D9 | TenantResolver fallback (unregistered → DynamicPage, not 404) | `frontend/src/router/TenantResolver.jsx` | ✅ Done 2026-05-14 |
+
+### Phase E — Deployment & Production Verification ⏳ NEXT
+
+| # | المهمة | الحالة |
+|---|--------|--------|
+| E1 | `git push` → Railway auto-deploy frontend + backend | ⏳ |
+| E2 | اختبار `salmansaas.com/demo/sneakers-beirut` مباشرةً | ⏳ |
+| E3 | اختبار `sneakers-beirut.salmansaas.com/` (subdomain mode) | ⏳ |
+| E4 | تأكيد DynamicPage يعمل على الـ production domain | ⏳ |
+| E5 | تأكيد Cart + CartDrawer تعملان على الموبايل في production | ⏳ |
+
+**هذه هي المهمة الوحيدة المتبقية قبل الإعلان عن المنصة End-to-End جاهزة للإنتاج.**
 
 ---
 

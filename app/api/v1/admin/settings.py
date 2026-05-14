@@ -90,6 +90,12 @@ async def update_settings(
     if not update_data:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
 
+    # Prisma Python requires Json() wrapper for Json? fields
+    from prisma import Json
+    for json_field in ("config", "features"):
+        if json_field in update_data and isinstance(update_data[json_field], dict):
+            update_data[json_field] = Json(update_data[json_field])
+
     try:
         await prisma_client.client.update(
             where={"id": tenant["id"]},

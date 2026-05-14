@@ -31,11 +31,16 @@
 
 ## In Progress / Carry Forward
 
-- [ ] **COMMIT + PUSH** — 8 agent files + Phase 60-B + Phase 61 + skills + SpatialHomePage (nothing committed since ed2661b)
+- [ ] **COMMIT + PUSH** — everything uncommitted (settings.py + phase D scripts + template + bug fixes)
 - [ ] **Deploy to Railway** — after commit
 - [ ] **PRODUCT.md + DESIGN.md** — required by impeccable skill at project root
 - [ ] **Phase 61 n8n wiring** — backend done, n8n workflow not built yet
-- [ ] **Footlab SpatialHomePage polish** — product strip below pinned area (needs real API test)
+- [ ] **Footlab CatalogPage blank store** — useState(false) fix in CatalogPage.jsx
+- ✅ **Phase D1 — _template.routes.jsx** — Done 2026-05-13
+- ✅ **Phase D2 — BUG-08 migration script** — Done 2026-05-13 (patched 2 live tenants)
+- ✅ **Phase D3 — Integration test script** — Done 2026-05-13
+- ✅ **BUG sneakers-beirut name_ar garbled** — Done 2026-05-13
+- ✅ **BUG settings PATCH "حدث خطأ"** — Done 2026-05-13 (Json() wrapper)
 
 ## Upcoming
 

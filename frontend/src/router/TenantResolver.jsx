@@ -25,6 +25,9 @@ import { Suspense, lazy } from 'react';
 import { Navigate }        from 'react-router-dom';
 import { tenantRegistry }  from './tenants/index';
 
+// Fallback for tenants not in the registry (onboarded via pipeline, not scaffolded)
+const DynamicTenantRoutes = lazy(() => import('./tenants/_dynamic.routes'));
+
 const SSOLoginPage = lazy(() => import('../pages/auth/SSOLoginPage'));
 
 // ── Full-screen gold-dot fallback (shown while lazy chunk downloads) ──────────
@@ -93,8 +96,17 @@ export default function TenantResolver() {
   }
 
   const tenant = tenantRegistry[activeSlug];
+
+  // Unknown slug: not a registered custom tenant.
+  // Serve via the generic dynamic page system — DynamicPage fetches its own config
+  // and shows sections built in the Page Builder (or a fallback if none configured).
+  // This covers every tenant created through the onboarding pipeline.
   if (!tenant) {
-    return <Navigate to="/404" replace />;
+    return (
+      <Suspense fallback={<TenantFallback />}>
+        <DynamicTenantRoutes />
+      </Suspense>
+    );
   }
 
   // Render the tenant's Routes directly — NO extra <Routes> wrapper here.
