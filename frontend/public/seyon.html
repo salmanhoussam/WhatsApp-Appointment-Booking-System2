@@ -178,7 +178,65 @@
 
     </div>
 
+    <!-- Locked overlay — hidden once unlock date passes -->
+    <div id="lock-screen" style="
+        display: none;
+        position: fixed; inset: 0; z-index: 9999;
+        background: linear-gradient(135deg, #0d0020 0%, #1a0040 60%, #2e0060 100%);
+        flex-direction: column; align-items: center; justify-content: center;
+        text-align: center; font-family: 'Noto Sans Ethiopic', sans-serif;
+        color: #d8b4fe; padding: 32px;
+    ">
+        <div style="font-size: 4rem; margin-bottom: 16px; animation: lockPulse 2s infinite;">🔒</div>
+        <h2 style="font-size: 2rem; font-weight: 900; margin-bottom: 8px; color: #e9d5ff;">Seyon</h2>
+        <p style="font-size: 1rem; color: #a78bfa; margin-bottom: 32px;">ገና አልደረሰም — ነገ ሁሉ ይከፈታል ✦</p>
+        <div style="
+            background: rgba(109,40,217,0.25);
+            border: 1px solid rgba(167,139,250,0.3);
+            border-radius: 16px; padding: 24px 40px;
+            font-size: 2.4rem; font-weight: 700; letter-spacing: 4px;
+            color: #f3e8ff; min-width: 220px;
+            box-shadow: 0 0 40px rgba(139,92,246,0.3);
+        " id="countdown-display">--:--:--</div>
+        <p style="font-size: 0.75rem; margin-top: 16px; color: rgba(167,139,250,0.5);">
+            ሰዓት · ደቂቃ · ሰከንድ
+        </p>
+    </div>
+
+    <style>
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50%       { transform: scale(1.15); opacity: 1; }
+        }
+    </style>
+
     <script>
+        // ── Date lock — unlocks at midnight 2026-05-15 ────────────────────────
+        const UNLOCK = new Date('2026-05-15T00:00:00');
+
+        function updateLock() {
+            const now  = new Date();
+            const diff = UNLOCK - now;
+
+            if (diff <= 0) {
+                document.getElementById('lock-screen').style.display = 'none';
+                return;
+            }
+
+            // Show lock screen
+            const ls = document.getElementById('lock-screen');
+            ls.style.display = 'flex';
+
+            const h  = String(Math.floor(diff / 3600000)).padStart(2, '0');
+            const m  = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+            const s  = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+            document.getElementById('countdown-display').textContent = `${h}:${m}:${s}`;
+        }
+
+        updateLock();
+        setInterval(updateLock, 1000);
+        // ─────────────────────────────────────────────────────────────────────
+
         document.addEventListener('DOMContentLoaded', () => {
             const container = document.getElementById('background-stars');
             const symbols = ['✦', '✧', '★', '💜', '✨', '💫'];
