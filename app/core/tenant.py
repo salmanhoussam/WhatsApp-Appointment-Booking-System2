@@ -32,7 +32,7 @@ security = HTTPBearer(auto_error=False)
 
 # Hosts that are NOT tenants
 RESERVED_HOSTS = {"localhost", "127.0.0.1"}
-MAIN_DOMAIN = "yourdomain.com"     # ← update to your production domain
+MAIN_DOMAIN = "salmansaas.com"
 LOCAL_SUFFIX = ".localhost"
 
 

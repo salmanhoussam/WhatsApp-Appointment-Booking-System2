@@ -246,3 +246,4 @@ __marimo__/
 # Claude AI Agent Files
 .claude/worktrees/
 .claude/settings.local.jsonservice-account.json
+.claude/worktrees/
