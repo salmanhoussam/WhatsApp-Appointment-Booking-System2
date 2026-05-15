@@ -2,19 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { REGISTER_URL, WHATSAPP_NUMBER } from '../../config';
 
 gsap.registerPlugin(ScrollTrigger);
-
-const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
-  ? 'https://auth.salmansaas.com/register'
-  : '/register';
 
 export default function CTASection() {
   const { lang } = useTranslation();
   const isAr = lang === 'ar';
   const sectionRef = useRef();
 
-  const whatsappNumber  = '96178727986';
+  const whatsappNumber  = WHATSAPP_NUMBER;
   const supportEmail    = 'support@salmansaas.com';
 
   const templates = {
@@ -100,8 +97,8 @@ export default function CTASection() {
           }}
         >
           {isAr
-            ? '// فريقنا جاهز لمساعدتك في اختيار النظام الأنسب لنمو مشروعك.'
-            : '// Our team is ready to help you choose the right system for your growth.'}
+            ? 'فريقنا جاهز لمساعدتك في اختيار النظام الأنسب لنمو مشروعك.'
+            : 'Our team is ready to help you choose the right system for your growth.'}
         </p>
 
         {/* Primary CTA */}
@@ -165,7 +162,7 @@ export default function CTASection() {
               e.currentTarget.style.boxShadow  = 'none';
             }}
           >
-            💬 {isAr ? 'واتساب' : 'WhatsApp'}
+            {isAr ? 'واتساب' : 'WhatsApp'}
           </a>
 
           <a
@@ -189,7 +186,7 @@ export default function CTASection() {
               e.currentTarget.style.color       = 'rgba(255,255,255,0.55)';
             }}
           >
-            📧 {isAr ? 'إيميل' : 'Email'}
+            {isAr ? 'إيميل' : 'Email'}
           </a>
         </div>
 

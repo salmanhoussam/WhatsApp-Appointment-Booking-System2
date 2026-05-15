@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from '../../hooks/useTranslation';
-
-const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
-  ? 'https://auth.salmansaas.com/register'
-  : '/register';
+import { REGISTER_URL } from '../../config';
 
 export default function Navbar() {
   const { t, lang } = useTranslation();

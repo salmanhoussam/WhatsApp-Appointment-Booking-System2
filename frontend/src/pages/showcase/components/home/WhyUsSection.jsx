@@ -5,30 +5,51 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const STATS = [
-  { num: '+50',  labelAr: 'مشروع مكتمل',   labelEn: 'Projects Done' },
-  { num: '99%',  labelAr: 'رضا العملاء',    labelEn: 'Satisfaction'  },
-  { num: '24/7', labelAr: 'دعم فني متواصل', labelEn: 'Support'       },
-  { num: '100%', labelAr: 'حماية وتشفير',   labelEn: 'Secure'        },
+const SYS_ROWS = [
+  { key: 'projects_delivered ........ ', val: '50+',   color: '#ffffff'  },
+  { key: 'client_satisfaction ....... ', val: '99%',   color: '#22c55e'  },
+  { key: 'support_availability ...... ', val: '24/7',  color: '#f59e0b'  },
+  { key: 'data_encryption ........... ', val: '100%',  color: '#8b5cf6'  },
 ];
+
+const IconSpeed = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9,2 16,9 9,16" />
+    <line x1="2" y1="9" x2="16" y2="9" />
+  </svg>
+);
+
+const IconResponsive = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="1" width="8" height="16" rx="1" />
+    <circle cx="9" cy="14" r="0.8" fill="#ff1a55" stroke="none" />
+  </svg>
+);
+
+const IconSecurity = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 1L3 4v5c0 3.5 2.2 6 6 7.5C12.8 15 15 12.5 15 9V4L9 1z" />
+    <polyline points="6,9 8,11 12,7" />
+  </svg>
+);
 
 const FEATURES = [
   {
-    icon: '⚡',
+    Icon: IconSpeed,
     titleAr: 'سرعة وأداء استثنائي',
     titleEn: 'Exceptional Speed',
     descAr: 'مواقعنا مبنية لتكون الأسرع — أداء يرفع ترتيبك في جوجل.',
     descEn: 'Our sites are built for speed — performance that improves your SEO.',
   },
   {
-    icon: '📱',
+    Icon: IconResponsive,
     titleAr: 'تصميم متجاوب بالكامل',
     titleEn: 'Fully Responsive',
     descAr: 'يظهر موقعك بشكل مثالي على الجوال والآيباد والكمبيوتر.',
     descEn: 'Perfect display on mobile, tablet, and desktop — everywhere.',
   },
   {
-    icon: '🔒',
+    Icon: IconSecurity,
     titleAr: 'أمان عالي المستوى',
     titleEn: 'Enterprise Security',
     descAr: 'بنية تحتية سحابية مؤمّنة بأحدث معايير التشفير.',
@@ -40,18 +61,15 @@ export default function WhyUsSection() {
   const { lang } = useTranslation();
   const isAr = lang === 'ar';
   const sectionRef  = useRef();
-  const statsRef    = useRef([]);
+  const termRef     = useRef();
   const featuresRef = useRef([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      statsRef.current.forEach((el, i) => {
-        gsap.from(el, {
-          opacity: 0, y: 40, scale: 0.85,
-          duration: 0.7, delay: i * 0.1,
-          ease: 'power3.out',
-          scrollTrigger: { trigger: el, start: 'top 88%' },
-        });
+      gsap.from(termRef.current, {
+        opacity: 0, y: 30,
+        duration: 0.8, ease: 'power3.out',
+        scrollTrigger: { trigger: termRef.current, start: 'top 88%' },
       });
       featuresRef.current.forEach((el, i) => {
         gsap.from(el, {
@@ -69,8 +87,9 @@ export default function WhyUsSection() {
     <section
       ref={sectionRef}
       id="why-us"
+      dir={isAr ? 'rtl' : 'ltr'}
       style={{
-        padding: '6rem 1.5rem',
+        padding: '6rem 2rem',
         position: 'relative',
       }}
     >
@@ -106,37 +125,28 @@ export default function WhyUsSection() {
           <span style={{ color: '#ff1a55' }}>SalmanSaaS</span>?
         </h2>
 
-        {/* Stats grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: '1rem',
-          marginBottom: '4rem',
-        }}>
-          {STATS.map((s, i) => (
-            <div
-              key={i}
-              ref={(el) => (statsRef.current[i] = el)}
-              style={{
-                background: 'rgba(255,26,85,0.05)',
-                border: '1px solid rgba(255,26,85,0.18)',
-                borderRadius: 6,
-                padding: '1.6rem 1.2rem',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{
-                fontFamily: "'Space Mono', monospace",
-                fontSize: 'clamp(1.8rem, 4vw, 2.6rem)',
-                fontWeight: 700, color: '#ff1a55', lineHeight: 1,
-                marginBottom: 8,
-              }}>
-                {s.num}
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)' }}>
-                {isAr ? s.labelAr : s.labelEn}
-              </div>
-            </div>
+        {/* Terminal sys-info — replaces big-number stat cards */}
+        <div
+          ref={termRef}
+          style={{
+            fontFamily: "'Space Mono', monospace",
+            background: 'rgba(8,8,8,0.7)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            padding: '1.4rem 1.8rem',
+            marginBottom: '4rem',
+            fontSize: '0.72rem',
+            letterSpacing: '0.05em',
+            lineHeight: 2.4,
+          }}
+        >
+          <p style={{ color: '#ff1a55', marginBottom: '0.4rem' }}>
+            {'$ sys_info --tenant-platform'}
+          </p>
+          {SYS_ROWS.map(({ key, val, color }) => (
+            <p key={key} style={{ margin: 0 }}>
+              <span style={{ color: 'rgba(255,255,255,0.28)' }}>{key}</span>
+              <span style={{ color }}>{val}</span>
+            </p>
           ))}
         </div>
 
@@ -155,16 +165,15 @@ export default function WhyUsSection() {
                 padding: '1.4rem',
                 background: 'rgba(255,255,255,0.02)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 6,
               }}
             >
               <div style={{
                 width: 40, height: 40, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,26,85,0.12)',
-                borderRadius: 6, fontSize: '1.2rem',
+                background: 'rgba(255,26,85,0.08)',
+                border: '1px solid rgba(255,26,85,0.18)',
               }}>
-                {f.icon}
+                <f.Icon />
               </div>
               <div>
                 <h4 style={{

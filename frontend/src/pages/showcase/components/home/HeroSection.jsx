@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { REGISTER_URL, WHATSAPP_NUMBER } from '../../config';
 
 gsap.registerPlugin(ScrollTrigger);
-
-const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
-  ? 'https://auth.salmansaas.com/register'
-  : '/register';
 
 export default function HeroSection() {
   const { t, lang } = useTranslation();
@@ -18,7 +15,7 @@ export default function HeroSection() {
   const subRef  = useRef();
   const ctaRef  = useRef();
 
-  const whatsappNumber = '96178727986';
+  const whatsappNumber = WHATSAPP_NUMBER;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -100,7 +97,7 @@ export default function HeroSection() {
             margin: '0 auto 2.8rem',
           }}
         >
-          // {t.heroSubDesc || t.heroDesc}
+          {t.heroSubDesc || t.heroDesc}
         </p>
 
         {/* CTAs */}

@@ -2,17 +2,37 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { REGISTER_URL } from '../../config';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const REGISTER_URL = window.location.hostname.includes('salmansaas.com')
-  ? 'https://auth.salmansaas.com/register'
-  : '/register';
+const IconBooking = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="12" height="10" rx="1" />
+    <path d="M6 16l4-3h6" />
+  </svg>
+);
+
+const IconMenu = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round">
+    <line x1="3" y1="5"  x2="17" y2="5"  />
+    <line x1="3" y1="10" x2="17" y2="10" />
+    <line x1="3" y1="15" x2="12" y2="15" />
+  </svg>
+);
+
+const IconStore = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#ff1a55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 7h16l-1.5 10H3.5L2 7z" />
+    <path d="M1 7l2-4h14l2 4" />
+    <line x1="10" y1="7" x2="10" y2="17" />
+  </svg>
+);
 
 const SERVICES = [
   {
     num: '01',
-    icon: '💬',
+    Icon: IconBooking,
     titleKey: 's1Title',
     descKey:  's1Desc',
     ctaKey:   's1Btn',
@@ -20,7 +40,7 @@ const SERVICES = [
   },
   {
     num: '02',
-    icon: '🍽️',
+    Icon: IconMenu,
     titleKey: 's2Title',
     descKey:  's2Desc',
     ctaKey:   null,
@@ -28,7 +48,7 @@ const SERVICES = [
   },
   {
     num: '03',
-    icon: '🛒',
+    Icon: IconStore,
     titleKey: 's3Title',
     descKey:  's3Desc',
     ctaKey:   null,
@@ -134,12 +154,11 @@ export default function ServicesSection() {
               <div style={{
                 width: 48, height: 48,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,26,85,0.1)',
+                background: 'rgba(255,26,85,0.08)',
                 border: '1px solid rgba(255,26,85,0.2)',
                 marginBottom: '1.4rem',
-                fontSize: '1.4rem',
               }}>
-                {svc.icon}
+                <svc.Icon />
               </div>
 
               {/* Number tag */}
