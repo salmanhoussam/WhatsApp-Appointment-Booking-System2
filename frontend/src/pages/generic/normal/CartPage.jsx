@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate }           from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import publicApi         from '../../../utils/publicApi'
@@ -178,8 +178,15 @@ export default function CartPage() {
   const navigate   = useNavigate()
   const accent     = config?.primary_color ?? '#d4a853'
 
-  const { moduleKey, sessionId, cartItems, updateQuantity, removeItem, clearCart, totalPrice } =
+  const { moduleKey, sessionId, cartItems, updateQuantity, removeItem, clearCart, totalPrice, setConfig: setStoreConfig } =
     useGenericStore()
+
+  // Sync config into store so moduleKey is available even on direct /cart navigation
+  useEffect(() => {
+    if (config && config.slug !== 'unknown') {
+      setStoreConfig(config, config.active_services ?? [])
+    }
+  }, [config, setStoreConfig])
 
   const [form, setForm] = useState({
     customer_name:    '',
@@ -210,7 +217,7 @@ export default function CartPage() {
 
       if (moduleKey === 'restaurant') {
         const { data } = await publicApi.post(
-          `/${slug}/restaurant/orders`,
+          '/restaurant/orders',
           {
             customer_name:  form.customer_name,
             customer_phone: form.customer_phone,
@@ -229,13 +236,13 @@ export default function CartPage() {
         // Sync local cart to server, then checkout
         for (const item of cartItems) {
           await publicApi.post(
-            `/${slug}/store/cart`,
+            '/store/cart',
             { session_id: sessionId, catalog_item_id: item.catalogItemId, quantity: item.quantity },
             { params }
           )
         }
         const { data } = await publicApi.post(
-          `/${slug}/store/orders`,
+          '/store/orders',
           {
             session_id:       sessionId,
             customer_name:    form.customer_name,
@@ -271,7 +278,7 @@ export default function CartPage() {
       <div style={{ minHeight: '100vh', background: '#0a0a0f', direction: 'rtl' }}>
         <TenantModuleNav />
         <div style={{ maxWidth: 640, margin: '0 auto', padding: '88px 20px 80px' }}>
-          <SuccessScreen accent={accent} orderId={orderId} onBack={() => navigate(`${base}/catalog`)} />
+          <SuccessScreen accent={accent} orderId={orderId} onBack={() => navigate(`${base}/${moduleKey === 'restaurant' ? 'menu' : 'store'}`)} />
         </div>
       </div>
     )

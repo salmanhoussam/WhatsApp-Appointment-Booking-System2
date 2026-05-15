@@ -31,11 +31,12 @@
 
 ## In Progress / Carry Forward
 
+- [ ] **Phase 62: Footlab store migration** — catalog API wiring, CartPage URL fix, checkout (DB seeded ✅)
+- [ ] **Phase 63: Caracas restaurant migration** — catalog API wiring, order flow (DB seeded ✅)
 - [ ] **COMMIT + PUSH** — everything uncommitted (settings.py + phase D scripts + template + bug fixes)
 - [ ] **Deploy to Railway** — after commit
 - [ ] **PRODUCT.md + DESIGN.md** — required by impeccable skill at project root
 - [ ] **Phase 61 n8n wiring** — backend done, n8n workflow not built yet
-- [ ] **Footlab CatalogPage blank store** — useState(false) fix in CatalogPage.jsx
 - ✅ **Phase D1 — _template.routes.jsx** — Done 2026-05-13
 - ✅ **Phase D2 — BUG-08 migration script** — Done 2026-05-13 (patched 2 live tenants)
 - ✅ **Phase D3 — Integration test script** — Done 2026-05-13
@@ -44,8 +45,6 @@
 
 ## Upcoming
 
-- Phase 62: Footlab store migration (catalog API wiring + CartPage + checkout)
-- Phase 63: Caracas restaurant migration (catalog API wiring + order flow)
 - ARCH-01: Prisma calls in Routes/Auth files (20 files) — Phase 60+ refactor
 - PRODUCT.md + DESIGN.md creation for impeccable context loading
 - n8n workflow: Konaan → webhook → WhatsApp AI settings
