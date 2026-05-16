@@ -76,11 +76,11 @@ const DEFAULT_DATA = {
 }
 
 const TEMPLATE_OPTIONS = [
-  { key: 'food-cafe',    label: 'Café',         color: '#e85d26', descAr: 'للمطاعم والكافيهات' },
-  { key: 'showcase',     label: 'Showcase',     color: '#6d28d9', descAr: 'واجهة سينمائية' },
-  { key: 'landing',      label: 'Landing',      color: '#3b82f6', descAr: 'صفحة هبوط تسويقية' },
-  { key: 'fashion-grid', label: 'Fashion Grid', color: '#E8E8E8', descAr: 'شبكة منتجات أنيقة' },
-  { key: 'normal',       label: 'Normal',       color: '#3ecf8e', descAr: 'بسيط وسريع' },
+  { key: 'food-cafe',    label: 'Café',         color: '#e85d26', descAr: 'للمطاعم والكافيهات',  sections: ['hero','categories_grid','featured_items','cta'] },
+  { key: 'showcase',     label: 'Showcase',     color: '#6d28d9', descAr: 'واجهة سينمائية',      sections: ['hero','story','featured_items','gallery'] },
+  { key: 'landing',      label: 'Landing',      color: '#3b82f6', descAr: 'صفحة هبوط تسويقية',  sections: ['hero','story','cta'] },
+  { key: 'fashion-grid', label: 'Fashion Grid', color: '#E8E8E8', descAr: 'شبكة منتجات أنيقة',   sections: ['hero','categories_grid','featured_items'] },
+  { key: 'normal',       label: 'Normal',       color: '#3ecf8e', descAr: 'بسيط وسريع',          sections: ['hero','featured_items','location'] },
 ]
 
 const uid = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -697,6 +697,13 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
     setSections(s => s.filter(sec => sec.id !== id))
   }, [])
 
+  const loadTemplate = useCallback((tpl) => {
+    const ok = sections.length === 0 || window.confirm('سيتم استبدال الأقسام الحالية بقالب ' + tpl.label + '. هل تريد المتابعة؟')
+    if (!ok) return
+    setSections(tpl.sections.map((type, i) => ({ id: uid(), type, order: i, data: { ...DEFAULT_DATA[type] } })))
+    setTemplateKey(tpl.key)
+  }, [sections.length])
+
   // DnD handlers
   const handleDragStart = ({ active }) => setActiveId(active.id)
 
@@ -783,24 +790,22 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
             </Button>
           </div>
 
-          {/* Active template badge */}
-          {templateKey && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>القالب:</span>
-              {(() => {
-                const t = TEMPLATE_OPTIONS.find(o => o.key === templateKey)
-                return t ? (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: t.color, background: `${t.color}18`, padding: '3px 8px', borderRadius: 4, border: `1px solid ${t.color}44` }}>
-                    {t.label}
-                  </span>
-                ) : null
-              })()}
-            </div>
-          )}
+          {/* Active template pill */}
+          {(() => {
+            const t = TEMPLATE_OPTIONS.find(o => o.key === templateKey)
+            return t ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: t.color, boxShadow: `0 0 6px ${t.color}` }} />
+                <span style={{ fontSize: 11, color: C.muted }}>القالب:</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: t.color }}>{t.label}</span>
+                <span style={{ fontSize: 10, color: C.muted }}>— {t.descAr}</span>
+              </div>
+            ) : null
+          })()}
         </div>
 
         {/* Sections list with DnD */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 8px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'visible', padding: '12px 12px 8px' }}>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -840,12 +845,12 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
             <AnimatePresence>
               {showAddMenu && (
                 <motion.div
-                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
                   transition={{ duration: 0.15 }}
                   style={{
-                    position: 'absolute', bottom: '110%', right: 0, left: 0, zIndex: 50,
+                    position: 'absolute', top: 'calc(100% + 4px)', right: 0, left: 0, zIndex: 200,
                     background: '#1a1a28', border: `1px solid ${C.borderHi}`,
-                    borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                    borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.8)',
                   }}
                 >
                   {SECTION_TYPES.map(t => (
@@ -873,7 +878,7 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
           <div style={{ marginTop: 20 }}>
             <div style={{
               fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
-              color: C.muted, marginBottom: 10, fontWeight: 600, paddingRight: 4,
+              color: C.muted, marginBottom: 10, fontWeight: 600,
             }}>
               القوالب المتاحة
             </div>
@@ -881,37 +886,68 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
               {TEMPLATE_OPTIONS.map(t => {
                 const active = templateKey === t.key
                 return (
-                  <button
+                  <div
                     key={t.key}
-                    onClick={() => setTemplateKey(t.key)}
                     style={{
                       padding: '10px 12px',
                       border: `1px solid ${active ? t.color : C.border}`,
                       borderRadius: 9,
-                      background: active ? `${t.color}18` : C.surfaceHi,
-                      cursor: 'pointer', textAlign: 'right',
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      transition: 'all 0.15s', width: '100%',
+                      background: active ? `${t.color}14` : C.surfaceHi,
+                      transition: 'border-color 0.15s',
                     }}
-                    onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = `${t.color}80` }}
-                    onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = C.border }}
                   >
-                    <div style={{
-                      width: 34, height: 34, flexShrink: 0, borderRadius: 7,
-                      background: `${t.color}22`,
-                      border: `2px solid ${active ? t.color : `${t.color}55`}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <div style={{ width: 10, height: 10, borderRadius: 3, background: t.color }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {/* Color dot */}
+                      <div style={{
+                        width: 32, height: 32, flexShrink: 0, borderRadius: 7,
+                        background: `${t.color}20`,
+                        border: `2px solid ${active ? t.color : `${t.color}50`}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 3, background: t.color }} />
+                      </div>
+                      {/* Label */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: active ? t.color : C.text }}>{t.label}</div>
+                        <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>{t.descAr}</div>
+                      </div>
+                      {active && <span style={{ fontSize: 13, color: t.color }}>✓</span>}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: active ? t.color : C.text }}>{t.label}</div>
-                      <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{t.descAr}</div>
+
+                    {/* Section preview tags */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                      {t.sections.map(type => {
+                        const meta = SECTION_TYPES.find(s => s.type === type)
+                        return (
+                          <span key={type} style={{
+                            fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                            background: `${t.color}12`, border: `1px solid ${t.color}30`,
+                            color: active ? t.color : C.muted,
+                          }}>
+                            {meta?.icon} {meta?.labelAr}
+                          </span>
+                        )
+                      })}
                     </div>
-                    {active && (
-                      <span style={{ fontSize: 14, color: t.color, flexShrink: 0 }}>✓</span>
-                    )}
-                  </button>
+
+                    {/* Apply button */}
+                    <button
+                      onClick={() => loadTemplate(t)}
+                      style={{
+                        marginTop: 8, width: '100%',
+                        padding: '6px 0', borderRadius: 6, cursor: 'pointer',
+                        fontSize: 11, fontWeight: 700,
+                        background: active ? `${t.color}25` : 'transparent',
+                        border: `1px solid ${active ? t.color : C.border}`,
+                        color: active ? t.color : C.muted,
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = `${t.color}20`; e.currentTarget.style.borderColor = t.color; e.currentTarget.style.color = t.color }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? `${t.color}25` : 'transparent'; e.currentTarget.style.borderColor = active ? t.color : C.border; e.currentTarget.style.color = active ? t.color : C.muted }}
+                    >
+                      تطبيق القالب
+                    </button>
+                  </div>
                 )
               })}
             </div>
