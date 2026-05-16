@@ -57,30 +57,82 @@ const C = {
 // ── Section type registry ─────────────────────────────────────────────────────
 const SECTION_TYPES = [
   { type: 'hero',            icon: '🌄', labelAr: 'الهيرو',           desc: 'صورة/فيديو خلفية + عنوان + زر' },
+  { type: 'offers',          icon: '🏷️', labelAr: 'العروض',           desc: 'بانر عروض وخصومات ملوّنة' },
   { type: 'story',           icon: '📖', labelAr: 'قصتنا',            desc: 'نص وصفي + إحصائيات' },
-  { type: 'featured_items',  icon: '⭐', labelAr: 'منتجات مميزة',     desc: 'يسحب من الكاتالوج تلقائياً' },
+  { type: 'featured_items',  icon: '⭐', labelAr: 'أبرز العناصر',     desc: 'يسحب من الكاتالوج تلقائياً' },
   { type: 'categories_grid', icon: '🗂', labelAr: 'شبكة التصنيفات',   desc: 'عرض فئات المتجر بصرياً' },
   { type: 'gallery',         icon: '🖼', labelAr: 'معرض الصور',       desc: 'رفع صور متعددة' },
+  { type: 'testimonials',    icon: '💬', labelAr: 'آراء العملاء',     desc: 'تقييمات مع نجوم ونصوص' },
+  { type: 'hours',           icon: '🕐', labelAr: 'أوقات العمل',      desc: 'جدول أيام الأسبوع' },
   { type: 'location',        icon: '📍', labelAr: 'الموقع',            desc: 'نص + رابط خريطة + وسوم' },
   { type: 'cta',             icon: '🎯', labelAr: 'دعوة للتحرك',      desc: 'بانر CTA عريض' },
 ]
 
 const DEFAULT_DATA = {
   hero:            { title_ar: '', subtitle_ar: '', cta_text_ar: 'اكتشف المزيد', bg_image_url: '', bg_type: 'color' },
+  offers:          { heading_ar: 'عروض خاصة', items: [
+    { title_ar: 'عرض اليوم',    desc_ar: 'على جميع المشروبات الساخنة', badge: '20% OFF', accent: '#e85d26' },
+    { title_ar: 'وجبة مجانية', desc_ar: 'مع كل طلبية فوق 50,000 ل.ل',  badge: 'مجاني',   accent: '#22c55e' },
+  ]},
   story:           { heading_ar: '', body_ar: '', stats: [{ num: '', label: '' }], bg_image_url: '', bg_type: 'color' },
-  featured_items:  { heading_ar: 'منتجات مميزة', limit: 6, bg_image_url: '', bg_type: 'color' },
+  featured_items:  { heading_ar: 'أبرز العناصر', limit: 6, bg_image_url: '', bg_type: 'color' },
   categories_grid: { heading_ar: 'التصنيفات', show_count: true, bg_image_url: '', bg_type: 'color' },
   gallery:         { images: [] },
+  testimonials:    { heading_ar: 'ماذا يقول عملاؤنا', items: [
+    { text_ar: '', author: '', rating: 5 },
+    { text_ar: '', author: '', rating: 5 },
+    { text_ar: '', author: '', rating: 5 },
+  ]},
+  hours:           { heading_ar: 'أوقات العمل', rows: [
+    { day_ar: 'الاثنين — الجمعة', open_ar: '09:00 ص', close_ar: '10:00 م', closed: false },
+    { day_ar: 'السبت',            open_ar: '10:00 ص', close_ar: '11:00 م', closed: false },
+    { day_ar: 'الأحد',            open_ar: '',         close_ar: '',         closed: true  },
+  ]},
   location:        { para_ar: '', maps_url: '', tags: '', bg_image_url: '', bg_type: 'color' },
   cta:             { text_ar: '', link: '', accent: '', bg_image_url: '', bg_type: 'color' },
 }
 
+// Business-type templates — ordered by common service types
 const TEMPLATE_OPTIONS = [
-  { key: 'food-cafe',    label: 'Café',         color: '#e85d26', descAr: 'للمطاعم والكافيهات',  sections: ['hero','categories_grid','featured_items','cta'] },
-  { key: 'showcase',     label: 'Showcase',     color: '#6d28d9', descAr: 'واجهة سينمائية',      sections: ['hero','story','featured_items','gallery'] },
-  { key: 'landing',      label: 'Landing',      color: '#3b82f6', descAr: 'صفحة هبوط تسويقية',  sections: ['hero','story','cta'] },
-  { key: 'fashion-grid', label: 'Fashion Grid', color: '#E8E8E8', descAr: 'شبكة منتجات أنيقة',   sections: ['hero','categories_grid','featured_items'] },
-  { key: 'normal',       label: 'Normal',       color: '#3ecf8e', descAr: 'بسيط وسريع',          sections: ['hero','featured_items','location'] },
+  {
+    key: 'restaurant',
+    label: 'مطعم / كافيه',
+    color: '#e85d26',
+    descAr: 'للمطاعم، الكافيهات، المطابخ السحابية',
+    serviceKey: 'restaurant',
+    sections: ['hero','offers','categories_grid','featured_items','gallery','testimonials','hours','cta'],
+  },
+  {
+    key: 'cafe_minimal',
+    label: 'كافيه بسيط',
+    color: '#f59e0b',
+    descAr: 'قائمة مختصرة + موقع + تواصل',
+    serviceKey: 'restaurant',
+    sections: ['hero','featured_items','offers','gallery','hours','cta'],
+  },
+  {
+    key: 'store_classic',
+    label: 'متجر إلكتروني',
+    color: '#8b5cf6',
+    descAr: 'للمتاجر، البوتيكات، المنتجات',
+    serviceKey: 'store',
+    sections: ['hero','offers','categories_grid','featured_items','testimonials','cta'],
+  },
+  {
+    key: 'booking_showcase',
+    label: 'فندق / شاليه',
+    color: '#3ecf8e',
+    descAr: 'للفنادق، الشاليهات، والمساحات',
+    serviceKey: 'booking',
+    sections: ['hero','story','gallery','featured_items','testimonials','hours','location','cta'],
+  },
+  {
+    key: 'landing',
+    label: 'صفحة تسويقية',
+    color: '#3b82f6',
+    descAr: 'للحملات، الإطلاق، وصفحات الهبوط',
+    sections: ['hero','story','featured_items','testimonials','cta'],
+  },
 ]
 
 const uid = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -382,12 +434,149 @@ function CtaEditor({ data, onChange }) {
   )
 }
 
+function OffersEditor({ data, onChange }) {
+  const set = (k, v) => onChange({ ...data, [k]: v })
+  const setItem = (i, k, v) => {
+    const items = [...(data.items || [])]
+    items[i] = { ...items[i], [k]: v }
+    set('items', items)
+  }
+  const removeItem = (i) => set('items', (data.items || []).filter((_, idx) => idx !== i))
+  const addItem    = () => set('items', [...(data.items || []), { title_ar: '', desc_ar: '', badge: '', accent: '#e85d26' }])
+
+  const ACCENT_PRESETS = ['#e85d26','#22c55e','#3b82f6','#f59e0b','#8b5cf6','#f87171']
+
+  return (
+    <>
+      <Field label="عنوان القسم" value={data.heading_ar} onChange={v => set('heading_ar', v)} placeholder="عروض خاصة" />
+      {(data.items || []).map((item, i) => (
+        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: C.surfaceHi, border: `1px solid ${C.border}`, marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>عرض {i + 1}</span>
+            <button onClick={() => removeItem(i)} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 12 }}>✕</button>
+          </div>
+          <Field label="العنوان" value={item.title_ar} onChange={v => setItem(i, 'title_ar', v)} placeholder="خصم 20%" />
+          <Field label="الوصف" value={item.desc_ar} onChange={v => setItem(i, 'desc_ar', v)} placeholder="على جميع الطلبات هذا الأسبوع" />
+          <Field label="شارة (badge)" value={item.badge} onChange={v => setItem(i, 'badge', v)} placeholder="20% OFF" />
+          <div className="mb-[11px]">
+            <label className="block text-[10px] tracking-[0.1em] uppercase text-white/40 font-semibold mb-[5px]">لون العرض</label>
+            <div style={{ display: 'flex', gap: 7 }}>
+              {ACCENT_PRESETS.map(c => (
+                <button key={c} onClick={() => setItem(i, 'accent', c)} style={{
+                  width: 22, height: 22, borderRadius: '50%', background: c, border: `2px solid ${item.accent === c ? '#fff' : 'transparent'}`,
+                  cursor: 'pointer', flexShrink: 0,
+                }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+      <button onClick={addItem} style={{
+        fontSize: 12, color: C.gold, background: 'none',
+        border: `1px dashed ${C.goldBorder}`, borderRadius: 7,
+        padding: '8px 0', width: '100%', cursor: 'pointer', fontWeight: 700,
+      }}>
+        + إضافة عرض
+      </button>
+    </>
+  )
+}
+
+function TestimonialsEditor({ data, onChange }) {
+  const set = (k, v) => onChange({ ...data, [k]: v })
+  const setItem = (i, k, v) => {
+    const items = [...(data.items || [])]
+    items[i] = { ...items[i], [k]: v }
+    set('items', items)
+  }
+  return (
+    <>
+      <Field label="عنوان القسم" value={data.heading_ar} onChange={v => set('heading_ar', v)} placeholder="ماذا يقول عملاؤنا" />
+      {(data.items || []).map((item, i) => (
+        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: C.surfaceHi, border: `1px solid ${C.border}`, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 8 }}>تقييم {i + 1}</div>
+          <Field label="النص" value={item.text_ar} onChange={v => setItem(i, 'text_ar', v)} multiline rows={2} placeholder="تجربة رائعة، الطعام لذيذ جداً..." />
+          <Field label="الاسم" value={item.author} onChange={v => setItem(i, 'author', v)} placeholder="أحمد محمد" />
+          <div className="mb-[11px]">
+            <label className="block text-[10px] tracking-[0.1em] uppercase text-white/40 font-semibold mb-[5px]">التقييم</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setItem(i, 'rating', n)} style={{
+                  fontSize: 20, background: 'none', border: 'none', cursor: 'pointer',
+                  color: n <= (item.rating ?? 5) ? '#f59e0b' : C.border, padding: 0,
+                }}>★</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+      {(data.items || []).length < 6 && (
+        <button onClick={() => set('items', [...(data.items || []), { text_ar: '', author: '', rating: 5 }])} style={{
+          fontSize: 12, color: C.gold, background: 'none',
+          border: `1px dashed ${C.goldBorder}`, borderRadius: 7,
+          padding: '8px 0', width: '100%', cursor: 'pointer', fontWeight: 700,
+        }}>
+          + إضافة تقييم
+        </button>
+      )}
+    </>
+  )
+}
+
+function HoursEditor({ data, onChange }) {
+  const set = (k, v) => onChange({ ...data, [k]: v })
+  const setRow = (i, k, v) => {
+    const rows = [...(data.rows || [])]
+    rows[i] = { ...rows[i], [k]: v }
+    set('rows', rows)
+  }
+  return (
+    <>
+      <Field label="عنوان القسم" value={data.heading_ar} onChange={v => set('heading_ar', v)} placeholder="أوقات العمل" />
+      {(data.rows || []).map((row, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+          <DSInput value={row.day_ar ?? ''} onChange={e => setRow(i, 'day_ar', e.target.value)} placeholder="الاثنين" className="mb-0 flex-1" />
+          {!row.closed ? (
+            <>
+              <DSInput value={row.open_ar ?? ''} onChange={e => setRow(i, 'open_ar', e.target.value)} placeholder="09:00" className="mb-0" style={{ width: 72 }} />
+              <span style={{ color: C.muted, fontSize: 11, flexShrink: 0 }}>—</span>
+              <DSInput value={row.close_ar ?? ''} onChange={e => setRow(i, 'close_ar', e.target.value)} placeholder="22:00" className="mb-0" style={{ width: 72 }} />
+            </>
+          ) : (
+            <span style={{ fontSize: 11, color: C.red, fontWeight: 600, flex: 1 }}>مغلق</span>
+          )}
+          <button onClick={() => setRow(i, 'closed', !row.closed)} style={{
+            background: 'none', border: `1px solid ${row.closed ? C.red : C.border}`,
+            borderRadius: 5, padding: '4px 8px', color: row.closed ? C.red : C.muted,
+            fontSize: 10, cursor: 'pointer', flexShrink: 0,
+          }}>
+            {row.closed ? 'افتح' : 'أغلق'}
+          </button>
+          <button onClick={() => set('rows', (data.rows || []).filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
+        </div>
+      ))}
+      {(data.rows || []).length < 8 && (
+        <button onClick={() => set('rows', [...(data.rows || []), { day_ar: '', open_ar: '', close_ar: '', closed: false }])} style={{
+          fontSize: 12, color: C.gold, background: 'none',
+          border: `1px dashed ${C.goldBorder}`, borderRadius: 7,
+          padding: '8px 0', width: '100%', cursor: 'pointer', fontWeight: 700, marginTop: 4,
+        }}>
+          + يوم جديد
+        </button>
+      )}
+    </>
+  )
+}
+
 const EDITORS = {
   hero:            HeroEditor,
+  offers:          OffersEditor,
   story:           StoryEditor,
   featured_items:  FeaturedItemsEditor,
   categories_grid: CategoriesGridEditor,
   gallery:         GalleryEditor,
+  testimonials:    TestimonialsEditor,
+  hours:           HoursEditor,
   location:        LocationEditor,
   cta:             CtaEditor,
 }
@@ -533,10 +722,13 @@ function DragGhost({ section }) {
 function LivePreview({ sections, color }) {
   const TYPE_COLOR = {
     hero:            '#6d28d9',
+    offers:          '#e85d26',
     story:           '#3ecf8e',
     featured_items:  '#d4a853',
     categories_grid: '#f59e0b',
     gallery:         '#60a5fa',
+    testimonials:    '#a78bfa',
+    hours:           '#34d399',
     location:        '#fb923c',
     cta:             '#f87171',
   }
@@ -603,6 +795,98 @@ function LivePreview({ sections, color }) {
                   <img key={i} src={img.url} alt="" style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 7 }} />
                 ))}
               </div>
+            </div>
+          )
+        }
+
+        if (sec.type === 'offers') {
+          const items = (sec.data.items || []).slice(0, 3)
+          return (
+            <div key={sec.id} style={{ marginBottom: 10 }}>
+              {sec.data.heading_ar && (
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>{sec.data.heading_ar}</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {items.map((item, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 9,
+                    background: `${item.accent || '#e85d26'}12`,
+                    border: `1px solid ${item.accent || '#e85d26'}30`,
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{item.title_ar || 'عنوان العرض'}</div>
+                      {item.desc_ar && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{item.desc_ar}</div>}
+                    </div>
+                    {item.badge && (
+                      <div style={{
+                        padding: '3px 8px', borderRadius: 5, fontSize: 11, fontWeight: 800,
+                        background: item.accent || '#e85d26', color: '#fff', flexShrink: 0,
+                      }}>{item.badge}</div>
+                    )}
+                  </div>
+                ))}
+                {(sec.data.items || []).length === 0 && (
+                  <div style={{ fontSize: 12, color: C.muted, padding: '10px 0' }}>أضف عروضاً من المحرر</div>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        if (sec.type === 'testimonials') {
+          const items = (sec.data.items || []).filter(t => t.text_ar || t.author).slice(0, 3)
+          return (
+            <div key={sec.id} style={{ marginBottom: 10 }}>
+              {sec.data.heading_ar && (
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>{sec.data.heading_ar}</div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: items.length > 1 ? '1fr 1fr' : '1fr', gap: 6 }}>
+                {items.map((item, i) => (
+                  <div key={i} style={{
+                    padding: '10px 12px', borderRadius: 9,
+                    background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)',
+                  }}>
+                    <div style={{ display: 'flex', gap: 1, marginBottom: 5 }}>
+                      {[1,2,3,4,5].map(n => (
+                        <span key={n} style={{ fontSize: 11, color: n <= (item.rating ?? 5) ? '#f59e0b' : C.border }}>★</span>
+                      ))}
+                    </div>
+                    {item.text_ar && (
+                      <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginBottom: 5 }}>
+                        "{item.text_ar.slice(0, 60)}{item.text_ar.length > 60 ? '…' : ''}"
+                      </div>
+                    )}
+                    {item.author && <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>— {item.author}</div>}
+                  </div>
+                ))}
+                {items.length === 0 && (
+                  <div style={{ fontSize: 12, color: C.muted, padding: '10px 0' }}>أضف تقييمات من المحرر</div>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        if (sec.type === 'hours') {
+          const rows = (sec.data.rows || []).slice(0, 5)
+          return (
+            <div key={sec.id} style={{ marginBottom: 10, background: C.surface, borderRadius: 10, padding: '16px', border: `1px solid ${C.border}` }}>
+              {sec.data.heading_ar && (
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 10 }}>{sec.data.heading_ar}</div>
+              )}
+              {rows.map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                  <span style={{ fontSize: 12, color: C.text }}>{row.day_ar || '—'}</span>
+                  {row.closed
+                    ? <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>مغلق</span>
+                    : <span style={{ fontSize: 11, color: C.green }}>{row.open_ar} — {row.close_ar}</span>
+                  }
+                </div>
+              ))}
+              {rows.length === 0 && (
+                <div style={{ fontSize: 12, color: C.muted }}>أضف أوقات العمل من المحرر</div>
+              )}
             </div>
           )
         }
