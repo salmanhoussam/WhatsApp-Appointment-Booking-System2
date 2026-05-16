@@ -67,20 +67,20 @@ const SECTION_TYPES = [
 
 const DEFAULT_DATA = {
   hero:            { title_ar: '', subtitle_ar: '', cta_text_ar: 'اكتشف المزيد', bg_image_url: '', bg_type: 'color' },
-  story:           { heading_ar: '', body_ar: '', stats: [{ num: '', label: '' }] },
-  featured_items:  { heading_ar: 'منتجات مميزة', limit: 6 },
-  categories_grid: { heading_ar: 'التصنيفات', show_count: true },
+  story:           { heading_ar: '', body_ar: '', stats: [{ num: '', label: '' }], bg_image_url: '', bg_type: 'color' },
+  featured_items:  { heading_ar: 'منتجات مميزة', limit: 6, bg_image_url: '', bg_type: 'color' },
+  categories_grid: { heading_ar: 'التصنيفات', show_count: true, bg_image_url: '', bg_type: 'color' },
   gallery:         { images: [] },
-  location:        { para_ar: '', maps_url: '', tags: '' },
-  cta:             { text_ar: '', link: '', accent: '' },
+  location:        { para_ar: '', maps_url: '', tags: '', bg_image_url: '', bg_type: 'color' },
+  cta:             { text_ar: '', link: '', accent: '', bg_image_url: '', bg_type: 'color' },
 }
 
 const TEMPLATE_OPTIONS = [
-  { key: 'fashion-grid', label: 'Fashion Grid', color: '#E8E8E8' },
-  { key: 'showcase',     label: 'Showcase',     color: '#6d28d9' },
-  { key: 'landing',      label: 'Landing',      color: '#3b82f6' },
-  { key: 'food-cafe',    label: 'Café',          color: '#e85d26' },
-  { key: 'normal',       label: 'Normal',        color: '#3ecf8e' },
+  { key: 'food-cafe',    label: 'Café',         color: '#e85d26', descAr: 'للمطاعم والكافيهات' },
+  { key: 'showcase',     label: 'Showcase',     color: '#6d28d9', descAr: 'واجهة سينمائية' },
+  { key: 'landing',      label: 'Landing',      color: '#3b82f6', descAr: 'صفحة هبوط تسويقية' },
+  { key: 'fashion-grid', label: 'Fashion Grid', color: '#E8E8E8', descAr: 'شبكة منتجات أنيقة' },
+  { key: 'normal',       label: 'Normal',       color: '#3ecf8e', descAr: 'بسيط وسريع' },
 ]
 
 const uid = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -186,6 +186,21 @@ function ImageUploadField({ label, value, onChange, context = 'page_hero' }) {
   )
 }
 
+// Shared bg-image field used by all non-hero section editors
+function BgImageField({ data, set }) {
+  return (
+    <>
+      <div style={{ height: 1, background: C.border, margin: '8px 0 14px' }} />
+      <ImageUploadField
+        label="صورة خلفية القسم (اختياري)"
+        value={data.bg_image_url}
+        onChange={v => set('bg_image_url', v)}
+        context="page_hero"
+      />
+    </>
+  )
+}
+
 // ── Section Editors ───────────────────────────────────────────────────────────
 
 function HeroEditor({ data, onChange }) {
@@ -243,6 +258,7 @@ function StoryEditor({ data, onChange }) {
           </div>
         ))}
       </div>
+      <BgImageField data={data} set={set} />
     </>
   )
 }
@@ -268,6 +284,7 @@ function FeaturedItemsEditor({ data, onChange }) {
       <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(212,168,83,0.05)', border: `1px solid ${C.goldBorder}`, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
         ⭐ يعرض العناصر ذات <code style={{ color: C.gold }}>is_featured=true</code> من الكاتالوج تلقائياً.
       </div>
+      <BgImageField data={data} set={set} />
     </>
   )
 }
@@ -284,6 +301,7 @@ function CategoriesGridEditor({ data, onChange }) {
       <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(212,168,83,0.05)', border: `1px solid ${C.goldBorder}`, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
         🗂 يسحب التصنيفات من الكاتالوج المزروع تلقائياً.
       </div>
+      <BgImageField data={data} set={set} />
     </>
   )
 }
@@ -348,6 +366,7 @@ function LocationEditor({ data, onChange }) {
       <Field label="النص التعريفي" value={data.para_ar} onChange={v => set('para_ar', v)} multiline rows={3} />
       <Field label="رابط Google Maps" value={data.maps_url} onChange={v => set('maps_url', v)} placeholder="https://maps.google.com/..." />
       <Field label="وسوم (مفصولة بفاصلة)" value={data.tags} onChange={v => set('tags', v)} placeholder="الرياض، حي النخيل" />
+      <BgImageField data={data} set={set} />
     </>
   )
 }
@@ -358,6 +377,7 @@ function CtaEditor({ data, onChange }) {
     <>
       <Field label="نص البانر" value={data.text_ar} onChange={v => set('text_ar', v)} placeholder="احجز الآن واستمتع بعرض خاص" />
       <Field label="رابط الزر" value={data.link} onChange={v => set('link', v)} placeholder="/store أو https://wa.me/..." />
+      <BgImageField data={data} set={set} />
     </>
   )
 }
@@ -763,24 +783,20 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
             </Button>
           </div>
 
-          {/* Template selector */}
-          <div>
-            <label className="block text-[10px] tracking-[0.1em] uppercase text-white/40 font-semibold mb-[5px]">
-              القالب
-            </label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {TEMPLATE_OPTIONS.map(t => (
-                <button key={t.key} onClick={() => setTemplateKey(t.key)} style={{
-                  padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600,
-                  background: templateKey === t.key ? `${t.color}1a` : 'transparent',
-                  border: `1px solid ${templateKey === t.key ? t.color : C.border}`,
-                  color: templateKey === t.key ? t.color : C.muted,
-                }}>
-                  {t.label}
-                </button>
-              ))}
+          {/* Active template badge */}
+          {templateKey && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>القالب:</span>
+              {(() => {
+                const t = TEMPLATE_OPTIONS.find(o => o.key === templateKey)
+                return t ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: t.color, background: `${t.color}18`, padding: '3px 8px', borderRadius: 4, border: `1px solid ${t.color}44` }}>
+                    {t.label}
+                  </span>
+                ) : null
+              })()}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sections list with DnD */}
@@ -853,6 +869,54 @@ export default function PageBuilderTab({ color = '#6d28d9', settings }) {
               )}
             </AnimatePresence>
           </div>
+          {/* ── Template visual cards ── */}
+          <div style={{ marginTop: 20 }}>
+            <div style={{
+              fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
+              color: C.muted, marginBottom: 10, fontWeight: 600, paddingRight: 4,
+            }}>
+              القوالب المتاحة
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {TEMPLATE_OPTIONS.map(t => {
+                const active = templateKey === t.key
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setTemplateKey(t.key)}
+                    style={{
+                      padding: '10px 12px',
+                      border: `1px solid ${active ? t.color : C.border}`,
+                      borderRadius: 9,
+                      background: active ? `${t.color}18` : C.surfaceHi,
+                      cursor: 'pointer', textAlign: 'right',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      transition: 'all 0.15s', width: '100%',
+                    }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = `${t.color}80` }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = C.border }}
+                  >
+                    <div style={{
+                      width: 34, height: 34, flexShrink: 0, borderRadius: 7,
+                      background: `${t.color}22`,
+                      border: `2px solid ${active ? t.color : `${t.color}55`}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: t.color }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: active ? t.color : C.text }}>{t.label}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{t.descAr}</div>
+                    </div>
+                    {active && (
+                      <span style={{ fontSize: 14, color: t.color, flexShrink: 0 }}>✓</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div style={{ height: 32 }} />
         </div>
       </div>
