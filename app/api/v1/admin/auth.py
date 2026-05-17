@@ -354,7 +354,7 @@ async def create_platform_user(
 @router.post("/register", tags=["Authentication"])
 async def register_tenant(request: TenantRegistrationRequest, response: Response):
     """
-    New-tenant self-onboarding via auth.salmansaas.com/register.
+    New-tenant self-onboarding via demo.salmansaas.com/register.
     Creates Client (trial) + TENANT_ADMIN User, issues JWT, sets HttpOnly cookie.
     Returns { token, slug, trial_ends_at, dashboard_url }.
     """

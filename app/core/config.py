@@ -45,7 +45,7 @@ class Settings(BaseSettings):
             "https://salmansaas.com",
             "https://www.salmansaas.com",
             "https://smar.salmansaas.com",
-            "https://auth.salmansaas.com",
+            "https://demo.salmansaas.com",
         ]
         if self.FRONTEND_URL:
             # Additional origins from Railway env var (comma-separated)

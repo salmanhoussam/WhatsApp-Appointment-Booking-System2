@@ -1,6 +1,6 @@
 /**
  * ClientsManager.jsx — Super Admin Control Room
- * Route: /super/clients (localhost) | auth.salmansaas.com/super/clients (prod)
+ * Route: /super/clients (localhost) | demo.salmansaas.com/super/clients (prod)
  * Access: SUPER_ADMIN role only (enforced backend + frontend)
  *
  * Calls:

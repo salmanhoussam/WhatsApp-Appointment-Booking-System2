@@ -21,7 +21,7 @@
  *   /              → TenantResolver → _dynamic.routes → DynamicPage
  *   /catalog       → CatalogPage
  *   /admin/*       → GenericAdminDashboard (JWT-gated, /admin/* route in App.jsx)
- *   Demo still at: auth.salmansaas.com/demo/:slug (auth subdomain)
+ *   Demo still at: demo.salmansaas.com/demo/:slug (auth subdomain)
  *
  * ── page_type is NOT a separate URL ───────────────────────────────────────────
  * page_type ("showcase", "catalog", "restaurant", "store", "normal") is a

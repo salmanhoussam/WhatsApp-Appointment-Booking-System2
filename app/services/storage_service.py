@@ -12,7 +12,7 @@ from fastapi import HTTPException
 logger = logging.getLogger(__name__)
 
 _SUPABASE_URL = os.getenv("SUPABASE_URL")
-_SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+_SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
 
 try:
     from supabase import create_client as _create_supabase

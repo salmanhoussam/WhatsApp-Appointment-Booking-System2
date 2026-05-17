@@ -5,10 +5,10 @@
  *
  *   1. localStorage `admin_access_token`  — set by the local Login.jsx
  *   2. URL `?token=<jwt>`                 — set by SSOLoginPage redirect from
- *                                           auth.salmansaas.com (cross-subdomain)
+ *                                           demo.salmansaas.com (cross-subdomain)
  *
  * SSO token handoff flow:
- *   auth.salmansaas.com logs in → redirects to
+ *   demo.salmansaas.com logs in → redirects to
  *   smar.salmansaas.com/dashboard/smar/units?token=<jwt>
  *   ProtectedRoute reads ?token=, saves to localStorage, strips from URL,
  *   then renders the protected page on the next pass.

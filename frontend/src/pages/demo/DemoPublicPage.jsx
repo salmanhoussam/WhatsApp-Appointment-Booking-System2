@@ -1,5 +1,5 @@
 /**
- * DemoPublicPage — auth.salmansaas.com/demo/:slug
+ * DemoPublicPage — demo.salmansaas.com/demo/:slug
  * Public customer-facing preview for trial tenants (no login required).
  * Fetches tenant config + catalog categories and renders ConfigurableHero.
  */

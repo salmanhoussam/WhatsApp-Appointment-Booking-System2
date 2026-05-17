@@ -1,5 +1,5 @@
 /**
- * SSOLoginPage.jsx — auth.salmansaas.com
+ * SSOLoginPage.jsx — demo.salmansaas.com
  *
  * Handles two modes based on pathname:
  *   /login    → existing tenant login (email/phone/slug + password)
@@ -41,7 +41,7 @@ function _isSuperAdmin(token) {
 function resolveRedirect(slug, token, status) {
   if (_isSuperAdmin(token)) {
     return import.meta.env.PROD
-      ? 'https://auth.salmansaas.com/super/clients'
+      ? 'https://demo.salmansaas.com/super/clients'
       : '/super/clients';
   }
   // Trial tenants → salmansaas.com/dashboard/{slug} (path-based, no per-tenant DNS)

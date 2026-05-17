@@ -76,8 +76,8 @@ export default function TenantResolver() {
     return <Navigate to="/smar" replace />;
   }
 
-  // auth.salmansaas.com → render the SSO login page directly, no tenant routing
-  if (hostname.startsWith('auth.')) {
+  // demo.salmansaas.com → render the SSO login page directly, no tenant routing
+  if (hostname.startsWith('demo.')) {
     return (
       <Suspense fallback={<TenantFallback />}>
         <SSOLoginPage />

@@ -31,10 +31,10 @@ const InputField = ({ label, error, ...props }) => (
 );
 
 const RegistrationPage = () => {
-  // In production, registration lives on auth.salmansaas.com/register
+  // In production, registration lives on demo.salmansaas.com/register
   // This component stays alive only for local dev testing
   if (import.meta.env.PROD) {
-    window.location.replace('https://auth.salmansaas.com/register');
+    window.location.replace('https://demo.salmansaas.com/register');
     return null;
   }
 

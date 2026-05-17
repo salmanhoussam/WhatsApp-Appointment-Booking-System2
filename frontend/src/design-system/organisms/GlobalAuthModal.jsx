@@ -7,7 +7,7 @@
  *   1. Guest form — toggles between Sign In / Create Account
  *      Calls POST /public/{slug}/auth/login  or  /register
  *   2. Admin bridge — subtle footer link → hard redirect to
- *      https://auth.salmansaas.com (cross-subdomain, no React Router)
+ *      https://demo.salmansaas.com (cross-subdomain, no React Router)
  *
  * FM12 / React 19 safety:
  *   Only animate=, whileHover, whileTap, AnimatePresence — no MotionValues.
@@ -25,7 +25,7 @@ import useTenantSlug from '../../utils/useTenantSlug';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ADMIN_PORTAL_URL = 'https://auth.salmansaas.com';
+const ADMIN_PORTAL_URL = 'https://demo.salmansaas.com';
 
 // ── Animation variants ────────────────────────────────────────────────────────
 

@@ -36,7 +36,7 @@ const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'
 const _h = window.location.hostname;
 const IS_SUBDOMAIN_MODE =
   _h !== 'localhost' && !_h.startsWith('127.') && _h.split('.').length >= 3;
-const IS_AUTH_SUBDOMAIN  = IS_SUBDOMAIN_MODE && _h.startsWith('auth.');
+const IS_DEMO_SUBDOMAIN  = IS_SUBDOMAIN_MODE && _h.startsWith('demo.');
 // salmansaas.com (no subdomain, not localhost) → serve showcase at root
 const IS_SHOWCASE_DOMAIN = !IS_SUBDOMAIN_MODE && _h !== 'localhost' && !_h.startsWith('127.');
 
@@ -80,16 +80,16 @@ function App() {
             <Route path="/" element={
               <Navigate to={
                 IS_SUBDOMAIN_MODE
-                  ? (_h.startsWith('auth.') ? '/login' : '/showcase')
+                  ? (_h.startsWith('demo.') ? '/login' : '/showcase')
                   : '/smar'
               } replace />
             } />
           )}
 
           {/* ── Static admin routes ── */}
-          {/* auth.salmansaas.com/login → SSO portal | localhost/login → legacy dev form */}
+          {/* demo.salmansaas.com/login → SSO portal | localhost/login → legacy dev form */}
           <Route path="/login" element={
-            IS_AUTH_SUBDOMAIN
+            IS_DEMO_SUBDOMAIN
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Login />
           } />
@@ -137,7 +137,7 @@ function App() {
           } />
 
           {/* ── Trial public page — no auth, customers browse here ── */}
-          {/* salmansaas.com/demo/:slug/*  or  auth.salmansaas.com/demo/:slug/*  or  localhost/demo/:slug/* */}
+          {/* salmansaas.com/demo/:slug/*  or  demo.salmansaas.com/demo/:slug/*  or  localhost/demo/:slug/* */}
           {/* More specific than /* so it wins on showcase domain without any condition. */}
           <Route path="/demo/:slug/*" element={
             <Suspense fallback={null}><DynamicTenantResolver /></Suspense>
@@ -145,7 +145,7 @@ function App() {
 
           {/* ── Trial admin — auth subdomain + localhost (no tenant DNS needed) ── */}
           {/* /:slug/dashboard  =  generic dashboard for all new tenants */}
-          {(IS_AUTH_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
+          {(IS_DEMO_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
             <Route path="/:slug/dashboard/*" element={
               <ProtectedRoute>
                 <Suspense fallback={null}><GenericAdminDashboard /></Suspense>

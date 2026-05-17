@@ -15,7 +15,7 @@ export const getTenantSlug = () => {
 
   // ── 1. URL path — /demo/:slug/* always wins ────────────────────────────────
   //    Must be checked first: a stored JWT for "smar" must NOT bleed into
-  //    another tenant's demo page on auth.salmansaas.com/demo/cafe.
+  //    another tenant's demo page on demo.salmansaas.com/demo/cafe.
   const parts = window.location.pathname.split('/').filter(Boolean);
   if (parts[0] === 'demo' && parts[1]) return parts[1];
 
