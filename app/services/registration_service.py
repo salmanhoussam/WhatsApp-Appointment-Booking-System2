@@ -11,6 +11,7 @@ from app.repositories.registration_repo import RegistrationRepository
 from app.core.security import get_password_hash
 from app.core.exceptions import ConflictError
 from app.services import sheets_service
+from app.services.email_service import send_welcome_email
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,16 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
 
     # Non-blocking: create tenant folder structure in Supabase Storage
     asyncio.get_event_loop().run_in_executor(None, _init_tenant_storage, client.slug)
+
+    # Non-blocking: send welcome email to new tenant admin
+    asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: asyncio.run(send_welcome_email(
+            to_email      = data["email"],
+            business_name = data.get("business_name_ar") or data.get("business_name_en") or data.get("business_name", ""),
+            slug          = client.slug,
+        ))
+    )
 
     await sheets_service.append_client_row({
         "slug":            client.slug,

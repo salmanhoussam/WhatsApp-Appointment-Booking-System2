@@ -14,6 +14,7 @@ import TickerSection   from '../components/home/TickerSection';
 import ServicesSection from '../components/home/ServicesSection';
 import WhyUsSection    from '../components/home/WhyUsSection';
 import CommandCenter   from '../components/home/CommandCenter';
+import PricingSection  from '../components/home/PricingSection';
 import CTASection      from '../components/home/CTASection';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -104,6 +105,7 @@ export default function HomePage() {
           <div style={{ height: '200vh' }} />
 
           <WhyUsSection />
+          <PricingSection />
           <CommandCenter />
           <CTASection />
         </main>

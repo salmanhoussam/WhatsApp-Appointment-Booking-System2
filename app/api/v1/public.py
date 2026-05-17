@@ -1,11 +1,12 @@
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.db.client import prisma_client
 from app.schemas.booking import PublicBookingRequest
 from app.services import price_service, public_service
+from app.services.email_service import send_booking_confirmation
 
 router = APIRouter(prefix="/public", tags=["Public Facing"])
 
@@ -44,13 +45,32 @@ async def get_listings_by_slug(
 
 
 @router.post("/{slug}/bookings")
-async def create_booking_by_slug(slug: str, data: PublicBookingRequest):
+async def create_booking_by_slug(
+    slug: str,
+    data: PublicBookingRequest,
+    background_tasks: BackgroundTasks,
+):
     if data.check_in and data.check_out and data.check_in >= data.check_out:
         raise HTTPException(status_code=400, detail="تاريخ الخروج غير منطقي")
 
     result = await public_service.create_public_booking(prisma_client, slug, data.model_dump())
     if not result:
         raise HTTPException(status_code=400, detail="فشل إنشاء الحجز، يرجى المحاولة لاحقاً")
+
+    # Non-blocking: send booking confirmation email if customer provided an email
+    if data.customer_email:
+        client = await prisma_client.client.find_first(where={"slug": slug})
+        unit   = await prisma_client.unit.find_unique(where={"id": data.unit_id})
+        background_tasks.add_task(
+            send_booking_confirmation,
+            to_email       = data.customer_email,
+            customer_name  = data.customer_name,
+            unit_name      = (unit.nameAr or unit.nameEn or data.unit_id) if unit else data.unit_id,
+            check_in       = str(data.check_in),
+            check_out      = str(data.check_out),
+            business_name  = (client.nameAr or client.nameEn or slug) if client else slug,
+            whatsapp_number= (client.whatsappNumber if client else None),
+        )
 
     return {
         "message": "Booking successful",
