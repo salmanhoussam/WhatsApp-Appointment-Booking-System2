@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-05-17
+# Last updated: 2026-05-18
 
 ## Completed Phases
 
@@ -30,29 +30,37 @@
 - FIX: Upload 500 (SUPABASE_KEY fallback) — ✅ Done 2026-05-17
 - FIX: auth → demo subdomain rename (14 files) — ✅ Done 2026-05-17
 - Resend email integration — booking confirmation + welcome email — ✅ Done 2026-05-17
+- Caracas re-seed `--clear` — 10 cat / 75 items, arizona duplicates cleared — ✅ Done 2026-05-18
+- Phase 66: ProChatbot.jsx + POST /api/v1/public/ai/chat (SSE, haiku) — ✅ Done 2026-05-18
+- ARCH-01 public routes — 0 prisma_client calls in public/ — ✅ Done 2026-05-18
+- Phase 67: CanvasPageEditor — Canva-style 3-panel, animations, keyboard, resizable — ✅ Done 2026-05-18
+- bo-hussein CEO agent — /bo-hussein command + agent file — ✅ Done 2026-05-18
+- Tenant onboarding rules — .claude/rules/tenant-onboarding.md + agent steps — ✅ Done 2026-05-18
+- Page content seed infrastructure — page_templates/ + seed_page_content.py — ✅ Done 2026-05-18
 
-## 🔴 عاجل — Blocker
+## 🔴 عاجل — يحتاج تنفيذ يدوي
 
-- [ ] **SEC-03**: Rotate ALL credentials in .env — مكشوفة في ZIP (7 secrets)
-- [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain (يدوي — بدل auth.)
-- [ ] **Caracas re-seed `--clear`** — items مكررة من arizona في الكاتالوج
+- [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain في Pages → Custom Domains
+- [ ] **SEC-03 (partial):** Supabase service key + Resend API key — rotation يدوي في الداشبوردات
+  - JWT_SECRET_KEY + SECRET_KEY + ONBOARDING_SECRET: ✅ rotated 2026-05-18
 
-## In Progress / Carry Forward
+## 🟠 In Progress / Carry Forward
 
-- [ ] **Phase 61 n8n wiring** — backend done، workflow لم يُبنَ بعد
-- [ ] **footlab page_type → store** — redirect تلقائي من `/demo/footlab` يحتاج ضبط
+- [ ] **Phase 67 — اختبار يدوي** — افتح `/{slug}/dashboard` → "محرر الصفحة"، تحقق من 3 panels + interactions + toast
+- [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
+- [ ] **ARCH-01 admin routes** — ~21 ملف admin لا تزال تستخدم prisma_client مباشرة
 
-## Upcoming (بالأولوية)
+## 🟡 Upcoming (بالأولوية)
 
-1. **Phase 66: ProChatbot.jsx + `POST /ai/chat`** — SSE chatbot للـ showcase (مرجع: ai_settings_agent.py)
-2. **Phase 67: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
+1. **Phase 68: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
+2. **SaaS Showcase Plan** — `.claudedocs/plans/SaaS_Showcase_Plan.md` — خطة الـ showcase كاملة
 3. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
 4. **tier field** في `template-registry.js` — normal | vip | pro
 
 ## Upcoming (مستقبلي)
 
-- ARCH-01: Prisma calls مباشرة في 20 route file (Phase 60+)
 - n8n workflow: Konaan → webhook → WhatsApp AI settings
+- footlab page_type → store: redirect fix من `/demo/footlab`
 
 ## Sprint 2 — Code Review Findings (مستقبلي)
 
@@ -65,7 +73,6 @@
 - BUG-04: Remove duplicate GET /{slug}/services endpoint
 - BUG-05: Add publicApi.interceptors.response error handler
 - PERF-01: N+1 query — replace per-service find_unique loop with find_many
-- ARCH-01: Replace direct prisma_client in routes with Depends(get_db)
 - ARCH-02: Fix circular import in price_service
 - SCHEMA-01: Add category field to GalleryImage + unify data source
 - FE-01: Persist language state to localStorage in LanguageContext.jsx

@@ -1,0 +1,107 @@
+{
+  "_meta": {
+    "template_key": "booking_showcase",
+    "label": "فندق / شاليه",
+    "service_key": "booking",
+    "description": "قالب للفنادق والشاليهات — hero + قصة + معرض + وحدات مميزة + تقييمات + موقع + CTA"
+  },
+  "template_key": "booking_showcase",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "استمتع بإقامة لا تُنسى",
+        "subtitle_ar": "وحدات فاخرة في أجمل المواقع — احجز الآن وتمتع بأفضل الأسعار",
+        "cta_text_ar": "احجز الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_story",
+      "type": "story",
+      "order": 1,
+      "data": {
+        "heading_ar": "قصتنا",
+        "body_ar": "منذ سنوات ونحن نرحّب بضيوفنا بأحدث وسائل الراحة وأعلى مستويات الخدمة. هدفنا أن تكون إقامتك تجربة فريدة تحملها في ذاكرتك للأبد.",
+        "stats": [
+          { "num": "500+", "label": "ضيف سعيد" },
+          { "num": "10+", "label": "سنوات خبرة" },
+          { "num": "4.9", "label": "تقييم متوسط" }
+        ],
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_gallery",
+      "type": "gallery",
+      "order": 2,
+      "data": { "images": [] }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "وحداتنا المميزة",
+        "limit": 6,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "ماذا قال ضيوفنا",
+        "items": [
+          { "text_ar": "إقامة رائعة والخدمة كانت على أعلى مستوى", "author": "عمر ب.", "rating": 5 },
+          { "text_ar": "المكان جميل جداً والهواء النقي لا يُصدّق", "author": "رنا س.", "rating": 5 },
+          { "text_ar": "سنعود بالتأكيد، شكراً على الاستقبال الرائع", "author": "فادي ح.", "rating": 5 }
+        ]
+      }
+    },
+    {
+      "id": "s_hours",
+      "type": "hours",
+      "order": 5,
+      "data": {
+        "heading_ar": "الاستقبال",
+        "rows": [
+          { "day_ar": "تسجيل الوصول", "open_ar": "14:00", "close_ar": "—", "closed": false },
+          { "day_ar": "تسجيل المغادرة", "open_ar": "12:00", "close_ar": "—", "closed": false },
+          { "day_ar": "الاستقبال", "open_ar": "24/7", "close_ar": "—", "closed": false }
+        ]
+      }
+    },
+    {
+      "id": "s_location",
+      "type": "location",
+      "order": 6,
+      "data": {
+        "para_ar": "موقعنا يتمتع بإطلالات خلابة ويمكن الوصول إليه بسهولة من الطرق الرئيسية",
+        "maps_url": "",
+        "tags": "",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 7,
+      "data": {
+        "text_ar": "احجز إقامتك الآن واستمتع بعرض الإفطار المجاني",
+        "link": "",
+        "accent": "#3ecf8e",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

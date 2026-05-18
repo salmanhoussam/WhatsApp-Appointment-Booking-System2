@@ -1,0 +1,83 @@
+{
+  "_meta": {
+    "template_key": "store_classic",
+    "label": "متجر إلكتروني",
+    "service_key": "store",
+    "description": "قالب للمتاجر والبوتيكات — hero + عروض + تصنيفات + منتجات مميزة + تقييمات + CTA"
+  },
+  "template_key": "store_classic",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "تسوّق بأفضل الأسعار",
+        "subtitle_ar": "منتجات أصيلة وشحن سريع لباب بيتك",
+        "cta_text_ar": "تسوق الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_offers",
+      "type": "offers",
+      "order": 1,
+      "data": {
+        "heading_ar": "عروض حصرية",
+        "items": [
+          { "title_ar": "تخفيضات الموسم", "desc_ar": "على جميع المنتجات المختارة", "badge": "30% OFF", "accent": "#8b5cf6" },
+          { "title_ar": "شحن مجاني", "desc_ar": "على الطلبات فوق 100,000 ل.ل", "badge": "مجاني", "accent": "#3ecf8e" }
+        ]
+      }
+    },
+    {
+      "id": "s_categories",
+      "type": "categories_grid",
+      "order": 2,
+      "data": {
+        "heading_ar": "تصفح الفئات",
+        "show_count": true,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "منتجات مميزة",
+        "limit": 8,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "آراء المتسوقين",
+        "items": [
+          { "text_ar": "جودة ممتازة والتوصيل كان سريعاً جداً!", "author": "ليلى ح.", "rating": 5 },
+          { "text_ar": "منتجات أصلية 100% وسعر مناسب", "author": "محمد س.", "rating": 5 },
+          { "text_ar": "تجربة تسوق رائعة، سأطلب مجدداً", "author": "نور ف.", "rating": 5 }
+        ]
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 5,
+      "data": {
+        "text_ar": "انضم إلى آلاف المتسوقين الراضين — اطلب الآن",
+        "link": "",
+        "accent": "#8b5cf6",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

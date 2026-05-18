@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "template_key": "restaurant",
+    "label": "مطعم / كافيه",
+    "service_key": "restaurant",
+    "description": "قالب كامل للمطاعم والكافيهات — hero + عروض + تصنيفات + معرض + تقييمات + أوقات + CTA"
+  },
+  "template_key": "restaurant",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "أهلاً وسهلاً بكم",
+        "subtitle_ar": "نقدم لكم أشهى الأطباق بأجود المكونات الطازجة",
+        "cta_text_ar": "اطلب الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_offers",
+      "type": "offers",
+      "order": 1,
+      "data": {
+        "heading_ar": "عروض اليوم",
+        "items": [
+          { "title_ar": "وجبة العائلة", "desc_ar": "4 أشخاص بسعر 3", "badge": "25% OFF", "accent": "#e85d26" },
+          { "title_ar": "توصيل مجاني", "desc_ar": "على الطلبات فوق 50,000 ل.ل", "badge": "مجاني", "accent": "#22c55e" }
+        ]
+      }
+    },
+    {
+      "id": "s_categories",
+      "type": "categories_grid",
+      "order": 2,
+      "data": {
+        "heading_ar": "قائمتنا",
+        "show_count": true,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "الأكثر طلباً",
+        "limit": 6,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_gallery",
+      "type": "gallery",
+      "order": 4,
+      "data": { "images": [] }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 5,
+      "data": {
+        "heading_ar": "ماذا يقول زبائننا",
+        "items": [
+          { "text_ar": "طعام رائع وخدمة ممتازة، سأعود بالتأكيد!", "author": "أحمد م.", "rating": 5 },
+          { "text_ar": "أفضل تجربة تناول طعام في المنطقة", "author": "سارة ع.", "rating": 5 },
+          { "text_ar": "الأسعار معقولة والطعام لذيذ جداً", "author": "خالد ر.", "rating": 4 }
+        ]
+      }
+    },
+    {
+      "id": "s_hours",
+      "type": "hours",
+      "order": 6,
+      "data": {
+        "heading_ar": "أوقات العمل",
+        "rows": [
+          { "day_ar": "الاثنين — الجمعة", "open_ar": "11:00 ص", "close_ar": "11:00 م", "closed": false },
+          { "day_ar": "السبت", "open_ar": "12:00 م", "close_ar": "12:00 ص", "closed": false },
+          { "day_ar": "الأحد", "open_ar": "12:00 م", "close_ar": "10:00 م", "closed": false }
+        ]
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 7,
+      "data": {
+        "text_ar": "اطلب عبر واتساب الآن واحصل على خصم 10%",
+        "link": "",
+        "accent": "#e85d26",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

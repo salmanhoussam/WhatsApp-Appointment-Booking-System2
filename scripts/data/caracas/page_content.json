@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "slug": "caracas",
+    "module_key": "restaurant",
+    "based_on": "page_templates/restaurant.json",
+    "note": "Caracas — Lebanese fast food restaurant, Beirut"
+  },
+  "template_key": "restaurant",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "كاراكاس — أصالة الطعم اللبناني",
+        "subtitle_ar": "أشهى السندويشات والمشاوي الطازجة يومياً — توصيل سريع لباب بيتك",
+        "cta_text_ar": "اطلب الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_offers",
+      "type": "offers",
+      "order": 1,
+      "data": {
+        "heading_ar": "عروض اليوم",
+        "items": [
+          { "title_ar": "وجبة الشاورما الكبيرة", "desc_ar": "شاورما + بطاطا + مشروب", "badge": "20% OFF", "accent": "#e85d26" },
+          { "title_ar": "توصيل مجاني", "desc_ar": "على الطلبات فوق $15", "badge": "مجاني", "accent": "#22c55e" }
+        ]
+      }
+    },
+    {
+      "id": "s_categories",
+      "type": "categories_grid",
+      "order": 2,
+      "data": {
+        "heading_ar": "قائمتنا",
+        "show_count": true,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "الأكثر طلباً",
+        "limit": 6,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "ماذا قال زبائننا",
+        "items": [
+          { "text_ar": "أحسن شاورما جربتها في المنطقة، العجينة طازجة والحشوة كريمة!", "author": "أحمد خ.", "rating": 5 },
+          { "text_ar": "خدمة سريعة وأسعار معقولة — الكبّة بالصينية لا مثيل لها", "author": "ريم م.", "rating": 5 },
+          { "text_ar": "زبون دائم منذ سنوات، الجودة لم تتغير أبداً", "author": "كريم ب.", "rating": 5 }
+        ]
+      }
+    },
+    {
+      "id": "s_hours",
+      "type": "hours",
+      "order": 5,
+      "data": {
+        "heading_ar": "أوقات العمل",
+        "rows": [
+          { "day_ar": "الاثنين — الجمعة", "open_ar": "10:00 ص", "close_ar": "11:00 م", "closed": false },
+          { "day_ar": "السبت", "open_ar": "10:00 ص", "close_ar": "12:00 ص", "closed": false },
+          { "day_ar": "الأحد", "open_ar": "12:00 م", "close_ar": "10:00 م", "closed": false }
+        ]
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 6,
+      "data": {
+        "text_ar": "اطلب الآن عبر واتساب واحصل على توصيل مجاني لأول طلبية",
+        "link": "",
+        "accent": "#e85d26",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

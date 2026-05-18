@@ -17,6 +17,7 @@ tools: Read, Glob, Grep, Bash, Write
 .claude/skills/seeding/demo/04-seed-catalog.md        ← seed categories + module_key
 .claude/skills/seeding/demo/05-verify-live.md         ← QA + deliver link
 frontend/src/config/template-registry.js              ← 20 templates
+.claude/rules/tenant-onboarding.md                    ← ⚠️ MANDATORY FILE CHECKLIST
 ```
 
 ---
@@ -61,6 +62,16 @@ Step 4: ازرع الـ Catalog
         → POST /api/v1/admin/catalog/seed-from-template
           Body: { template_key, module_key ← إلزامي!, categories, clear_existing: false }
         → .claude/skills/seeding/demo/04-seed-catalog.md
+
+Step 4.5: ⚠️ إنشاء ملفات الـ data — MANDATORY (راجع .claude/rules/tenant-onboarding.md)
+        → إذا scripts/data/{slug}/ غير موجود: أنشئه
+        → أنشئ scripts/data/{slug}/settings.json (slug + module_key + currency)
+        → انسخ القالب المناسب:
+            restaurant → cp scripts/data/page_templates/restaurant.json scripts/data/{slug}/page_content.json
+            store      → cp scripts/data/page_templates/store.json       scripts/data/{slug}/page_content.json
+            booking    → cp scripts/data/page_templates/booking.json     scripts/data/{slug}/page_content.json
+        → عدّل النصوص في page_content.json ليناسبوا الـ tenant
+        → python scripts/seed_page_content.py {slug}
 
 Step 5: Frontend Architect (بعد نجاح Step 4 مباشرة)
         → تحقق: هل /{slug}.routes.jsx موجود؟

@@ -40,6 +40,7 @@ start_dev.bat              -- Start FastAPI + Prisma + React locally
 /audit --pre-deploy        -- Strict — blocks deploy on any 🔴
 /audit --quick             -- Security scan only
 /memory-sync               -- Sync memory after schema changes or long sessions
+/bo-hussein [idea/goal]    -- CEO Orchestrator: analyzes idea, searches web, delegates to agents
 
 ## Rules (Path-Scoped — auto-loaded)
 rules/global.md                  -- Always: multi-tenancy, 4-layer, session protocol
@@ -53,6 +54,7 @@ rules/frontend/scaffolding.md    -- New tenant folder structure
 rules/smar-tenant.md             -- Smar-specific complete reference
 
 ## Agents (.claude/agent/)
+bo-hussein             -- CEO Orchestrator: strategic planning, web search, delegates to all agents
 memory-keeper          -- Updates memory.md without duplication (called by /session-close)
 system-auditor         -- Full codebase scan (called by /audit)
 code-reviewer          -- Architecture + multi-tenancy compliance

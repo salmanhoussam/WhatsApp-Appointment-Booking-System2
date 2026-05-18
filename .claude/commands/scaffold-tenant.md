@@ -183,5 +183,15 @@ https://[project].supabase.co/storage/v1/object/public/properties/[slug]/[catego
 - [ ] Test: navigate to `/:slug/` in browser
 - [ ] Admin: `/:slug/dashboard` works via GenericAdminDashboard (no extra step needed)
 
+## ⚠️ Data Files Checklist — MANDATORY (see .claude/rules/tenant-onboarding.md)
+
+- [ ] `scripts/data/[slug]/settings.json` — slug + module_key + currency
+- [ ] `scripts/data/[slug]/page_content.json` — copied from page_templates/{module}.json + customized
+- [ ] `python scripts/seed_page_content.py [slug]` — executed successfully
+- [ ] (if restaurant/store) `scripts/data/[slug]/categories.json` + `items.json`
+- [ ] (if restaurant/store) `python scripts/seed_catalog.py [slug]` — executed
+
+> Reference templates: `scripts/data/page_templates/restaurant.json` | `store.json` | `booking.json`
+
 > Note: `/admin/` per-tenant pages (like `src/pages/smar/admin/`) are only needed
 > for tenants with custom admin UI. Most tenants use GenericAdminDashboard automatically.

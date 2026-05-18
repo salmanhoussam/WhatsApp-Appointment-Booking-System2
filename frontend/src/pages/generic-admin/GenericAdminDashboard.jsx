@@ -7,7 +7,7 @@ import SettingsTab       from './tabs/SettingsTab'
 import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
-import PageBuilderTab    from './tabs/PageBuilderTab'
+import CanvasPageEditor  from './tabs/CanvasPageEditor'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icons
@@ -129,7 +129,7 @@ function buildNav(hasReservations) {
     { id: 'overview',  labelAr: 'نظرة عامة', Icon: IconOverview  },
     { id: 'orders',    labelAr: 'الطلبات',   Icon: IconOrders    },
     { id: 'catalog',      labelAr: 'الكتالوج',    Icon: IconCatalog      },
-    { id: 'pagebuilder',  labelAr: 'بناء الصفحة', Icon: IconPageBuilder  },
+    { id: 'pagebuilder',  labelAr: 'محرر الصفحة', Icon: IconPageBuilder  },
     { id: 'settings',     labelAr: 'الإعدادات',   Icon: IconSettings     },
   ]
   if (hasReservations) {
@@ -300,8 +300,6 @@ export default function GenericAdminDashboard() {
         return <ReservationsTab color={color} />
       case 'catalog':
         return <CatalogTab color={color} />
-      case 'pagebuilder':
-        return <PageBuilderTab color={color} settings={settings} />
       case 'settings':
         return <SettingsTab settings={settings} onUpdated={setSettings} color={color} />
       default:
@@ -458,107 +456,128 @@ export default function GenericAdminDashboard() {
         )}
 
         {/* ── Tab content ──────────────────────────────────────────── */}
-        {activeTab === 'settings' && !isMobile ? (
+        <AnimatePresence mode="wait">
 
-          /* ── Settings: split preview layout ────────────────────── */
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+          {activeTab === 'pagebuilder' ? (
 
-            {/* Left: live iframe preview */}
-            <div style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              background: '#060609', borderRight: '1px solid rgba(255,255,255,0.06)',
-              minWidth: 0,
-            }}>
-              {/* Fake browser chrome */}
+            /* ── Page editor: full height, no padding ─────────────── */
+            <motion.div
+              key="pagebuilder"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0  }}
+              exit={{    opacity: 0, x: 10  }}
+              transition={{ type: 'spring', stiffness: 280, damping: 26, mass: 0.6 }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+            >
+              <CanvasPageEditor color={color} settings={settings} onUpdate={() => {}} />
+            </motion.div>
+
+          ) : (activeTab === 'settings' && !isMobile) ? (
+
+            /* ── Settings: split preview layout ──────────────────── */
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, y: 8  }}
+              animate={{ opacity: 1, y: 0  }}
+              exit={{    opacity: 0, y: -8  }}
+              transition={SPRING_SNAPPY}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}
+            >
+              {/* Left: live iframe preview */}
               <div style={{
-                padding: '10px 16px',
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                display: 'flex', alignItems: 'center', gap: 6,
-                flexShrink: 0,
+                flex: 1, display: 'flex', flexDirection: 'column',
+                background: '#060609', borderRight: '1px solid rgba(255,255,255,0.06)',
+                minWidth: 0,
               }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
+                {/* Fake browser chrome */}
                 <div style={{
-                  marginRight: 10, flex: 1, padding: '4px 12px', borderRadius: 6,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  fontSize: 11, color: 'rgba(255,255,255,0.2)',
-                  fontFamily: 'monospace', direction: 'ltr',
-                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                  padding: '10px 16px',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  flexShrink: 0,
                 }}>
-                  /demo/{settings?.slug}
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
+                  <div style={{
+                    marginRight: 10, flex: 1, padding: '4px 12px', borderRadius: 6,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    fontSize: 11, color: 'rgba(255,255,255,0.2)',
+                    fontFamily: 'monospace', direction: 'ltr',
+                    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                  }}>
+                    /demo/{settings?.slug}
+                  </div>
+                  <div style={{
+                    fontSize: 10, color: 'rgba(255,255,255,0.2)',
+                    letterSpacing: '0.06em',
+                  }}>
+                    LIVE
+                    <span style={{
+                      display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                      background: color, marginRight: 5, marginBottom: -1,
+                      boxShadow: `0 0 6px ${color}`,
+                      animation: 'livePulse 2s ease-in-out infinite',
+                    }} />
+                  </div>
                 </div>
-                <div style={{
-                  fontSize: 10, color: 'rgba(255,255,255,0.2)',
-                  letterSpacing: '0.06em',
-                }}>
-                  LIVE
-                  <span style={{
-                    display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-                    background: color, marginRight: 5, marginBottom: -1,
-                    boxShadow: `0 0 6px ${color}`,
-                    animation: 'livePulse 2s ease-in-out infinite',
-                  }} />
-                </div>
+                <style>{`@keyframes livePulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
+
+                {/* The iframe */}
+                {settings?.slug ? (
+                  <iframe
+                    ref={iframeRef}
+                    src={`/demo/${settings.slug}`}
+                    title="live-preview"
+                    style={{ flex: 1, border: 'none', width: '100%' }}
+                  />
+                ) : (
+                  <div style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'rgba(255,255,255,0.15)', fontSize: 13,
+                  }}>
+                    جاري التحميل...
+                  </div>
+                )}
               </div>
-              <style>{`@keyframes livePulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
 
-              {/* The iframe */}
-              {settings?.slug ? (
-                <iframe
-                  ref={iframeRef}
-                  src={`/demo/${settings.slug}`}
-                  title="live-preview"
-                  style={{ flex: 1, border: 'none', width: '100%' }}
+              {/* Right: settings controls */}
+              <div style={{
+                width: 420, flexShrink: 0,
+                overflowY: 'auto', padding: '28px 24px',
+                direction: 'rtl',
+              }}>
+                <SettingsTab
+                  settings={settings}
+                  onUpdated={setSettings}
+                  color={color}
+                  onFormChange={setPreviewForm}
                 />
-              ) : (
-                <div style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'rgba(255,255,255,0.15)', fontSize: 13,
-                }}>
-                  جاري التحميل...
-                </div>
-              )}
-            </div>
+              </div>
+            </motion.div>
 
-            {/* Right: settings controls */}
-            <div style={{
-              width: 420, flexShrink: 0,
-              overflowY: 'auto', padding: '28px 24px',
-              direction: 'rtl',
-            }}>
-              <SettingsTab
-                settings={settings}
-                onUpdated={setSettings}
-                color={color}
-                onFormChange={setPreviewForm}
-              />
-            </div>
-          </div>
+          ) : (
 
-        ) : (
+            /* ── All other tabs (and mobile settings) ─────────────── */
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0  }}
+              exit={{    opacity: 0, y: -6  }}
+              transition={SPRING_SNAPPY}
+              style={{
+                flex: 1,
+                padding: isMobile ? '20px 16px 100px' : '28px 32px',
+                direction: 'rtl',
+              }}
+            >
+              {renderTab()}
+            </motion.div>
 
-          /* ── All other tabs (and mobile settings) ───────────────── */
-          <div style={{
-            flex: 1,
-            padding: isMobile ? '20px 16px 100px' : '28px 32px',
-            direction: 'rtl',
-          }}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0  }}
-                exit={{    opacity: 0, y: -6  }}
-                transition={SPRING_SNAPPY}
-              >
-                {renderTab()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          )}
 
-        )}
+        </AnimatePresence>
       </main>
 
       {/* ════════════════════════════════════════════════════════════════
