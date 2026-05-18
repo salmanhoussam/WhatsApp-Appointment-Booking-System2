@@ -1,5 +1,5 @@
-# Project Todo List — Beit Smar / Salman SaaS
-# Last updated: 2026-05-13
+# Project Todo List — SalmanSaaS
+# Last updated: 2026-05-17
 
 ## Completed Phases
 
@@ -9,60 +9,64 @@
 - Phase 31: Backend API — FastAPI routes, Prisma schema, Supabase connection — COMPLETED
 - Phase 32: TenantConfig Auto-Seed — 404 fix for `/config` endpoint — COMPLETED
 - Phase 33: FEAT-01 Login Modal — Glassmorphism overlay, Guest + Admin entry points — COMPLETED
-- Phase 34.1: TenantHeader User Icon — lucide-react User button triggers LoginModal — COMPLETED
-- Phase 34.2: organisms/index.js — LoginModal barrel export added — COMPLETED
-- Phase 34.3: Standardized Agent Frontend Architecture Docs — COMPLETED
+- Phase 34.1–34.3: TenantHeader, organisms export, Frontend Architecture Docs — COMPLETED
 - Phase 40: Auth Evolution A→D — bcrypt backfill, GlobalAuthModal, SSO, RBAC — COMPLETED
 - Phase 41: Auth Production Hotfixes — useAdminRole, Login.jsx endpoint, subdomain routing — COMPLETED
 - Phase 42: Tailwind v3 CDN vs v4 Build Conflict — blank pages fix — COMPLETED
-- BUG-01: Admin Dashboard Stats 500 Error — Prisma date type mismatch — FIXED
-- BUG-02: Customer CRM Linkage Failure — cross-tenant phone lookup — FIXED
-- BUG-03: Bookings Tab Empty Table — response shape mismatch — FIXED
-
-## Completed Phases (continued)
-
-- Phase 52: Self-Service Onboarding (TenantRegisterPage + GenericAdminDashboard + CatalogTab) — ✅ Done 2026-05-08
-- Phase 53: Image Upload (`POST /admin/upload` + `useImageUpload.js`) — ✅ Done 2026-05-05
+- BUG-01/02/03: Admin stats 500, CRM linkage, bookings table — FIXED
+- Phase 52: Self-Service Onboarding — ✅ Done 2026-05-08
+- Phase 53: Image Upload (`POST /admin/upload`) — ✅ Done 2026-05-05
 - Phase 54: DB Unification (menu+store → catalog, 29→23 tables) — ✅ Done 2026-05-05
-- Phase 56-A/B/C/D/E: Dashboard v2 (OverviewTab + Activity Feed + ReservationsTab + mobile) — ✅ Done 2026-05-08/09
-- Phase 59 + 60-A: Template Picker System + Dashboard Live Preview — ✅ Done 2026-05-11 (commit: ed2661b)
-- Phase 60-B: TemplatePicker saves to DB via persistToDb() — ✅ Done 2026-05-13
+- Phase 56-A/B/C/D/E: Dashboard v2 — ✅ Done 2026-05-08/09
+- Phase 59 + 60-A: Template Picker + Dashboard Live Preview — ✅ Done 2026-05-11
+- Phase 60-B: TemplatePicker saves to DB — ✅ Done 2026-05-13
 - Phase 61: WhatsApp AI Settings Agent endpoint — ✅ Backend done 2026-05-13
+- Phase D1/D2/D3: _template.routes, BUG-08 migration, integration test — ✅ Done 2026-05-13
+- Phase 57: Cyberpunk showcase homepage (R3F + GSAP + Lenis) — ✅ Done 2026-05-15
+- Phase 62: Footlab store — admin user + catalog seed + CartPage fix + store live ✅ — Done 2026-05-15
+- Phase 63: Caracas restaurant — admin user + catalog seed + CartPage fix + menu live ✅ — Done 2026-05-15
+- Phase 64: Page Builder v2 — drag-and-drop, 10 section types, 5 business templates, live preview — ✅ Done 2026-05-16
+- Phase 65: PricingSection.jsx — 3-tier pricing on showcase homepage — ✅ Done 2026-05-17
+- FIX: Upload 500 (SUPABASE_KEY fallback) — ✅ Done 2026-05-17
+- FIX: auth → demo subdomain rename (14 files) — ✅ Done 2026-05-17
+- Resend email integration — booking confirmation + welcome email — ✅ Done 2026-05-17
+
+## 🔴 عاجل — Blocker
+
+- [ ] **SEC-03**: Rotate ALL credentials in .env — مكشوفة في ZIP (7 secrets)
+- [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain (يدوي — بدل auth.)
+- [ ] **Caracas re-seed `--clear`** — items مكررة من arizona في الكاتالوج
 
 ## In Progress / Carry Forward
 
-- [ ] **Phase 62: Footlab store migration** — catalog API wiring, CartPage URL fix, checkout (DB seeded ✅)
-- [ ] **Phase 63: Caracas restaurant migration** — catalog API wiring, order flow (DB seeded ✅)
-- [ ] **COMMIT + PUSH** — everything uncommitted (settings.py + phase D scripts + template + bug fixes)
-- [ ] **Deploy to Railway** — after commit
-- [ ] **PRODUCT.md + DESIGN.md** — required by impeccable skill at project root
-- [ ] **Phase 61 n8n wiring** — backend done, n8n workflow not built yet
-- ✅ **Phase D1 — _template.routes.jsx** — Done 2026-05-13
-- ✅ **Phase D2 — BUG-08 migration script** — Done 2026-05-13 (patched 2 live tenants)
-- ✅ **Phase D3 — Integration test script** — Done 2026-05-13
-- ✅ **BUG sneakers-beirut name_ar garbled** — Done 2026-05-13
-- ✅ **BUG settings PATCH "حدث خطأ"** — Done 2026-05-13 (Json() wrapper)
+- [ ] **Phase 61 n8n wiring** — backend done، workflow لم يُبنَ بعد
+- [ ] **footlab page_type → store** — redirect تلقائي من `/demo/footlab` يحتاج ضبط
 
-## Upcoming
+## Upcoming (بالأولوية)
 
-- ARCH-01: Prisma calls in Routes/Auth files (20 files) — Phase 60+ refactor
-- PRODUCT.md + DESIGN.md creation for impeccable context loading
+1. **Phase 66: ProChatbot.jsx + `POST /ai/chat`** — SSE chatbot للـ showcase (مرجع: ai_settings_agent.py)
+2. **Phase 67: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
+3. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
+4. **tier field** في `template-registry.js` — normal | vip | pro
+
+## Upcoming (مستقبلي)
+
+- ARCH-01: Prisma calls مباشرة في 20 route file (Phase 60+)
 - n8n workflow: Konaan → webhook → WhatsApp AI settings
 
-## Sprint 2 — Code Review Findings (all Pending)
+## Sprint 2 — Code Review Findings (مستقبلي)
 
 - SEC-01: Fix plain-text password fallback in app/core/security.py
-- SEC-02: Add race condition check (find_first conflict check) in public_service.py
-- SEC-03: Rotate ALL credentials in .env — URGENT (exposed in ZIP)
-- SEC-04: Fix Customer.phone/email from global @unique → @@unique([clientId, phone])
-- BUG-01: get_client_catalog — except Exception returns None, should raise 500
-- BUG-02: create_public_booking — same, re-raise HTTPException first
-- BUG-03: datetime.utcnow() → datetime.now(timezone.utc) in public_service.py
+- SEC-02: Add race condition check in public_service.py (create_public_booking)
+- SEC-04: Fix Customer.phone/email → @@unique([clientId, phone])
+- BUG-01: get_client_catalog — except Exception → should raise 500
+- BUG-02: create_public_booking — re-raise HTTPException first
+- BUG-03: datetime.utcnow() → datetime.now(timezone.utc)
 - BUG-04: Remove duplicate GET /{slug}/services endpoint
 - BUG-05: Add publicApi.interceptors.response error handler
-- PERF-01: Fix N+1 query — replace per-service find_unique loop with find_many
+- PERF-01: N+1 query — replace per-service find_unique loop with find_many
 - ARCH-01: Replace direct prisma_client in routes with Depends(get_db)
 - ARCH-02: Fix circular import in price_service
-- SCHEMA-01: Add category field to GalleryImage model + unify data source
+- SCHEMA-01: Add category field to GalleryImage + unify data source
 - FE-01: Persist language state to localStorage in LanguageContext.jsx
 - FE-02: Add ErrorBoundary wrapping App in App.jsx
