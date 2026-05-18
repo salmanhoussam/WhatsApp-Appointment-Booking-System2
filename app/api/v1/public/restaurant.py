@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
+import app.repositories.restaurant_repo as restaurant_repo
 
 router = APIRouter()
 
@@ -38,10 +38,10 @@ def _fmt_item(item) -> dict:
 
 def _fmt_category(cat, include_items: bool = True) -> dict:
     result = {
-        "id":        cat.id,
-        "name_ar":   cat.nameAr,
-        "name_en":   cat.nameEn,
-        "image_url": cat.imageUrl,
+        "id":         cat.id,
+        "name_ar":    cat.nameAr,
+        "name_en":    cat.nameEn,
+        "image_url":  cat.imageUrl,
         "sort_order": cat.sortOrder,
     }
     if include_items and cat.items is not None:
@@ -75,9 +75,7 @@ def _fmt_order(order) -> dict:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_restaurant(client_id: str):
-    restaurant = await prisma_client.restaurantconfig.find_first(
-        where={"clientId": client_id, "isActive": True}
-    )
+    restaurant = await restaurant_repo.find_restaurant_config(client_id)
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not configured for this tenant.")
     return restaurant
@@ -94,11 +92,7 @@ async def get_full_menu(
     client_id = tenant["id"]
     restaurant = await _get_restaurant(client_id)
 
-    categories = await prisma_client.catalogcategory.find_many(
-        where={"clientId": client_id, "moduleKey": "restaurant", "isActive": True},
-        include={"items": True},
-        order={"sortOrder": "asc"},
-    )
+    categories = await restaurant_repo.list_menu_categories(client_id, include_items=True)
 
     return {
         "success": True,
@@ -124,11 +118,7 @@ async def get_categories(
     _svc=Depends(require_service("restaurant")),
 ):
     """Categories only, without items — for tab navigation."""
-    client_id = tenant["id"]
-    categories = await prisma_client.catalogcategory.find_many(
-        where={"clientId": client_id, "moduleKey": "restaurant", "isActive": True},
-        order={"sortOrder": "asc"},
-    )
+    categories = await restaurant_repo.list_menu_categories(tenant["id"], include_items=False)
     return {
         "success": True,
         "data": [_fmt_category(c, include_items=False) for c in categories],
@@ -142,17 +132,7 @@ async def get_category_items(
     _svc=Depends(require_service("restaurant")),
 ):
     """Items for a specific category."""
-    client_id = tenant["id"]
-
-    category = await prisma_client.catalogcategory.find_first(
-        where={
-            "id":        category_id,
-            "clientId":  client_id,
-            "moduleKey": "restaurant",
-            "isActive":  True,
-        },
-        include={"items": True},
-    )
+    category = await restaurant_repo.find_menu_category_with_items(tenant["id"], category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found.")
 
@@ -192,14 +172,7 @@ async def create_order(
         raise HTTPException(status_code=400, detail="Order must have at least one item.")
 
     item_ids = [i.catalog_item_id for i in body.items]
-    catalog_items = await prisma_client.catalogitem.find_many(
-        where={
-            "id":       {"in": item_ids},
-            "clientId": client_id,
-            "isActive": True,
-            "category": {"moduleKey": "restaurant"},
-        }
-    )
+    catalog_items = await restaurant_repo.find_catalog_items_by_ids(client_id, item_ids)
 
     item_map = {m.id: m for m in catalog_items}
     missing = [i for i in item_ids if i not in item_map]
@@ -211,29 +184,27 @@ async def create_order(
         for i in body.items
     )
 
-    order = await prisma_client.restaurantorder.create(
+    order_items = [
+        {
+            "catalogItemId": i.catalog_item_id,
+            "quantity":      i.quantity,
+            "unitPrice":     float(item_map[i.catalog_item_id].price or 0),
+            "notes":         i.notes,
+        }
+        for i in body.items
+    ]
+
+    order = await restaurant_repo.create_restaurant_order(
+        restaurant_id=restaurant.id,
         data={
-            "restaurantId":  restaurant.id,
-            "customerName":  body.customer_name,
-            "customerPhone": body.customer_phone,
-            "tableNumber":   body.table_number,
-            "totalPrice":    total,
-            "currency":      restaurant.currency,
-            "status":        "pending",
-            "notes":         body.notes,
-            "items": {
-                "create": [
-                    {
-                        "catalogItemId": i.catalog_item_id,
-                        "quantity":      i.quantity,
-                        "unitPrice":     float(item_map[i.catalog_item_id].price or 0),
-                        "notes":         i.notes,
-                    }
-                    for i in body.items
-                ]
-            },
+            "customer_name":  body.customer_name,
+            "customer_phone": body.customer_phone,
+            "table_number":   body.table_number,
+            "total_price":    total,
+            "currency":       restaurant.currency,
+            "notes":          body.notes,
+            "order_items":    order_items,
         },
-        include={"items": True},
     )
 
     return {"success": True, "data": _fmt_order(order)}
@@ -249,13 +220,10 @@ async def get_order_status(
     """Track order status — requires customer_phone for verification."""
     restaurant = await _get_restaurant(tenant["id"])
 
-    order = await prisma_client.restaurantorder.find_first(
-        where={
-            "id":            order_id,
-            "restaurantId":  restaurant.id,
-            "customerPhone": customer_phone,
-        },
-        include={"items": True},
+    order = await restaurant_repo.find_restaurant_order(
+        restaurant_id=restaurant.id,
+        order_id=order_id,
+        customer_phone=customer_phone,
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")

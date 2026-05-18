@@ -4,12 +4,13 @@ from datetime import date
 from pydantic import BaseModel
 from typing import List
 
-from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations
+from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations, ai_chat
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_client
 from app.core.services import require_service
 from app.services import public_service
 from app.services import catalog_service
+import app.repositories.public_repo as public_repo
 
 router = APIRouter()
 
@@ -86,11 +87,11 @@ async def get_price_by_slug(
     from datetime import timedelta
     from app.services import price_service
 
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
+    client = await public_repo.find_active_client_by_slug(slug)
     if not client:
         raise HTTPException(status_code=404, detail="المنتجع غير موجود")
 
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
+    unit = await public_repo.find_unit_by_id(unit_id)
     if not unit or unit.clientId != client.id:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
     if unit.capacity < guests:
@@ -116,17 +117,15 @@ async def get_services_by_slug(
     slug: str,
     unit_id: str = Query(...),
 ):
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
+    client = await public_repo.find_active_client_by_slug(slug)
     if not client:
         raise HTTPException(status_code=404, detail="المنتجع غير موجود")
 
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
+    unit = await public_repo.find_unit_by_id(unit_id)
     if not unit or unit.clientId != client.id:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
-    services = await prisma_client.service.find_many(
-        where={"clientId": unit.clientId, "isActive": True}
-    )
+    services = await public_repo.list_active_services_for_client(unit.clientId)
     return [
         {
             "id": s.id,
@@ -141,18 +140,15 @@ async def get_services_by_slug(
 
 @router.get("/{slug}/units/{unit_id}/gallery", tags=["Public Tenant"])
 async def get_unit_gallery(slug: str, unit_id: str):
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
+    client = await public_repo.find_active_client_by_slug(slug)
     if not client:
         raise HTTPException(status_code=404, detail="المنتجع غير موجود")
 
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
+    unit = await public_repo.find_unit_by_id(unit_id)
     if not unit or unit.clientId != client.id:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
-    images = await prisma_client.galleryimage.find_many(
-        where={"unitId": unit_id, "clientId": client.id, "isActive": True},
-        order={"sort_order": "asc"},
-    )
+    images = await public_repo.list_gallery_images_for_unit(unit_id, client.id)
     return [
         {
             "id":         img.id,
@@ -168,34 +164,25 @@ async def get_unit_gallery(slug: str, unit_id: str):
 @router.get("/{slug}/units/{unit_id}/calendar", tags=["Public Tenant"])
 async def get_unit_calendar(slug: str, unit_id: str):
     from datetime import timedelta
-    client = await prisma_client.client.find_first(where={"slug": slug, "isActive": True})
+
+    client = await public_repo.find_active_client_by_slug(slug)
     if not client:
         raise HTTPException(status_code=404, detail="المنتجع غير موجود")
 
-    unit = await prisma_client.unit.find_unique(where={"id": unit_id})
+    unit = await public_repo.find_unit_by_id(unit_id)
     if not unit or unit.clientId != client.id:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
-    bookings = await prisma_client.booking.find_many(
-        where={
-            "unitId":   unit_id,
-            "clientId": client.id,
-            "status":   {"not": "cancelled"},
-        },
-        order={"checkIn": "asc"},
-    )
+    bookings_list = await public_repo.list_active_bookings_for_unit(unit_id, client.id)
     disabled_set = set()
-    for b in bookings:
+    for b in bookings_list:
         current = b.checkIn.date() if hasattr(b.checkIn, "date") else b.checkIn
         end     = b.checkOut.date() if hasattr(b.checkOut, "date") else b.checkOut
         while current < end:
             disabled_set.add(current.strftime("%Y-%m-%d"))
             current += timedelta(days=1)
 
-    prices = await prisma_client.price.find_many(
-        where={"unitId": unit_id, "clientId": client.id},
-        order={"date": "asc"},
-    )
+    prices = await public_repo.list_prices_for_unit(unit_id, client.id)
     price_overrides = {}
     for p in prices:
         d = p.date.date() if hasattr(p.date, "date") else p.date
@@ -260,3 +247,4 @@ router.include_router(restaurant.router,   prefix="/restaurant",   tags=["Public
 router.include_router(store.router,        prefix="/store",         tags=["Public Store"])
 router.include_router(catalog.router,        prefix="/catalog",       tags=["Public Catalog"])
 router.include_router(reservations.router,  prefix="/reservations",  tags=["Public Reservations"])
+router.include_router(ai_chat.router,       prefix="/ai",             tags=["Public AI"])

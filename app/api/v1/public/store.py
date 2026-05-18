@@ -11,9 +11,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
+import app.repositories.store_repo as store_repo
 
 router = APIRouter()
 
@@ -84,20 +84,8 @@ async def list_products(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    where: dict = {
-        "clientId": tenant["id"],
-        "isActive": True,
-        "category": {"moduleKey": "store"},
-    }
-    if category_id:
-        where["categoryId"] = category_id
-    if featured is not None:
-        where["isFeatured"] = featured
-
-    products = await prisma_client.catalogitem.find_many(
-        where=where,
-        take=limit,
-        order={"sortOrder": "asc"},
+    products = await store_repo.list_store_products(
+        tenant["id"], category_id=category_id, featured=featured, limit=limit
     )
 
     if search:
@@ -116,15 +104,7 @@ async def get_product(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    product = await prisma_client.catalogitem.find_first(
-        where={
-            "id":       product_id,
-            "clientId": tenant["id"],
-            "isActive": True,
-            "category": {"moduleKey": "store"},
-        },
-        include={"category": True},
-    )
+    product = await store_repo.find_store_product(tenant["id"], product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
 
@@ -144,10 +124,7 @@ async def list_categories(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cats = await prisma_client.catalogcategory.find_many(
-        where={"clientId": tenant["id"], "moduleKey": "store", "parentId": None, "isActive": True},
-        order={"sortOrder": "asc"},
-    )
+    cats = await store_repo.list_store_categories(tenant["id"])
     return {
         "success": True,
         "data": [
@@ -174,36 +151,19 @@ async def add_to_cart(
     if body.quantity < 1:
         raise HTTPException(status_code=400, detail="Quantity must be at least 1.")
 
-    product = await prisma_client.catalogitem.find_first(
-        where={
-            "id":       body.catalog_item_id,
-            "clientId": tenant["id"],
-            "isActive": True,
-            "category": {"moduleKey": "store"},
-        }
-    )
+    product = await store_repo.find_product_for_cart(tenant["id"], body.catalog_item_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
 
     expires = datetime.now(timezone.utc) + timedelta(days=_CART_TTL_DAYS)
 
-    cart = await prisma_client.storecart.find_unique(where={"sessionId": body.session_id})
+    cart = await store_repo.find_cart_by_session(body.session_id)
     if not cart:
-        cart = await prisma_client.storecart.create(data={
-            "clientId":  tenant["id"],
-            "sessionId": body.session_id,
-            "expiresAt": expires,
-        })
+        cart = await store_repo.create_cart(tenant["id"], body.session_id, expires)
     elif cart.clientId != tenant["id"]:
         raise HTTPException(status_code=403, detail="Cart mismatch.")
 
-    await prisma_client.storecartitem.upsert(
-        where={"cartId_catalogItemId": {"cartId": cart.id, "catalogItemId": body.catalog_item_id}},
-        data={
-            "create": {"cartId": cart.id, "catalogItemId": body.catalog_item_id, "quantity": body.quantity},
-            "update": {"quantity": body.quantity},
-        },
-    )
+    await store_repo.upsert_cart_item(cart.id, body.catalog_item_id, body.quantity)
 
     return {"success": True, "data": {"session_id": cart.sessionId}}
 
@@ -214,14 +174,11 @@ async def get_cart(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+    cart = await store_repo.find_cart_by_session(session_id)
     if not cart or cart.clientId != tenant["id"]:
         return {"success": True, "data": {"session_id": session_id, "items": []}}
 
-    items = await prisma_client.storecartitem.find_many(
-        where={"cartId": cart.id},
-        include={"catalogItem": True},
-    )
+    items = await store_repo.list_cart_items(cart.id)
     return {"success": True, "data": _fmt_cart(cart, items)}
 
 
@@ -232,13 +189,11 @@ async def remove_from_cart(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+    cart = await store_repo.find_cart_by_session(session_id)
     if not cart or cart.clientId != tenant["id"]:
         raise HTTPException(status_code=404, detail="Cart not found.")
 
-    await prisma_client.storecartitem.delete_many(
-        where={"cartId": cart.id, "catalogItemId": catalog_item_id}
-    )
+    await store_repo.delete_cart_item(cart.id, catalog_item_id)
     return {"success": True}
 
 
@@ -260,48 +215,43 @@ async def checkout(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await prisma_client.storecart.find_unique(where={"sessionId": body.session_id})
+    cart = await store_repo.find_cart_by_session(body.session_id)
     if not cart or cart.clientId != tenant["id"]:
         raise HTTPException(status_code=404, detail="Cart not found.")
 
-    items = await prisma_client.storecartitem.find_many(
-        where={"cartId": cart.id},
-        include={"catalogItem": True},
-    )
+    items = await store_repo.list_cart_items(cart.id)
     if not items:
         raise HTTPException(status_code=400, detail="Cart is empty.")
 
     total = sum(float(ci.catalogItem.price or 0) * ci.quantity for ci in items)
 
-    order = await prisma_client.storeorder.create(
+    order_items = [
+        {
+            "catalogItemId": ci.catalogItemId,
+            "quantity":      ci.quantity,
+            "unitPrice":     float(ci.catalogItem.price or 0),
+            "totalPrice":    float(ci.catalogItem.price or 0) * ci.quantity,
+        }
+        for ci in items
+    ]
+
+    order = await store_repo.create_store_order(
+        client_id=tenant["id"],
         data={
-            "clientId":        tenant["id"],
-            "customerName":    body.customer_name,
-            "customerPhone":   body.customer_phone,
-            "customerEmail":   body.customer_email,
-            "totalPrice":      total,
-            "currency":        "USD",
-            "status":          "pending",
-            "paymentMethod":   body.payment_method,
-            "shippingAddress": body.shipping_address,
-            "notes":           body.notes,
-            "items": {
-                "create": [
-                    {
-                        "catalogItemId": ci.catalogItemId,
-                        "quantity":      ci.quantity,
-                        "unitPrice":     float(ci.catalogItem.price or 0),
-                        "totalPrice":    float(ci.catalogItem.price or 0) * ci.quantity,
-                    }
-                    for ci in items
-                ]
-            },
+            "customer_name":    body.customer_name,
+            "customer_phone":   body.customer_phone,
+            "customer_email":   body.customer_email,
+            "total_price":      total,
+            "currency":         "USD",
+            "payment_method":   body.payment_method,
+            "shipping_address": body.shipping_address,
+            "notes":            body.notes,
+            "order_items":      order_items,
         },
-        include={"items": True},
     )
 
-    await prisma_client.storecartitem.delete_many(where={"cartId": cart.id})
-    await prisma_client.storecart.delete(where={"id": cart.id})
+    await store_repo.delete_all_cart_items(cart.id)
+    await store_repo.delete_cart(cart.id)
 
     return {"success": True, "data": _fmt_order(order)}
 
@@ -313,11 +263,7 @@ async def get_order(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    where: dict = {"id": order_id, "clientId": tenant["id"]}
-    if customer_phone:
-        where["customerPhone"] = customer_phone
-
-    order = await prisma_client.storeorder.find_first(where=where)
+    order = await store_repo.find_store_order(tenant["id"], order_id, customer_phone)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 

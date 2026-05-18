@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
+import app.repositories.catalog_repository as catalog_repo
 
 router = APIRouter()
 
@@ -48,18 +48,8 @@ async def list_categories(
     tenant: dict = Depends(get_current_tenant),
     _svc = Depends(require_service("catalog")),
 ):
-    where = {"clientId": tenant["id"], "isActive": True}
-    if module_key:
-        where["moduleKey"] = module_key
-    if parent_id:
-        where["parentId"] = parent_id
-    else:
-        where["parentId"] = None  # top-level by default
-
-    cats = await prisma_client.catalogcategory.find_many(
-        where=where,
-        order={"sortOrder": "asc"},
-        include={"children": {"where": {"isActive": True}, "order_by": {"sortOrder": "asc"}}},
+    cats = await catalog_repo.list_categories_with_children(
+        tenant["id"], module_key, parent_id
     )
     return {"success": True, "data": [_fmt_category(c, include_children=True) for c in cats]}
 
@@ -71,20 +61,11 @@ async def list_category_items(
     tenant: dict = Depends(get_current_tenant),
     _svc = Depends(require_service("catalog")),
 ):
-    cat = await prisma_client.catalogcategory.find_first(
-        where={"id": category_id, "clientId": tenant["id"], "isActive": True}
-    )
+    cat = await catalog_repo.find_category_basic(tenant["id"], category_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    where = {"categoryId": category_id, "clientId": tenant["id"], "isActive": True}
-    if featured_only:
-        where["isFeatured"] = True
-
-    items = await prisma_client.catalogitem.find_many(
-        where=where,
-        order={"sortOrder": "asc"},
-    )
+    items = await catalog_repo.list_items_filtered(tenant["id"], category_id, featured_only)
     return {"success": True, "data": [_fmt_item(i) for i in items]}
 
 
@@ -94,10 +75,7 @@ async def get_item(
     tenant: dict = Depends(get_current_tenant),
     _svc = Depends(require_service("catalog")),
 ):
-    item = await prisma_client.catalogitem.find_first(
-        where={"id": item_id, "clientId": tenant["id"], "isActive": True},
-        include={"category": True},
-    )
+    item = await catalog_repo.find_item(tenant["id"], item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -113,13 +91,5 @@ async def list_featured(
     tenant: dict = Depends(get_current_tenant),
     _svc = Depends(require_service("catalog")),
 ):
-    where = {"clientId": tenant["id"], "isActive": True, "isFeatured": True}
-    if module_key:
-        where["category"] = {"is": {"moduleKey": module_key}}
-
-    items = await prisma_client.catalogitem.find_many(
-        where=where,
-        order={"sortOrder": "asc"},
-        include={"category": True},
-    )
+    items = await catalog_repo.list_featured_items(tenant["id"], module_key)
     return {"success": True, "data": [_fmt_item(i) for i in items]}

@@ -16,6 +16,7 @@ import WhyUsSection    from '../components/home/WhyUsSection';
 import CommandCenter   from '../components/home/CommandCenter';
 import PricingSection  from '../components/home/PricingSection';
 import CTASection      from '../components/home/CTASection';
+import ProChatbot      from '../components/home/ProChatbot';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -111,6 +112,9 @@ export default function HomePage() {
         </main>
         <Footer />
       </div>
+
+      {/* ── Layer 4: Floating AI chatbot (fixed, above everything) ── */}
+      <ProChatbot />
 
       {/* ── Layer 3: Floor HUD — right-edge service indicator ── */}
       <div style={{
