@@ -1,0 +1,30 @@
+[
+  {
+    "name_ar": "زيت بكر ممتاز",
+    "name_en": "Extra Virgin Oil",
+    "sort_order": 1,
+    "display_template": "grid",
+    "id": "1001d517-a4c0-4e9c-bbe7-853518e0d063"
+  },
+  {
+    "name_ar": "زيت المعصرة الحجرية",
+    "name_en": "Stone Mill Oil",
+    "sort_order": 2,
+    "display_template": "grid",
+    "id": "4abce4a2-62cf-4f5c-89a2-a7d0bef8f246"
+  },
+  {
+    "name_ar": "زيت معطّر",
+    "name_en": "Infused Oil",
+    "sort_order": 3,
+    "display_template": "grid",
+    "id": "ba069a92-b159-4ccb-8e75-1912684e533e"
+  },
+  {
+    "name_ar": "مجموعات الهدايا",
+    "name_en": "Gift Sets",
+    "sort_order": 4,
+    "display_template": "showcase",
+    "id": "49653b99-e2d8-4e2a-baf2-3f9d2cdb3148"
+  }
+]

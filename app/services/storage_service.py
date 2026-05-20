@@ -20,9 +20,12 @@ try:
 except Exception:
     _supabase = None
 
-_BUCKET    = "properties"
-_ALLOWED   = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-_MAX_BYTES = 8 * 1024 * 1024  # 8 MB
+_BUCKET        = "properties"
+_ALLOWED_IMAGE = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
+_ALLOWED       = _ALLOWED_IMAGE | _ALLOWED_VIDEO
+_MAX_IMAGE     = 8  * 1024 * 1024   # 8 MB
+_MAX_VIDEO     = 200 * 1024 * 1024  # 200 MB
 
 
 def _path_from_url(url: str) -> str:
@@ -51,10 +54,10 @@ async def upload_unit_image(
     if not _supabase:
         raise HTTPException(status_code=500, detail="Storage not configured — check SUPABASE_URL and SUPABASE_SERVICE_KEY")
 
-    if content_type not in _ALLOWED:
+    if content_type not in _ALLOWED_IMAGE:
         raise HTTPException(status_code=400, detail=f"Unsupported file type '{content_type}'. Allowed: jpeg, png, webp, gif")
 
-    if len(file_bytes) > _MAX_BYTES:
+    if len(file_bytes) > _MAX_IMAGE:
         raise HTTPException(status_code=400, detail="File exceeds 8 MB limit")
 
     ext  = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
@@ -96,11 +99,14 @@ async def upload_to_gallery_path(
     if not _supabase:
         raise HTTPException(status_code=500, detail="Storage not configured — check SUPABASE_URL and SUPABASE_SERVICE_KEY")
 
+    is_video = content_type in _ALLOWED_VIDEO
     if content_type not in _ALLOWED:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type '{content_type}'. Allowed: jpeg, png, webp, gif")
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{content_type}'. Allowed: jpeg, png, webp, gif, mp4, webm, mov")
 
-    if len(file_bytes) > _MAX_BYTES:
-        raise HTTPException(status_code=400, detail="File exceeds 8 MB limit")
+    max_bytes = _MAX_VIDEO if is_video else _MAX_IMAGE
+    if len(file_bytes) > max_bytes:
+        limit_str = "200 MB" if is_video else "8 MB"
+        raise HTTPException(status_code=400, detail=f"File exceeds {limit_str} limit")
 
     ext  = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
     path = f"{client_slug}/{folder_context}/{uuid.uuid4()}.{ext}"

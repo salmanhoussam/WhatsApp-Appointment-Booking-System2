@@ -43,6 +43,18 @@ CLIENTS = [
         "whatsapp_number": "",
         "services":       ["store", "store.products", "store.cart"],
     },
+    {
+        "slug":           "olivello",
+        "name":           "Olivello",
+        "name_ar":        "أوليفيلو",
+        "name_en":        "Olivello",
+        "service_type":   "ecommerce",
+        "primary_color":  "#7A6E4A",
+        "currency":       "USD",
+        "status":         "active",
+        "whatsapp_number": "",
+        "services":       ["store", "store.products", "store.cart"],
+    },
 ]
 
 

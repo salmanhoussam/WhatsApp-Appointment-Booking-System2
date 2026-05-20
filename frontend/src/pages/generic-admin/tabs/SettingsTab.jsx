@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import adminApi from '../../../utils/admin.config'
+import useImageUpload from '../../../hooks/useImageUpload'
 
 const inputStyle = {
   width: '100%', padding: '11px 14px', borderRadius: 8, boxSizing: 'border-box',
@@ -33,6 +34,74 @@ function Field({ label, children, hint }) {
     <div style={{ marginBottom: 20 }}>
       <label style={labelStyle}>{label}</label>
       {children}
+      {hint && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 5 }}>{hint}</div>}
+    </div>
+  )
+}
+
+// ── Video Upload Field ────────────────────────────────────────────────────────
+
+function VideoUploadField({ label, value, onChange, hint }) {
+  const { upload, uploading } = useImageUpload()
+  const inputRef = useRef(null)
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const { url } = await upload(file, { context: 'page_hero_video' })
+      onChange(url)
+    } catch { /* leave existing */ }
+  }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <label style={labelStyle}>{label}</label>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          style={{ ...inputStyle, flex: 1 }}
+          value={value ?? ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://... أو ارفع فيديو"
+          dir="ltr"
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          style={{
+            padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            cursor: uploading ? 'not-allowed' : 'pointer', fontSize: 13,
+            fontFamily: "'Cairo', sans-serif", whiteSpace: 'nowrap', flexShrink: 0,
+          }}
+        >
+          {uploading ? '⏳ جاري الرفع...' : '📎 رفع فيديو'}
+        </button>
+        <input
+          ref={inputRef} type="file"
+          accept="video/mp4,video/webm,video/quicktime"
+          style={{ display: 'none' }}
+          onChange={handleFile}
+        />
+      </div>
+      {value && (
+        <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+          <video
+            src={value} muted
+            style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
+          />
+          <button
+            onClick={() => onChange('')}
+            style={{
+              position: 'absolute', top: 6, right: 6,
+              background: 'rgba(0,0,0,0.7)', border: 'none',
+              borderRadius: 4, color: '#ff6b6b', cursor: 'pointer',
+              fontSize: 11, padding: '2px 8px',
+            }}
+          >✕ حذف</button>
+        </div>
+      )}
       {hint && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 5 }}>{hint}</div>}
     </div>
   )
@@ -102,6 +171,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
     name_en:          settings?.name_en         ?? '',
     primary_color:    settings?.primary_color   ?? '#6366f1',
     whatsapp_number:  settings?.whatsapp_number ?? '',
+    hero_video_url:   settings?.hero_video_url  ?? '',
     // design
     page_type:        settings?.page_type       ?? 'normal',
     catalog_layout:   existingConfig.catalog_layout ?? 'grid',
@@ -136,6 +206,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
         name_en:         form.name_en         || undefined,
         primary_color:   form.primary_color,
         whatsapp_number: form.whatsapp_number || undefined,
+        hero_video_url:  form.hero_video_url  || undefined,
         page_type:       form.page_type,
         config: {
           ...existingConfig,
@@ -266,6 +337,17 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
         <Field label="نص زر التواصل">
           <input style={inputStyle} value={form.hero_cta_ar} onChange={set('hero_cta_ar')} placeholder="تواصل معنا" />
         </Field>
+      </div>
+
+      {/* ── Hero Video ────────────────────────────────────────────────── */}
+      <div style={{ ...sectionTitle, marginBottom: 14 }}>فيديو الصفحة الرئيسية</div>
+      <div style={{ ...glass, marginBottom: 20 }}>
+        <VideoUploadField
+          label="فيديو الـ Hero (اختياري)"
+          value={form.hero_video_url}
+          onChange={v => { setForm(p => ({ ...p, hero_video_url: v })); setSuccess(false) }}
+          hint="MP4 أو WebM — حتى 200 MB — يظهر كخلفية متحركة للصفحة الرئيسية"
+        />
       </div>
 
       {/* ── Feedback + Save ───────────────────────────────────────────── */}

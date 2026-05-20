@@ -1,0 +1,203 @@
+[
+  {
+    "category": "Extra Virgin Oil",
+    "name_ar": "زيت الزيتون البكر — 250 مل",
+    "name_en": "Extra Virgin Olive Oil — 250ml",
+    "price": 12.0,
+    "description_ar": "عصير بارد من بساتيننا الجبلية — حموضة أقل من 0.3٪",
+    "description_en": "Cold pressed from our mountain orchards — acidity < 0.3%",
+    "is_featured": false,
+    "sort_order": 1,
+    "metadata": {
+      "size": "250ml",
+      "harvest_year": "2025",
+      "acidity": "< 0.3%",
+      "origin": "جبال لبنان"
+    },
+    "id": "508e5fe7-b431-4ba6-bb16-dcdae9610b18"
+  },
+  {
+    "category": "Extra Virgin Oil",
+    "name_ar": "زيت الزيتون البكر — 500 مل",
+    "name_en": "Extra Virgin Olive Oil — 500ml",
+    "price": 18.0,
+    "description_ar": "عصير بارد من بساتيننا الجبلية — حموضة أقل من 0.3٪",
+    "description_en": "Cold pressed from our mountain orchards — acidity < 0.3%",
+    "is_featured": true,
+    "sort_order": 2,
+    "metadata": {
+      "size": "500ml",
+      "harvest_year": "2025",
+      "acidity": "< 0.3%",
+      "origin": "جبال لبنان"
+    },
+    "id": "7295d171-5530-47cf-9ae2-154c9133849d"
+  },
+  {
+    "category": "Extra Virgin Oil",
+    "name_ar": "زيت الزيتون البكر — 1 لتر",
+    "name_en": "Extra Virgin Olive Oil — 1L",
+    "price": 30.0,
+    "description_ar": "الحجم العائلي — نفس الجودة بسعر أفضل للكمية",
+    "description_en": "Family size — same quality at better value per ml",
+    "is_featured": false,
+    "sort_order": 3,
+    "metadata": {
+      "size": "1L",
+      "harvest_year": "2025",
+      "acidity": "< 0.3%",
+      "origin": "جبال لبنان"
+    },
+    "id": "b62629cf-dc10-4cf6-83b2-1bf76641b90e"
+  },
+  {
+    "category": "Stone Mill Oil",
+    "name_ar": "زيت المعصرة الحجرية — 250 مل",
+    "name_en": "Stone Mill Oil — 250ml",
+    "price": 16.0,
+    "description_ar": "معصور بالأسلوب التقليدي على حجر البازلت — طعم الأرض والذاكرة",
+    "description_en": "Pressed in the traditional method on basalt stone — the taste of earth and memory",
+    "is_featured": false,
+    "sort_order": 1,
+    "metadata": {
+      "size": "250ml",
+      "method": "stone_mill",
+      "notes": "fruity, peppery"
+    },
+    "id": "76b7e6fb-8fdb-40be-957c-68424ca65a8b"
+  },
+  {
+    "category": "Stone Mill Oil",
+    "name_ar": "زيت المعصرة الحجرية — 750 مل",
+    "name_en": "Stone Mill Oil — 750ml",
+    "price": 28.0,
+    "description_ar": "معصور بالأسلوب التقليدي على حجر البازلت — طعم الأرض والذاكرة",
+    "description_en": "Pressed in the traditional method on basalt stone — the taste of earth and memory",
+    "is_featured": true,
+    "sort_order": 2,
+    "metadata": {
+      "size": "750ml",
+      "method": "stone_mill",
+      "notes": "fruity, peppery"
+    },
+    "id": "8599f74d-7a06-4e0d-ac37-1f534f7264df"
+  },
+  {
+    "category": "Infused Oil",
+    "name_ar": "زيت الزيتون بالزعتر البري",
+    "name_en": "Wild Thyme Infused Oil",
+    "price": 22.0,
+    "description_ar": "زيت بكر ممتاز مُعطَّر بزعتر الجبل اللبناني",
+    "description_en": "Extra virgin olive oil infused with Lebanese mountain thyme",
+    "is_featured": true,
+    "sort_order": 1,
+    "metadata": {
+      "infusion": "wild thyme",
+      "size": "250ml"
+    },
+    "id": "139b0ba1-aca7-4b81-9164-71cf708a9f99"
+  },
+  {
+    "category": "Infused Oil",
+    "name_ar": "زيت الزيتون بالليمون",
+    "name_en": "Lemon Infused Oil",
+    "price": 20.0,
+    "description_ar": "زيت بكر مُعطَّر بقشر الليمون الطازج — رائحة الصيف",
+    "description_en": "Extra virgin oil infused with fresh lemon zest — the scent of summer",
+    "is_featured": false,
+    "sort_order": 2,
+    "metadata": {
+      "infusion": "lemon zest",
+      "size": "250ml"
+    },
+    "id": "344269da-376e-4078-bf01-de9513752f16"
+  },
+  {
+    "category": "Infused Oil",
+    "name_ar": "زيت الزيتون بالفلفل الأحمر",
+    "name_en": "Chili Infused Oil",
+    "price": 20.0,
+    "description_ar": "زيت بكر مُعطَّر بالفلفل الأحمر — حرارة خفيفة في كل قطرة",
+    "description_en": "Extra virgin oil infused with red chili — a gentle heat in every drop",
+    "is_featured": false,
+    "sort_order": 3,
+    "metadata": {
+      "infusion": "red chili",
+      "size": "250ml",
+      "heat_level": "mild"
+    },
+    "id": "d7d1a047-664a-4275-9383-2392be56a5f6"
+  },
+  {
+    "category": "Gift Sets",
+    "name_ar": "طقم رحلة الزيتونة — 3 قناني",
+    "name_en": "The Olive Journey Gift Set — 3 bottles",
+    "price": 65.0,
+    "description_ar": "ثلاث قناني تروي كل مرحلة من رحلة الزيتونة — البكر والحجري والزعتر",
+    "description_en": "Three bottles telling each stage of the olive journey — Extra Virgin, Stone Mill & Thyme",
+    "is_featured": true,
+    "sort_order": 1,
+    "metadata": {
+      "includes": [
+        "500ml Extra Virgin",
+        "250ml Stone Mill",
+        "250ml Thyme Infused"
+      ],
+      "packaging": "wooden box",
+      "occasion": [
+        "wedding",
+        "corporate",
+        "eid"
+      ]
+    },
+    "id": "357646c2-e515-47d8-8e82-3f9aff1f99c5"
+  },
+  {
+    "category": "Gift Sets",
+    "name_ar": "طقم أصدقاء الطاولة — 2 قناني",
+    "name_en": "Table Friends Gift Set — 2 bottles",
+    "price": 42.0,
+    "description_ar": "زوج مثالي للمطبخ — زيت بكر وزيت ليمون",
+    "description_en": "The perfect kitchen pair — Extra Virgin and Lemon Infused",
+    "is_featured": false,
+    "sort_order": 2,
+    "metadata": {
+      "includes": [
+        "500ml Extra Virgin",
+        "250ml Lemon Infused"
+      ],
+      "packaging": "kraft box",
+      "occasion": [
+        "housewarming",
+        "birthday"
+      ]
+    },
+    "id": "bc96a7c1-9695-4f0f-9384-94e40500f86b"
+  },
+  {
+    "category": "Gift Sets",
+    "name_ar": "طقم الجبل الكامل — 5 قناني",
+    "name_en": "The Full Mountain Set — 5 bottles",
+    "price": 110.0,
+    "description_ar": "المجموعة الملكية الكاملة — لكل من يعشق زيت الزيتون الأصيل",
+    "description_en": "The complete royal collection — for true olive oil connoisseurs",
+    "is_featured": true,
+    "sort_order": 3,
+    "metadata": {
+      "includes": [
+        "1L Extra Virgin",
+        "750ml Stone Mill",
+        "250ml Thyme",
+        "250ml Lemon",
+        "250ml Chili"
+      ],
+      "packaging": "premium olive wood crate",
+      "occasion": [
+        "corporate",
+        "wedding",
+        "special"
+      ]
+    },
+    "id": "17a85cc4-8c2a-43ba-9c57-c86b042b71fe"
+  }
+]

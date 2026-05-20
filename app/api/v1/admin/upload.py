@@ -24,23 +24,25 @@ from app.services.storage_service import upload_to_gallery_path
 router = APIRouter(prefix="/upload", tags=["Admin Upload"])
 
 FOLDER_MAP = {
-    "catalog_item": "catalog/{category_id}/{item_id}",
-    "page_hero":    "pages/home/hero",
-    "page_logo":    "pages/home/logo",
-    "page_story":   "pages/home/story",
-    "page_demo":    "pages/demo",
-    "unit_cover":   "units/{unit_id}/cover",
-    "unit_gallery": "units/{unit_id}/gallery",
+    "catalog_item":   "catalog/{category_id}/{item_id}",
+    "page_hero":      "pages/home/hero",
+    "page_hero_video":"pages/home/hero",
+    "page_logo":      "pages/home/logo",
+    "page_story":     "pages/home/story",
+    "page_demo":      "pages/demo",
+    "unit_cover":     "units/{unit_id}/cover",
+    "unit_gallery":   "units/{unit_id}/gallery",
 }
 
 IMAGE_TYPE_MAP = {
-    "catalog_item": "catalog",
-    "page_hero":    "page_hero",
-    "page_logo":    "page_logo",
-    "page_story":   "gallery",
-    "page_demo":    "gallery",
-    "unit_cover":   "cover",
-    "unit_gallery": "gallery",
+    "catalog_item":   "catalog",
+    "page_hero":      "page_hero",
+    "page_hero_video":"page_hero",
+    "page_logo":      "page_logo",
+    "page_story":     "gallery",
+    "page_demo":      "gallery",
+    "unit_cover":     "cover",
+    "unit_gallery":   "gallery",
 }
 
 
@@ -89,6 +91,13 @@ async def upload_image(
 
     image_type = IMAGE_TYPE_MAP[context]
     image_id   = None
+
+    if context == "page_hero_video":
+        await prisma_client.client.update(
+            where={"id": tenant["id"]},
+            data={"hero_video_url": public_url},
+        )
+        return {"url": public_url, "image_id": None, "saved_to": "hero_video_url"}
 
     if context == "catalog_item":
         item = await prisma_client.catalogitem.find_first(

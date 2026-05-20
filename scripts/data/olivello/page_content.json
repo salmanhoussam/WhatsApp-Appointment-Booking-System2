@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "template_key": "store_classic",
+    "label": "متجر زيت الزيتون",
+    "service_key": "store",
+    "description": "أوليفيلو — زيت زيتون فاخر من الجبال اللبنانية"
+  },
+  "template_key": "store_classic",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "من شجرة إلى قطرة",
+        "subtitle_ar": "خلاصة التاريخ في قنينة — زيت زيتون بكر من جبال لبنان",
+        "cta_text_ar": "اكتشف المنتجات",
+        "bg_image_url": "",
+        "bg_type": "color",
+        "bg_color": "#2C2A1E"
+      }
+    },
+    {
+      "id": "s_story",
+      "type": "story",
+      "order": 1,
+      "data": {
+        "heading_ar": "رحلة زيتونة",
+        "text_ar": "من الشجرة المعمّرة، إلى أيدي القطّافين، إلى حجر المعصرة القديم — كل قطرة تحمل ذاكرة الجبل وأغاني النساء ودوائر الحمار الأعمى.",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_categories",
+      "type": "categories_grid",
+      "order": 2,
+      "data": {
+        "heading_ar": "تصفح التشكيلة",
+        "show_count": true,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "أبرز المنتجات",
+        "limit": 8,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "ماذا يقول زبائننا",
+        "items": [
+          { "text_ar": "أفضل زيت زيتون جربته في حياتي — طعم حقيقي من الجبل", "author": "مريم خ.", "rating": 5 },
+          { "text_ar": "زيت المعصرة الحجرية شيء آخر — رائحته تعيدك لطفولتك", "author": "جورج ب.", "rating": 5 },
+          { "text_ar": "أهديت طقم رحلة الزيتونة لأهلي وكانوا مبسوطين كتير", "author": "سارة م.", "rating": 5 }
+        ]
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 5,
+      "data": {
+        "text_ar": "اطلب زيتك الآن — شحن لباب البيت",
+        "link": "",
+        "accent": "#C8A84B",
+        "bg_image_url": "",
+        "bg_type": "color",
+        "bg_color": "#2C2A1E"
+      }
+    }
+  ]
+}

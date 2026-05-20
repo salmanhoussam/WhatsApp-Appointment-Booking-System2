@@ -42,7 +42,7 @@ import adminApi from '../utils/admin.config'
 
 const VALID_CONTEXTS = [
   'catalog_item',
-  'page_hero', 'page_logo', 'page_story', 'page_demo',
+  'page_hero', 'page_hero_video', 'page_logo', 'page_story', 'page_demo',
   'unit_cover', 'unit_gallery',
 ]
 
