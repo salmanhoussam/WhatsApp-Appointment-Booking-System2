@@ -40,4 +40,10 @@ export const tenantRegistry = {
     defaultRedirect: 'store',
     theme:           'blue-dark',
   },
+
+  olivello: {
+    routes:          lazy(() => import('./olivello.routes')),
+    defaultRedirect: 'home',
+    theme:           'olive-dark',
+  },
 };

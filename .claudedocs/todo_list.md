@@ -37,6 +37,16 @@
 - bo-hussein CEO agent — /bo-hussein command + agent file — ✅ Done 2026-05-18
 - Tenant onboarding rules — .claude/rules/tenant-onboarding.md + agent steps — ✅ Done 2026-05-18
 - Page content seed infrastructure — page_templates/ + seed_page_content.py — ✅ Done 2026-05-18
+- BUG-V: Video upload 400 fix — storage_service + upload.py + useImageUpload.js — ✅ Done 2026-05-21
+- BUG-C: Prisma connection pool timeout fix — app/db/client.py — ✅ Done 2026-05-21
+- Hero Video upload field in SettingsTab — VideoUploadField + hero_video_url save — ✅ Done 2026-05-21
+- TemplatePicker removed from public/demo pages — DynamicPage + DemoPublicPage — ✅ Done 2026-05-21
+- Phase 70A: Olivello DB seed — Client + 4 cat + 11 items — ✅ Done 2026-05-20/21
+- Phase 70B: Olivello frontend scaffold — TreeSection + HarvestSection + MillSection + routes — ✅ Done 2026-05-21
+- Phase 70D: Olivello sections 4-7 — DonkeySection + PasteSection + PressSection + GoldenDropSection — ✅ Done 2026-05-21
+- Phase 70E: Olivello ProductsSection + store flow (CatalogPage/CartPage generic wired) — ✅ Done 2026-05-21
+- Phase 70F: /impeccable polish — fonts, perf, reduced-motion, SVG icons, config drift — ✅ Done 2026-05-21
+- New workflow rule: .claudedocs/plans/phase-XY.md per phase, per-agent division — ✅ Done 2026-05-21
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
@@ -46,16 +56,17 @@
 
 ## 🟠 In Progress / Carry Forward
 
+- [ ] **Olivello deploy** — git push → Railway/Vercel + smoke test `/olivello/home`
 - [ ] **Phase 67 — اختبار يدوي** — افتح `/{slug}/dashboard` → "محرر الصفحة"، تحقق من 3 panels + interactions + toast
 - [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
 - [ ] **ARCH-01 admin routes** — ~21 ملف admin لا تزال تستخدم prisma_client مباشرة
 
 ## 🟡 Upcoming (بالأولوية)
 
-1. **Phase 68: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
-2. **SaaS Showcase Plan** — `.claudedocs/plans/SaaS_Showcase_Plan.md` — خطة الـ showcase كاملة
-3. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
-4. **tier field** في `template-registry.js` — normal | vip | pro
+1. **Phase 70F** — `/impeccable polish` على olivello showcase بعد اكتمال الـ 7 sections
+2. **Phase 68: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
+3. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
+4. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
 
 ## Upcoming (مستقبلي)
 

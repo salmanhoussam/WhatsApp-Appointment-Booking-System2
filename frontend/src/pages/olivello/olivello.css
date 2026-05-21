@@ -142,3 +142,20 @@ body[data-slug="olivello"] .ov-confetti-particle {
     transform: none !important;
   }
 }
+
+/* ── Smooth scrolling ───────────────────────────────────────── */
+body[data-slug="olivello"] {
+  scroll-behavior: smooth;
+}
+
+/* ── Reduced motion — disable all scroll animations ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  body[data-slug="olivello"] *,
+  body[data-slug="olivello"] *::before,
+  body[data-slug="olivello"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    /* Framer Motion respects this via its own media query check */
+  }
+}
