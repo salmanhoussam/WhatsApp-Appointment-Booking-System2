@@ -17,8 +17,8 @@ import ProtectedRoute from '../ProtectedRoute';
 import { TenantConfigProvider } from '../../context/TenantConfigContext';
 
 // ── Lazy page imports ─────────────────────────────────────────────────────────
-// FM12: OlivelloShowcase uses useScroll/useTransform → MUST be lazy()
-const OlivelloShowcase       = lazy(() => import('../../pages/olivello/sections/OlivelloShowcase'));
+// FM12: OlivelloStory uses useScroll/useTransform → MUST be lazy()
+const OlivelloStory          = lazy(() => import('../../pages/olivello/sections/OlivelloStory'));
 const CatalogPage            = lazy(() => import('../../pages/generic/normal/CatalogPage'));
 const CartPage               = lazy(() => import('../../pages/generic/normal/CartPage'));
 const OlivelloAdminDashboard = lazy(() => import('../../pages/olivello/admin/OlivelloAdminDashboard'));
@@ -54,7 +54,7 @@ export default function OlivelloRoutes() {
   return (
     <TenantConfigProvider slug="olivello">
       <Routes>
-        <Route path="home"  element={<Lazy component={OlivelloShowcase} />} />
+        <Route path="home"  element={<Lazy component={OlivelloStory} />} />
         <Route path="store" element={<Lazy component={CatalogPage} />} />
         <Route path="cart"  element={<Lazy component={CartPage} />} />
 
