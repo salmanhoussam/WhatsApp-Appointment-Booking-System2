@@ -28,7 +28,6 @@ import { tenantRegistry }  from './tenants/index';
 // Fallback for tenants not in the registry (onboarded via pipeline, not scaffolded)
 const DynamicTenantRoutes = lazy(() => import('./tenants/_dynamic.routes'));
 
-const SSOLoginPage = lazy(() => import('../pages/auth/SSOLoginPage'));
 
 // ── Full-screen gold-dot fallback (shown while lazy chunk downloads) ──────────
 function TenantFallback() {
@@ -66,23 +65,17 @@ export default function TenantResolver() {
     ? parts[0]
     : null;
 
-  // Path-based slug (localhost): /smar/showcase → 'smar'
+  // Path-based slug (localhost / demo subdomain): /olivello/home → 'olivello'
   const pathSlug = window.location.pathname.split('/').filter(Boolean)[0] ?? null;
 
-  // Subdomain takes priority on production; path-based on localhost
-  const activeSlug = subdomain ?? pathSlug;
+  // demo.salmansaas.com uses path-based slug (like localhost) so that
+  // demo.salmansaas.com/olivello/* correctly routes to the olivello tenant.
+  // Other subdomains (smar.salmansaas.com) still use the subdomain as the slug.
+  const isDemoSubdomain = hostname.startsWith('demo.');
+  const activeSlug = (isLocalhost || isDemoSubdomain) ? pathSlug : (subdomain ?? pathSlug);
 
   if (!activeSlug) {
     return <Navigate to="/smar" replace />;
-  }
-
-  // demo.salmansaas.com → render the SSO login page directly, no tenant routing
-  if (hostname.startsWith('demo.')) {
-    return (
-      <Suspense fallback={<TenantFallback />}>
-        <SSOLoginPage />
-      </Suspense>
-    );
   }
 
   // Legacy URL fix: smar.salmansaas.com/smar/showcase → /showcase

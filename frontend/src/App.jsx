@@ -175,8 +175,12 @@ function App() {
 
           {/* ── Dynamic tenant routes (must be last) ──
                Subdomain mode: /* so smar.domain.com/showcase resolves cleanly
+               Demo subdomain: /:slug/* ALSO registered so /olivello/* gets correct pathnameBase
                Localhost mode:  /:slug/* so /smar/showcase resolves correctly
                Showcase domain: TenantResolver not registered (ShowcaseRoutes above handles /*) */}
+          {IS_DEMO_SUBDOMAIN && (
+            <Route path="/:slug/*" element={<TenantResolver />} />
+          )}
           {IS_SUBDOMAIN_MODE
             ? <Route path="/*"       element={<TenantResolver />} />
             : !IS_SHOWCASE_DOMAIN && <Route path="/:slug/*" element={<TenantResolver />} />
