@@ -27,7 +27,6 @@ import publicApi      from '../../../utils/publicApi'
 import useGenericStore from '../store/useGenericStore'
 import CartBadge      from '../../../design-system/molecules/CartBadge'
 import CartDrawer     from '../../../design-system/organisms/CartDrawer'
-import TemplatePicker from '../../../components/TemplatePicker'
 import ConfigurableHero from '../../../components/ConfigurableHero'
 
 import {
@@ -186,10 +185,6 @@ export default function DynamicPage() {
 
   const { setConfig, addItem, totalItems } = useGenericStore()
 
-  // Show TemplatePicker inside admin iframe or when admin token is present
-  const isAdminPreview = !!localStorage.getItem('admin_access_token')
-    || window.self !== window.top
-
   const isDemoRoute = window.location.pathname.includes('/demo/')
 
   // ── Fetch tenant config via publicApi ────────────────────────────────────────
@@ -318,16 +313,6 @@ export default function DynamicPage() {
         <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
       )}
 
-      {/* TemplatePicker — admin preview only (inside dashboard iframe) */}
-      {isAdminPreview && (
-        <TemplatePicker
-          accent={accent}
-          heroType={pageType}
-          catalogLayout={tenantConfig.config?.catalog_layout || 'grid'}
-          onHeroChange={() => {}}
-          onCatalogChange={() => {}}
-        />
-      )}
     </div>
   )
 }

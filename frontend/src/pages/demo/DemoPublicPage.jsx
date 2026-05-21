@@ -9,7 +9,6 @@ import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import ConfigurableHero from '../../components/ConfigurableHero';
-import TemplatePicker from '../../components/TemplatePicker';
 import adminApi from '../../utils/admin.config';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
@@ -318,10 +317,6 @@ export default function DemoPublicPage() {
   const [catalogLayout, setCatalogLayout] = useState('grid');
   const [accent,        setAccent]        = useState('#6d28d9');
 
-  // TemplatePicker is admin-only: show only when admin token exists in localStorage
-  // OR when page is rendered inside the dashboard iframe (postMessage source)
-  const isAdminPreview = !!localStorage.getItem('admin_access_token')
-    || window.self !== window.top;
 
   useEffect(() => {
     axios.get(`${API_BASE}/api/v1/public/${slug}/config`)
@@ -418,16 +413,6 @@ export default function DemoPublicPage() {
         )}
       </div>
 
-      {/* Floating template picker — admin dashboard only */}
-      {isAdminPreview && (
-        <TemplatePicker
-          accent={accent}
-          heroType={heroType}
-          catalogLayout={catalogLayout}
-          onHeroChange={handleHeroChange}
-          onCatalogChange={handleCatalogChange}
-        />
-      )}
     </div>
   );
 }
