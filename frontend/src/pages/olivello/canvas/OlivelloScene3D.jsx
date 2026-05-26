@@ -33,9 +33,23 @@ const SlotMat = shaderMaterial(
    varying vec2 vUv;
    void main() {
      vec4 c = texture2D(uTexture, vUv);
-     vec2 d = vUv - 0.5;
-     float v = 1.0 - smoothstep(0.26, 0.50, length(d * vec2(1.0, 1.35)));
-     gl_FragColor = vec4(c.rgb, v * uOpacity);
+     vec2 d   = vUv - 0.5;
+     float dist = length(d * vec2(1.0, 1.35));
+
+     // Soft vignette fade
+     float v = 1.0 - smoothstep(0.22, 0.52, dist);
+
+     // Warm cinematic grade — lift shadows, slight golden cast
+     vec3 warm = c.rgb;
+     warm *= vec3(1.06, 1.02, 0.94);          // warm bias
+     warm  = mix(warm, pow(warm, vec3(0.88)),  // lift shadows
+                 smoothstep(0.3, 0.0, dot(warm, vec3(0.33))));
+
+     // Gold rim glow at inner edge of vignette
+     float rim = smoothstep(0.35, 0.40, dist) * (1.0 - smoothstep(0.44, 0.52, dist));
+     warm = mix(warm, vec3(0.78, 0.66, 0.29), rim * 0.32);
+
+     gl_FragColor = vec4(warm, v * uOpacity);
    }`
 );
 extend({ SlotMat });
@@ -197,7 +211,7 @@ function SlotPlane({ slot, texture }) {
     const [lo, hi] = slot.visibleRange;
     const fadeIn  = smoothstep(lo, lo + 0.05, p);
     const fadeOut = 1 - smoothstep(hi - 0.05, hi, p);
-    matRef.current.uOpacity = Math.min(fadeIn, fadeOut) * 0.84;
+    matRef.current.uOpacity = Math.min(fadeIn, fadeOut) * 0.91;
   });
 
   return (

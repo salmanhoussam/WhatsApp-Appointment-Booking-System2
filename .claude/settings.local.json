@@ -27,7 +27,23 @@
       "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\)\\)\\)\")",
       "Bash(gh pr create --repo salmanhoussam/WhatsApp-Appointment-Booking-System2 --title 'docs: add smar tenant comprehensive reference' --body ' *)",
       "Bash(where gh *)",
-      "Read(//usr/local/bin/**)"
+      "Read(//usr/local/bin/**)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx --no-install vite build --mode development)",
+      "Skill(impeccable)",
+      "Skill(impeccable:*)",
+      "Bash(node \"c:\\\\Users\\\\Lenovo\\\\Desktop\\\\WhatsApp Appointment Booking System\\\\.claude\\\\skills\\\\impeccable\\\\scripts\\\\load-context.mjs\")",
+      "Bash(node \"c:\\\\Users\\\\Lenovo\\\\Desktop\\\\WhatsApp Appointment Booking System\\\\.claude\\\\skills\\\\impeccable\\\\scripts\\\\critique-storage.mjs\" slug \"olivello showcase\")",
+      "Bash(grep \"^\\\\.env$\")",
+      "Bash(git push *)",
+      "Bash(grep -iE \"\\\\.\\(jpg|jpeg|png|webp|jfif\\)$\")",
+      "Bash(python scripts/upload_olivello_story_images.py)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); const deps={...p.dependencies,...p.devDependencies}; ['@react-three/fiber','@react-three/drei','three'].forEach\\(k=>console.log\\(k,deps[k]||'NOT INSTALLED'\\)\\)\")",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\Lenovo\\\\Desktop\\\\WhatsApp Appointment Booking System\\\\frontend\\\\src\\\\pages\\\\olivello\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(node --input-type=module)",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/pages/olivello/sections/OlivelloStory.jsx','utf8'\\); console.log\\('read ok'\\)\")",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/pages/olivello/canvas/OlivelloScene3D.jsx','utf8'\\); console.log\\('canvas ok'\\); require\\('fs'\\).readFileSync\\('src/pages/olivello/context/ScrollProgressContext.jsx','utf8'\\); console.log\\('context ok'\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Lenovo\\.claude\\projects\\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System"

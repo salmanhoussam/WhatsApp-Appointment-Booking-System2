@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Journey of an Olive</title>
+    
+    <!-- Google Fonts for elegant storytelling -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- GSAP for advanced scroll animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f0c08; /* Fallback dark background */
+            color: #f5f5f0;
+            font-family: 'Playfair Display', serif;
+            overflow-x: hidden;
+            overscroll-behavior-y: none;
+        }
+
+        /* Cinematic noise overlay for texture */
+        .noise-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.05;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+        }
+
+        /* The morphing shape: Olive to Drop */
+        .shape-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-center;
+            pointer-events: none;
+            z-index: 10;
+            /* Move slightly to the right so text doesn't overlap on desktop */
+            justify-content: center;
+        }
+
+        #the-shape {
+            /* Initial state: Olive */
+            width: 70px;
+            height: 90px;
+            background-color: #5d6942;
+            border-radius: 50%;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.3), 5px 5px 15px rgba(0,0,0,0.2);
+            transition: border-radius 0.1s ease;
+        }
+
+        /* Text styling */
+        .story-section {
+            height: 120vh; /* Gives plenty of scroll room per scene */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 20;
+        }
+
+        .text-box {
+            max-width: 600px;
+            text-align: center;
+            font-size: 1.5rem;
+            line-height: 1.8;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            /* Initial state for GSAP */
+            opacity: 0;
+            transform: translateY(50px);
+        }
+
+        @media (min-width: 768px) {
+            .text-box { font-size: 2rem; }
+            .shape-container { justify-content: flex-end; padding-right: 15%; }
+            .story-section { justify-content: flex-start; padding-left: 15%; }
+            /* Center the last text */
+            .story-section:last-child { justify-content: center; padding: 0; }
+            .story-section:last-child .text-box { max-width: 800px; }
+        }
+
+        /* The background that shifts colors */
+        #bg-layer {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #8A9A5B; /* Starts silver-green */
+            z-index: 1;
+        }
+
+        .highlight-gold {
+            color: #e5b82e;
+            font-weight: 600;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Texture -->
+    <div class="noise-overlay"></div>
+
+    <!-- Color changing background -->
+    <div id="bg-layer"></div>
+
+    <!-- The Morphing Visual (Olive to Oil) -->
+    <div class="shape-container">
+        <div id="the-shape"></div>
+    </div>
+
+    <!-- Scroll Content -->
+    <div id="story-container">
+        
+        <!-- Intro -->
+        <section class="story-section h-[100vh]">
+            <div class="text-box opacity-100 transform-none">
+                <h1 class="text-5xl md:text-7xl mb-4 font-semibold tracking-wide">The Journey</h1>
+                <p class="font-sans tracking-widest text-sm md:text-base text-gray-300 uppercase">Scroll slowly to begin</p>
+            </div>
+        </section>
+
+        <!-- Scene 1: Branch -->
+        <section class="story-section">
+            <div class="text-box story-text">
+                "A small olive hung on a silver-green branch, dreaming of becoming something more."
+            </div>
+        </section>
+
+        <!-- Scene 2: Basket -->
+        <section class="story-section">
+            <div class="text-box story-text">
+                "One autumn morning, a gentle hand picked her and placed her in a wicker basket."
+            </div>
+        </section>
+
+        <!-- Scene 3: Stone Basin & Millstone -->
+        <section class="story-section">
+            <div class="text-box story-text">
+                "She traveled to the old stone press, where the air smelled of earth and ancestors. There, she and her sisters were poured into a large stone basin.<br><br>A heavy millstone, turned by strong arms, began to roll over them slowly, patiently."
+            </div>
+        </section>
+
+        <!-- Scene 4: Pressing -->
+        <section class="story-section">
+            <div class="text-box story-text">
+                "The olive felt the ancient stone crush her flesh, releasing her soul drop by drop. She flowed into woven palm mats, stacked under a stone press that groaned with age and weight."
+            </div>
+        </section>
+
+        <!-- Scene 5: Birth of Oil -->
+        <section class="story-section">
+            <div class="text-box story-text">
+                "Then came her birth: a <span class="highlight-gold">golden drop of oil</span>, pure as dawn. It trickled down carved stone channels, joining other drops into a clay jar, and finally into a small glass bottle."
+            </div>
+        </section>
+
+        <!-- Scene 6: Finale -->
+        <section class="story-section" style="height: 150vh;">
+            <div class="text-box story-text text-center w-full">
+                "Inside the bottle, the oil looked at the light and knew she carried the memory of the hills, the touch of old stones, and the taste of centuries.<br><br>She was no longer just an olive."
+                <div id="finale-text" class="mt-12 text-5xl md:text-8xl font-bold highlight-gold opacity-0 transform translate-y-10">
+                    She was Palestine in a drop.
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // --- 1. Background Color Timeline ---
+        const bgTimeline = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#story-container",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 1.5, // Smooth interpolation
+            }
+        });
+
+        bgTimeline
+            .to("#bg-layer", { backgroundColor: "#1e251a", ease: "none" }) // Deep Green
+            .to("#bg-layer", { backgroundColor: "#3a3b2b", ease: "none" }) // Olive
+            .to("#bg-layer", { backgroundColor: "#262216", ease: "none" }) // Dark Gold base
+            .to("#bg-layer", { backgroundColor: "#11130e", ease: "none" }); // Premium Dark end
+
+        // --- 2. The Shape Transformation Timeline ---
+        const shapeTimeline = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#story-container",
+                start: "5% top",
+                end: "85% bottom",
+                scrub: 1.5,
+            }
+        });
+
+        shapeTimeline
+            // Scene 1: Drops down
+            .to("#the-shape", { y: 150, rotation: 20, duration: 1 })
+            
+            // Scene 2: Cold pressed (squishes slightly, turns darker)
+            .to("#the-shape", { 
+                y: 300, 
+                rotation: 0, 
+                scaleY: 0.5, 
+                scaleX: 1.4, 
+                backgroundColor: "#2a301d", 
+                duration: 1 
+            })
+            
+            // Scene 3: Morphs into golden drop
+            .to("#the-shape", { 
+                scaleY: 1, 
+                scaleX: 1, 
+                width: "70px", 
+                height: "70px",
+                borderRadius: "0 50% 50% 50%", 
+                rotation: 45, 
+                backgroundColor: "#e5b82e", // Gold
+                boxShadow: "inset -5px -5px 15px rgba(0,0,0,0.2), 0 0 40px rgba(229, 184, 46, 0.8)",
+                y: 450, 
+                duration: 1.5 
+            })
+            
+            // Scene 4: Fades out behind the product card
+            .to("#the-shape", { 
+                y: 500, 
+                scale: 3, 
+                opacity: 0,
+                boxShadow: "inset -5px -5px 15px rgba(0,0,0,0.2), 0 0 120px rgba(229, 184, 46, 1)",
+                duration: 1 
+            });
+
+        // Move the drop to center for the finale on desktop
+        if(window.innerWidth > 768) {
+            gsap.to(".shape-container", {
+                justifyContent: "center",
+                paddingLeft: "0",
+                ease: "power2.inOut",
+                scrollTrigger: {
+                    trigger: ".story-section:last-child",
+                    start: "top center",
+                    end: "center center",
+                    scrub: 1
+                }
+            });
+        }
+
+        // --- 3. Text Reveal Animations ---
+        const textElements = gsap.utils.toArray('.story-text');
+        
+        textElements.forEach((text, i) => {
+            // Fade in as it approaches center
+            gsap.fromTo(text, 
+                { opacity: 0, y: 50 },
+                { 
+                    opacity: 1, y: 0, 
+                    scrollTrigger: {
+                        trigger: text.parentElement,
+                        start: "top 70%",
+                        end: "center center",
+                        scrub: 1
+                    }
+                }
+            );
+
+            // Fade out as it leaves center (except for the last one)
+            if (i !== textElements.length - 1) {
+                gsap.to(text, { 
+                    opacity: 0, y: -50, 
+                    scrollTrigger: {
+                        trigger: text.parentElement,
+                        start: "center center",
+                        end: "bottom 30%",
+                        scrub: 1
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

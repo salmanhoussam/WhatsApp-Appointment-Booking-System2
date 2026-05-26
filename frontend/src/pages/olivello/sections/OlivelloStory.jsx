@@ -144,60 +144,63 @@ function SceneText({ scene, p, index }) {
         position: 'absolute',
         top: `${topVh}vh`,
         left: 0,
-        width: '50%',
-        maxWidth: 520,
-        padding: 'clamp(20px, 4vw, 60px)',
+        width: '54%',
+        maxWidth: 620,
+        padding: 'clamp(24px, 5vw, 72px)',
         zIndex: 6,
         opacity: textOpacity,
         y: textY,
       }}
     >
       <p style={{
-        fontSize: 9, letterSpacing: '0.38em',
-        color: 'rgba(200,168,75,0.72)',
-        textTransform: 'uppercase', marginBottom: 18,
+        fontSize: 'clamp(9px, 0.7vw, 11px)', letterSpacing: '0.42em',
+        color: 'rgba(200,168,75,0.80)',
+        textTransform: 'uppercase', marginBottom: 20,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         {scene.overline}
       </p>
 
       <h2 style={{
-        fontSize: 'clamp(28px, 4.5vw, 58px)',
-        fontWeight: 800, color: '#f0ede6',
-        margin: '0 0 8px',
+        fontSize: 'clamp(44px, 6.5vw, 88px)',
+        fontWeight: 900, color: '#f4f0e8',
+        margin: '0 0 10px',
         fontFamily: "'Tajawal', system-ui, sans-serif",
         direction: 'rtl', textAlign: 'right',
-        lineHeight: 1.15,
-        textShadow: '0 4px 40px rgba(0,0,0,0.6)',
+        lineHeight: 1.1,
+        textShadow: '0 6px 48px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4)',
+        letterSpacing: '-0.01em',
       }}>
         {scene.title_ar}
       </h2>
 
       <p style={{
-        fontSize: 'clamp(9px, 1vw, 11px)',
-        letterSpacing: '0.22em', textTransform: 'uppercase',
-        color: 'rgba(200,168,75,0.55)', marginBottom: 24,
+        fontSize: 'clamp(10px, 0.85vw, 12px)',
+        letterSpacing: '0.26em', textTransform: 'uppercase',
+        color: 'rgba(200,168,75,0.60)', marginBottom: 28,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         {scene.title_en}
       </p>
 
       <p style={{
-        fontSize: 'clamp(13px, 1.4vw, 15px)',
-        lineHeight: 1.9, color: 'rgba(240,237,230,0.70)',
+        fontSize: 'clamp(16px, 1.8vw, 21px)',
+        lineHeight: 1.85, color: 'rgba(240,237,230,0.82)',
         fontFamily: "'Tajawal', system-ui, sans-serif",
         direction: 'rtl', textAlign: 'right',
-        marginBottom: 12,
-        textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+        marginBottom: 14,
+        textShadow: '0 2px 24px rgba(0,0,0,0.55)',
       }}>
         {scene.body_ar}
       </p>
 
       <p style={{
-        fontSize: 'clamp(10px, 1.1vw, 12px)',
-        lineHeight: 1.7, color: 'rgba(255,255,255,0.30)',
+        fontSize: 'clamp(12px, 1.15vw, 14px)',
+        lineHeight: 1.75, color: 'rgba(255,255,255,0.36)',
         fontFamily: "'Inter', system-ui, sans-serif",
         textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+        fontStyle: 'italic',
+        letterSpacing: '0.01em',
       }}>
         {scene.body_en}
       </p>
