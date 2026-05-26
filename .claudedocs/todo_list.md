@@ -47,6 +47,8 @@
 - Phase 70E: Olivello ProductsSection + store flow (CatalogPage/CartPage generic wired) — ✅ Done 2026-05-21
 - Phase 70F: /impeccable polish — fonts, perf, reduced-motion, SVG icons, config drift — ✅ Done 2026-05-21
 - New workflow rule: .claudedocs/plans/phase-XY.md per phase, per-agent division — ✅ Done 2026-05-21
+- Phase 71: OlivelloStory cinematic scroll (7 scenes × 130vh, real photos, CSS olive morphing) — ✅ Done 2026-05-22
+- Phase 72: 3D Olive R3F + Slot System (SphereGeometry PBR, 6 SlotPlane vignette shader, ScrollProgressContext) — ✅ Built 2026-05-26 (visual validation pending)
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
@@ -56,7 +58,8 @@
 
 ## 🟠 In Progress / Carry Forward
 
-- [ ] **Olivello deploy** — git push → Railway/Vercel + smoke test `/olivello/home`
+- [ ] **Phase 72 visual validation** — جرّب `localhost:5173/olivello/home`، تحقق olive size + slot positions
+- [ ] **Phase 72 deploy** — git push → Railway smoke test `demo.salmansaas.com/olivello`
 - [ ] **Phase 67 — اختبار يدوي** — افتح `/{slug}/dashboard` → "محرر الصفحة"، تحقق من 3 panels + interactions + toast
 - [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
 - [ ] **ARCH-01 admin routes** — ~21 ملف admin لا تزال تستخدم prisma_client مباشرة

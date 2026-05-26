@@ -26,9 +26,17 @@ prisma/
   schema.prisma   -- Single source of truth — ALL modules here
 
 ## Active Clients
-smar      → booking    → smar.salmansaas.com     ✅ Live
-caracas   → restaurant → caracas.salmansaas.com  🔄 Migration pending
-footlab   → store      → footlab.salmansaas.com  🔄 Migration pending
+smar      → booking    → smar.salmansaas.com          ✅ Live (subdomain)
+caracas   → restaurant → caracas.salmansaas.com        🔄 Migration pending
+footlab   → store      → footlab.salmansaas.com        🔄 Migration pending
+
+## Canonical Demo URLs (RULE — one URL per tenant, no duplicates)
+smar      → demo.salmansaas.com/smar/home
+olivello  → demo.salmansaas.com/olivello/home
+caracas   → demo.salmansaas.com/caracas/menu
+footlab   → demo.salmansaas.com/footlab/store
+Rule: /demo/{slug} auto-redirects to /{slug}/{defaultRedirect} for registry tenants.
+Only auto-onboarded (generic) tenants use /demo/{slug} directly.
 
 ## Commands
 start_dev.bat              -- Start FastAPI + Prisma + React locally

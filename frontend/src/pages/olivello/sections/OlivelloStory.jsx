@@ -17,6 +17,8 @@ import { useRef, useState } from 'react';
 import {
   motion, useScroll, useTransform, useSpring, useMotionValueEvent,
 } from 'framer-motion';
+import { ScrollProgressContext } from '../context/ScrollProgressContext';
+import OlivelloScene3D from '../canvas/OlivelloScene3D';
 
 const SUPABASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties';
 
@@ -259,40 +261,6 @@ export default function OlivelloStory() {
   // ── Background color ────────────────────────────────────────────────────────
   const bgColor = useTransform(p, BG_STOPS, BG_COLORS);
 
-  // ── Olive shape transforms ──────────────────────────────────────────────────
-  // Width / height
-  const shapeW = useTransform(p, [0, 0.40, 0.54, 0.68, 0.92], [70, 72, 68, 68, 68]);
-  const shapeH = useTransform(p, [0, 0.40, 0.44, 0.54, 0.68, 0.92], [90, 92, 36, 66, 66, 66]);
-
-  // BorderRadius: olive → squished → teardrop
-  const shapeR = useTransform(
-    p,
-    [0,      0.38,   0.54,              0.92],
-    ['50%', '50%', '0 50% 50% 50%',  '0 50% 50% 50%']
-  );
-
-  // Color: dark olive → squished dark → gold
-  const shapeColor = useTransform(
-    p,
-    [0,        0.40,      0.54,      0.92],
-    ['#4a5e30', '#2a301d', '#c8a84b', '#c8a84b']
-  );
-
-  // Rotation: upright → tilt → 45° (teardrop)
-  const shapeRotate = useTransform(p, [0, 0.25, 0.40, 0.54, 1.0], [0, 8, -4, 45, 45]);
-
-  // Scale: normal → normal → explodes at finale
-  const shapeScale = useTransform(p, [0, 0.82, 0.90, 0.96], [1, 1, 2.8, 9]);
-
-  // Glow (box-shadow intensity)
-  const shapeGlow = useTransform(p, [0.50, 0.60, 0.78, 0.90, 0.96], [0, 0, 1, 1, 0]);
-
-  // Opacity: present through finale, fades at very end
-  const shapeOpacity = useTransform(p, [0, 0.92, 0.97, 1.0], [1, 1, 1, 0]);
-
-  // Vertical position: gently falls from 32vh → 52vh
-  const shapeTop = useTransform(p, [0, 0.40, 0.60, 0.85], ['32vh', '40vh', '48vh', '52vh']);
-
   // ── One-shot CTA trigger ────────────────────────────────────────────────────
   useMotionValueEvent(p, 'change', (v) => {
     if (v >= 0.84 && !ctaVisible) setCtaVisible(true);
@@ -302,10 +270,14 @@ export default function OlivelloStory() {
   const scrollHintOpacity = useTransform(p, [0, 0.04], [1, 0]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ height: '1010vh', position: 'relative' }}
-    >
+    <ScrollProgressContext.Provider value={p}>
+      {/* R3F 3D olive + photo slots — position:fixed z:4 */}
+      <OlivelloScene3D />
+
+      <div
+        ref={containerRef}
+        style={{ height: '1010vh', position: 'relative' }}
+      >
       {/* ── Fixed: background color ──────────────────────────────────────── */}
       <motion.div style={{
         position: 'fixed', inset: 0, zIndex: 0,
@@ -345,30 +317,7 @@ export default function OlivelloStory() {
         </span>
       </div>
 
-      {/* ── Fixed: morphing olive shape ──────────────────────────────────── */}
-      <motion.div style={{
-        position: 'fixed',
-        right: 'clamp(8%, 14vw, 20%)',
-        top: shapeTop,
-        zIndex: 4,
-        pointerEvents: 'none',
-        width: shapeW,
-        height: shapeH,
-        borderRadius: shapeR,
-        backgroundColor: shapeColor,
-        rotate: shapeRotate,
-        scale: shapeScale,
-        opacity: shapeOpacity,
-        boxShadow: useTransform(
-          shapeGlow,
-          (v) => v > 0.01
-            ? `inset -6px -6px 16px rgba(0,0,0,0.3), 0 0 ${Math.round(v * 60)}px rgba(200,168,75,${(v * 0.85).toFixed(2)})`
-            : 'inset -6px -6px 16px rgba(0,0,0,0.3)'
-        ),
-        translateX: '-50%',
-        translateY: '-50%',
-        transform: 'translateX(-50%) translateY(-50%)',
-      }} />
+      {/* ── Olive shape: now handled by OlivelloScene3D (R3F canvas z:4) ── */}
 
       {/* ── Fixed: scroll cue ────────────────────────────────────────────── */}
       <motion.div style={{
@@ -472,6 +421,7 @@ export default function OlivelloStory() {
           Olivello · من الجبل إلى طاولتك
         </p>
       </div>
-    </div>
+      </div>
+    </ScrollProgressContext.Provider>
   );
 }

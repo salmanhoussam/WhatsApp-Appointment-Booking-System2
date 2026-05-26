@@ -43,7 +43,8 @@
  */
 
 import { lazy, Suspense } from 'react';
-import { Routes, Route }  from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { tenantRegistry } from './tenants/index.js';
 
 const DynamicPage     = lazy(() => import('../pages/generic/normal/DynamicPage'));
 const DemoPublicPage  = lazy(() => import('../pages/demo/DemoPublicPage'));
@@ -67,6 +68,15 @@ function PageFallback() {
 }
 
 export default function DynamicTenantResolver() {
+  const { slug } = useParams();
+
+  // Custom-built tenants have dedicated routes — canonical URL is /{slug}/{defaultRedirect}
+  // /demo/{slug} for these must redirect so there is exactly ONE public URL per tenant.
+  if (slug && tenantRegistry[slug]) {
+    const redirect = tenantRegistry[slug].defaultRedirect || 'home';
+    return <Navigate to={`/${slug}/${redirect}`} replace />;
+  }
+
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
