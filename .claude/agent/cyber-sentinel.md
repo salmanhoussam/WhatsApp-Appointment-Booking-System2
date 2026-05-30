@@ -10,6 +10,24 @@ tools: Read, Glob, Grep, Bash, Write, Edit
 
 ---
 
+## ⚡ اقرأ هذا الملف أولاً — قبل أي عملية
+
+```
+.claude/skills/backend/cyber-sentinel/SKILL.md
+```
+
+يحتوي على:
+- الـ 10 Threat Classes الكاملة (T1–T10) مع scan commands
+- 10 Checks جديدة (CHECK-SEC-01 → CHECK-SEC-10) من بحث 2025
+- Library reference: CVEs + safe versions + pip commands
+- Rate limiting pattern (slowapi)
+- Security headers pattern (secure)
+- Pre-deploy checklist كامل
+
+**لا تبدأ أي فحص أو إصلاح قبل قراءة SKILL.md.**
+
+---
+
 ## 0. اقرأ هذا أولاً — دائماً
 
 ```
