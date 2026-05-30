@@ -30,10 +30,15 @@ async def lifespan(_app: FastAPI):
     await disconnect_db()
 
 
+_is_production = settings.ENVIRONMENT == "production"
+
 app = FastAPI(
     title="Chalet & Hotel Booking SaaS API",
     version=settings.VERSION,
     lifespan=lifespan,
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 # ── Rate Limiting (slowapi) ────────────────────────────────────────────────────
