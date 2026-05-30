@@ -23,7 +23,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useTenantBase } from '../../../utils/useTenantSlug';
+import { useTenantBase } from '../../../hooks/useTenantSlug';
 import { motion, AnimatePresence } from 'framer-motion';
 import publicApi from '../../../utils/publicApi';
 import UnitImageGallery from '../../../components/ui/UnitImageGallery';

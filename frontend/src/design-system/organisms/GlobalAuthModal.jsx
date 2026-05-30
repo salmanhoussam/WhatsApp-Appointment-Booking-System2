@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, Phone, Lock, User, Eye, EyeOff, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
 import publicApi from '../../utils/publicApi';
-import useTenantSlug from '../../utils/useTenantSlug';
+import useTenantSlug from '../../hooks/useTenantSlug';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

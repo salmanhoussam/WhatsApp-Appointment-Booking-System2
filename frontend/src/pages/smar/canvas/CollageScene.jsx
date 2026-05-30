@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence }      from 'framer-motion';
 import { useNavigate, useParams }        from 'react-router-dom';
-import { useTenantBase }                 from '../../../utils/useTenantSlug';
+import { useTenantBase }                 from '../../../hooks/useTenantSlug';
 import { useSmarStore }                 from '../store/useSmarStore';
 import { useTenantConfigContext }        from '../../../context/TenantConfigContext';
 

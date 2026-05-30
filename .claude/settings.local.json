@@ -51,10 +51,36 @@
       "Bash(.venv/Scripts/python.exe -c \"from app.main import app; print\\('OK'\\)\")",
       "Bash(.venv/Scripts/pip.exe list *)",
       "Bash(grep -rn \"except Exception:\\\\s*$\\\\|except:\\\\s*$\" app/ --include=\"*.py\")",
-      "Bash(python -m py_compile app/repositories/booking_repo.py app/api/v1/public/bookings.py app/core/config.py app/main.py)"
+      "Bash(python -m py_compile app/repositories/booking_repo.py app/api/v1/public/bookings.py app/core/config.py app/main.py)",
+      "WebSearch",
+      "WebFetch(domain:vulert.com)",
+      "WebFetch(domain:security.snyk.io)",
+      "WebFetch(domain:ostif.org)",
+      "Bash(python -m py_compile app/core/security.py app/repositories/booking_repo.py app/main.py)",
+      "Edit(/.claude/skills/backend/**)",
+      "Bash(python -m py_compile app/core/security.py)",
+      "Bash(python -m py_compile app/main.py)",
+      "Bash(python -m py_compile app/core/security.py app/main.py)",
+      "Bash(pip install *)",
+      "Bash(python -m py_compile app/api/v1/admin/auth.py)",
+      "Bash(python -m py_compile app/api/v1/public/registration.py)",
+      "Bash(python -m py_compile app/api/v1/public/__init__.py)",
+      "Bash(python -c \"from slowapi import Limiter; print\\('slowapi imported OK'\\)\")",
+      "Bash(.venv\\\\Scripts\\\\pip install *)",
+      "Bash(\".venv/Scripts/pip.exe\" install *)",
+      "Bash(\".venv/Scripts/python.exe\" -c \"from slowapi import Limiter; print\\('slowapi imported OK'\\)\")",
+      "Bash(\".venv/Scripts/python.exe\" -c \"from slowapi import Limiter; from slowapi.util import get_remote_address; from slowapi.errors import RateLimitExceeded; print\\('slowapi fully imported OK'\\)\")",
+      "Bash(\".venv/Scripts/python.exe\" -m py_compile app/main.py)",
+      "Bash(\".venv/Scripts/python.exe\" -m py_compile app/api/v1/admin/auth.py)",
+      "Bash(\".venv/Scripts/python.exe\" -m py_compile app/api/v1/public/registration.py)",
+      "Bash(\".venv/Scripts/python.exe\" -m py_compile app/api/v1/public/__init__.py)",
+      "Bash(python -m py_compile app/main.py app/api/v1/admin/auth.py app/api/v1/public/registration.py app/api/v1/public/__init__.py)",
+      "Edit(/.claude/skills/frontend/**)",
+      "Bash(xargs sed *)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\Lenovo\\.claude\\projects\\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System"
+      "c:\\Users\\Lenovo\\.claude\\projects\\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System",
+      "c:\\Users\\Lenovo\\Desktop\\WhatsApp Appointment Booking System\\.claude\\skills\\backend"
     ]
   }
 }

@@ -11,10 +11,53 @@ paths: "frontend/src/**"
 بدون هيكلية واضحة، كل tenant جديد يصبح:
 - `sections/` لكل شيء
 - `ui/` تحتوي على business logic
-- لا مكان واضح للـ shared hooks
+- لا مكان واضح للـ shared hooks أو services
 - Components تُعاد كتابتها بدل إعادة استخدامها
+- hooks مختلطة مع utilities في نفس المجلد
 
 هذه القاعدة تحدد مكان كل ملف — لا تخمين.
+
+---
+
+## 0. الـ Shared Layer — الأساس (Bulletproof React 5 Buckets)
+
+```
+frontend/src/
+├── components/    ← Presentational UI — لا API calls هنا أبداً
+│   ├── ConfigurableHero.jsx
+│   ├── dynamic-sections/
+│   └── catalog/
+│
+├── hooks/         ← كل ملف يبدأ بـ use* — React hooks فقط
+│   ├── useTenantConfig.js    ← useQuery([slug,'config']) — مشترك
+│   ├── useCatalog.js         ← useQuery catalog — مشترك
+│   ├── useUnits.js           ← useQuery units — مشترك
+│   ├── useTenantSlug.js      ← useParams + subdomain routing
+│   └── useAdminRole.js       ← JWT decode + ROLE_TABS
+│
+├── services/      ← Pure API functions — لا React، لا hooks
+│   └── catalogApi.js         ← fetchCategories(), fetchItems()
+│
+├── utils/         ← Pure JS helpers — لا React، لا use* prefix
+│   ├── publicApi.js          ← Axios instance (transport config)
+│   ├── admin.config.js
+│   ├── tenant.config.js
+│   └── translations.js
+│
+└── design-system/ ← Atoms / Molecules / Organisms (tenant-agnostic)
+    ├── atoms/
+    ├── molecules/
+    └── organisms/
+```
+
+**القاعدة الفاصلة:**
+
+| السؤال | المجلد |
+|--------|--------|
+| يستخدم React hook داخلياً (`useParams`, `useState`...)? | `hooks/` |
+| يستدعي `publicApi` مباشرة، بدون React؟ | `services/` |
+| يُحوّل بيانات أو يُعالج strings/dates؟ | `utils/` |
+| يُرنّد JSX؟ | `components/` أو tenant `sections/` |
 
 ---
 

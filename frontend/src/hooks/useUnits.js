@@ -19,7 +19,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import publicApi from '../utils/publicApi';
-import useTenantSlug from '../utils/useTenantSlug';
+import useTenantSlug from '../hooks/useTenantSlug';
 
 export default function useUnits() {
   const slug = useTenantSlug();

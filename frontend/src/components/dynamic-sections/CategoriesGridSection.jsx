@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { fetchCategories } from '../../data/catalogApi'
+import { fetchCategories } from '../../services/catalogApi'
 
 const TILE_COLORS = [
   'oklch(0.30 0.08 280)', 'oklch(0.28 0.07 320)',

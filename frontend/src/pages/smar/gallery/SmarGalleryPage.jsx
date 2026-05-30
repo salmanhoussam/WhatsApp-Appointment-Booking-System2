@@ -15,7 +15,7 @@ import { motion, AnimatePresence }          from 'framer-motion';
 import { TenantHeader, TenantFooter }       from '../../../design-system/organisms';
 import { SEO }                              from '../../../design-system/atoms';
 import publicApi                            from '../../../utils/publicApi';
-import useTenantSlug                        from '../../../utils/useTenantSlug';
+import useTenantSlug                        from '../../../hooks/useTenantSlug';
 
 // ── Fallback images (homepage/ bucket) — used when gallery/ is still empty ───
 const BASE =

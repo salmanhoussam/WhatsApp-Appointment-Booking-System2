@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCategories, fetchItems } from '../../data/catalogApi'
+import { fetchCategories, fetchItems } from '../../services/catalogApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
 
 function SkeletonCard() {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTenantBase } from '../../../utils/useTenantSlug';
+import { useTenantBase } from '../../../hooks/useTenantSlug';
 
 export const LanguageContext = { t: {} };
 

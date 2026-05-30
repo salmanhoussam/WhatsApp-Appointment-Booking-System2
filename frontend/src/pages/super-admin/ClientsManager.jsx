@@ -12,7 +12,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import { useAdminRole } from '../../utils/useAdminRole';
+import { useAdminRole } from '../../hooks/useAdminRole';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 

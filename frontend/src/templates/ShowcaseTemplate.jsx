@@ -20,7 +20,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate }                        from 'react-router-dom';
 import gsap                          from 'gsap';
 import { ScrollTrigger }             from 'gsap/ScrollTrigger';
-import useTenantSlug, { useTenantBase } from '../utils/useTenantSlug';
+import useTenantSlug, { useTenantBase } from '../hooks/useTenantSlug';
 import TenantHeader                  from '../design-system/organisms/TenantHeader';
 import useTenantConfig               from '../hooks/useTenantConfig';
 import { SEO }                       from '../design-system/atoms';

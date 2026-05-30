@@ -20,7 +20,7 @@ import { User } from 'lucide-react';
 import { Button } from '../atoms';
 import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
-import useTenantSlug, { useTenantBase } from '../../utils/useTenantSlug';
+import useTenantSlug, { useTenantBase } from '../../hooks/useTenantSlug';
 
 export default function TenantHeader() {
   const { config } = useTenantConfig();

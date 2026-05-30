@@ -17,7 +17,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect }     from 'react';
 import { useNavigate }             from 'react-router-dom';
-import { useTenantBase }           from '../../../utils/useTenantSlug';
+import { useTenantBase }           from '../../../hooks/useTenantSlug';
 import publicApi                   from '../../../utils/publicApi';
 import UnitCalendar                from '../../../components/UnitCalendar';
 import ServicesAddon              from '../../../components/ui/ServicesAddon';

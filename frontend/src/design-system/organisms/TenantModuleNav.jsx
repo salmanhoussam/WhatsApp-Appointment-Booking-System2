@@ -12,7 +12,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useTenantConfig from '../../hooks/useTenantConfig';
-import useTenantSlug   from '../../utils/useTenantSlug';
+import useTenantSlug   from '../../hooks/useTenantSlug';
 
 export default function TenantModuleNav() {
   const { config, navItems } = useTenantConfig();

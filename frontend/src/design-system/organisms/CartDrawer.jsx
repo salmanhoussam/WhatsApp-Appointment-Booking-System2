@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import useTenantConfig from '../../hooks/useTenantConfig'
-import { useTenantBase } from '../../utils/useTenantSlug'
+import { useTenantBase } from '../../hooks/useTenantSlug'
 import useGenericStore from '../../pages/generic/store/useGenericStore'
 import { colors, radius, spring } from '../tokens'
 

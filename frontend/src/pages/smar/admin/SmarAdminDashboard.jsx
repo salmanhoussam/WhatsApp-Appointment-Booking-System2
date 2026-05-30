@@ -22,7 +22,7 @@ import TeamTab      from './components/TeamTab';
 import ServicesTab  from './components/ServicesTab';
 import GalleryTab   from './components/GalleryTab';
 import VisualBuilder from './VisualBuilder';
-import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../utils/useAdminRole';
+import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../hooks/useAdminRole';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {

@@ -24,7 +24,7 @@ import { useState }              from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard, Input, Button, PriceTag, GoldDot } from '../atoms';
 import publicApi      from '../../utils/publicApi';
-import useTenantSlug  from '../../utils/useTenantSlug';
+import useTenantSlug  from '../../hooks/useTenantSlug';
 import useTenantConfig from '../../hooks/useTenantConfig';
 
 // ── Constants ─────────────────────────────────────────────────────────────────

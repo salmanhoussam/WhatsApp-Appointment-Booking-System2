@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import useTenantConfig from './useTenantConfig'
-import useTenantSlug from '../utils/useTenantSlug'
+import useTenantSlug from '../hooks/useTenantSlug'
 import useGenericStore from '../pages/generic/store/useGenericStore'
-import { fetchCategories, fetchItems } from '../data/catalogApi'
+import { fetchCategories, fetchItems } from '../services/catalogApi'
 
 /**
  * useCatalog — domain hook for any catalog-driven page.
