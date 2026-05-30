@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel
 from typing import List
 
 from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations, ai_chat
+from app.main import limiter
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_client
 from app.core.services import require_service
@@ -62,7 +63,8 @@ async def get_listings_by_slug(
     return data
 
 @router.post("/{slug}/bookings", tags=["Public Tenant"])
-async def create_booking_by_slug(slug: str, data: BookingRequest):
+@limiter.limit("10/minute")
+async def create_booking_by_slug(request: Request, slug: str, data: BookingRequest):
     if data.check_in and data.check_out and data.check_in >= data.check_out:
         raise HTTPException(status_code=400, detail="تاريخ الخروج غير منطقي")
 

@@ -9,13 +9,14 @@ Two login flows:
 
 import logging
 import re
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.db.client import prisma_client
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.config import settings
 from app.services import registration_service as _reg_service
+from app.main import limiter
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
 # On localhost the domain kwarg is omitted (browsers reject .salmansaas.com there).
@@ -78,30 +79,31 @@ class UserLoginResponse(BaseModel):
 # ── Client (tenant root) login ─────────────────────────────────────────────────
 
 @router.post("/login", response_model=ClientLoginResponse)
-async def client_login(request: ClientLoginRequest, response: Response):
+@limiter.limit("5/minute")
+async def client_login(request: Request, body: ClientLoginRequest, response: Response):
     """
     Authenticates the tenant root account (Client model).
     Accepts slug, email, or phone as the identifier.
     Returns a JWT with type='client'.
     """
-    logger.info("🔐 Client login attempt: '%s'", request.identifier)
+    logger.info("🔐 Client login attempt: '%s'", body.identifier)
 
     try:
         client = await prisma_client.client.find_first(
             where={
                 "OR": [
-                    {"slug": request.identifier},
-                    {"email": request.identifier},
-                    {"phone": request.identifier},
+                    {"slug": body.identifier},
+                    {"email": body.identifier},
+                    {"phone": body.identifier},
                 ]
             }
         )
 
         if not client:
-            logger.warning("❌ Client not found: '%s'", request.identifier)
+            logger.warning("❌ Client not found: '%s'", body.identifier)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
-        if not verify_password(request.password, client.password_hash):
+        if not verify_password(body.password, client.password_hash):
             logger.warning("❌ Password mismatch for client: %s", client.slug)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
@@ -141,7 +143,8 @@ async def client_login(request: ClientLoginRequest, response: Response):
 # ── User (staff / manager) login ───────────────────────────────────────────────
 
 @router.post("/users/login", response_model=UserLoginResponse)
-async def user_login(request: UserLoginRequest, response: Response):
+@limiter.limit("5/minute")
+async def user_login(request: Request, body: UserLoginRequest, response: Response):
     """
     Authenticates a staff member or manager (User model).
     Returns a JWT with type='admin', user_id, client_id, and role.
@@ -149,19 +152,19 @@ async def user_login(request: UserLoginRequest, response: Response):
     Use this token on all admin routes that call get_current_admin_user().
     The 'slug' field in the payload also satisfies get_current_tenant().
     """
-    logger.info("🔐 User login attempt: '%s'", request.email)
+    logger.info("🔐 User login attempt: '%s'", body.email)
 
     try:
         user = await prisma_client.user.find_unique(
-            where={"email": request.email},
+            where={"email": body.email},
             include={"client": True},
         )
 
         if not user:
-            logger.warning("❌ User not found: '%s'", request.email)
+            logger.warning("❌ User not found: '%s'", body.email)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
-        if not verify_password(request.password, user.password_hash):
+        if not verify_password(body.password, user.password_hash):
             logger.warning("❌ Password mismatch for user: %s", user.email)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
@@ -352,19 +355,20 @@ async def create_platform_user(
 
 
 @router.post("/register", tags=["Authentication"])
-async def register_tenant(request: TenantRegistrationRequest, response: Response):
+@limiter.limit("3/minute")
+async def register_tenant(request: Request, body: TenantRegistrationRequest, response: Response):
     """
     New-tenant self-onboarding via demo.salmansaas.com/register.
     Creates Client (trial) + TENANT_ADMIN User, issues JWT, sets HttpOnly cookie.
     Returns { token, slug, trial_ends_at, dashboard_url }.
     """
-    logger.info("📝 Tenant registration attempt: email=%s venue=%s", request.email, request.venue_type)
+    logger.info("📝 Tenant registration attempt: email=%s venue=%s", body.email, body.venue_type)
 
     # Derive or validate slug
-    slug_source = request.business_name_en or request.owner_name
-    slug = request.slug or _auto_slug(slug_source)
+    slug_source = body.business_name_en or body.owner_name
+    slug = body.slug or _auto_slug(slug_source)
     if len(slug) < 3:
-        slug = _auto_slug(request.owner_name)
+        slug = _auto_slug(body.owner_name)
 
     if not _SLUG_PATTERN.match(slug):
         raise HTTPException(
@@ -373,7 +377,7 @@ async def register_tenant(request: TenantRegistrationRequest, response: Response
         )
 
     payload = {
-        **request.model_dump(exclude={"slug"}),
+        **body.model_dump(exclude={"slug"}),
         "slug": slug,
     }
 
@@ -408,7 +412,7 @@ async def register_tenant(request: TenantRegistrationRequest, response: Response
             "slug":          slug,
             "role":          user.role,
             "status":        "trial",
-            "venue_type":    request.venue_type,
+            "venue_type":    body.venue_type,
             "trial_ends_at": result["data"]["trial_ends_at"],
             "dashboard_url": result["data"]["dashboard_url"],
         },

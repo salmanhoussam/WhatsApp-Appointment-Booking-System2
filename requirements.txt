@@ -16,6 +16,7 @@ supafunc>=0.10.0
 # Security & Authentication
 PyJWT==2.11.0
 bcrypt==5.0.0
+slowapi==0.1.9
 
 # Utils, Environment & Network
 python-multipart==0.0.22

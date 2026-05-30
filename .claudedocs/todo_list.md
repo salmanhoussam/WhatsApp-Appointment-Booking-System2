@@ -71,6 +71,20 @@
 3. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
 4. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
 
+## 🏗️ Frontend Architecture Upgrades (من بحث @beyond.the.brackets)
+
+5. **Cache Layer — TanStack Query** — أضف React Query على كل `publicApi` calls
+   - Ref: github.com/devkodeio/frontend-system-design (Layer 4: Cache)
+   - المشكلة الحالية: كل re-render يعمل fetch جديد، لا caching
+   - الخطة: `useQuery` بدل `useEffect + fetch` في pages/[slug]/
+   - Impact: ⭐ أثر فوري على performance عند تعدد التنانت
+
+6. **Feature-based Structure — Bulletproof React** — وثّق architecture rule للـ Frontend
+   - Ref: github.com/alan2207/bulletproof-react
+   - المشكلة الحالية: داخل كل tenant البنية مختلطة (sections/ + canvas/ + ui/ لكن لا shared/)
+   - الخطة: أضف `.claude/rules/frontend/feature-structure.md` بناءً على Bulletproof React
+   - Impact: ⭐ يمنع technical debt مع كل tenant جديد
+
 ## Upcoming (مستقبلي)
 
 - n8n workflow: Konaan → webhook → WhatsApp AI settings
