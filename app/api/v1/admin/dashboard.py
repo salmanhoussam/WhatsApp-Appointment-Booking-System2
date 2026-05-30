@@ -30,6 +30,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db.client import prisma_client
 from app.core.tenant import get_current_tenant
 from app.repositories.dashboard_repo import DashboardRepository
+from app.repositories import BookingRepository, UnitRepository
+
+_booking_repo = BookingRepository(prisma_client)
+_unit_repo    = UnitRepository(prisma_client)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Dashboard"])
@@ -149,28 +153,11 @@ async def get_quick_stats(tenant: dict = Depends(get_current_tenant)):
         month_start = date(today.year, today.month, 1)
         client_id   = tenant["id"]
 
-        today_bookings_task = prisma_client.booking.count(where={
-            "clientId": client_id,
-            # Date column — pass date objects, NOT datetime
-            "checkIn":  {"gte": today, "lt": tomorrow},
-        })
-        pending_task = prisma_client.booking.count(where={
-            "clientId": client_id,
-            "status":   "pending",
-        })
-        revenue_task = prisma_client.booking.find_many(where={
-            "clientId": client_id,
-            "status":   "confirmed",
-            "checkIn":  {"gte": month_start},
-        })
-        units_task = prisma_client.unit.count(where={
-            "clientId":    client_id,
-            "isAvailable": True,
-            "isActive":    True,
-        })
-
         today_count, pending_count, revenue_bookings, available_units = await asyncio.gather(
-            today_bookings_task, pending_task, revenue_task, units_task
+            _booking_repo.count_by_client(client_id, date_from=today, date_to=tomorrow),
+            _booking_repo.count_by_client(client_id, status="pending"),
+            _booking_repo.get_all_by_client(client_id, status="confirmed", date_from=month_start),
+            _unit_repo.count_available(client_id),
         )
 
         monthly_revenue = round(sum(float(b.totalPrice) for b in revenue_bookings), 2)

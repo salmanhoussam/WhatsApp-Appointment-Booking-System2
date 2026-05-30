@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.db.client import prisma_client
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles
+from app.repositories import admin_client_repo as _client_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Settings"])
@@ -46,7 +46,7 @@ class SettingsUpdateRequest(BaseModel):
 async def get_settings(tenant: dict = Depends(get_current_tenant)):
     """Return all editable branding/config fields for this tenant's Client row."""
     try:
-        client = await prisma_client.client.find_unique(where={"id": tenant["id"]})
+        client = await _client_repo.find_client_by_id(tenant["id"])
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
 
@@ -97,10 +97,7 @@ async def update_settings(
             update_data[json_field] = Json(update_data[json_field])
 
     try:
-        await prisma_client.client.update(
-            where={"id": tenant["id"]},
-            data=update_data,
-        )
+        await _client_repo.update_client(tenant["id"], update_data)
         # Bust the in-process TTL cache so public /config reflects immediately
         invalidate_tenant_cache(tenant["slug"])
 

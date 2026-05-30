@@ -13,6 +13,9 @@ from app.schemas.booking import BookingResponse
 from app.services import BookingService
 from app.services.whatsapp_notifications import send_booking_confirmation
 
+# ARCH-01: repo used instead of prisma_client directly in update_booking
+_booking_repo = BookingRepository(prisma_client)
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -201,9 +204,7 @@ async def update_booking(
     current_client: dict = Depends(get_current_tenant),
 ):
     try:
-        existing = await prisma_client.booking.find_first(
-            where={"id": booking_id, "clientId": current_client["id"]}
-        )
+        existing = await _booking_repo.find_by_id(booking_id, current_client["id"])
         if not existing:
             raise HTTPException(status_code=404, detail="Booking not found.")
 
@@ -213,11 +214,7 @@ async def update_booking(
         if not patch:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        updated = await prisma_client.booking.update(
-            where={"id": booking_id},
-            data=patch,
-            include={"unit": True, "customer": True},
-        )
+        updated = await _booking_repo.update_patch(booking_id, current_client["id"], patch)
         return _serialize(updated)
     except HTTPException:
         raise

@@ -12,10 +12,11 @@ import re
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, field_validator
 
-from app.db.client import prisma_client
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.config import settings
 from app.services import registration_service as _reg_service
+from app.repositories import user_repo as _user_repo
+from app.repositories import admin_client_repo as _client_repo
 from app.main import limiter
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
@@ -89,15 +90,7 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
     logger.info("🔐 Client login attempt: '%s'", body.identifier)
 
     try:
-        client = await prisma_client.client.find_first(
-            where={
-                "OR": [
-                    {"slug": body.identifier},
-                    {"email": body.identifier},
-                    {"phone": body.identifier},
-                ]
-            }
-        )
+        client = await _client_repo.find_client_by_identifier(body.identifier)
 
         if not client:
             logger.warning("❌ Client not found: '%s'", body.identifier)
@@ -155,10 +148,7 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
     logger.info("🔐 User login attempt: '%s'", body.email)
 
     try:
-        user = await prisma_client.user.find_unique(
-            where={"email": body.email},
-            include={"client": True},
-        )
+        user = await _user_repo.find_user_by_email(body.email)
 
         if not user:
             logger.warning("❌ User not found: '%s'", body.email)
@@ -214,10 +204,7 @@ async def magic_link_login(token: str, response: Response):
     """
     from datetime import datetime, timezone as tz
 
-    user = await prisma_client.user.find_first(
-        where={"setupToken": token},
-        include={"client": True},
-    )
+    user = await _user_repo.find_user_by_setup_token(token)
 
     if not user:
         raise HTTPException(status_code=404, detail="رابط غير صالح أو منتهي الصلاحية")
@@ -229,10 +216,7 @@ async def magic_link_login(token: str, response: Response):
         raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
 
     # Invalidate token immediately (one-time use)
-    await prisma_client.user.update(
-        where={"id": user.id},
-        data={"setupToken": None, "setupTokenExp": None},
-    )
+    await _user_repo.invalidate_setup_token(user.id)
 
     jwt = create_access_token(data={
         "type":      "admin",
@@ -326,24 +310,21 @@ async def create_platform_user(
         raise HTTPException(status_code=422, detail="email required, password >= 8 chars.")
 
     owner_slug = getattr(settings, "SUPER_ADMIN_SLUG", "smar")
-    owner = await prisma_client.client.find_unique(where={"slug": owner_slug})
+    owner = await _client_repo.find_client_by_slug(owner_slug)
     if not owner:
         raise HTTPException(status_code=500, detail=f"Platform owner client '{owner_slug}' not found.")
 
-    existing = await prisma_client.user.find_unique(where={"email": email})
+    existing = await _user_repo.find_user_by_email(email)
     if existing:
-        await prisma_client.user.update(
-            where={"email": email},
-            data={
-                "password_hash": get_password_hash(password),
-                "role": role,
-                "isActive": True,
-                "fullName": full_name,
-            },
-        )
+        await _user_repo.update_user(existing.id, {
+            "password_hash": get_password_hash(password),
+            "role":          role,
+            "isActive":      True,
+            "fullName":      full_name,
+        })
         return {"action": "updated", "email": email, "role": role}
 
-    await prisma_client.user.create(data={
+    await _user_repo.create_user(data={
         "clientId":      owner.id,
         "email":         email,
         "password_hash": get_password_hash(password),
@@ -382,15 +363,14 @@ async def register_tenant(request: Request, body: TenantRegistrationRequest, res
     }
 
     try:
-        result = await _reg_service.register_new_tenant(prisma_client, payload)
+        from app.db.client import prisma_client as _pc
+        result = await _reg_service.register_new_tenant(_pc, payload)
     except Exception:
         raise  # ConflictError is handled by the global exception handler
 
     # Fetch the created client + user in one go
-    client = await prisma_client.client.find_unique(where={"slug": slug})
-    user   = await prisma_client.user.find_first(
-        where={"clientId": client.id, "role": "TENANT_ADMIN"}
-    )
+    client = await _client_repo.find_client_by_slug(slug)
+    user   = await _user_repo.find_admin_user_for_client(client.id, role="TENANT_ADMIN")
 
     # Issue USER JWT (type="admin") — works directly with GenericAdminDashboard
     # and all /admin/* routes without a separate login step.

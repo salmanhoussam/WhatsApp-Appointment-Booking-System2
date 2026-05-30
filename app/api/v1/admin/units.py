@@ -18,6 +18,12 @@ from app.services.storage_service import (
     upload_unit_image as _svc_upload,
     delete_unit_image as _svc_delete,
 )
+from app.repositories import UnitRepository, BookingRepository, CustomerRepository
+from app.repositories import price_repo as _price_repo
+
+_unit_repo     = UnitRepository(prisma_client)
+_booking_repo  = BookingRepository(prisma_client)
+_customer_repo = CustomerRepository(prisma_client)
 
 router = APIRouter(prefix="/units", tags=["Admin Units"])
 
@@ -132,10 +138,7 @@ def _fmt(unit) -> dict:
 @router.get("/")
 async def list_units(tenant: dict = Depends(get_current_tenant)):
     """Return ALL units for this tenant (active + inactive) — admin view."""
-    units = await prisma_client.unit.find_many(
-        where={"clientId": tenant["id"]},
-        order=[{"unit_type": "asc"}, {"sort_order": "asc"}],
-    )
+    units = await _unit_repo.get_all_admin(tenant["id"])
     return [_fmt(u) for u in units]
 
 
@@ -148,42 +151,37 @@ async def create_unit(
     Create a new unit.
     propertyId is auto-resolved to the tenant's first active property.
     """
-    prop = await prisma_client.property.find_first(
-        where={"clientId": tenant["id"], "isActive": True},
-        order={"createdAt": "asc"},
-    )
+    prop = await _unit_repo.find_first_active_property(tenant["id"])
     if not prop:
         raise HTTPException(
             status_code=422,
             detail="No active property found for this tenant. Create a property first."
         )
 
-    unit = await prisma_client.unit.create(
-        data={
-            "clientId":       tenant["id"],
-            "propertyId":     prop.id,
-            "name_ar":        body.name_ar,
-            "name_en":        body.name_en,
-            "unit_type":      body.unit_type,
-            "capacity":       body.capacity,
-            "bedrooms":       body.bedrooms,
-            "bathrooms":      body.bathrooms,
-            "image_url":      body.images[0] if body.images and len(body.images) > 0 else body.image_url,
-            "images":         body.images if body.images else [],
-            "price":          body.price,
-            "price_label":    body.price_label,
-            "sort_order":     body.sort_order,
-            "isActive":       True,
-            "isAvailable":    True,
-            # ── Dynamic Content (Block Builder) ────────────────────────────────
-            "category":       body.category,
-            "description_ar": body.description_ar,
-            "description_en": body.description_en,
-            "content_blocks": Json(body.content_blocks) if body.content_blocks is not None else None,
-            "amenities":      Json(body.amenities)      if body.amenities      is not None else None,
-            "rules_policies": Json(body.rules_policies) if body.rules_policies is not None else None,
-        }
-    )
+    unit = await _unit_repo.create_unit(data={
+        "clientId":       tenant["id"],
+        "propertyId":     prop.id,
+        "name_ar":        body.name_ar,
+        "name_en":        body.name_en,
+        "unit_type":      body.unit_type,
+        "capacity":       body.capacity,
+        "bedrooms":       body.bedrooms,
+        "bathrooms":      body.bathrooms,
+        "image_url":      body.images[0] if body.images and len(body.images) > 0 else body.image_url,
+        "images":         body.images if body.images else [],
+        "price":          body.price,
+        "price_label":    body.price_label,
+        "sort_order":     body.sort_order,
+        "isActive":       True,
+        "isAvailable":    True,
+        # ── Dynamic Content (Block Builder) ────────────────────────────────
+        "category":       body.category,
+        "description_ar": body.description_ar,
+        "description_en": body.description_en,
+        "content_blocks": Json(body.content_blocks) if body.content_blocks is not None else None,
+        "amenities":      Json(body.amenities)      if body.amenities      is not None else None,
+        "rules_policies": Json(body.rules_policies) if body.rules_policies is not None else None,
+    })
     return _fmt(unit)
 
 
@@ -195,9 +193,7 @@ async def update_unit(
 ):
     """Update unit details (toggles, names, capacity, amenities, images)."""
     # Verify ownership before updating
-    existing = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    existing = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not existing:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
@@ -254,10 +250,7 @@ async def update_unit(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await prisma_client.unit.update(
-        where={"id": unit_id},
-        data=patch,
-    )
+    updated = await _unit_repo.update_raw(unit_id, patch)
     return _fmt(updated)
 
 
@@ -276,25 +269,13 @@ async def block_dates(
         raise HTTPException(status_code=400, detail="check_out must be after check_in.")
 
     # Verify unit belongs to this tenant
-    unit = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
     # Resolve (or create) a deterministic system customer for blocked records
-    system_phone = f"__block__{tenant['id']}"
-    system_customer = await prisma_client.customer.upsert(
-        where={"phone": system_phone},
-        data={
-            "create": {
-                "clientId": tenant["id"],
-                "phone":    system_phone,
-                "name":     "Admin Block",
-            },
-            "update": {},
-        },
-    )
+    system_phone    = f"__block__{tenant['id']}"
+    system_customer = await _customer_repo.upsert_system_customer(tenant["id"], system_phone)
 
     # Expand the blocked range so we can build the list of dates for the response
     blocked_dates: List[str] = []
@@ -303,19 +284,17 @@ async def block_dates(
         blocked_dates.append(cursor.strftime("%Y-%m-%d"))
         cursor += timedelta(days=1)
 
-    booking = await prisma_client.booking.create(
-        data={
-            "clientId":   tenant["id"],
-            "unitId":     unit_id,
-            "customerId": system_customer.id,
-            "checkIn":    body.check_in.isoformat(),
-            "checkOut":   body.check_out.isoformat(),
-            "guests":     0,
-            "totalPrice": 0,
-            "status":     "blocked",
-            "notes":      body.reason or "Admin block",
-        }
-    )
+    booking = await _booking_repo.create_block(data={
+        "clientId":   tenant["id"],
+        "unitId":     unit_id,
+        "customerId": system_customer.id,
+        "checkIn":    body.check_in.isoformat(),
+        "checkOut":   body.check_out.isoformat(),
+        "guests":     0,
+        "totalPrice": 0,
+        "status":     "blocked",
+        "notes":      body.reason or "Admin block",
+    })
 
     return {
         "booking_id":    booking.id,
@@ -341,9 +320,7 @@ async def set_date_overrides(
     if body.start_date > body.end_date:
         raise HTTPException(status_code=400, detail="end_date must be >= start_date.")
 
-    unit = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
@@ -364,17 +341,12 @@ async def set_date_overrides(
         cursor += timedelta(days=1)
 
     # Delete existing rows for this range, then bulk-insert
-    await prisma_client.price.delete_many(
-        where={
-            "unitId":   unit_id,
-            "clientId": tenant["id"],
-            "date": {
-                "gte": to_datetime_start(body.start_date),
-                "lte": to_datetime_start(body.end_date),
-            },
-        }
+    await _price_repo.delete_price_range(
+        tenant["id"], unit_id,
+        to_datetime_start(body.start_date),
+        to_datetime_start(body.end_date),
     )
-    await prisma_client.price.create_many(data=records)
+    await _price_repo.bulk_create_prices(records)
 
     days = len(records)
     return {
@@ -398,9 +370,7 @@ async def upload_image(
     Appends the returned public URL to Unit.images and updates Unit.image_url
     to the first image in the array.
     """
-    unit = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
@@ -417,10 +387,7 @@ async def upload_image(
     current_images = list(getattr(unit, "images", []) or [])
     new_images = current_images + [public_url]
 
-    updated = await prisma_client.unit.update(
-        where={"id": unit_id},
-        data={"images": new_images, "image_url": new_images[0]},
-    )
+    updated = await _unit_repo.update_raw(unit_id, {"images": new_images, "image_url": new_images[0]})
     return {"images": list(updated.images), "image_url": updated.image_url}
 
 
@@ -434,9 +401,7 @@ async def delete_image(
     Remove an image from Supabase Storage and from Unit.images array.
     Updates Unit.image_url to the next remaining image (or null if empty).
     """
-    unit = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
@@ -445,13 +410,10 @@ async def delete_image(
     current_images = list(getattr(unit, "images", []) or [])
     new_images = [u for u in current_images if u != body.url]
 
-    updated = await prisma_client.unit.update(
-        where={"id": unit_id},
-        data={
-            "images":    new_images,
-            "image_url": new_images[0] if new_images else None,
-        },
-    )
+    updated = await _unit_repo.update_raw(unit_id, {
+        "images":    new_images,
+        "image_url": new_images[0] if new_images else None,
+    })
     return {"images": list(updated.images), "image_url": updated.image_url}
 
 
@@ -464,11 +426,9 @@ async def delete_unit(
     Permanently delete a unit and all its associated bookings, prices, and images.
     Cascade is enforced at the DB level (onDelete: Cascade on Booking → Unit).
     """
-    unit = await prisma_client.unit.find_first(
-        where={"id": unit_id, "clientId": tenant["id"]}
-    )
+    unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
-    await prisma_client.unit.delete(where={"id": unit_id})
+    await _unit_repo.delete_unit(unit_id)
     return {"success": True, "deleted_id": unit_id}

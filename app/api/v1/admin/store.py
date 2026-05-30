@@ -10,22 +10,22 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_admin_user
 from app.core.services import require_service
+from app.repositories import admin_catalog_repo as _cat_repo
+from app.repositories import store_admin_repo as _store_repo
 
 router = APIRouter()
 
 ORDER_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]
 
-# Valid forward transitions — terminal states map to empty set
 STORE_TRANSITIONS: dict[str, set] = {
     "pending":    {"processing", "cancelled"},
     "processing": {"shipped",    "cancelled"},
     "shipped":    {"delivered"},
     "delivered":  {"refunded"},
-    "refunded":   set(),   # terminal
-    "cancelled":  set(),   # terminal
+    "refunded":   set(),
+    "cancelled":  set(),
 }
 
 
@@ -55,13 +55,13 @@ def _fmt_product(p) -> dict:
 
 def _fmt_category(c) -> dict:
     return {
-        "id":        c.id,
-        "name_ar":   c.nameAr,
-        "name_en":   c.nameEn,
-        "image_url": c.imageUrl,
-        "parent_id": c.parentId,
+        "id":         c.id,
+        "name_ar":    c.nameAr,
+        "name_en":    c.nameEn,
+        "image_url":  c.imageUrl,
+        "parent_id":  c.parentId,
         "sort_order": c.sortOrder,
-        "is_active": c.isActive,
+        "is_active":  c.isActive,
     }
 
 
@@ -111,25 +111,23 @@ class ProductIn(BaseModel):
 
 @router.get("/products")
 async def list_products(
-    category_id: Optional[str] = None,
+    category_id: Optional[str]  = None,
     is_active:   Optional[bool] = None,
-    limit:       int = Query(50, le=200),
+    limit:       int            = Query(50, le=200),
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
 ):
-    client_id = str(user.clientId)
-    where: dict = {"clientId": client_id, "category": {"moduleKey": "store"}}
-    if category_id:
-        where["categoryId"] = category_id
-    if is_active is not None:
-        where["isActive"] = is_active
-
-    products = await prisma_client.catalogitem.find_many(
-        where=where,
-        take=limit,
-        order={"createdAt": "desc"},
+    items = await _cat_repo.list_items(
+        client_id=str(user.clientId),
+        category_id=category_id,
+        include_inactive=(is_active is None or not is_active),
+        module_key="store",
+        limit=limit,
     )
-    return {"success": True, "data": [_fmt_product(p) for p in products]}
+    # Apply explicit is_active filter if provided
+    if is_active is not None:
+        items = [i for i in items if i.isActive == is_active]
+    return {"success": True, "data": [_fmt_product(p) for p in items]}
 
 
 @router.post("/products")
@@ -139,29 +137,21 @@ async def create_product(
     _svc=Depends(require_service("store")),
 ):
     client_id = str(user.clientId)
-    if body.category_id:
-        cat = await prisma_client.catalogcategory.find_first(
-            where={"id": body.category_id, "clientId": client_id, "moduleKey": "store"}
-        )
-        if not cat:
-            raise HTTPException(status_code=404, detail="Category not found.")
-
-    meta = {}
-    if body.compare_at_price is not None:
-        meta["compare_at_price"] = body.compare_at_price
-    if body.images:
-        meta["images"] = body.images
-    if body.discount:
-        meta["discount"] = body.discount
-    if body.variants:
-        meta["variants"] = body.variants
-    if body.brand:
-        meta["brand"] = body.brand
-
     if not body.category_id:
         raise HTTPException(status_code=400, detail="category_id is required.")
 
-    product = await prisma_client.catalogitem.create(data={
+    cat = await _cat_repo.find_active_category(client_id, body.category_id, module_key="store")
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found.")
+
+    meta = {}
+    if body.compare_at_price is not None: meta["compare_at_price"] = body.compare_at_price
+    if body.images:                        meta["images"]           = body.images
+    if body.discount:                      meta["discount"]         = body.discount
+    if body.variants:                      meta["variants"]         = body.variants
+    if body.brand:                         meta["brand"]            = body.brand
+
+    product = await _cat_repo.create_item(data={
         "clientId":      client_id,
         "categoryId":    body.category_id,
         "nameAr":        body.name_ar,
@@ -185,39 +175,29 @@ async def update_product(
     _svc=Depends(require_service("store")),
 ):
     client_id = str(user.clientId)
-    product = await prisma_client.catalogitem.find_first(
-        where={"id": product_id, "clientId": client_id, "category": {"moduleKey": "store"}}
-    )
+    product = await _cat_repo.find_item(client_id, product_id, module_key="store")
     if not product:
         raise HTTPException(status_code=404, detail="Product not found.")
 
     meta = {}
-    if body.compare_at_price is not None:
-        meta["compare_at_price"] = body.compare_at_price
-    if body.images:
-        meta["images"] = body.images
-    if body.discount:
-        meta["discount"] = body.discount
-    if body.variants:
-        meta["variants"] = body.variants
-    if body.brand:
-        meta["brand"] = body.brand
+    if body.compare_at_price is not None: meta["compare_at_price"] = body.compare_at_price
+    if body.images:                        meta["images"]           = body.images
+    if body.discount:                      meta["discount"]         = body.discount
+    if body.variants:                      meta["variants"]         = body.variants
+    if body.brand:                         meta["brand"]            = body.brand
 
-    updated = await prisma_client.catalogitem.update(
-        where={"id": product_id},
-        data={
-            "categoryId":    body.category_id,
-            "nameAr":        body.name_ar,
-            "nameEn":        body.name_en,
-            "descriptionAr": body.description_ar,
-            "descriptionEn": body.description_en,
-            "price":         body.price,
-            "imageUrl":      body.image_url,
-            "isFeatured":    body.is_featured,
-            "isActive":      body.is_active,
-            "metadata":      meta if meta else None,
-        },
-    )
+    updated = await _cat_repo.update_item(product_id, {
+        "categoryId":    body.category_id,
+        "nameAr":        body.name_ar,
+        "nameEn":        body.name_en,
+        "descriptionAr": body.description_ar,
+        "descriptionEn": body.description_en,
+        "price":         body.price,
+        "imageUrl":      body.image_url,
+        "isFeatured":    body.is_featured,
+        "isActive":      body.is_active,
+        "metadata":      meta if meta else None,
+    })
     return {"success": True, "data": _fmt_product(updated)}
 
 
@@ -228,9 +208,7 @@ async def delete_product(
     _svc=Depends(require_service("store")),
 ):
     client_id = str(user.clientId)
-    result = await prisma_client.catalogitem.delete_many(
-        where={"id": product_id, "clientId": client_id, "category": {"moduleKey": "store"}}
-    )
+    result = await _cat_repo.delete_item_by_filter(client_id, product_id, module_key="store")
     if result.count == 0:
         raise HTTPException(status_code=404, detail="Product not found.")
     return {"success": True}
@@ -252,9 +230,10 @@ async def list_categories(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
 ):
-    cats = await prisma_client.catalogcategory.find_many(
-        where={"clientId": str(user.clientId), "moduleKey": "store"},
-        order={"sortOrder": "asc"},
+    cats = await _cat_repo.list_categories(
+        client_id=str(user.clientId),
+        module_key="store",
+        include_inactive=True,
     )
     return {"success": True, "data": [_fmt_category(c) for c in cats]}
 
@@ -265,7 +244,7 @@ async def create_category(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
 ):
-    cat = await prisma_client.catalogcategory.create(data={
+    cat = await _cat_repo.create_category(data={
         "clientId":  str(user.clientId),
         "moduleKey": "store",
         "nameAr":    body.name_ar,
@@ -286,23 +265,18 @@ async def update_category(
     _svc=Depends(require_service("store")),
 ):
     client_id = str(user.clientId)
-    cat = await prisma_client.catalogcategory.find_first(
-        where={"id": category_id, "clientId": client_id, "moduleKey": "store"}
-    )
+    cat = await _cat_repo.find_active_category(client_id, category_id, module_key="store")
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found.")
 
-    updated = await prisma_client.catalogcategory.update(
-        where={"id": category_id},
-        data={
-            "nameAr":    body.name_ar,
-            "nameEn":    body.name_en,
-            "imageUrl":  body.image_url,
-            "parentId":  body.parent_id,
-            "sortOrder": body.sort_order,
-            "isActive":  body.is_active,
-        },
-    )
+    updated = await _cat_repo.update_category(category_id, {
+        "nameAr":    body.name_ar,
+        "nameEn":    body.name_en,
+        "imageUrl":  body.image_url,
+        "parentId":  body.parent_id,
+        "sortOrder": body.sort_order,
+        "isActive":  body.is_active,
+    })
     return {"success": True, "data": _fmt_category(updated)}
 
 
@@ -313,9 +287,7 @@ async def delete_category(
     _svc=Depends(require_service("store")),
 ):
     client_id = str(user.clientId)
-    result = await prisma_client.catalogcategory.delete_many(
-        where={"id": category_id, "clientId": client_id, "moduleKey": "store"}
-    )
+    result = await _cat_repo.delete_category_by_filter(client_id, category_id, module_key="store")
     if result.count == 0:
         raise HTTPException(status_code=404, detail="Category not found.")
     return {"success": True}
@@ -330,22 +302,13 @@ class OrderStatusIn(BaseModel):
 @router.get("/orders")
 async def list_orders(
     status: Optional[str] = None,
-    limit:  int = Query(50, le=200),
+    limit:  int           = Query(50, le=200),
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
 ):
-    where: dict = {"clientId": str(user.clientId)}
-    if status:
-        if status not in ORDER_STATUSES:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
-        where["status"] = status
-
-    orders = await prisma_client.storeorder.find_many(
-        where=where,
-        include={"items": True},
-        order={"createdAt": "desc"},
-        take=limit,
-    )
+    if status and status not in ORDER_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
+    orders = await _store_repo.list_orders(str(user.clientId), status=status, limit=limit)
     return {"success": True, "data": [_fmt_order(o) for o in orders]}
 
 
@@ -356,22 +319,16 @@ async def update_order_status(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
 ):
-    # ── 1. Validate status value ───────────────────────────────────────────
     if body.status not in ORDER_STATUSES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid status '{body.status}'. Allowed: {ORDER_STATUSES}",
         )
 
-    # ── 2. Multi-tenant isolation ─────────────────────────────────────────
-    # clientId from JWT — direct ownership check, no JOIN needed.
-    order = await prisma_client.storeorder.find_first(
-        where={"id": order_id, "clientId": str(user.clientId)}
-    )
+    order = await _store_repo.find_order(str(user.clientId), order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 
-    # ── 3. State machine ──────────────────────────────────────────────────
     allowed = STORE_TRANSITIONS.get(order.status, set())
     if body.status not in allowed:
         readable = sorted(allowed) if allowed else ["none — terminal state"]
@@ -383,11 +340,7 @@ async def update_order_status(
             ),
         )
 
-    updated = await prisma_client.storeorder.update(
-        where={"id": order_id},
-        data={"status": body.status},
-        include={"items": True},
-    )
+    updated = await _store_repo.update_order_status(order_id, body.status)
     return {"success": True, "data": _fmt_order(updated)}
 
 
@@ -397,12 +350,7 @@ async def order_stats(
     _svc=Depends(require_service("store")),
 ):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
-    orders = await prisma_client.storeorder.find_many(
-        where={
-            "clientId":  str(user.clientId),
-            "createdAt": {"gte": today_start},
-        }
-    )
+    orders      = await _store_repo.list_today_orders(str(user.clientId), today_start)
 
     stats = {s: {"count": 0, "total": 0.0} for s in ORDER_STATUSES}
     for o in orders:

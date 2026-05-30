@@ -22,3 +22,17 @@ class CustomerRepository:
                 "clientId": client_id
             }
         )
+
+    async def upsert_system_customer(self, client_id: str, phone: str):
+        """Upsert a deterministic system customer (used for admin block records)."""
+        return await self.db.customer.upsert(
+            where={"phone": phone},
+            data={
+                "create": {
+                    "clientId": client_id,
+                    "phone":    phone,
+                    "name":     "Admin Block",
+                },
+                "update": {},
+            },
+        )

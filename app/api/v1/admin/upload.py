@@ -20,6 +20,11 @@ from typing import Optional
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
 from app.services.storage_service import upload_to_gallery_path
+from app.repositories import admin_catalog_repo as _cat_repo
+from app.repositories import gallery_repo as _gallery
+from app.repositories import UnitRepository
+
+_unit_repo = UnitRepository(prisma_client)
 
 router = APIRouter(prefix="/upload", tags=["Admin Upload"])
 
@@ -93,41 +98,35 @@ async def upload_image(
     image_id   = None
 
     if context == "page_hero_video":
-        await prisma_client.client.update(
-            where={"id": tenant["id"]},
-            data={"hero_video_url": public_url},
-        )
+        from app.repositories import admin_client_repo as _client_repo
+        await _client_repo.update_client(tenant["id"], {"hero_video_url": public_url})
         return {"url": public_url, "image_id": None, "saved_to": "hero_video_url"}
 
     if context == "catalog_item":
-        item = await prisma_client.catalogitem.find_first(
-            where={"id": item_id, "clientId": tenant["id"]}
-        )
+        item = await _cat_repo.find_item(tenant["id"], item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Catalog item not found")
 
-        img = await prisma_client.galleryimage.create(data={
-            "clientId":     tenant["id"],
+        img = await _gallery.create_gallery_image({
+            "clientId":      tenant["id"],
             "catalogItemId": item_id,
-            "imageType":    image_type,
-            "url":          public_url,
-            "caption_ar":   caption_ar,
-            "caption_en":   caption_en,
+            "imageType":     image_type,
+            "url":           public_url,
+            "caption_ar":    caption_ar,
+            "caption_en":    caption_en,
         })
         image_id = img.id
 
     elif context in ("unit_cover", "unit_gallery"):
-        unit = await prisma_client.unit.find_first(
-            where={"id": unit_id, "clientId": tenant["id"]}
-        )
+        unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
         if not unit:
             raise HTTPException(status_code=404, detail="Unit not found")
 
-        img = await prisma_client.galleryimage.create(data={
-            "clientId":  tenant["id"],
-            "unitId":    unit_id,
-            "imageType": image_type,
-            "url":       public_url,
+        img = await _gallery.create_gallery_image({
+            "clientId":   tenant["id"],
+            "unitId":     unit_id,
+            "imageType":  image_type,
+            "url":        public_url,
             "caption_ar": caption_ar,
             "caption_en": caption_en,
         })

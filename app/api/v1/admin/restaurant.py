@@ -4,25 +4,27 @@ JWT required (TENANT_ADMIN or MANAGER_RESERVATIONS).
 Categories and items are stored in CatalogCategory/CatalogItem (module_key='restaurant').
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from datetime import date, datetime, timezone
 from typing import Optional
 
-from app.db.client import prisma_client
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from app.db.dependencies import get_current_admin_user
 from app.core.services import require_service
+from app.repositories import admin_catalog_repo as _cat_repo
+from app.repositories import restaurant_admin_repo as _rest_repo
 
 router = APIRouter()
 
 ORDER_STATUSES = ["pending", "preparing", "ready", "delivered", "cancelled"]
 
-# Valid forward transitions only — terminal states map to empty set
 RESTAURANT_TRANSITIONS: dict[str, set] = {
     "pending":   {"preparing", "cancelled"},
     "preparing": {"ready",     "cancelled"},
     "ready":     {"delivered", "cancelled"},
-    "delivered": set(),   # terminal
-    "cancelled": set(),   # terminal
+    "delivered": set(),
+    "cancelled": set(),
 }
 
 
@@ -50,12 +52,12 @@ def _fmt_item(item) -> dict:
 
 def _fmt_category(cat) -> dict:
     return {
-        "id":        cat.id,
-        "name_ar":   cat.nameAr,
-        "name_en":   cat.nameEn,
-        "image_url": cat.imageUrl,
+        "id":         cat.id,
+        "name_ar":    cat.nameAr,
+        "name_en":    cat.nameEn,
+        "image_url":  cat.imageUrl,
         "sort_order": cat.sortOrder,
-        "is_active": cat.isActive,
+        "is_active":  cat.isActive,
     }
 
 
@@ -85,9 +87,7 @@ def _fmt_order(order) -> dict:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_restaurant(client_id: str):
-    restaurant = await prisma_client.restaurantconfig.find_first(
-        where={"clientId": client_id, "isActive": True}
-    )
+    restaurant = await _rest_repo.find_restaurant_config(client_id)
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not configured.")
     return restaurant
@@ -107,10 +107,10 @@ async def list_categories(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
-    cats = await prisma_client.catalogcategory.find_many(
-        where={"clientId": client_id, "moduleKey": "restaurant"},
-        order={"sortOrder": "asc"},
+    cats = await _cat_repo.list_categories(
+        client_id=str(user.clientId),
+        module_key="restaurant",
+        include_inactive=True,
     )
     return {"success": True, "data": [_fmt_category(c) for c in cats]}
 
@@ -121,14 +121,13 @@ async def create_category(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
-    cat = await prisma_client.catalogcategory.create(data={
-        "clientId":   client_id,
-        "moduleKey":  "restaurant",
-        "nameAr":     body.name_ar,
-        "nameEn":     body.name_en,
-        "imageUrl":   body.image_url,
-        "sortOrder":  body.sort_order,
+    cat = await _cat_repo.create_category(data={
+        "clientId":  str(user.clientId),
+        "moduleKey": "restaurant",
+        "nameAr":    body.name_ar,
+        "nameEn":    body.name_en,
+        "imageUrl":  body.image_url,
+        "sortOrder": body.sort_order,
     })
     return {"success": True, "data": _fmt_category(cat)}
 
@@ -140,22 +139,18 @@ async def update_category(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
-    cat = await prisma_client.catalogcategory.find_first(
-        where={"id": category_id, "clientId": client_id, "moduleKey": "restaurant"}
+    cat = await _cat_repo.find_active_category(
+        str(user.clientId), category_id, module_key="restaurant"
     )
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found.")
 
-    updated = await prisma_client.catalogcategory.update(
-        where={"id": category_id},
-        data={
-            "nameAr":    body.name_ar,
-            "nameEn":    body.name_en,
-            "imageUrl":  body.image_url,
-            "sortOrder": body.sort_order,
-        },
-    )
+    updated = await _cat_repo.update_category(category_id, {
+        "nameAr":    body.name_ar,
+        "nameEn":    body.name_en,
+        "imageUrl":  body.image_url,
+        "sortOrder": body.sort_order,
+    })
     return {"success": True, "data": _fmt_category(updated)}
 
 
@@ -165,9 +160,8 @@ async def delete_category(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
-    result = await prisma_client.catalogcategory.delete_many(
-        where={"id": category_id, "clientId": client_id, "moduleKey": "restaurant"}
+    result = await _cat_repo.delete_category_by_filter(
+        str(user.clientId), category_id, module_key="restaurant"
     )
     if result.count == 0:
         raise HTTPException(status_code=404, detail="Category not found.")
@@ -196,14 +190,11 @@ async def list_items(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
-    where: dict = {"clientId": client_id, "category": {"moduleKey": "restaurant"}}
-    if category_id:
-        where["categoryId"] = category_id
-
-    items = await prisma_client.catalogitem.find_many(
-        where=where,
-        order={"sortOrder": "asc"},
+    items = await _cat_repo.list_items(
+        client_id=str(user.clientId),
+        category_id=category_id,
+        module_key="restaurant",
+        include_inactive=True,
     )
     return {"success": True, "data": [_fmt_item(i) for i in items]}
 
@@ -214,12 +205,10 @@ async def create_item(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    client_id = str(user.clientId)
+    client_id  = str(user.clientId)
     restaurant = await _get_restaurant(client_id)
 
-    cat = await prisma_client.catalogcategory.find_first(
-        where={"id": body.category_id, "clientId": client_id, "moduleKey": "restaurant"}
-    )
+    cat = await _cat_repo.find_active_category(client_id, body.category_id, module_key="restaurant")
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found.")
 
@@ -229,7 +218,7 @@ async def create_item(
     if body.is_spicy:
         meta["spicy"] = True
 
-    item = await prisma_client.catalogitem.create(data={
+    item = await _cat_repo.create_item(data={
         "clientId":      client_id,
         "categoryId":    body.category_id,
         "nameAr":        body.name_ar,
@@ -254,9 +243,7 @@ async def update_item(
     _svc=Depends(require_service("restaurant")),
 ):
     client_id = str(user.clientId)
-    item = await prisma_client.catalogitem.find_first(
-        where={"id": item_id, "clientId": client_id, "category": {"moduleKey": "restaurant"}}
-    )
+    item = await _cat_repo.find_item(client_id, item_id, module_key="restaurant")
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")
 
@@ -266,21 +253,18 @@ async def update_item(
     if body.is_spicy:
         meta["spicy"] = True
 
-    updated = await prisma_client.catalogitem.update(
-        where={"id": item_id},
-        data={
-            "categoryId":    body.category_id,
-            "nameAr":        body.name_ar,
-            "nameEn":        body.name_en,
-            "descriptionAr": body.description_ar,
-            "descriptionEn": body.description_en,
-            "imageUrl":      body.image_url,
-            "price":         body.price,
-            "isActive":      body.is_available,
-            "sortOrder":     body.sort_order,
-            "metadata":      meta if meta else None,
-        },
-    )
+    updated = await _cat_repo.update_item(item_id, {
+        "categoryId":    body.category_id,
+        "nameAr":        body.name_ar,
+        "nameEn":        body.name_en,
+        "descriptionAr": body.description_ar,
+        "descriptionEn": body.description_en,
+        "imageUrl":      body.image_url,
+        "price":         body.price,
+        "isActive":      body.is_available,
+        "sortOrder":     body.sort_order,
+        "metadata":      meta if meta else None,
+    })
     return {"success": True, "data": _fmt_item(updated)}
 
 
@@ -291,9 +275,7 @@ async def delete_item(
     _svc=Depends(require_service("restaurant")),
 ):
     client_id = str(user.clientId)
-    result = await prisma_client.catalogitem.delete_many(
-        where={"id": item_id, "clientId": client_id, "category": {"moduleKey": "restaurant"}}
-    )
+    result = await _cat_repo.delete_item_by_filter(client_id, item_id, module_key="restaurant")
     if result.count == 0:
         raise HTTPException(status_code=404, detail="Item not found.")
     return {"success": True}
@@ -313,18 +295,10 @@ async def list_orders(
     _svc=Depends(require_service("restaurant")),
 ):
     restaurant = await _get_restaurant(str(user.clientId))
-    where: dict = {"restaurantId": restaurant.id}
-    if status:
-        if status not in ORDER_STATUSES:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
-        where["status"] = status
+    if status and status not in ORDER_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
 
-    orders = await prisma_client.restaurantorder.find_many(
-        where=where,
-        include={"items": True},
-        order={"createdAt": "desc"},
-        take=limit,
-    )
+    orders = await _rest_repo.list_orders(restaurant.id, status=status, limit=limit)
     return {"success": True, "data": [_fmt_order(o) for o in orders]}
 
 
@@ -335,25 +309,18 @@ async def update_order_status(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    # ── 1. Validate status value ───────────────────────────────────────────
     if body.status not in ORDER_STATUSES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid status '{body.status}'. Allowed: {ORDER_STATUSES}",
         )
 
-    client_id = str(user.clientId)
-    restaurant = await _get_restaurant(client_id)
+    restaurant = await _get_restaurant(str(user.clientId))
 
-    # ── 2. Multi-tenant isolation ─────────────────────────────────────────
-    # restaurantId is owned by this client — guarantees cross-tenant safety.
-    order = await prisma_client.restaurantorder.find_first(
-        where={"id": order_id, "restaurantId": restaurant.id}
-    )
+    order = await _rest_repo.find_order(restaurant.id, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
 
-    # ── 3. State machine ──────────────────────────────────────────────────
     allowed = RESTAURANT_TRANSITIONS.get(order.status, set())
     if body.status not in allowed:
         readable = sorted(allowed) if allowed else ["none — terminal state"]
@@ -365,11 +332,7 @@ async def update_order_status(
             ),
         )
 
-    updated = await prisma_client.restaurantorder.update(
-        where={"id": order_id},
-        data={"status": body.status},
-        include={"items": True},
-    )
+    updated = await _rest_repo.update_order_status(order_id, body.status)
     return {"success": True, "data": _fmt_order(updated)}
 
 
@@ -378,16 +341,9 @@ async def order_stats(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
 ):
-    from datetime import date, datetime, timezone
-    restaurant = await _get_restaurant(str(user.clientId))
-
+    restaurant  = await _get_restaurant(str(user.clientId))
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
-    orders = await prisma_client.restaurantorder.find_many(
-        where={
-            "restaurantId": restaurant.id,
-            "createdAt": {"gte": today_start},
-        }
-    )
+    orders      = await _rest_repo.list_today_orders(restaurant.id, today_start)
 
     stats = {s: {"count": 0, "total": 0.0} for s in ORDER_STATUSES}
     for o in orders:

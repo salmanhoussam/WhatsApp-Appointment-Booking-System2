@@ -114,3 +114,21 @@ class BookingRepository:
             data={"status": status},
             include={"unit": True, "customer": True},
         )
+
+    async def find_by_id(self, booking_id: str, client_id: str):
+        """Find a single booking scoped to tenant."""
+        return await self.db.booking.find_first(
+            where={"id": booking_id, "clientId": client_id}
+        )
+
+    async def update_patch(self, booking_id: str, client_id: str, patch: dict):
+        """Apply a partial update to a booking, scoped to tenant."""
+        return await self.db.booking.update(
+            where={"id": booking_id, "clientId": client_id},
+            data=patch,
+            include={"unit": True, "customer": True},
+        )
+
+    async def create_block(self, data: dict):
+        """Create a 'blocked' booking record."""
+        return await self.db.booking.create(data=data)

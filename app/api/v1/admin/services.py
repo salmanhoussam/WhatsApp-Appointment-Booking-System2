@@ -9,8 +9,8 @@ Tenancy:    every query filtered by clientId from the token
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.repositories import service_repo as _repo
 
 router = APIRouter(prefix="/services", tags=["Admin Services"])
 
@@ -61,10 +61,7 @@ def _fmt(s) -> dict:
 
 @router.get("/")
 async def list_services(tenant: dict = Depends(get_current_tenant)):
-    services = await prisma_client.service.find_many(
-        where={"clientId": tenant["id"]},
-        order=[{"sort_order": "asc"}, {"createdAt": "asc"}],
-    )
+    services = await _repo.list_services(tenant["id"])
     return [_fmt(s) for s in services]
 
 
@@ -73,26 +70,21 @@ async def create_service(
     body: ServiceCreate,
     tenant: dict = Depends(get_current_tenant),
 ):
-    prop = await prisma_client.property.find_first(
-        where={"clientId": tenant["id"], "isActive": True},
-        order={"createdAt": "asc"},
-    )
+    prop = await _repo.find_first_property(tenant["id"])
 
-    service = await prisma_client.service.create(
-        data={
-            "clientId":    tenant["id"],
-            "propertyId":  prop.id if prop else None,
-            "name_ar":     body.name_ar,
-            "name_en":     body.name_en,
-            "description": body.description,
-            "image_url":   body.image_url,
-            "duration":    body.duration,
-            "basePrice":   body.base_price,
-            "currency":    body.currency or tenant.get("currency", "SAR"),
-            "sort_order":  body.sort_order,
-            "isActive":    True,
-        }
-    )
+    service = await _repo.create_service(data={
+        "clientId":    tenant["id"],
+        "propertyId":  prop.id if prop else None,
+        "name_ar":     body.name_ar,
+        "name_en":     body.name_en,
+        "description": body.description,
+        "image_url":   body.image_url,
+        "duration":    body.duration,
+        "basePrice":   body.base_price,
+        "currency":    body.currency or tenant.get("currency", "SAR"),
+        "sort_order":  body.sort_order,
+        "isActive":    True,
+    })
     return _fmt(service)
 
 
@@ -102,9 +94,7 @@ async def update_service(
     body: ServiceUpdate,
     tenant: dict = Depends(get_current_tenant),
 ):
-    existing = await prisma_client.service.find_first(
-        where={"id": service_id, "clientId": tenant["id"]}
-    )
+    existing = await _repo.find_service(tenant["id"], service_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Service not found.")
 
@@ -122,10 +112,7 @@ async def update_service(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await prisma_client.service.update(
-        where={"id": service_id},
-        data=patch,
-    )
+    updated = await _repo.update_service(service_id, patch)
     return _fmt(updated)
 
 
@@ -134,10 +121,8 @@ async def delete_service(
     service_id: str,
     tenant: dict = Depends(get_current_tenant),
 ):
-    existing = await prisma_client.service.find_first(
-        where={"id": service_id, "clientId": tenant["id"]}
-    )
+    existing = await _repo.find_service(tenant["id"], service_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Service not found.")
 
-    await prisma_client.service.delete(where={"id": service_id})
+    await _repo.delete_service(service_id)

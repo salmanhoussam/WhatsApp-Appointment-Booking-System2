@@ -23,9 +23,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.db.client import prisma_client
 from app.db.dependencies import get_current_admin_user
 from app.core.services import sync_selected_services
+from app.repositories import client_services_repo as _repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/client-services", tags=["Admin Client Services"])
@@ -74,10 +74,7 @@ def _fmt(row) -> dict:
 @router.get("/")
 async def list_client_services(user=Depends(get_current_admin_user)):
     """Return all ClientService rows (active + inactive) for the current tenant."""
-    rows = await prisma_client.clientservice.find_many(
-        where={"clientId": str(user.clientId)},
-        order={"activatedAt": "desc"},
-    )
+    rows = await _repo.list_client_services(str(user.clientId))
     return {"success": True, "data": [_fmt(r) for r in rows]}
 
 
@@ -117,13 +114,7 @@ async def activate_services(
     activated: list[str] = []
 
     for key in body.services:
-        await prisma_client.clientservice.upsert(
-            where={"clientId_serviceKey": {"clientId": client_id, "serviceKey": key}},
-            data={
-                "create": {"clientId": client_id, "serviceKey": key, "isActive": True},
-                "update": {"isActive": True},
-            },
-        )
+        await _repo.upsert_client_service(client_id, key, is_active=True)
         activated.append(key)
 
     # Keep Client.selected_services in sync with the ClientService table
@@ -164,10 +155,7 @@ async def deactivate_services(
     deactivated: list[str] = []
 
     for key in body.services:
-        result = await prisma_client.clientservice.update_many(
-            where={"clientId": client_id, "serviceKey": key},
-            data={"isActive": False},
-        )
+        result = await _repo.deactivate_client_service(client_id, key)
         if result.count > 0:
             deactivated.append(key)
 

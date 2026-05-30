@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { LanguageProvider } from '../pages/showcase/context/LanguageContext';
+import DemoLauncher from '../components/DemoLauncher';
 import '../pages/showcase/showcase.css';
 
 const HomePage            = lazy(() => import('../pages/showcase/pages/HomePage'));
@@ -22,6 +23,8 @@ function ShowcaseLayout() {
   return (
     <LanguageProvider>
       <Outlet />
+      {/* Global demo-trial overlay — visible on all showcase pages */}
+      <DemoLauncher />
     </LanguageProvider>
   );
 }

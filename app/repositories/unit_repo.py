@@ -74,3 +74,40 @@ class UnitRepository:
             where={"id": unit_id},
             data={k: v for k, v in data.items() if v is not None},
         )
+
+    async def update_raw(self, unit_id: str, data: dict):
+        """Update a unit by primary key (caller must pre-verify ownership)."""
+        return await self.db.unit.update(
+            where={"id": unit_id},
+            data=data,
+        )
+
+    async def get_all_admin(self, client_id: str) -> list:
+        """Return ALL units for a tenant (active + inactive) — admin view."""
+        return await self.db.unit.find_many(
+            where={"clientId": client_id},
+            order=[{"unit_type": "asc"}, {"sort_order": "asc"}],
+        )
+
+    async def find_first_active_property(self, client_id: str):
+        """Resolve tenant's first active property (for propertyId FK on unit create)."""
+        return await self.db.property.find_first(
+            where={"clientId": client_id, "isActive": True},
+            order={"createdAt": "asc"},
+        )
+
+    async def create_unit(self, data: dict):
+        """Insert a new Unit row (data must already include clientId + propertyId)."""
+        return await self.db.unit.create(data=data)
+
+    async def delete_unit(self, unit_id: str):
+        """Hard-delete a unit by primary key (cascade at DB level)."""
+        return await self.db.unit.delete(where={"id": unit_id})
+
+    async def count_available(self, client_id: str) -> int:
+        """Count active + available units for a tenant (for dashboard KPIs)."""
+        return await self.db.unit.count(where={
+            "clientId":    client_id,
+            "isAvailable": True,
+            "isActive":    True,
+        })

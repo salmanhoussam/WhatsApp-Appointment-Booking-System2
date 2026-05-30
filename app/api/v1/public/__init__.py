@@ -4,7 +4,7 @@ from datetime import date
 from pydantic import BaseModel
 from typing import List
 
-from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations, ai_chat
+from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations, ai_chat, demo
 from app.main import limiter
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_client
@@ -250,3 +250,4 @@ router.include_router(store.router,        prefix="/store",         tags=["Publi
 router.include_router(catalog.router,        prefix="/catalog",       tags=["Public Catalog"])
 router.include_router(reservations.router,  prefix="/reservations",  tags=["Public Reservations"])
 router.include_router(ai_chat.router,       prefix="/ai",             tags=["Public AI"])
+router.include_router(demo.router,          tags=["Public — Demo"])
