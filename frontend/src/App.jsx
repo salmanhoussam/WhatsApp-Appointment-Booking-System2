@@ -93,7 +93,7 @@ function App() {
             <Route path="/" element={
               <Navigate to={
                 IS_SUBDOMAIN_MODE
-                  ? (_h.startsWith('demo.') ? '/login' : '/showcase')
+                  ? (_h.startsWith('demo.') ? '/home' : '/showcase')
                   : '/smar'
               } replace />
             } />
@@ -179,6 +179,11 @@ function App() {
           {/* ── Showcase domain: full site served at /* ── */}
           {IS_SHOWCASE_DOMAIN && (
             <Route path="/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />
+          )}
+
+          {/* ── Demo subdomain: /home → DemoLandingPage via ShowcaseRoutes ── */}
+          {IS_DEMO_SUBDOMAIN && (
+            <Route path="/home/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />
           )}
 
           {/* ── Localhost dev preview: /showcase/* ── */}

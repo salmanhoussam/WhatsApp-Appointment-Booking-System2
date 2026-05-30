@@ -5,6 +5,7 @@ import DemoLauncher from '../components/DemoLauncher';
 import '../pages/showcase/showcase.css';
 
 const HomePage            = lazy(() => import('../pages/showcase/pages/HomePage'));
+const DemoLandingPage     = lazy(() => import('../pages/showcase/pages/DemoLandingPage'));
 const GeneralPrivacyPage  = lazy(() => import('../pages/showcase/pages/GeneralPrivacyPage'));
 const PrivacyTermsPage    = lazy(() => import('../pages/showcase/pages/PrivacyTermsPage'));
 const SpecificPrivacyPage = lazy(() => import('../pages/showcase/pages/SpecificPrivacyPage'));
@@ -34,6 +35,7 @@ function ShowcaseRoutes() {
     <Routes>
       <Route element={<ShowcaseLayout />}>
         <Route index element={<Suspense fallback={<PageFallback />}><HomePage /></Suspense>} />
+        <Route path="home" element={<Suspense fallback={<PageFallback />}><DemoLandingPage /></Suspense>} />
         <Route path="privacy" element={<Suspense fallback={<PageFallback />}><GeneralPrivacyPage /></Suspense>} />
         <Route path="terms" element={<Suspense fallback={<PageFallback />}><PrivacyTermsPage /></Suspense>} />
         <Route path="whatsapp-privacy" element={<Suspense fallback={<PageFallback />}><SpecificPrivacyPage /></Suspense>} />
