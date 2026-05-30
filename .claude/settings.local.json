@@ -43,7 +43,15 @@
       "Bash(Select-Object FullName)",
       "Bash(node --input-type=module)",
       "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/pages/olivello/sections/OlivelloStory.jsx','utf8'\\); console.log\\('read ok'\\)\")",
-      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/pages/olivello/canvas/OlivelloScene3D.jsx','utf8'\\); console.log\\('canvas ok'\\); require\\('fs'\\).readFileSync\\('src/pages/olivello/context/ScrollProgressContext.jsx','utf8'\\); console.log\\('context ok'\\)\")"
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/pages/olivello/canvas/OlivelloScene3D.jsx','utf8'\\); console.log\\('canvas ok'\\); require\\('fs'\\).readFileSync\\('src/pages/olivello/context/ScrollProgressContext.jsx','utf8'\\); console.log\\('context ok'\\)\")",
+      "Bash(grep \"\\\\.py$\")",
+      "Bash(grep -rn \"except Exception.*pass\\\\|except:.*pass\\\\|except Exception:\\\\s*$\" app/ --include=\"*.py\")",
+      "Bash(python -m venv --help)",
+      "Bash(where python *)",
+      "Bash(.venv/Scripts/python.exe -c \"from app.main import app; print\\('OK'\\)\")",
+      "Bash(.venv/Scripts/pip.exe list *)",
+      "Bash(grep -rn \"except Exception:\\\\s*$\\\\|except:\\\\s*$\" app/ --include=\"*.py\")",
+      "Bash(python -m py_compile app/repositories/booking_repo.py app/api/v1/public/bookings.py app/core/config.py app/main.py)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Lenovo\\.claude\\projects\\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System"

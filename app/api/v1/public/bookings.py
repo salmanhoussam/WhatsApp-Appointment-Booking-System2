@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, Body
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Body
 from app.db.client import prisma_client
 from app.repositories import ClientRepository, BookingRepository, CustomerRepository
 from app.services import BookingService
 from app.schemas.booking import BookingCreate, BookingResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,4 +50,7 @@ async def create_booking(
         )
         return booking
     except ValueError as e:
+        # ValueError from BookingService = known user-facing errors (availability, validation).
+        # Safe to surface as-is; internal/DB errors are caught by the global handler.
+        logger.info("Booking rejected for unit %s: %s", unit_id, e)
         raise HTTPException(status_code=400, detail=str(e))

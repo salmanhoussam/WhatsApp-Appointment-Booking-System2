@@ -49,6 +49,7 @@ tools: Read, Glob, Grep, Bash, Write, WebSearch, WebFetch, Agent
 | `dashboard-builder` | Admin dashboards، DnD، tabs، panels، PageBuilder |
 | `code-reviewer` | Architecture review، security audit، compliance |
 | `system-auditor` | Full codebase audit، pre-deploy checks |
+| `cyber-sentinel` | Security scan: multi-tenancy leaks، auth bypass، race conditions، secrets — أعمق من system-auditor |
 | `memory-keeper` | تحديث الـ memory بعد أي تغيير مهم |
 | `tenant-seeder` | إنشاء tenants جدد + seed data + Supabase folders |
 | `generic-page-builder` | Landing pages، showcase pages |

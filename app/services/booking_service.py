@@ -30,7 +30,7 @@ class BookingService:
         check_out = datetime.fromisoformat(booking_data["checkOut"])
         
         is_available = await self.booking_repo.check_availability(
-            unit_id, check_in, check_out
+            unit_id, check_in, check_out, client_id=client_id
         )
         
         if not is_available:

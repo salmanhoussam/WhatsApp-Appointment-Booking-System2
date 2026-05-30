@@ -66,16 +66,22 @@ class BookingRepository:
             }
         )
 
-    async def check_availability(self, unit_id: str, check_in: datetime, check_out: datetime):
-        """Check if a unit is available for the given dates (Overlapping check)."""
+    async def check_availability(self, unit_id: str, check_in: datetime, check_out: datetime, client_id: str = ""):
+        """Check if a unit is available for the given dates (Overlapping check).
+        client_id MUST be provided — enforces tenant isolation at DB level.
+        """
         if isinstance(check_in, date) and not isinstance(check_in, datetime):
             check_in = datetime.combine(check_in, datetime.min.time()).replace(tzinfo=timezone.utc)
         if isinstance(check_out, date) and not isinstance(check_out, datetime):
             check_out = datetime.combine(check_out, datetime.min.time()).replace(tzinfo=timezone.utc)
 
+        if not client_id:
+            raise ValueError("check_availability requires client_id for tenant isolation")
+
         conflicting_bookings = await self.db.booking.find_many(
             where={
-                "unitId": unit_id,
+                "unitId":   unit_id,
+                "clientId": client_id,
                 "status": {"in": ["pending", "confirmed", "blocked"]},
                 "OR": [
                     {

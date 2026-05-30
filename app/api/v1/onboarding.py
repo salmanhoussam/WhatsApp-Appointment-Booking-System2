@@ -1,9 +1,12 @@
+import logging
 import secrets
 import string
 
 import anthropic
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.db.client import prisma_client
@@ -81,8 +84,14 @@ async def onboarding_webhook(
 
     try:
         result = await register_new_tenant(prisma_client, data)
-    except Exception as e:
+    except ValueError as e:
+        # Known domain errors from registration_service (slug conflict, email taken…)
+        logger.warning("Onboarding rejected for slug '%s': %s", extracted.slug, e)
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Unexpected DB/infra error — log full detail, never leak to caller
+        logger.error("Onboarding failed unexpectedly for slug '%s': %s", extracted.slug, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
     # 4. إرجاع كل ما يحتاجه n8n لإرسال رسالة واتساب للعميل
     return {

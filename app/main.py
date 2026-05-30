@@ -77,7 +77,9 @@ async def health_check():
         await prisma_client.execute_raw("SELECT 1")
         return {"status": "ok", "db": "ok", "timestamp": ts}
     except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error("Health check DB failure: %s", e)
         return JSONResponse(
             status_code=503,
-            content={"status": "error", "db": "unreachable", "timestamp": ts, "detail": str(e)},
+            content={"status": "error", "db": "unreachable", "timestamp": ts},
         )

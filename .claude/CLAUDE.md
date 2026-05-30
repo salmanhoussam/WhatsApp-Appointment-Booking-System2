@@ -68,6 +68,7 @@ system-auditor         -- Full codebase scan (called by /audit)
 code-reviewer          -- Architecture + multi-tenancy compliance
 backend-architect      -- FastAPI / Prisma / module design
 Frontend-Architect-Agent -- React 19 / Framer Motion / GS MAR
+cyber-sentinel         -- Security engineer: multi-tenancy leaks, auth, race conditions, secrets (10 threat classes)
 
 ## Skills (.claude/skills/)
 backend/  -- database-architecture, supabase-prisma, n8n-automation

@@ -93,6 +93,9 @@ class Settings(BaseSettings):
 # نسخة واحدة مشتركة من الإعدادات
 settings = Settings()
 
-# تحذير إذا كان SECRET_KEY هو القيمة الافتراضية في الإنتاج
-if settings.is_production() and settings.SECRET_KEY == "my-super-secret-key-change-in-production":
-    raise ValueError("⚠️ يجب تغيير SECRET_KEY في بيئة الإنتاج!")
+# تحذير إذا كانت المفاتيح الافتراضية مستخدمة في الإنتاج
+if settings.is_production():
+    if settings.SECRET_KEY == "my-super-secret-key-change-in-production":
+        raise ValueError("⚠️ يجب تغيير SECRET_KEY في بيئة الإنتاج!")
+    if settings.WHATSAPP_VERIFY_TOKEN == "my_secure_token":
+        raise ValueError("⚠️ يجب تغيير WHATSAPP_VERIFY_TOKEN في بيئة الإنتاج!")
