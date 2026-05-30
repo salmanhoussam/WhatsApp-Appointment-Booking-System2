@@ -17,10 +17,22 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from './pages/admin/Login';
 import TenantResolver from './router/TenantResolver';
 import ProtectedRoute from './router/ProtectedRoute';
 import { LanguageProvider } from './context/LanguageContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,    // 5 min default — override per-hook
+      gcTime:    10 * 60 * 1000,   // 10 min cache retention
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Lazy — keeps heavy admin deps out of the main bundle
 const SmarAdminDashboard    = lazy(() => import('./pages/smar/admin/SmarAdminDashboard'));
@@ -71,6 +83,7 @@ function NotFound() {
 
 function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <HelmetProvider>
     <LanguageProvider>
       <BrowserRouter>
@@ -189,6 +202,7 @@ function App() {
       </BrowserRouter>
     </LanguageProvider>
     </HelmetProvider>
+    </QueryClientProvider>
   );
 }
 

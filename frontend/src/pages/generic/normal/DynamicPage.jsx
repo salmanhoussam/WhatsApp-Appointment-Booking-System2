@@ -19,12 +19,12 @@
  *   Set VITE_API_URL=https://your-backend.up.railway.app in Railway env vars.
  */
 
-import { useState, useEffect }   from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
-import { AnimatePresence }        from 'framer-motion'
+import { useState, useEffect, useMemo } from 'react'
+import { useParams, Link, Navigate }    from 'react-router-dom'
+import { AnimatePresence }              from 'framer-motion'
 
-import publicApi      from '../../../utils/publicApi'
-import useGenericStore from '../store/useGenericStore'
+import useTenantConfig from '../../../hooks/useTenantConfig'
+import useGenericStore  from '../store/useGenericStore'
 import CartBadge      from '../../../design-system/molecules/CartBadge'
 import CartDrawer     from '../../../design-system/organisms/CartDrawer'
 import ConfigurableHero from '../../../components/ConfigurableHero'
@@ -179,52 +179,47 @@ function TrialRibbon({ accent, name }) {
 export default function DynamicPage() {
   const { slug } = useParams()
 
-  const [tenantConfig, setTenantConfig] = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [cartOpen,     setCartOpen]     = useState(false)
+  // ── Server state — React Query backed, 10 min cache, cross-navigation dedup ──
+  const { config: serverConfig, isLoading: loading } = useTenantConfig(slug)
+
+  // ── Live preview overrides — Page Builder iframe sends PREVIEW_UPDATE ────────
+  const [previewPatch, setPreviewPatch] = useState({})
+
+  // Merge: server config + preview overrides (preview wins on key collision)
+  const tenantConfig = useMemo(
+    () => serverConfig ? { ...serverConfig, ...previewPatch } : null,
+    [serverConfig, previewPatch]
+  )
+
+  const [cartOpen, setCartOpen] = useState(false)
 
   const { setConfig, addItem, totalItems } = useGenericStore()
 
   const isDemoRoute = window.location.pathname.includes('/demo/')
 
-  // ── Fetch tenant config via publicApi ────────────────────────────────────────
-  // publicApi baseURL = ${VITE_API_URL}/api/v1/public
-  // → GET /api/v1/public/{slug}/config
+  // ── Sync tenantConfig into Zustand store (moduleKey derivation) ───────────────
   useEffect(() => {
-    if (!slug) return
-    publicApi.get(`/${slug}/config`)
-      .then(({ data }) => {
-        setTenantConfig(data)
-        setConfig(data, data.active_services ?? [])
-      })
-      .catch(() => setTenantConfig(null))
-      .finally(() => setLoading(false))
-  }, [slug])
+    if (tenantConfig) setConfig(tenantConfig, tenantConfig.active_services ?? [])
+  }, [tenantConfig, setConfig])
 
   // ── Live preview bridge — postMessage from GenericAdminDashboard iframe ──────
-  // Dashboard sends:
-  //   { type: 'PREVIEW_UPDATE', accent, heroType, catalogLayout, config? }
-  // We map those keys back to the tenantConfig shape so sections re-render live.
+  // Dashboard sends: { type: 'PREVIEW_UPDATE', accent, heroType, catalogLayout, config? }
   useEffect(() => {
     const handler = (e) => {
       if (e.data?.type !== 'PREVIEW_UPDATE') return
-      setTenantConfig(prev => {
-        if (!prev) return prev
-        const patch = {}
-        if (e.data.accent)        patch.primary_color = e.data.accent
-        if (e.data.heroType)      patch.page_type = e.data.heroType
-        if (e.data.catalogLayout) patch.config = {
-          ...(prev.config ?? {}),
-          catalog_layout: e.data.catalogLayout,
-        }
-        // Full config patch (e.g. from Page Builder live preview)
-        if (e.data.config)        Object.assign(patch, e.data.config)
-        return { ...prev, ...patch }
-      })
+      const patch = {}
+      if (e.data.accent)        patch.primary_color = e.data.accent
+      if (e.data.heroType)      patch.page_type = e.data.heroType
+      if (e.data.catalogLayout) patch.config = {
+        ...(serverConfig?.config ?? {}),
+        catalog_layout: e.data.catalogLayout,
+      }
+      if (e.data.config)        Object.assign(patch, e.data.config)
+      setPreviewPatch(prev => ({ ...prev, ...patch }))
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [])
+  }, [serverConfig])
 
   // ── Early exits ──────────────────────────────────────────────────────────────
   if (loading)       return <LoadingScreen />

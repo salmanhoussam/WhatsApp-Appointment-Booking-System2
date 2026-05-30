@@ -2,11 +2,7 @@
  * useTenantConfig.js
  *
  * Provides tenant branding and feature flags to any component in the tree.
- *
- * ─── PHASE STATUS ────────────────────────────────────────────────────────────
- * Phase 35.1 (current): Live API call → GET /api/v1/public/{slug}/config
- *   In-memory session cache prevents redundant requests.
- *   Falls back to DEFAULT_CONFIG if the request fails.
+ * Backed by TanStack Query — automatic caching, deduplication, background refresh.
  *
  * ─── USAGE ───────────────────────────────────────────────────────────────────
  *   const { config, isLoading } = useTenantConfig();          // auto-slug
@@ -21,12 +17,17 @@
  *     unit_types:      string[],
  *     payment_methods: string[],
  *   }
+ *
+ * ─── CACHE BEHAVIOR ──────────────────────────────────────────────────────────
+ *   staleTime 10 min  → no re-fetch on navigation between pages
+ *   queryKey  [slug, 'config']  → each tenant cached independently
+ *   On error  → DEFAULT_CONFIG fallback so UI never hard-crashes
  */
 
-import { useState, useEffect, useRef } from 'react';
-import publicApi          from '../utils/publicApi';
-import useTenantSlug      from '../utils/useTenantSlug';
-import { getNavItems }    from '../config/service-catalog';
+import { useQuery }   from '@tanstack/react-query';
+import publicApi      from '../utils/publicApi';
+import useTenantSlug  from '../utils/useTenantSlug';
+import { getNavItems } from '../config/service-catalog';
 
 // ─── Default fallback (prevents white screen if API is unreachable) ──────────
 const DEFAULT_CONFIG = {
@@ -53,64 +54,29 @@ const DEFAULT_CONFIG = {
   active_services: [],
 };
 
-// ─── In-memory session cache — one fetch per slug per page load ───────────────
-const _cache = {};
-
 // ─── Hook ────────────────────────────────────────────────────────────────────
 export default function useTenantConfig(slugOverride) {
   // useTenantSlug is a hook — must always be called unconditionally
   const autoSlug = useTenantSlug();
   const slug     = slugOverride ?? autoSlug ?? 'smar';
 
-  const [config,    setConfig]    = useState(() => _cache[slug] ?? null);
-  const [isLoading, setIsLoading] = useState(!_cache[slug]);
-  const [error,     setError]     = useState(null);
+  const { data, isLoading, isError, error: queryError } = useQuery({
+    queryKey:  [slug, 'config'],
+    queryFn:   () => publicApi.get(`/${slug}/config`).then(r => r.data),
+    staleTime: 10 * 60 * 1000,   // 10 min — tenant config rarely changes
+    gcTime:    30 * 60 * 1000,   // 30 min — keep in memory across navigation
+    retry:     1,
+    enabled:   !!slug,
+  });
 
-  const slugRef = useRef(slug);
-  slugRef.current = slug;
-
-  useEffect(() => {
-    const s = slugRef.current;
-
-    // Cache hit — no network call
-    if (_cache[s]) {
-      setConfig(_cache[s]);
-      setIsLoading(false);
-      return;
-    }
-
-    // ── Phase 35.1: live API call ─────────────────────────────────────────────
-    const controller = new AbortController();
-    setIsLoading(true);
-
-    publicApi
-      .get(`/${s}/config`, { signal: controller.signal })
-      .then(res => {
-        _cache[s] = res.data;
-        setConfig(res.data);
-        setError(null);
-      })
-      .catch(err => {
-        if (err.name === 'CanceledError' || controller.signal.aborted) return;
-        // Fall back to default so UI never hard-crashes
-        const fallback = { ...DEFAULT_CONFIG, slug: s };
-        _cache[s] = fallback;
-        setConfig(fallback);
-        setError(err?.response?.data?.detail ?? err?.message ?? 'Config unavailable');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [slug]);
-
+  // On error: fall back to DEFAULT_CONFIG so the page never hard-crashes
+  const config = isError ? { ...DEFAULT_CONFIG, slug } : (data ?? null);
   const resolved = config ?? DEFAULT_CONFIG;
 
   return {
     config:    resolved,
     navItems:  getNavItems(resolved.active_services ?? [], resolved.slug ?? slug),
     isLoading,
-    error,
+    error:     isError ? (queryError?.response?.data?.detail ?? queryError?.message ?? 'Config unavailable') : null,
   };
 }
