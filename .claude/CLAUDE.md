@@ -55,11 +55,12 @@ rules/global.md                  -- Always: multi-tenancy, 4-layer, session prot
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern
-rules/frontend/architecture.md   -- @data/@domain/@presentation layers
-rules/frontend/routing.md        -- Registry lazy routing, FM12 rule
-rules/frontend/animations.md     -- Awwwards springs, parallax, video pivot
-rules/frontend/scaffolding.md    -- New tenant folder structure
-rules/smar-tenant.md             -- Smar-specific complete reference
+rules/frontend/architecture.md      -- @data/@domain/@presentation layers
+rules/frontend/routing.md           -- Registry lazy routing, FM12 rule
+rules/frontend/animations.md        -- Awwwards springs, parallax, video pivot
+rules/frontend/scaffolding.md       -- New tenant folder structure
+rules/frontend/feature-structure.md -- Bulletproof React: hooks/ layer, useQuery, no fetch in sections/
+rules/smar-tenant.md                -- Smar-specific complete reference
 
 ## Agents (.claude/agent/)
 bo-hussein             -- CEO Orchestrator: strategic planning, web search, delegates to all agents
@@ -74,7 +75,8 @@ cyber-sentinel         -- Security engineer: multi-tenancy leaks, auth, race con
 backend/  -- database-architecture, supabase-prisma, n8n-automation
 frontend/ -- gs-mar-design-system, admin-dashboard-builder, awwwards-animations,
              webgl-awwwards, frontend-component-builder, ai-agent-canvas,
-             ui-ux-pro-max, frontend-design
+             ui-ux-pro-max, frontend-design,
+             tanstack-query (React Query v5 — multi-tenant cache layer)
 shared/   -- auto-reporting, project-health
 general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, + more
 

@@ -32,3 +32,10 @@ Read these files before starting:
   .claude/skills/impeccable/reference/craft.md                ← polish + finishing touches
   .claude/skills/impeccable/reference/bolder.md               ← push designs beyond safe
   .claude/skills/ui-ux-pro-max/data/landing.csv               ← visual taste references
+
+8. Data Fetching & Caching — اقرأ قبل أي مهمة تحتوي API calls
+  .claude/skills/frontend/tanstack-query/SKILL.md            ← React Query v5 patterns for multi-tenant
+  .claude/rules/frontend/feature-structure.md                ← hooks/ مجلد، layer assignment، scaffolding
+
+  قاعدة صارمة: لا useEffect+fetch داخل sections/ أو canvas/ أو ui/.
+  كل fetch = داخل hooks/ مجلد → useQuery مع queryKey يبدأ بـ [slug, ...].
