@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List
 
 from . import properties, units, bookings, listings, registration, restaurant, store, catalog, reservations, ai_chat, demo
-from app.main import limiter
+from app.core.limiter import limiter
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_client
 from app.core.services import require_service

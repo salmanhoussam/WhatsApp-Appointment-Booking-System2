@@ -20,7 +20,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, field_validator
 
 from app.db.client import prisma_client
-from app.main import limiter
+from app.core.limiter import limiter
 from app.services.demo_service import create_demo_tenant
 
 router = APIRouter()

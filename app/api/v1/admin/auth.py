@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.services import registration_service as _reg_service
 from app.repositories import user_repo as _user_repo
 from app.repositories import admin_client_repo as _client_repo
-from app.main import limiter
+from app.core.limiter import limiter
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
 # On localhost the domain kwarg is omitted (browsers reject .salmansaas.com there).

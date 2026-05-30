@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 from app.db.client import prisma_client
 from app.services import registration_service
-from app.main import limiter
+from app.core.limiter import limiter
 
 router = APIRouter()
 
