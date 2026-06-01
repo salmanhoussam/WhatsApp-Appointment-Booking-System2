@@ -70,6 +70,8 @@ const copy = {
     menuClose:        'إغلاق القائمة',
     errFill:          'يرجى ملء جميع الحقول',
     errServer:        'حدث خطأ، يرجى المحاولة مجدداً',
+    storiesTitle:     'عملاء يثقون بنا',
+    storiesSub:       'قصص حقيقية من منشآت تستخدم SalmanSaaS',
   },
   en: {
     logoName:         'SalmanSaaS',
@@ -113,6 +115,8 @@ const copy = {
     menuClose:        'Close menu',
     errFill:          'Please fill in all fields',
     errServer:        'An error occurred, please try again',
+    storiesTitle:     'Trusted by Businesses',
+    storiesSub:       'Real stories from businesses using SalmanSaaS',
   },
 };
 
@@ -182,6 +186,48 @@ const FEATURES = [
   { icon: '⚡', titleKey: 'f1Title', descKey: 'f1Desc' },
   { icon: '🌐', titleKey: 'f2Title', descKey: 'f2Desc' },
   { icon: '📊', titleKey: 'f3Title', descKey: 'f3Desc' },
+];
+
+// ─────────────────────────────────────────────
+// Customer Stories data
+// ─────────────────────────────────────────────
+const CUSTOMER_STORIES = [
+  {
+    avatar:      '🍽️',
+    businessType: { ar: 'مطعم', en: 'Restaurant' },
+    name:        { ar: 'أحمد — مطعم الزيتونة، بيروت', en: 'Ahmad — Al Zeitouneh, Beirut' },
+    quoteAr:     'في أقل من ساعة أصبح لدي قائمة رقمية كاملة. زبائني الآن يطلبون عبر الواتساب مباشرة.',
+    quoteEn:     'In under an hour I had a full digital menu. Customers now order directly via WhatsApp.',
+    metric:      { ar: '+٤٠٪ في الطلبات', en: '+40% in Orders' },
+    accent:      '#e8a045',
+  },
+  {
+    avatar:      '👟',
+    businessType: { ar: 'متجر إلكتروني', en: 'Online Store' },
+    name:        { ar: 'سارة — ستايل ستور، الرياض', en: 'Sara — Style Store, Riyadh' },
+    quoteAr:     'كنت أبيع عبر انستغرام يدوياً. اليوم متجري الكامل يدير نفسه.',
+    quoteEn:     'I used to sell manually on Instagram. Today my full store runs itself.',
+    metric:      { ar: '٢× مبيعات في ٣٠ يوم', en: '2× sales in 30 days' },
+    accent:      '#7c3aed',
+  },
+  {
+    avatar:      '🏠',
+    businessType: { ar: 'حجوزات', en: 'Booking' },
+    name:        { ar: 'خالد — شاليهات النخيل، دبي', en: 'Khaled — Al Nakheel Chalets, Dubai' },
+    quoteAr:     'نظام الحجز الجديد وفّر عليّ ٣ ساعات يومياً كنت أقضيها في الردود اليدوية.',
+    quoteEn:     'The new booking system saved me 3 hours daily I used to spend on manual replies.',
+    metric:      { ar: '٣ ساعات يومياً موفّرة', en: '3 hours saved daily' },
+    accent:      '#0ea5e9',
+  },
+  {
+    avatar:      '☕',
+    businessType: { ar: 'كافيه', en: 'Café' },
+    name:        { ar: 'ليلى — كافيه لونا، عمّان', en: 'Layla — Luna Café, Amman' },
+    quoteAr:     'أول يوم فتحت فيه الرابط أمام زبائني، جاءتني ١٢ طلبية خلال ساعتين.',
+    quoteEn:     'The first day I shared the link with customers, I got 12 orders in 2 hours.',
+    metric:      { ar: '١٢ طلبية في أول يومين', en: '12 orders on day one' },
+    accent:      '#d4a853',
+  },
 ];
 
 // ─────────────────────────────────────────────
@@ -1024,6 +1070,215 @@ function DemoCard({ card, lang, t, onNavigate }) {
 }
 
 // ─────────────────────────────────────────────
+// Customer Stories Section
+// ─────────────────────────────────────────────
+function CustomerStoriesSection({ lang, t }) {
+  const isAr = lang === 'ar';
+  const cardRefs = CUSTOMER_STORIES.map(() => ({ current: null }));
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+
+    cardRefs.forEach((ref) => {
+      if (ref.current) observer.observe(ref.current);
+    });
+
+    return () => observer.disconnect();
+    // cardRefs is stable per render — suppress lint
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <section
+      style={{
+        background: '#060610',
+        padding:    '80px 1.5rem',
+        boxSizing:  'border-box',
+        borderTop:  '1px solid rgba(255,255,255,0.04)',
+      }}
+      dir={isAr ? 'rtl' : 'ltr'}
+    >
+      {/* Story-card CSS — injected once */}
+      <style>{`
+        .story-card {
+          opacity: 0;
+          transform: translateY(32px);
+          transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1),
+                      transform 0.65s cubic-bezier(0.22,1,0.36,1);
+        }
+        .story-card.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .story-card {
+            transition: opacity 0.3s;
+            transform: none !important;
+          }
+        }
+      `}</style>
+
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        {/* Section header */}
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <h2 style={{
+            fontFamily:    FONT,
+            fontWeight:    800,
+            fontSize:      'clamp(1.6rem, 3.5vw, 2.2rem)',
+            color:         TEXT_PRI,
+            margin:        '0 0 0.75rem',
+            letterSpacing: '-0.02em',
+          }}>
+            {t.storiesTitle}
+          </h2>
+          <p style={{ color: TEXT_SEC, fontSize: '15px', fontFamily: FONT, margin: 0 }}>
+            {t.storiesSub}
+          </p>
+        </div>
+
+        {/* Cards grid */}
+        <div style={{
+          display:             'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap:                 '1.25rem',
+        }}>
+          {CUSTOMER_STORIES.map((story, i) => (
+            <StoryCard
+              key={i}
+              story={story}
+              lang={lang}
+              delay={i * 150}
+              refCallback={(el) => { cardRefs[i].current = el; }}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StoryCard({ story, lang, delay, refCallback }) {
+  const isAr = lang === 'ar';
+  const [hovered, setHovered] = useState(false);
+
+  const quote      = isAr ? story.quoteAr       : story.quoteEn;
+  const name       = isAr ? story.name.ar       : story.name.en;
+  const bizType    = isAr ? story.businessType.ar : story.businessType.en;
+  const metric     = isAr ? story.metric.ar     : story.metric.en;
+  const { accent } = story;
+
+  return (
+    <div
+      ref={refCallback}
+      className="story-card"
+      style={{ transitionDelay: `${delay}ms` }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{
+        background:    'rgba(255,255,255,0.035)',
+        border:        `1px solid ${hovered ? `${accent}66` : 'rgba(255,255,255,0.07)'}`,
+        borderTop:     `3px solid ${accent}`,
+        borderRadius:  '14px',
+        padding:       '24px',
+        boxSizing:     'border-box',
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           '12px',
+        height:        '100%',
+        transition:    'border-color 0.25s, transform 0.25s, box-shadow 0.25s',
+        transform:     hovered ? 'translateY(-5px)' : 'translateY(0)',
+        boxShadow:     hovered ? `0 16px 40px ${accent}1a` : 'none',
+      }}>
+        {/* Avatar + business info */}
+        <div style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        '12px',
+          flexDirection: isAr ? 'row-reverse' : 'row',
+        }}>
+          <div style={{
+            fontSize:       '32px',
+            lineHeight:     1,
+            flexShrink:     0,
+          }}>
+            {story.avatar}
+          </div>
+          <div style={{ textAlign: isAr ? 'right' : 'left' }}>
+            <p style={{
+              fontFamily:  FONT,
+              fontWeight:  700,
+              fontSize:    '14px',
+              color:       TEXT_PRI,
+              margin:      0,
+              lineHeight:  1.3,
+              direction:   isAr ? 'rtl' : 'ltr',
+            }}>
+              {name}
+            </p>
+            <span style={{
+              display:       'inline-block',
+              marginTop:     '5px',
+              background:    `${accent}18`,
+              border:        `1px solid ${accent}33`,
+              borderRadius:  '999px',
+              padding:       '2px 10px',
+              color:         accent,
+              fontSize:      '11px',
+              fontFamily:    FONT,
+              fontWeight:    600,
+              letterSpacing: '0.04em',
+            }}>
+              {bizType}
+            </span>
+          </div>
+        </div>
+
+        {/* Quote */}
+        <p style={{
+          fontFamily:  FONT,
+          fontSize:    '14px',
+          fontStyle:   'italic',
+          color:       'rgba(255,255,255,0.75)',
+          lineHeight:  1.7,
+          margin:      0,
+          direction:   isAr ? 'rtl' : 'ltr',
+          textAlign:   isAr ? 'right' : 'left',
+          flexGrow:    1,
+        }}>
+          "{quote}"
+        </p>
+
+        {/* Divider */}
+        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+
+        {/* Metric */}
+        <p style={{
+          fontFamily: FONT,
+          fontWeight: 700,
+          fontSize:   '18px',
+          color:      accent,
+          margin:     0,
+          direction:  isAr ? 'rtl' : 'ltr',
+          textAlign:  isAr ? 'right' : 'left',
+        }}>
+          {metric}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Features Strip
 // ─────────────────────────────────────────────
 function FeaturesSection({ lang, t }) {
@@ -1223,10 +1478,13 @@ export default function DemoLandingPage() {
         {/* BLOCK 3 — Live Demo Cards */}
         <DemoCardsSection lang={lang} t={t} />
 
-        {/* BLOCK 4 — Features Strip */}
+        {/* BLOCK 4 — Customer Stories */}
+        <CustomerStoriesSection lang={lang} t={t} />
+
+        {/* BLOCK 5 — Features Strip */}
         <FeaturesSection lang={lang} t={t} />
 
-        {/* BLOCK 5 — Footer */}
+        {/* BLOCK 6 — Footer */}
         <DemoFooter lang={lang} t={t} />
       </div>
     </>
