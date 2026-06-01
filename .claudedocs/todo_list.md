@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-05-18
+# Last updated: 2026-05-30
 
 ## Completed Phases
 
@@ -48,47 +48,34 @@
 - Phase 70F: /impeccable polish — fonts, perf, reduced-motion, SVG icons, config drift — ✅ Done 2026-05-21
 - New workflow rule: .claudedocs/plans/phase-XY.md per phase, per-agent division — ✅ Done 2026-05-21
 - Phase 71: OlivelloStory cinematic scroll (7 scenes × 130vh, real photos, CSS olive morphing) — ✅ Done 2026-05-22
-- Phase 72: 3D Olive R3F + Slot System (SphereGeometry PBR, 6 SlotPlane vignette shader, ScrollProgressContext) — ✅ Built 2026-05-26 (visual validation pending)
+- Phase 72: 3D Olive R3F + Slot System (SphereGeometry PBR, 6 SlotPlane vignette shader, ScrollProgressContext) — ✅ Built 2026-05-26
+- cyber-sentinel agent — 10 threat classes — ✅ Done 2026-05-30
+- SEC-07: /docs hidden in production (main.py) — ✅ Done 2026-05-30
+- SEC-09: bcrypt 72-byte guard (security.py) — ✅ Done 2026-05-30
+- TanStack Query cache layer — useTenantConfig + DynamicPage migrated — ✅ Done 2026-05-30
+- Bulletproof React 5-bucket refactor — hooks/ + services/ + rule file — ✅ Done 2026-05-30
+- Phase F ARCH-01 admin routes — 0 prisma_client violations (13 files, 9 new repos) — ✅ Done 2026-05-30
+- Phase E: POST /demo/create + auto-seed catalog + DemoLauncher.jsx — ✅ Done 2026-05-30
+- FIX: circular import crash (limiter → app.core.limiter) — ✅ Done 2026-05-30
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
+- [ ] **`npx prisma db push`** — run on Railway backend to activate `status`/`trial_ends_at`/`service_type` fields in DB (needed for demo flow)
 - [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain في Pages → Custom Domains
 - [ ] **SEC-03 (partial):** Supabase service key + Resend API key — rotation يدوي في الداشبوردات
-  - JWT_SECRET_KEY + SECRET_KEY + ONBOARDING_SECRET: ✅ rotated 2026-05-18
 
 ## 🟠 In Progress / Carry Forward
 
+- [ ] **DemoLauncher navigation fix** — بعد الإنشاء يوجّه لـ `/{slug}/menu` (restaurant) أو `/{slug}/store` (store) بدل `/{slug}/home` دائماً
 - [ ] **Phase 72 visual validation** — جرّب `localhost:5173/olivello/home`، تحقق olive size + slot positions
-- [ ] **Phase 72 deploy** — git push → Railway smoke test `demo.salmansaas.com/olivello`
 - [ ] **Phase 67 — اختبار يدوي** — افتح `/{slug}/dashboard` → "محرر الصفحة"، تحقق من 3 panels + interactions + toast
 - [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
-- [ ] **ARCH-01 admin routes** — ~21 ملف admin لا تزال تستخدم prisma_client مباشرة
 
 ## 🟡 Upcoming (بالأولوية)
 
-1. **Phase 70F** — `/impeccable polish` على olivello showcase بعد اكتمال الـ 7 sections
-2. **Phase 68: DemoLauncher.jsx + `POST /demo/create`** — زر "جرّب مجاناً" → tenant مؤقت 7 أيام
-3. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
-4. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
-
-## 🏗️ Frontend Architecture Upgrades (من بحث @beyond.the.brackets)
-
-5. **Cache Layer — TanStack Query** — أضف React Query على كل `publicApi` calls
-   - Ref: github.com/devkodeio/frontend-system-design (Layer 4: Cache)
-   - المشكلة الحالية: كل re-render يعمل fetch جديد، لا caching
-   - الخطة: `useQuery` بدل `useEffect + fetch` في pages/[slug]/
-   - Impact: ⭐ أثر فوري على performance عند تعدد التنانت
-
-6. **Feature-based Structure — Bulletproof React** — وثّق architecture rule للـ Frontend
-   - Ref: github.com/alan2207/bulletproof-react
-   - المشكلة الحالية: داخل كل tenant البنية مختلطة (sections/ + canvas/ + ui/ لكن لا shared/)
-   - الخطة: أضف `.claude/rules/frontend/feature-structure.md` بناءً على Bulletproof React
-   - Impact: ⭐ يمنع technical debt مع كل tenant جديد
-
-## Upcoming (مستقبلي)
-
-- n8n workflow: Konaan → webhook → WhatsApp AI settings
-- footlab page_type → store: redirect fix من `/demo/footlab`
+1. **Phase 73: Olivello .glb model** — real olive .glb + morph targets (squish/teardrop on scroll)
+2. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
+3. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
 
 ## Sprint 2 — Code Review Findings (مستقبلي)
 

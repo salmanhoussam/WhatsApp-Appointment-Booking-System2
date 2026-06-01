@@ -4,7 +4,7 @@
  * All inline — no separate component files, no Tailwind.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import publicApi from '../../../utils/publicApi';
@@ -289,13 +289,13 @@ function DemoNavbar({ lang, t, toggleLang }) {
     left:           0,
     right:          0,
     zIndex:         100,
-    padding:        '1rem 2rem',
+    padding:        scrolled ? '0.7rem 2rem' : '1.2rem 2rem',
     display:        'flex',
     justifyContent: 'space-between',
     alignItems:     'center',
-    transition:     'background 0.35s, border-color 0.35s',
+    transition:     'padding 0.4s ease, background 0.4s ease, border-color 0.4s ease, backdrop-filter 0.4s ease',
     background:     scrolled ? 'rgba(5,5,8,0.92)' : 'transparent',
-    borderBottom:   scrolled ? '1px solid rgba(212,168,83,0.12)' : '1px solid transparent',
+    borderBottom:   scrolled ? '1px solid rgba(212,168,83,0.1)' : '1px solid transparent',
     backdropFilter: scrolled ? 'blur(16px)' : 'none',
     WebkitBackdropFilter: scrolled ? 'blur(16px)' : 'none',
     boxSizing:      'border-box',
@@ -554,7 +554,6 @@ function HeroSection({ lang, t, navigate }) {
     textAlign:  'center',
     maxWidth:   '720px',
     width:      '100%',
-    animation:  'dl-fade-up 0.7s ease-out both',
   };
 
   const h1Style = {
@@ -648,13 +647,47 @@ function HeroSection({ lang, t, navigate }) {
 
   return (
     <section style={sectionStyle}>
+      <style>{`
+        .hero-heading {
+          opacity: 0;
+          transform: translateY(28px);
+          animation: heroReveal 0.7s cubic-bezier(0.22,1,0.36,1) 0.15s forwards;
+        }
+        .hero-sub {
+          opacity: 0;
+          transform: translateY(20px);
+          animation: heroReveal 0.7s cubic-bezier(0.22,1,0.36,1) 0.35s forwards;
+        }
+        .hero-form {
+          opacity: 0;
+          transform: translateY(16px) scale(0.98);
+          animation: heroFormIn 0.75s cubic-bezier(0.22,1,0.36,1) 0.55s forwards;
+        }
+        .hero-note {
+          opacity: 0;
+          animation: heroReveal 0.5s ease 0.9s forwards;
+        }
+        @keyframes heroReveal {
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes heroFormIn {
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-heading, .hero-sub, .hero-form, .hero-note {
+            animation: none;
+            opacity: 1;
+            transform: none;
+          }
+        }
+      `}</style>
       <div style={glowStyle} />
       <div style={contentStyle}>
-        <h1 style={h1Style}>{t.heroH1}</h1>
-        <p style={subStyle}>{t.heroSub}</p>
+        <h1 style={h1Style} className="hero-heading">{t.heroH1}</h1>
+        <p style={subStyle} className="hero-sub">{t.heroSub}</p>
 
         {/* Glass form panel */}
-        <div style={glassPanel} dir={isAr ? 'rtl' : 'ltr'}>
+        <div style={glassPanel} className="hero-form" dir={isAr ? 'rtl' : 'ltr'}>
           {/* Business type selector */}
           <p style={{
             color: TEXT_SEC, fontSize: '12px', fontFamily: FONT,
@@ -766,7 +799,7 @@ function HeroSection({ lang, t, navigate }) {
           </form>
 
           {/* Disclaimer */}
-          <p style={{
+          <p className="hero-note" style={{
             color:      'rgba(255,255,255,0.25)',
             fontSize:   '11px',
             fontFamily: FONT,
@@ -908,6 +941,25 @@ function SuccessCard({ t, lang, slug, tempPassword, onNavigate }) {
 function DemoCardsSection({ lang, t }) {
   const isAr = lang === 'ar';
   const navigate = useNavigate();
+  const cardRefs = useRef([]);
+  const titleRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    if (titleRef.current) observer.observe(titleRef.current);
+    cardRefs.current.forEach((ref) => ref && observer.observe(ref));
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <section
@@ -919,9 +971,33 @@ function DemoCardsSection({ lang, t }) {
       }}
       dir={isAr ? 'rtl' : 'ltr'}
     >
+      <style>{`
+        .demo-card-reveal {
+          opacity: 0;
+          transform: translateY(24px);
+          transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1),
+                      transform 0.65s cubic-bezier(0.22,1,0.36,1);
+        }
+        .demo-card-reveal.visible { opacity: 1; transform: translateY(0); }
+        .section-title-reveal {
+          opacity: 0;
+          transform: translateY(16px);
+          transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1) 0.05s,
+                      transform 0.6s cubic-bezier(0.22,1,0.36,1) 0.05s;
+        }
+        .section-title-reveal.visible { opacity: 1; transform: translateY(0); }
+        @media (prefers-reduced-motion: reduce) {
+          .demo-card-reveal { transition: opacity 0.3s; transform: none !important; }
+          .section-title-reveal { transition: opacity 0.3s; transform: none !important; }
+        }
+      `}</style>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         {/* Section header */}
-        <div style={{ textAlign: 'center', marginBottom: '3rem', animation: 'dl-fade-up 0.6s ease-out both' }}>
+        <div
+          ref={titleRef}
+          className="section-title-reveal"
+          style={{ textAlign: 'center', marginBottom: '3rem' }}
+        >
           <h2 style={{
             fontFamily:    FONT,
             fontWeight:    800,
@@ -943,14 +1019,20 @@ function DemoCardsSection({ lang, t }) {
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap:                 '1.25rem',
         }}>
-          {DEMO_CARDS.map((card) => (
-            <DemoCard
+          {DEMO_CARDS.map((card, i) => (
+            <div
               key={card.slug}
-              card={card}
-              lang={lang}
-              t={t}
-              onNavigate={() => navigate(card.url)}
-            />
+              className="demo-card-reveal"
+              style={{ transitionDelay: `${i * 120}ms` }}
+              ref={(el) => { cardRefs.current[i] = el; }}
+            >
+              <DemoCard
+                card={card}
+                lang={lang}
+                t={t}
+                onNavigate={() => navigate(card.url)}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -1075,6 +1157,7 @@ function DemoCard({ card, lang, t, onNavigate }) {
 function CustomerStoriesSection({ lang, t }) {
   const isAr = lang === 'ar';
   const cardRefs = CUSTOMER_STORIES.map(() => ({ current: null }));
+  const storyTitleRef = useRef(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -1088,6 +1171,7 @@ function CustomerStoriesSection({ lang, t }) {
       { threshold: 0.12 }
     );
 
+    if (storyTitleRef.current) observer.observe(storyTitleRef.current);
     cardRefs.forEach((ref) => {
       if (ref.current) observer.observe(ref.current);
     });
@@ -1129,7 +1213,11 @@ function CustomerStoriesSection({ lang, t }) {
 
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         {/* Section header */}
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+        <div
+          ref={storyTitleRef}
+          className="section-title-reveal"
+          style={{ textAlign: 'center', marginBottom: '3rem' }}
+        >
           <h2 style={{
             fontFamily:    FONT,
             fontWeight:    800,
@@ -1283,6 +1371,25 @@ function StoryCard({ story, lang, delay, refCallback }) {
 // ─────────────────────────────────────────────
 function FeaturesSection({ lang, t }) {
   const isAr = lang === 'ar';
+  const pillarRefs = useRef([]);
+  const featTitleRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    if (featTitleRef.current) observer.observe(featTitleRef.current);
+    pillarRefs.current.forEach((ref) => ref && observer.observe(ref));
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <section
@@ -1296,9 +1403,38 @@ function FeaturesSection({ lang, t }) {
       }}
       dir={isAr ? 'rtl' : 'ltr'}
     >
+      <style>{`
+        .feature-pillar {
+          opacity: 0;
+          transform: translateY(20px);
+          transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1),
+                      transform 0.6s cubic-bezier(0.22,1,0.36,1);
+        }
+        .feature-pillar.visible { opacity: 1; transform: translateY(0); }
+        .feature-icon {
+          display: inline-block;
+          transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .feature-pillar.visible .feature-icon {
+          animation: iconPulse 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        @keyframes iconPulse {
+          0%   { transform: scale(0.7); }
+          60%  { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .feature-pillar { transition: opacity 0.3s; transform: none !important; }
+          @keyframes iconPulse { to { transform: scale(1); } }
+        }
+      `}</style>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+        <div
+          ref={featTitleRef}
+          className="section-title-reveal"
+          style={{ textAlign: 'center', marginBottom: '3rem' }}
+        >
           <h2 style={{
             fontFamily:    FONT,
             fontWeight:    800,
@@ -1318,13 +1454,19 @@ function FeaturesSection({ lang, t }) {
           gap:                 '1.5rem',
         }}>
           {FEATURES.map((feat, i) => (
-            <FeaturePillar
+            <div
               key={i}
-              icon={feat.icon}
-              title={t[feat.titleKey]}
-              desc={t[feat.descKey]}
-              isAr={isAr}
-            />
+              className="feature-pillar"
+              style={{ transitionDelay: `${i * 100}ms` }}
+              ref={(el) => { pillarRefs.current[i] = el; }}
+            >
+              <FeaturePillar
+                icon={feat.icon}
+                title={t[feat.titleKey]}
+                desc={t[feat.descKey]}
+                isAr={isAr}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -1342,7 +1484,7 @@ function FeaturePillar({ icon, title, desc, isAr }) {
       textAlign:    isAr ? 'right' : 'left',
       boxSizing:    'border-box',
     }}>
-      <div style={{
+      <div className="feature-icon" style={{
         fontSize:     '2.5rem',
         marginBottom: '1rem',
         lineHeight:   1,
