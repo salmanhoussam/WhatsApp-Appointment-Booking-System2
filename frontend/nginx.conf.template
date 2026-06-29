@@ -1,0 +1,25 @@
+server {
+    listen ${PORT};
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Static test pages — served directly by nginx, bypass React Router
+    location = /demo/hamoudi {
+        try_files /hamoudi.html =404;
+    }
+
+    # SPA fallback — all other paths → index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache hashed static assets (Vite adds content hashes)
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2|woff|ttf|webp)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript application/x-javascript text/xml application/xml text/javascript image/svg+xml;
+    gzip_min_length 1024;
+}

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalmanSaas | The Future of Web</title>
+
+    <!-- خطوط عصرية وتقنية -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                        mono: ['Space Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: '#ff1a55', // اللون الأحمر/الوردي المميز في الفيديو
+                        dark: '#050505',
+                        surface: '#111',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* إعدادات أساسية */
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* تأثير التشويش السينمائي (Noise Overlay) */
+        .noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.04;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+        }
+
+        /* الشبكة ثلاثية الأبعاد (3D Grid) الموجودة في الفيديو */
+        .grid-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            perspective: 1000px;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .cyber-grid {
+            position: absolute;
+            bottom: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image:
+                linear-gradient(to right, rgba(255, 26, 85, 0.1) 1px, transparent 1px),
+                linear-gradient(to top, rgba(255, 26, 85, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: rotateX(60deg);
+            transform-origin: center top;
+            animation: moveGrid 15s linear infinite;
+        }
+
+        @keyframes moveGrid {
+            0% {
+                transform: rotateX(60deg) translateY(0);
+            }
+
+            100% {
+                transform: rotateX(60deg) translateY(50px);
+            }
+
+            /* نفس حجم المربع للتحريك السلس */
+        }
+
+        /* تأثير التوهج المربع (شبه 3D) */
+        .floating-cube {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, #ff1a55 0%, #3b0018 100%);
+            box-shadow: 0 0 60px rgba(255, 26, 85, 0.5);
+            transform: rotate(-45deg) skew(15deg, 15deg);
+            transition: transform 0.1s ease-out;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* حركات السكرول للنصوص (Scroll Reveal) */
+        .scroll-reveal {
+            opacity: 0;
+            transform: translateY(100px) scale(0.9);
+            transition: all 1s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .scroll-reveal.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* خطوط التقسيم التقنية */
+        .tech-line {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 26, 85, 0.5), transparent);
+            width: 100%;
+            margin: 2rem 0;
+        }
+
+        /* تأثير الكتابة بالخطوط المونو */
+        .mono-tag {
+            font-family: 'Space Mono', monospace;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            color: #ff1a55;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mono-tag::before {
+            content: '';
+            width: 30px;
+            height: 2px;
+            background-color: #ff1a55;
+        }
+
+        /* صورة اللوحة (Dashboard Mockup) */
+        .dashboard-mockup {
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 30px 100px -20px rgba(255, 26, 85, 0.4);
+            transform: perspective(1000px) rotateX(10deg);
+            transition: transform 0.5s ease;
+        }
+
+        .dashboard-mockup:hover {
+            transform: perspective(1000px) rotateX(0deg);
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-brand selection:text-white">
+
+    <!-- طبقة التشويش -->
+    <div class="noise"></div>
+
+    <!-- الخلفية الشبكية -->
+    <div class="grid-container">
+        <div class="absolute top-0 w-full h-full bg-gradient-to-b from-dark via-transparent to-dark z-10"></div>
+        <div class="cyber-grid"></div>
+    </div>
+
+    <!-- شريط التنقل (Navigation) -->
+    <nav class="fixed w-full z-40 top-0 mix-blend-difference px-8 py-6 flex justify-between items-center">
+        <div class="text-2xl font-black tracking-tighter flex items-center gap-2">
+            <div class="w-4 h-8 bg-brand skew-x-[-20deg]"></div>
+            Salman<span class="text-brand">Saas</span>
+        </div>
+        <div class="hidden md:flex gap-8 font-mono text-sm uppercase tracking-widest text-gray-400">
+            <a href="#" class="hover:text-white transition-colors">عن الشركة</a>
+            <a href="#" class="hover:text-white transition-colors">تحليل البيانات</a>
+            <a href="#" class="hover:text-white transition-colors">المميزات</a>
+        </div>
+        <button
+            class="font-mono text-xs border border-white/20 px-6 py-2 hover:bg-white hover:text-black transition-all">
+            تسجيل الدخول
+        </button>
+    </nav>
+
+    <!-- القسم الأول (Hero Section) -->
+    <section class="relative h-screen flex items-center justify-center overflow-hidden pt-20 px-4">
+        <!-- شكل هندسي يتفاعل مع الماوس والسكرول -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <div class="floating-cube opacity-80" id="heroShape"></div>
+        </div>
+
+        <div class="relative z-10 text-center flex flex-col items-center">
+            <div class="mono-tag mb-6 scroll-reveal">Understanding</div>
+            <h1 class="text-7xl md:text-[9rem] font-black uppercase leading-none tracking-tighter scroll-reveal"
+                style="transition-delay: 0.1s">
+                What Is<br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-500">Salman<span
+                        class="text-brand">Saas</span>?</span>
+            </h1>
+            <p class="mt-8 max-w-xl text-gray-400 font-mono text-sm md:text-base leading-relaxed scroll-reveal"
+                style="transition-delay: 0.2s">
+                // SYSTEM INITIALIZED. WE BUILD HIGH-PERFORMANCE WEB APPLICATIONS.
+                YOUR DIGITAL PRESENCE IS MONITORED, OPTIMIZED, AND SCALED.
+            </p>
+        </div>
+    </section>
+
+    <!-- خط فاصل -->
+    <div class="tech-line"></div>
+
+    <!-- القسم الثاني (Features/Analytics) -->
+    <section class="py-32 px-4 md:px-20 relative z-10">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+
+            <div class="order-2 md:order-1 relative">
+                <!-- عناصر زخرفية تشبه الكود -->
+                <div class="absolute -top-10 -right-10 text-brand/20 font-mono text-9xl font-black">01</div>
+
+                <div class="mono-tag mb-4 scroll-reveal">Analyzing Data</div>
+                <h2 class="text-5xl md:text-7xl font-black uppercase tracking-tight mb-8 scroll-reveal">
+                    Track <br> <span class="text-brand">Responses</span>
+                </h2>
+                <p class="text-gray-400 leading-relaxed font-mono text-sm mb-8 scroll-reveal">
+                    > Executing data protocol. SalmanSaas monitors user interactions in real-time. We translate complex
+                    data into actionable digital strategies.
+                </p>
+                <div class="grid grid-cols-2 gap-4 font-mono text-xs scroll-reveal">
+                    <div class="border border-white/10 p-4 bg-white/5">
+                        <div class="text-brand mb-1">Latency</div>
+                        <div class="text-2xl text-white">12ms</div>
+                    </div>
+                    <div class="border border-white/10 p-4 bg-white/5">
+                        <div class="text-brand mb-1">Uptime</div>
+                        <div class="text-2xl text-white">99.9%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- شكل هندسي آخر للتزيين يتحرك مع السكرول -->
+            <div class="order-1 md:order-2 flex justify-center parallax-item" data-speed="0.2">
+                <div class="w-64 h-64 border-4 border-brand/40 rounded-full flex items-center justify-center relative">
+                    <div
+                        class="absolute w-full h-full border-2 border-white/20 rounded-full animate-[spin_10s_linear_infinite]">
+                    </div>
+                    <div class="w-32 h-32 bg-brand/20 rounded-full blur-2xl"></div>
+                    <div class="font-mono text-brand font-bold absolute">SYNCING...</div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- القسم الثالث (Dashboard Reveal) -->
+    <section class="py-32 px-4 relative z-10 bg-gradient-to-b from-transparent to-black">
+        <div class="max-w-6xl mx-auto text-center mb-20">
+            <div class="mono-tag justify-center mb-4 scroll-reveal">System Interface</div>
+            <h2 class="text-5xl md:text-7xl font-black uppercase tracking-tight scroll-reveal">
+                Command <span class="text-gray-600">Center</span>
+            </h2>
+        </div>
+
+        <!-- محاكاة لشاشة لوحة التحكم (Dashboard) -->
+        <div class="max-w-5xl mx-auto dashboard-mockup rounded-2xl overflow-hidden scroll-reveal">
+            <!-- شريط علوي للوحة -->
+            <div class="h-10 border-b border-white/10 flex items-center px-4 gap-2 bg-white/5">
+                <div class="w-3 h-3 rounded-full bg-red-500/50"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500/50"></div>
+                <div class="font-mono text-[10px] text-gray-500 ml-auto uppercase tracking-widest">SalmanSaas //
+                    Admin_Terminal</div>
+            </div>
+
+            <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- رسم بياني وهمي -->
+                <div class="md:col-span-2 border border-white/10 rounded-xl p-6 bg-white/5 relative overflow-hidden">
+                    <div class="text-xs font-mono text-gray-400 mb-6">LIVE TRAFFIC METRICS</div>
+                    <div class="flex items-end gap-2 h-40">
+                        <!-- أعمدة عشوائية -->
+                        <div class="w-full bg-brand/20 rounded-t-sm h-[40%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand"></div>
+                        </div>
+                        <div class="w-full bg-brand/20 rounded-t-sm h-[70%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand"></div>
+                        </div>
+                        <div class="w-full bg-brand/20 rounded-t-sm h-[50%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand"></div>
+                        </div>
+                        <div class="w-full bg-brand/40 rounded-t-sm h-[90%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand shadow-[0_0_10px_#ff1a55]"></div>
+                        </div>
+                        <div class="w-full bg-brand/20 rounded-t-sm h-[60%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand"></div>
+                        </div>
+                        <div class="w-full bg-brand/20 rounded-t-sm h-[30%] relative">
+                            <div class="absolute top-0 w-full h-1 bg-brand"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- إحصائيات -->
+                <div class="space-y-6">
+                    <div class="border border-white/10 rounded-xl p-6 bg-white/5">
+                        <div class="text-xs font-mono text-gray-400 mb-2">ACTIVE USERS</div>
+                        <div class="text-4xl font-black">24,592</div>
+                        <div class="text-brand text-xs font-mono mt-2">+14.5% ↑</div>
+                    </div>
+                    <div class="border border-white/10 rounded-xl p-6 bg-white/5">
+                        <div class="text-xs font-mono text-gray-400 mb-2">SYSTEM STATUS</div>
+                        <div class="text-2xl font-bold text-green-400 flex items-center gap-2">
+                            <span class="relative flex h-3 w-3">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
+                            ONLINE
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- الفوتر -->
+    <footer class="py-10 border-t border-white/10 relative z-10 text-center font-mono text-xs text-gray-500">
+        <p>INITIALIZING PROTOCOL... DONE.</p>
+        <p class="mt-2">&copy; 2024 SALMANSAAS. ALL SYSTEMS NOMINAL.</p>
+    </footer>
+
+    <script>
+        // 1. حركة ظهور العناصر عند السكرول (Scroll Reveal)
+        const revealElements = document.querySelectorAll('.scroll-reveal');
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.15
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    // اختياري: إيقاف المراقبة بعد الظهور الأول
+                    // observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        revealElements.forEach(el => observer.observe(el));
+
+        // 2. تأثيرات البارالاكس (Parallax) وحركة المجسم في القسم الأول
+        const heroShape = document.getElementById('heroShape');
+        const parallaxItems = document.querySelectorAll('.parallax-item');
+
+        window.addEventListener('scroll', () => {
+            let scrolled = window.scrollY;
+
+            // تحريك المجسم المربع في الأعلى بناءً على السكرول
+            if (heroShape) {
+                // تدويره وتحريكه للأسفل قليلاً
+                heroShape.style.transform = `rotate(${-45 + scrolled * 0.1}deg) skew(15deg, 15deg) translateY(${scrolled * 0.3}px)`;
+            }
+
+            // تحريك العناصر الأخرى (Parallax)
+            parallaxItems.forEach(item => {
+                let speed = item.getAttribute('data-speed');
+                item.style.transform = `translateY(${scrolled * speed}px)`;
+            });
+        });
+
+        // 3. تأثير تفاعل المجسم مع حركة الماوس (اختياري لزيادة الجمالية)
+        document.addEventListener('mousemove', (e) => {
+            if (window.scrollY < window.innerHeight) { // فقط إذا كنا في القسم الأول
+                const x = (window.innerWidth / 2 - e.pageX) / 30;
+                const y = (window.innerHeight / 2 - e.pageY) / 30;
+
+                if (heroShape) {
+                    // دمج حركة السكرول مع حركة الماوس
+                    heroShape.style.marginLeft = `${-x}px`;
+                    heroShape.style.marginTop = `${-y}px`;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

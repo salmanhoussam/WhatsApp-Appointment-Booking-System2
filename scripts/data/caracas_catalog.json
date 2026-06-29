@@ -1,0 +1,223 @@
+{
+  "_meta": {
+    "tenant": "caracas",
+    "module_key": "restaurant",
+    "currency": "LBP",
+    "source": "sample — old DB had no seed file. Replace with real menu data.",
+    "categories_count": 4,
+    "items_count": 14,
+    "note": "هذه بيانات نموذجية. يمكنك تعديل الأسماء والأسعار والصور قبل تشغيل الـ seeder."
+  },
+  "categories": [
+    {
+      "name_ar": "مقبلات",
+      "name_en": "Starters",
+      "module_key": "restaurant",
+      "display_template": "list",
+      "sort_order": 1,
+      "image_url": null,
+      "items": [
+        {
+          "name_ar": "تيكينيوس",
+          "name_en": "Tequeños",
+          "description_ar": "عيدان عجين مقلية محشوة بجبنة موتزاريلا — المقبل الفنزويلي الأشهر.",
+          "description_en": "Crispy fried dough sticks stuffed with mozzarella cheese — Venezuela's most iconic starter.",
+          "price": 45000,
+          "currency": "LBP",
+          "is_featured": true,
+          "sort_order": 1,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "إمباناداس",
+          "name_en": "Empanadas",
+          "description_ar": "فطائر مقلية محشوة بالدجاج أو اللحم أو الجبن — يختار الزبون حشوته.",
+          "description_en": "Fried pastries filled with chicken, beef, or cheese — choose your filling.",
+          "price": 50000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 2,
+          "image_url": null,
+          "metadata": {
+            "fillings": ["chicken", "beef", "cheese"]
+          }
+        },
+        {
+          "name_ar": "غواكامولي مع توستوناس",
+          "name_en": "Guacamole & Tostones",
+          "description_ar": "غواكامولي طازج مع شرائح الموز الأخضر المقلية المقرمشة.",
+          "description_en": "Fresh guacamole served with crispy fried green plantain slices.",
+          "price": 55000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 3,
+          "image_url": null,
+          "metadata": {}
+        }
+      ]
+    },
+    {
+      "name_ar": "أطباق رئيسية",
+      "name_en": "Main Dishes",
+      "module_key": "restaurant",
+      "display_template": "list",
+      "sort_order": 2,
+      "image_url": null,
+      "items": [
+        {
+          "name_ar": "أريبا مشكّلة",
+          "name_en": "Arepa Mixta",
+          "description_ar": "خبز الأريبا الفنزويلي الكلاسيكي، محشو بالدجاج المفروم، الأفوكادو، والجبن الأبيض.",
+          "description_en": "Classic Venezuelan corn bread stuffed with shredded chicken, avocado, and white cheese.",
+          "price": 90000,
+          "currency": "LBP",
+          "is_featured": true,
+          "sort_order": 1,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "باييون كريوليو",
+          "name_en": "Pabellón Criollo",
+          "description_ar": "الطبق الوطني الفنزويلي: أرز أبيض، فاصوليا سوداء، لحم بقري مفروم، وتوستوناس.",
+          "description_en": "Venezuela's national dish: white rice, black beans, shredded beef, and fried plantains.",
+          "price": 130000,
+          "currency": "LBP",
+          "is_featured": true,
+          "sort_order": 2,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "لحم بيرنيل",
+          "name_en": "Pernil",
+          "description_ar": "كتف لحم خنزير مشوي ببطء مع توابل فنزويلية — يُقدّم مع الأرز والموز.",
+          "description_en": "Slow-roasted pork shoulder marinated in Venezuelan spices — served with rice and plantains.",
+          "price": 150000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 3,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "كاتشاباس",
+          "name_en": "Cachapas",
+          "description_ar": "فطائر الذرة الطازجة اللينة، محشوة بجبنة مانو وقطعة لحم دجاج مشوي.",
+          "description_en": "Soft fresh corn pancakes filled with mano cheese and grilled chicken breast.",
+          "price": 110000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 4,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "هالاكاس",
+          "name_en": "Hallacas",
+          "description_ar": "طبق احتفالي فنزويلي: عجينة ذرة محشوة باللحم المطبوخ ومغلّفة بأوراق الموز.",
+          "description_en": "Festive Venezuelan tamale: seasoned corn dough filled with stewed meat, wrapped in banana leaves.",
+          "price": 120000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 5,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "شيش طاووق كاراكاس",
+          "name_en": "Caracas Shish Tawook",
+          "description_ar": "دجاج متبّل بالليمون والتوابل اللاتينية، مشوي على الفحم مع صلصة الثوم.",
+          "description_en": "Chicken marinated in lemon and Latin spices, charcoal-grilled with garlic sauce.",
+          "price": 115000,
+          "currency": "LBP",
+          "is_featured": true,
+          "sort_order": 6,
+          "image_url": null,
+          "metadata": {}
+        }
+      ]
+    },
+    {
+      "name_ar": "حلويات",
+      "name_en": "Desserts",
+      "module_key": "restaurant",
+      "display_template": "grid",
+      "sort_order": 3,
+      "image_url": null,
+      "items": [
+        {
+          "name_ar": "بيبي ليتشي",
+          "name_en": "Bienmesabe",
+          "description_ar": "كريمة جوز الهند الفنزويلية الحلوة — يُقدّم بارداً مع رشة قرفة.",
+          "description_en": "Venezuelan sweet coconut cream — served chilled with a sprinkle of cinnamon.",
+          "price": 40000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 1,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "فلان دي كوكو",
+          "name_en": "Coconut Flan",
+          "description_ar": "كاستار ناعم بنكهة جوز الهند مع كراميل ذهبي — وصفة منزلية كلاسيكية.",
+          "description_en": "Silky coconut custard with golden caramel — a classic homestyle recipe.",
+          "price": 45000,
+          "currency": "LBP",
+          "is_featured": true,
+          "sort_order": 2,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "تشوروس مع شوكولا",
+          "name_en": "Churros con Chocolate",
+          "description_ar": "تشوروس مقلية طازجة مع صلصة الشوكولاتة الداكنة الساخنة.",
+          "description_en": "Freshly fried churros served with warm dark chocolate dipping sauce.",
+          "price": 50000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 3,
+          "image_url": null,
+          "metadata": {}
+        }
+      ]
+    },
+    {
+      "name_ar": "مشروبات",
+      "name_en": "Drinks",
+      "module_key": "restaurant",
+      "display_template": "grid",
+      "sort_order": 4,
+      "image_url": null,
+      "items": [
+        {
+          "name_ar": "باباياليتش — عصير باباي",
+          "name_en": "Papaya Juice",
+          "description_ar": "عصير باباي طازج بالسكر والحليب — وصفة فنزويلية تقليدية.",
+          "description_en": "Fresh papaya blended with sugar and milk — a traditional Venezuelan recipe.",
+          "price": 30000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 1,
+          "image_url": null,
+          "metadata": {}
+        },
+        {
+          "name_ar": "عصير مانغو طازج",
+          "name_en": "Fresh Mango Juice",
+          "description_ar": "مانغو طازج معصور على الثلج.",
+          "description_en": "Freshly squeezed mango on ice.",
+          "price": 28000,
+          "currency": "LBP",
+          "is_featured": false,
+          "sort_order": 2,
+          "image_url": null,
+          "metadata": {}
+        }
+      ]
+    }
+  ]
+}

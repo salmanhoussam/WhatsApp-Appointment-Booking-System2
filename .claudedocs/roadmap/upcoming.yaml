@@ -1,0 +1,1700 @@
+project: Smar 3D Scrollytelling Experience
+tenant: smar
+last_updated: 2026-05-03
+# split from phases_roadmap.yaml on 2026-04-24
+
+phases:
+
+  # ── UPCOMING: Phases 36-39 ────────────────────────────────────────────
+
+  - id: 36
+    name: "components/ Folder Cleanup — Tech Debt"
+    status: planned
+    priority: low
+    description: |
+      مجلد src/components/ يحتوي على 16 مكوّن قديم.
+      14 منهم orphans (لا أحد يستوردهم).
+      يجب تنظيف المجلد قبل إضافة tenants جدد.
+    tasks:
+
+      - id: 36.1
+        name: "Migrate UnitCalendar → design-system/organisms"
+        file: "src/components/UnitCalendar.jsx"
+        status: planned
+        details: |
+          UnitCalendar مستخدم في:
+            - SmarAdminDashboard.jsx:1169
+            - SmarBookingDrawer.jsx:421
+          يجب نقله إلى src/design-system/organisms/UnitCalendar.jsx
+          وتحديث الاستيرادات في الملفين.
+          لا تغيير في المنطق — نقل فقط.
+
+      - id: 36.2
+        name: "Delete 13 orphan components"
+        status: planned
+        files_to_delete:
+          - src/components/AboutResort.jsx
+          - src/components/BookingModal.jsx
+          - src/components/BookingPolicy.jsx
+          - src/components/ChaletCard.jsx
+          - src/components/ChaletInterior.jsx
+          - src/components/ChaletMarker.jsx
+          - src/components/CustomerHeader.jsx
+          - src/components/DateSearchBar.jsx
+          - src/components/FooterPolicies.jsx
+          - src/components/LanguageSwitcher.jsx
+          - src/components/LocationMap.jsx
+          - src/components/PoolAndCafe.jsx
+          - src/components/ResortAboutUs.jsx
+          - src/components/PaymentCard.css
+        details: |
+          كلها يتيمة (0 imports في المشروع).
+          التحقق قبل الحذف: grep -r "ComponentName" src/ --include="*.jsx"
+
+      - id: 36.3
+        name: "Review MountainMap + ChaletModal"
+        status: planned
+        details: |
+          يُستخدمان فقط في pages/admin/MountainDashboard.jsx
+          وهي صفحة غير مرتبطة بأي route في smar.routes.jsx.
+          القرار: إذا لا يوجد route → حذف MountainDashboard + المكونين معها.
+
+  - id: 37
+    name: "ShowcaseTemplate — Portrait Mobile Optimization"
+    status: planned
+    priority: medium
+    description: |
+      تحسين تجربة الموبايل في ShowcaseTemplate.
+      الأولوية بعد اكتمال تجهيز الصور (Phase 30.2).
+    tasks:
+
+      - id: 37.1
+        name: "Portrait asset swap via <picture> or srcset"
+        details: |
+          استخدام <picture> element بدل <img> للـ S2-S6:
+            <picture>
+              <source media="(max-width: 640px)" srcSet={ASSETS.forest_portrait} />
+              <img src={ASSETS.forest} ... />
+            </picture>
+          يتطلب رفع نسخ portrait على Supabase أولاً (Phase 30.2)
+
+      - id: 37.2
+        name: "Mobile glass panel positioning"
+        details: |
+          على الموبايل: sc-glass-r و sc-glass-l تتحول لـ bottom positioning
+          (الـ CSS media query موجود، لكن قد يحتاج fine-tuning بعد الاختبار)
+
+  - id: 38
+    name: "Admin Settings — homepage_assets Editor"
+    status: planned
+    priority: low
+    description: |
+      إضافة قسم في SettingsTab بلوحة الأدمن يسمح لبيت سمار
+      بتحديث روابط الأصول (Assets) من الواجهة بدون تدخل مطور.
+    tasks:
+
+      - id: 38.1
+        name: "SettingsTab — Assets Section"
+        file: "src/pages/smar/admin/components/SettingsTab.jsx"
+        details: |
+          إضافة section جديد في SettingsTab:
+            - Input لكل asset URL (forest, villa, chalet, pool, sunset)
+            - Preview thumbnail صغيرة بجانب كل input
+            - PATCH /api/v1/admin/settings مع homepage_assets JSON
+          يتطلب إضافة homepage_assets لـ SettingsUpdateRequest في backend
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 39: Gallery Page — /smar/gallery
+  # صفحة معرض مستقلة تجلب صورها من Supabase Storage تلقائياً
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 39
+    name: "Gallery Page — Masonry Grid + Lightbox + Coming Soon Villas"
+    status: planned
+    priority: high
+    description: |
+      صفحة /smar/gallery مستقلة — Masonry Grid أنيق لعرض جمال بيت سمار.
+      البيانات تُجلب من properties/beitsmar/gallery/ في Supabase Storage (auto-list).
+      الفلل تظهر واجهة Coming Soon بدلاً من صور.
+
+    supabase_storage:
+      showcase_bucket: "properties/beitsmar/showcase/"   # أصول الـ ShowcaseTemplate
+      gallery_bucket:  "properties/beitsmar/gallery/"    # صور المعرض العامة (beitsmar1→12)
+
+    tasks:
+
+      - id: 39.1
+        name: "Backend — List Gallery Images from Supabase Storage"
+        file: "app/api/v1/public.py"
+        status: planned
+        details: |
+          إضافة endpoint:
+            GET /api/v1/public/{slug}/gallery
+            يُعيد قائمة الصور من Supabase Storage bucket properties/{slug}/gallery/
+            يستخدم supabase-py storage.list() — لا column في DB
+            Response: [ { url, filename, category } ]
+
+          Category تُستخرج من اسم الملف:
+            beitsmar1-3  → "chalet"
+            beitsmar4-6  → "nature"
+            beitsmar7-9  → "pool"
+            beitsmar10-12 → "chalet"
+          (أو تُخزَّن في metadata مع الرفع — أسهل)
+
+          Multi-tenancy: bucket path يحتوي slug — لا تسريب بين tenants
+
+      - id: 39.2
+        name: "Gallery Page — React Component"
+        file: "src/pages/smar/gallery/SmarGalleryPage.jsx"
+        status: planned
+        details: |
+          Route: /smar/gallery
+          يُضاف إلى smar.routes.jsx كـ lazy import.
+
+          Layout:
+            1. TenantHeader (sticky, glassmorphism)
+            2. Page title "معرض بيت سمار" + subtitle
+            3. Filter Tabs: الكل | الشاليهات | المسبح | الطبيعة | الفلل
+            4. Masonry Grid (CSS columns: 3 desktop / 2 tablet / 1 mobile)
+            5. Footer
+
+          Filter Tabs منطق:
+            - الكل / الشاليهات / المسبح / الطبيعة:
+                يُرشّح صور gallery/ بالـ category وتُعرض
+            - تاب الفلل → Coming Soon State (لا صور):
+                واجهة glassmorphism كاملة (backdrop-blur + border ذهبي)
+                أيقونة قفل ذهبي (🔒 أو SVG)
+                نص: "الفلل الملكية" / "نجهز لكم تجربة استثنائية"
+                نص ثانوي: "قريباً جداً..."
+                لا صور ولا grid — الواجهة تملأ المساحة بأناقة
+
+      - id: 39.3
+        name: "Lightbox — Fullscreen Image Viewer"
+        file: "src/pages/smar/gallery/SmarGalleryPage.jsx"
+        status: planned
+        details: |
+          عند الضغط على أي صورة في الـ Masonry Grid:
+            - AnimatePresence: overlay يظهر (opacity 0→1)
+            - الصورة تتمدد لـ fullscreen (scale + y animation)
+            - Glassmorphism toolbar: X للإغلاق + اسم الصورة
+            - ← / → للتنقل بين الصور
+            - ESC key يغلق
+            - Swipe gesture على الموبايل (touchstart/touchend)
+
+          Implementation: state فقط — لا مكتبة خارجية (react-photo-view / lightgallery)
+          No external deps: AnimatePresence + motion.div فقط
+
+      - id: 39.4
+        name: "Route Registration — /smar/gallery"
+        file: "src/router/tenants/smar.routes.jsx"
+        status: planned
+        details: |
+          إضافة lazy import:
+            const SmarGalleryPage = lazy(() => import('../../pages/smar/gallery/SmarGalleryPage'));
+          إضافة route:
+            <Route path="gallery" element={<Lazy component={SmarGalleryPage} />} />
+          إضافة رابط Gallery في nav الـ ShowcaseTemplate S6 Finale.
+
+      - id: 39.5
+        name: "ShowcaseTemplate — S3 Coming Soon Modal"
+        file: "src/templates/ShowcaseTemplate.jsx"
+        status: planned
+        details: |
+          تعديل زر "استكشف الفلل" في S3:
+            - لا navigate — يُطلق useState showVillaModal=true
+            - AnimatePresence modal (glassmorphism, backdrop-blur):
+                قفل ذهبي + "الفلل الملكية" + "قريباً جداً..."
+                زر إغلاق X
+            - نفس Coming Soon design المستخدم في Gallery tab
+
+    implementation_order:
+      - "39.2 + 39.3 أولاً (Gallery Page) — نتيجة بصرية فورية للصور المرفوعة"
+      - "39.4 تسجيل الـ route"
+      - "39.1 Backend endpoint (الصور الأولى يمكن hardcode URLs في frontend مؤقتاً)"
+      - "39.5 تعديل ShowcaseTemplate S3 CTA"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 40: Auth Evolution Plan A–D  (2026-04-19 → 2026-04-20) ✅ COMPLETE
+  # ══════════════════════════════════════════════════════════════════════════
+
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 43: Google Sheets CRM Integration
+  # ربط المنصة بـ Google Sheets كـ CRM خفيف لتتبع العملاء والصفقات
+  # القرار: 2026-04-26 | الأولوية: medium | بعد استقرار Super Admin
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 43
+    name: "Google Sheets CRM — Business Pipeline Integration"
+    status: planned
+    priority: medium
+    agent: backend-architect
+    description: |
+      عند كل registration جديد أو تغيير status في Super Admin،
+      يُحدَّث صف في Google Sheet تلقائياً.
+      الهدف: لوحة تشغيلية لسلمان لمتابعة العملاء بدون فتح الـ dashboard.
+
+    business_context: |
+      سلمان يدير المشروع وحده (bootstrapped).
+      Google Sheets = CRM خفيف + مصدر حقيقة للصفقات.
+      كل عميل = صف، كل عمود = مرحلة في دورة الحياة.
+
+    sheet_schema:
+      columns:
+        - slug:          "الرابط المختصر"
+        - business_name: "اسم المنشأة"
+        - owner_name:    "اسم المسؤول"
+        - phone:         "رقم الواتساب"
+        - email:         "البريد الإلكتروني"
+        - service_type:  "نوع الخدمة (real_estate / restaurant / hotel)"
+        - status:        "trial | active | demo | suspended | expired"
+        - trial_ends_at: "تاريخ انتهاء التجربة"
+        - created_at:    "تاريخ التسجيل"
+        - notes:         "ملاحظات سلمان (يملأها يدوياً)"
+        - deal_value:    "قيمة الصفقة المتوقعة $$ (يملأها يدوياً)"
+        - next_action:   "الخطوة التالية (يملأها يدوياً)"
+
+    trigger_events:
+      - event: "new_registration"
+        when:  "POST /api/v1/auth/register succeeds"
+        action: "append new row"
+      - event: "status_change"
+        when:  "PATCH /api/v1/super/clients/{id}/status succeeds"
+        action: "update status cell in existing row"
+
+    tasks:
+
+      - id: 43.1
+        name: "Google Sheets API — Service Account Setup"
+        status: planned
+        type: manual_setup
+        details: |
+          خطوات يدوية (مرة واحدة):
+          1. Google Cloud Console → New Project "SalmanSaaS CRM"
+          2. Enable Google Sheets API
+          3. Create Service Account → Download JSON credentials
+          4. Share the target Google Sheet with the service account email
+          5. Copy Sheet ID من URL: docs.google.com/spreadsheets/d/{SHEET_ID}/
+
+          Variables needed:
+            GOOGLE_SERVICE_ACCOUNT_JSON  ← محتوى الـ JSON كامل (base64 أو JSON string)
+            GOOGLE_SHEET_ID              ← ID الشيت
+
+      - id: 43.2
+        name: "Backend — sheets_service.py"
+        file: "app/services/sheets_service.py"
+        status: planned
+        details: |
+          مكتبة: google-api-python-client + google-auth
+          (pip install google-api-python-client google-auth)
+
+          Functions:
+            async def append_client_row(client_data: dict) -> None
+              → يُضيف صف جديد عند التسجيل
+              → columns: slug, name, owner, phone, email, service_type,
+                         status, trial_ends_at, created_at
+
+            async def update_client_status(slug: str, new_status: str) -> None
+              → يبحث عن الصف بالـ slug في العمود A
+              → يُحدّث خلية الـ status فقط
+
+          Error handling: Silent fail + log (Sheets API لا يوقف المنصة إذا فشل)
+          يُستدعى في: FastAPI BackgroundTasks (لا يُبطّئ الـ response)
+
+      - id: 43.3
+        name: "Backend — Wire to registration_service.py"
+        file: "app/services/registration_service.py"
+        status: planned
+        details: |
+          في register_new_tenant()، بعد إنشاء الـ client + user:
+
+            background_tasks.add_task(
+              sheets_service.append_client_row,
+              {
+                "slug":          client.slug,
+                "name":          client.name,
+                "owner_name":    data.get("owner_name"),
+                "phone":         data["whatsapp_number"],
+                "email":         data["email"],
+                "service_type":  venue_type,
+                "status":        "trial",
+                "trial_ends_at": trial_ends_at.isoformat(),
+                "created_at":    datetime.now(timezone.utc).isoformat(),
+              }
+            )
+
+          ملاحظة: register_new_tenant يحتاج BackgroundTasks param → تعديل signature
+          أو: استدعاء مباشر asyncio.create_task() من الـ endpoint
+
+      - id: 43.4
+        name: "Backend — Wire to super/clients.py (status change)"
+        file: "app/api/v1/super/clients.py"
+        status: planned
+        details: |
+          في update_client_status() endpoint:
+
+            background_tasks.add_task(
+              sheets_service.update_client_status,
+              slug=result["slug"],
+              new_status=body.status,
+            )
+
+          يُضاف background_tasks: BackgroundTasks = ... في signature
+
+      - id: 43.5
+        name: "Frontend — Super Admin: رابط لفتح Google Sheet"
+        file: "frontend/src/pages/super-admin/ClientsManager.jsx"
+        status: planned
+        details: |
+          إضافة زر في أعلى الـ Control Room:
+
+            <a href={GOOGLE_SHEET_URL} target="_blank">
+              📊 فتح CRM Sheet
+            </a>
+
+          GOOGLE_SHEET_URL = VITE_GOOGLE_SHEET_URL env var (Vite)
+          أو hardcode في ClientsManager لأنه super admin only
+
+    dependencies:
+      pip:
+        - google-api-python-client
+        - google-auth
+      env_vars:
+        - GOOGLE_SERVICE_ACCOUNT_JSON
+        - GOOGLE_SHEET_ID
+        - VITE_GOOGLE_SHEET_URL  # (frontend — رابط الـ Sheet لفتحه مباشرة)
+
+    implementation_order:
+      - "43.1 أولاً — Setup يدوي (Service Account + Sheet)"
+      - "43.2 — بناء sheets_service.py"
+      - "43.3 + 43.4 — ربط Registration و Status Change"
+      - "43.5 — رابط في Frontend (أسهل خطوة)"
+
+    estimated_effort: "2-3 ساعات (بعد اكتمال 43.1)"
+
+    alternative_considered:
+      n8n: |
+        أبطأ في الإعداد (n8n server مطلوب).
+        مناسب إذا أردنا workflows معقدة مستقبلاً (إشعارات WhatsApp + Sheets + Email).
+        يمكن الانتقال إليه لاحقاً بدون تغيير في الـ backend.
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# قواعد النظام الذري الجديد
+# ══════════════════════════════════════════════════════════════════════════════
+
+atomic_architecture_rules:
+  slug_resolution:
+    rule: "كل كومبونت يقرأ السلوغ من useTenantSlug() مباشرة"
+    exception: "Admin preview فقط يمرر slug كـ prop"
+
+  data_fetching:
+    rule: "الـ Organisms تجلب بياناتها بنفسها — لا data prop drilling"
+    example: "<UnitGrid /> يعمل بدون أي props إضافية"
+
+  no_hardcoding:
+    rule: "لا tenant name أو URLs أو phone numbers في JSX مباشرة"
+    source: "كل هذا يأتي من useTenantConfig()"
+
+  fm12_react19_safety:
+    rule1: "لا MotionValue في style props — فقط animate= و whileHover= و whileTap="
+    rule2: "لا useScroll مع target ref — scroll listener في useEffect فقط"
+
+  error_boundaries:
+    rule1: "كل Template يُلفّ بـ ErrorBoundary على مستوى الـ route"
+    rule2: "كل Organism يُلفّ بـ ErrorBoundary داخلي — خطأ section لا يكسر الصفحة"
+
+  layer_mapping:
+    atoms:     "props فقط — لا hooks، لا API، لا state خارجي"
+    molecules: "local state فقط — لا API calls"
+    organisms: "useTenantSlug + useUnits + useBooking — self-contained"
+    templates: "تُرتّب organisms فقط — لا slug، لا data"
+    pages:     "= template instance في route — تختفي تدريجياً"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 44: Admin Permissions System — Role-Based Multi-Tenant
+# القرار: 2026-04-27 | الأولوية: high | قبل onboarding أي tenant جديد
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 44
+    name: "Admin Permissions — SUPER_ADMIN / TENANT_ADMIN / Staff Roles"
+    status: partial  # 44.1-44.4 done (2026-04-27). 44.5 settings placeholder, 44.6 n8n pending
+    priority: high
+    completed_tasks:
+      - "44.1: SUPER_ADMIN redirect guard in SmarAdminDashboard"
+      - "44.2: TeamTab role enum fix (admin→TENANT_ADMIN, manager→MANAGER_*)"
+      - "44.3: Slug fallback from getTenantSlug() on subdomain mode"
+      - "44.4: TeamTab + SettingsTab placeholder cleanup"
+    agent: backend-architect
+    description: |
+      تصحيح وبناء نظام الصلاحيات الكامل.
+      المنطق الصحيح:
+        - سلمان (SUPER_ADMIN)    → ClientsManager فقط — لا وصول لـ SmarAdminDashboard
+        - أدمن كل tenant         → SmarAdminDashboard كاملة (TENANT_ADMIN)
+        - موظفون الـ tenant       → SmarAdminDashboard مقيّدة (MANAGER_RESERVATIONS | MANAGER_UNITS)
+      كل صلاحية مقيّدة بالـ slug الخاص بالـ tenant في كل query.
+
+    permission_model:
+      SUPER_ADMIN:
+        who:   "سلمان فقط — User record بـ role=SUPER_ADMIN"
+        where: "ClientsManager (/super/clients) فقط"
+        can:   "إنشاء/تعليق/تفعيل أي tenant — لا وصول لبيانات أي tenant"
+
+      TENANT_ADMIN:
+        who:   "مالك الـ tenant (Client JWT أو User بـ role=TENANT_ADMIN)"
+        where: "SmarAdminDashboard — كل الـ tabs"
+        can:   "إدارة كل شيء داخل سلوغه فقط: وحدات، حجوزات، فريق، إعدادات"
+
+      MANAGER_RESERVATIONS:
+        who:   "موظف أضافه الـ TENANT_ADMIN"
+        where: "SmarAdminDashboard — inbox + bookings + dashboard + housekeeping + maintenance + gardens"
+        can:   "قراءة وتحديث الحجوزات — لا وحدات، لا إعدادات، لا فريق"
+
+      MANAGER_UNITS:
+        who:   "موظف أضافه الـ TENANT_ADMIN"
+        where: "SmarAdminDashboard — units + services + dashboard + housekeeping + maintenance + gardens"
+        can:   "إدارة الوحدات والخدمات — لا حجوزات، لا فريق، لا إعدادات"
+
+    audit_findings_2026_04_27:
+      critical:
+        - file: "frontend/src/utils/useAdminRole.js"
+          issue: "SUPER_ADMIN في ROLE_TABS لديه نفس tabs التنانت — يجب redirect لـ /super/clients"
+          fix:   "إضافة guard في SmarAdminDashboard: if role===SUPER_ADMIN → navigate('/super/clients')"
+
+        - file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+          issue: |
+            Frontend يبعت role:'admin'|'manager' للباكند
+            لكن Prisma UserRole enum: TENANT_ADMIN | MANAGER_RESERVATIONS | MANAGER_UNITS
+            → mismatch كامل في الإنشاء والعرض
+          fix: |
+            تغيير الـ options في AddMemberModal:
+              'admin'   → 'TENANT_ADMIN'
+              'manager' → 'MANAGER_RESERVATIONS' أو 'MANAGER_UNITS'
+            تحديث ROLE_CONFIG ليعرض الأسماء الصحيحة
+
+      medium:
+        - file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+          issue: "slug undefined على subdomain mode (smar.salmansaas.com/admin) — Sidebar تعرض 'TENANT'"
+          fix:   "استخدام getTenantSlug() من tenant.config.js كـ fallback عند غياب useParams().slug"
+
+        - file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx:TrialBanner"
+          issue: "TrialBanner تقرأ من localStorage فقط — لا تعمل مع SSO direct login"
+          fix:   "قراءة status من JWT payload أيضاً كـ fallback"
+
+      low:
+        - file: "frontend/src/pages/smar/admin/components/TeamTab.jsx:155"
+          issue: "placeholder 'staff@beitsmar.com' hardcoded"
+          fix:   "استبدال بـ placeholder غير مرتبط بـ tenant"
+
+        - file: "frontend/src/pages/smar/admin/components/SettingsTab.jsx:148,153"
+          issue: "placeholders بـ 'beitsmar' hardcoded"
+          fix:   "استخدام slug ديناميكي من useParams أو getTenantSlug()"
+
+    tasks:
+
+      - id: 44.1
+        name: "SUPER_ADMIN redirect guard في SmarAdminDashboard"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: planned
+        priority: critical
+        details: |
+          في الـ useEffect الأول في SmarAdminDashboard:
+            if (role === 'SUPER_ADMIN') {
+              navigate('/super/clients', { replace: true });
+              return;
+            }
+          يمنع سلمان من رؤية بيانات tenant عند دخول الصفحة بالخطأ.
+
+      - id: 44.2
+        name: "TeamTab — تصحيح Role Mismatch"
+        file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+        status: planned
+        priority: critical
+        details: |
+          1. تحديث ROLE_CONFIG:
+               TENANT_ADMIN:          { label: 'مدير كامل', labelEn: 'Admin',             color: gold  }
+               MANAGER_RESERVATIONS:  { label: 'مدير حجوزات', labelEn: 'Reservations Mgr', color: blue  }
+               MANAGER_UNITS:         { label: 'مدير وحدات',  labelEn: 'Units Manager',    color: green }
+
+          2. تحديث AddMemberModal options:
+               بدل 'admin'   → 'MANAGER_RESERVATIONS' أو 'TENANT_ADMIN' (TENANT_ADMIN لا يُوصى بإنشائه من هنا)
+               بدل 'manager' → radio: MANAGER_RESERVATIONS | MANAGER_UNITS
+
+          3. Backend: تحقق من app/api/v1/admin/team.py أنه يقبل enum values
+
+      - id: 44.3
+        name: "Slug fallback في SmarAdminDashboard"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: planned
+        priority: medium
+        details: |
+          إضافة:
+            import { getTenantSlug } from '../../../utils/tenant.config';
+            const { slug: paramSlug } = useParams();
+            const slug = paramSlug || getTenantSlug();
+          يحل مشكلة subdomain mode (smar.salmansaas.com/admin).
+
+      - id: 44.4
+        name: "TeamTab placeholder cleanup"
+        file: "frontend/src/pages/smar/admin/components/TeamTab.jsx"
+        status: planned
+        priority: low
+        details: "استبدال 'staff@beitsmar.com' بـ 'staff@example.com' أو input generic"
+
+      - id: 44.5
+        name: "SettingsTab placeholder cleanup"
+        file: "frontend/src/pages/smar/admin/components/SettingsTab.jsx"
+        status: planned
+        priority: low
+        details: "استبدال hardcoded 'beitsmar' بـ slug ديناميكي"
+
+      - id: 44.6
+        name: "WhatsApp Onboarding Questionnaire — n8n Flow"
+        status: planned
+        priority: medium
+        description: |
+          بعد تسجيل tenant جديد، يستلم رسالة WhatsApp تفاعلية لجمع:
+            - ستايل التصميم (Minimalist / Luxury / Bold)
+            - لون رئيسي
+            - لوغو (صورة)
+            - وصف قصير للمنشأة
+          n8n يجمع الإجابات ويبعثها لـ POST /api/v1/super/tenants/{slug}/brief
+          تُخزَّن في tenant_configs ← تظهر في ClientsManager
+
+    implementation_order:
+      - "44.1 فوراً (critical — security)"
+      - "44.2 فوراً (critical — data corruption)"
+      - "44.3 بعدها (medium)"
+      - "44.4 + 44.5 أي وقت (low)"
+      - "44.6 Phase مستقل بعد استقرار الباقي"
+
+    estimated_effort: "44.1-44.3: ساعة واحدة | 44.4-44.5: 30 دقيقة | 44.6: Phase كامل"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 45: Gallery Admin Tab + Login System Finalization
+# منجز: 2026-04-27
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 45
+    name: "Gallery Admin Tab + Two-Account Login System"
+    status: done
+    completed_at: "2026-04-27"
+    commit: "a940d7e (gallery tab) + DB scripts"
+    description: |
+      إنشاء تبويب إدارة معرض الصور في لوحة الأدمن،
+      وإصلاح نظام تسجيل الدخول بحسابين منفصلين من auth.salmansaas.com.
+
+    tasks_done:
+
+      - id: 45.1
+        name: "GalleryTab.jsx — تبويب معرض الصور"
+        file: "frontend/src/pages/smar/admin/components/GalleryTab.jsx"
+        status: done
+        details: |
+          Unit pill selector (اختيار الوحدة)
+          Upload dropzone: drag-drop + multi-file + validation
+          Image grid: hover controls → span toggle (small/hero) + hide/show + delete
+          API: GET/POST /admin/gallery/{unit_id} + PATCH/DELETE /admin/gallery/images/{id}
+
+      - id: 45.2
+        name: "SmarAdminDashboard — wire gallery tab"
+        file: "frontend/src/pages/smar/admin/SmarAdminDashboard.jsx"
+        status: done
+        details: |
+          gallery أضيف للـ ALL_NAV (بين units و services)
+          renderTab case + title map محدّثان
+
+      - id: 45.3
+        name: "useAdminRole — ROLE_TABS updated"
+        file: "frontend/src/utils/useAdminRole.js"
+        status: done
+        details: |
+          gallery أضيف لـ: SUPER_ADMIN, TENANT_ADMIN, MANAGER_UNITS
+
+      - id: 45.4
+        name: "SpatialHomePage — fix null render"
+        file: "frontend/src/pages/smar/spatial/SpatialHomePage.jsx"
+        status: done
+        details: "كانت ترجع null (blank page) → redirect لـ /${base}/listings"
+
+      - id: 45.5
+        name: "Two-Account Login — DB setup"
+        status: done
+        details: |
+          salman@salmansaas.com → SUPER_ADMIN → /super/clients
+          admin@salmansaas.com  → TENANT_ADMIN → smar.salmansaas.com/admin
+          smar status = 'demo' → redirect يذهب للـ subdomain مباشرة
+          SSOLoginPage.resolveRedirect تغطي كلا الحالتين بدون تعديل
+
+      - id: 45.6
+        name: "scripts/create_admin_user.py — general purpose"
+        file: "scripts/create_admin_user.py"
+        status: done
+        details: |
+          يقبل --email --role --password
+          يطبع الـ redirect المتوقع بعد الـ login
+          يستخدم DIRECT_URL لتجاوز pgbouncer
+
+    next_phase: "Phase 43 (Google Sheets CRM) — بعد 43.1 manual setup"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 46: Unified Server Merge — 3 Servers → 1 SalmanSaaS Platform
+# القرار: 2026-05-02 | الأولوية: high | خطة مفصلة لدمج الـ 3 servers
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 46
+    name: "Unified Server Merge — Booking + Restaurant + Store"
+    status: planned
+    priority: high
+    agent: backend-architect
+    estimated_effort: "5-7 أيام"
+    description: |
+      دمج 3 servers مستقلة في منصة SalmanSaaS موحدة:
+        - WhatsApp Booking (smar) — booking module ✅ Live
+        - Multi-Cafe-SaaS (caracas) — restaurant module 🔄
+        - Multy_Store (footlab) — store module 🔄
+      النتيجة: server واحد، DB واحد، 3 modules خلف client_services gate.
+
+    old_servers:
+      booking:    "C:\\Users\\Lenovo\\Desktop\\WhatsApp Appointment Booking System\\"
+      cafe:       "old servers\\Multi-Cafe-Saas\\"
+      store:      "old servers\\Multy_store\\"
+
+    clients:
+      - slug: smar
+        module: booking
+        status: live
+        db_migration: none_needed
+      - slug: caracas
+        module: restaurant
+        status: needs_client_record_created
+        db_migration: add_clientId_to_restaurant_tables
+      - slug: footlab
+        module: store
+        status: needs_client_record_created
+        db_migration: data_already_uses_Client_model
+
+    architecture_decisions:
+      tenant_model:    "Client table (slug, type) — unified across all modules"
+      service_gate:    "client_services bridge table + require_service() dependency"
+      routing:         "/{slug}/config → type detection → module-specific endpoints"
+      customer_model:  "unified customers table — phone unique per client (NOT global)"
+      security:        "single security.py (bcrypt only, no plain-text fallback, JWT 8h)"
+      tenant_resolver: "tenant.py from current booking server (TTL cache + subdomain + header)"
+
+    tasks:
+
+      # ── PHASE 46.1: Schema Additions ─────────────────────────────────────
+
+      - id: 46.1
+        name: "Add ClientService model to prisma/schema.prisma"
+        file: "prisma/schema.prisma"
+        status: done
+        completed_at: "2026-05-02"
+        priority: critical
+        details: |
+          إضافة model ClientService:
+            id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            clientId    String   @db.Uuid
+            serviceKey  String   // "booking" | "gallery" | "restaurant" | "store" | ...
+            isActive    Boolean  @default(true)
+            activatedAt DateTime @default(now())
+            config      Json?
+            client      Client   @relation(fields: [clientId], references: [id])
+            @@unique([clientId, serviceKey])
+            @@map("client_services")
+
+          إضافة relation في Client model:
+            services ClientService[]
+
+          بعد الإضافة: npx prisma db push (DIRECT_URL port 5432)
+
+      - id: 46.2
+        name: "Fix Customer.phone — unique per client (not global)"
+        file: "prisma/schema.prisma"
+        status: done
+        completed_at: "2026-05-02"
+        priority: critical
+        details: |
+          المشكلة الحالية:
+            phone String @unique  ← global unique — يمنع نفس الزبون من التسجيل في tenants مختلفة
+
+          الحل:
+            phone    String
+            clientId String
+            @@unique([clientId, phone])  ← unique per tenant فقط
+
+          يتطلب migration: DROP old unique constraint + ADD new composite unique
+
+      - id: 46.3
+        name: "Add Restaurant Module models to schema"
+        file: "prisma/schema.prisma"
+        status: done
+        completed_at: "2026-05-02"
+        priority: high
+        details: |
+          نقل من old servers/Multi-Cafe-Saas/prisma/schema.prisma مع تعديلات:
+
+          model Restaurant {
+            id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            clientId     String  @db.Uuid    ← إضافة جديدة للربط بـ Client
+            name         String
+            nameAr       String?
+            description  String?
+            logoUrl      String?
+            workingHours Json?
+            isActive     Boolean @default(true)
+            client       Client  @relation(fields: [clientId], references: [id])
+            categories   MenuCategory[]
+            orders       RestaurantOrder[]
+            @@map("restaurants")
+          }
+
+          model MenuCategory {
+            id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            restaurantId String @db.Uuid
+            nameAr       String
+            nameEn       String?
+            imageUrl     String?
+            position     Int    @default(0)
+            isActive     Boolean @default(true)
+            restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+            items        MenuItem[]
+            @@map("menu_categories")
+          }
+
+          model MenuItem {
+            id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            categoryId   String @db.Uuid
+            nameAr       String
+            nameEn       String?
+            description  String?
+            price        Float
+            imageUrl     String?
+            isAvailable  Boolean @default(true)
+            position     Int     @default(0)
+            category     MenuCategory @relation(fields: [categoryId], references: [id])
+            orderItems   RestaurantOrderItem[]
+            @@map("menu_items")
+          }
+
+          model RestaurantOrder {
+            id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            restaurantId String @db.Uuid
+            customerName String
+            customerPhone String
+            tableNumber  String?
+            status       String @default("pending") // pending|preparing|ready|delivered|cancelled
+            totalAmount  Float
+            notes        String?
+            createdAt    DateTime @default(now())
+            restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+            items        RestaurantOrderItem[]
+            @@map("restaurant_orders")
+          }
+
+          model RestaurantOrderItem {
+            id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+            orderId    String @db.Uuid
+            menuItemId String @db.Uuid
+            quantity   Int
+            unitPrice  Float
+            notes      String?
+            order      RestaurantOrder @relation(fields: [orderId], references: [id])
+            menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+            @@map("restaurant_order_items")
+          }
+
+      - id: 46.4
+        name: "Add Store Module models to schema"
+        file: "prisma/schema.prisma"
+        status: done
+        completed_at: "2026-05-02"
+        priority: high
+        details: |
+          نقل من old servers/Multy_store/backend/prisma/schema.prisma:
+          (هذه النماذج تستخدم Client بالفعل — تعديل طفيف فقط)
+
+          models to add:
+            StoreProduct   (clientId → Client, brand, category, price, stock, images Json)
+            StoreCategory  (clientId → Client, name, nameAr, imageUrl, position)
+            StoreBrand     (clientId → Client, name, logoUrl)
+            StoreCart      (clientId → Client, sessionId, items Json, expiresAt)
+            StoreOrder     (clientId → Client, customer info, status, total, items Json)
+            StoreCustomer  (clientId → Client, name, phone @@unique([clientId, phone]))
+            StoreReview    (productId → StoreProduct, rating, comment)
+            StoreWishlist  (clientId → Client, sessionId, productIds Json)
+
+          ملاحظة: StoreCustomer.phone يجب أن يكون unique per client (نفس مشكلة 46.2)
+
+      # ── PHASE 46.2: Data Migration ────────────────────────────────────────
+
+      - id: 46.5
+        name: "Create Client records for caracas and footlab"
+        file: "scripts/seed_unified_clients.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: high
+        details: |
+          إنشاء script جديد يُنشئ:
+
+          caracas:
+            slug='caracas'  type='restaurant'  status='active'
+            name_ar='كاراكاس'  name_en='Caracas'
+            primary_color='#...'  currency='LBP'
+            Services: ['restaurant', 'whatsapp_ordering']
+
+          footlab:
+            slug='footlab'  type='store'  status='active'
+            name_ar='فوتلاب'  name_en='Footlab'
+            primary_color='#...'  currency='USD'
+            Services: ['store']
+
+          يُشغَّل بعد إضافة نماذج الـ Schema.
+
+      - id: 46.6
+        name: "Migrate Cafe data — add clientId to Restaurant records"
+        file: "scripts/migrate_cafe_to_unified.py"
+        status: planned
+        priority: high
+        details: |
+          مشكلة: الـ Cafe server يستخدم restaurants table بدون clientId
+          الحل:
+          1. إنشاء Client record لـ caracas (46.5)
+          2. UPDATE restaurants SET clientId = '{caracas_client_id}' WHERE ...
+          3. نقل بيانات categories + menu_items + orders من Cafe DB
+
+          إذا كانت Cafe DB منفصلة → استخدام DIRECT_URL للـ DB القديمة
+          ثم INSERT إلى الـ unified DB
+
+          ملاحظة: حافظ على restaurant IDs إذا أمكن (foreign keys)
+
+      # ── PHASE 46.3: Backend API ───────────────────────────────────────────
+
+      - id: 46.7
+        name: "Restaurant Module — Public API endpoints"
+        file: "app/api/v1/public/restaurant.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: high
+        details: |
+          GET /{slug}/menu              → categories + items (filtered by isAvailable)
+          GET /{slug}/menu/{category}   → items in category
+          POST /{slug}/orders           → إنشاء طلب جديد
+          GET /{slug}/orders/{id}       → status tracking
+
+          كل endpoint:
+          1. Depends(get_current_client) → tenant isolation
+          2. Depends(require_service("restaurant")) → service gate
+          3. يجلب Restaurant بالـ clientId
+
+      - id: 46.8
+        name: "Restaurant Module — Admin API endpoints"
+        file: "app/api/v1/admin/restaurant.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: medium
+        details: |
+          GET/POST/PATCH/DELETE /admin/menu/categories
+          GET/POST/PATCH/DELETE /admin/menu/items
+          GET/PATCH /admin/orders/{id}/status   → pending→preparing→ready→delivered
+          GET /admin/orders/stats               → طلبات اليوم، الإيرادات
+
+      - id: 46.9
+        name: "Store Module — Public API endpoints"
+        file: "app/api/v1/public/store.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: high
+        details: |
+          GET /{slug}/products              → catalog (filter: category, brand, search)
+          GET /{slug}/products/{id}         → product details + reviews
+          POST /{slug}/cart                 → add to cart (session-based)
+          GET /{slug}/cart/{session}        → view cart
+          POST /{slug}/orders               → checkout
+          GET /{slug}/orders/{id}           → order status
+
+          كل endpoint: require_service("store")
+
+      - id: 46.10
+        name: "Store Module — Admin API endpoints"
+        file: "app/api/v1/admin/store.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: medium
+        details: |
+          GET/POST/PATCH/DELETE /admin/products
+          GET/POST/PATCH/DELETE /admin/categories
+          GET/PATCH /admin/orders/{id}/status
+          GET /admin/orders/stats
+          POST /admin/products/{id}/images
+
+      - id: 46.11
+        name: "require_service() dependency — create app/core/services.py"
+        file: "app/core/services.py"
+        status: done
+        completed_at: "2026-05-02"
+        priority: critical
+        details: |
+          نقل pattern من rules/backend/service-system.md إلى كود حقيقي.
+          ملف جديد app/core/services.py يحتوي:
+            async def require_service(service_key: str) → Callable
+          يُستخدم في كل module endpoint.
+
+      # ── PHASE 46.4: Frontend ─────────────────────────────────────────────
+
+      - id: 46.12
+        name: "Scaffold Caracas tenant pages"
+        file: "frontend/src/pages/caracas/"
+        status: done
+        completed_at: "2026-05-02"
+        priority: medium
+        details: |
+          هيكل المجلدات (حسب scaffolding.md rule):
+            src/pages/caracas/
+            ├── normal/
+            │   ├── MenuPage.jsx       ← تصفح المنيو + فلتر بالـ category
+            │   └── OrderPage.jsx      ← تقديم طلب + متابعة status
+            ├── admin/
+            │   ├── CaracasAdmin.jsx   ← تبويبات: orders | menu | settings
+            │   └── components/
+            │       ├── OrdersTab.jsx
+            │       └── MenuTab.jsx
+            ├── store/
+            │   └── useCaracasStore.js ← Zustand: cart, activeCategory
+            └── caracas.css            ← scoped: body[data-slug="caracas"]
+
+          src/router/tenants/caracas.routes.jsx → Route definitions
+          src/router/tenants/index.js → registry entry
+
+      - id: 46.13
+        name: "Scaffold Footlab tenant pages"
+        file: "frontend/src/pages/footlab/"
+        status: done
+        completed_at: "2026-05-02"
+        priority: medium
+        details: |
+          هيكل المجلدات:
+            src/pages/footlab/
+            ├── normal/
+            │   ├── StorePage.jsx      ← catalog + filter (brand, category, search)
+            │   ├── ProductPage.jsx    ← details + images + add to cart
+            │   └── CartPage.jsx       ← review cart + checkout
+            ├── admin/
+            │   ├── FootlabAdmin.jsx
+            │   └── components/
+            │       ├── ProductsTab.jsx
+            │       └── OrdersTab.jsx
+            ├── store/
+            │   └── useFootlabStore.js ← Zustand: cart (sessionId + items)
+            └── footlab.css
+
+          src/router/tenants/footlab.routes.jsx
+          src/router/tenants/index.js → registry entry
+
+      # ── PHASE 46.5: Cleanup ───────────────────────────────────────────────
+
+      - id: 46.14
+        name: "Retire old servers"
+        status: planned
+        priority: low
+        details: |
+          بعد اختبار كامل للـ unified server:
+          1. Stop old Railway services (Multi-Cafe + Multy_Store)
+          2. Keep their Railway projects for 2 weeks (safety net)
+          3. Update DNS إذا كانوا على subdomains مختلفة
+          4. Archive old server code في git tag
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE 47: Service Categories System
+  # القرار: 2026-05-02 | الهدف: frontend يبني nav ديناميكياً من active_services
+  # ══════════════════════════════════════════════════════════════════════════
+
+  - id: 47
+    name: "Service Categories — Dynamic Nav from client_services"
+    status: done
+    completed_at: "2026-05-02"
+    priority: medium
+    description: |
+      نظام هرمي من مفاتيح الخدمات يحل مشكلتين:
+        1. Frontend يعرف ماذا يبني بناءً على active_services
+        2. Backend يعرف أي endpoints يُفعِّل بناءً على نفس المفاتيح
+      طبقتان: static catalog (JS) + dynamic response (/config endpoint)
+
+    tasks:
+
+      - id: 47.1
+        name: "frontend/src/config/service-catalog.js"
+        status: done
+        completed_at: "2026-05-02"
+        details: |
+          Static mapping: serviceKey → { labelAr, labelEn, icon, route(slug), priority }
+          getNavItems(activeServices, slug) → sorted nav items
+          getServiceRoute(key, slug) → route string
+          Handles granular dot-notation keys (restaurant.menu suppresses restaurant)
+
+      - id: 47.2
+        name: "GET /{slug}/config — extend with active_services"
+        status: done
+        completed_at: "2026-05-02"
+        details: |
+          get_tenant_config() now includes services relation (isActive=true)
+          _record_to_dict() now outputs:
+            active_services: [serviceKey, ...]  ← list of active service keys
+            service_type: "restaurant" | "real_estate" | "ecommerce"
+
+      - id: 47.3
+        name: "Extend seed scripts with granular keys"
+        status: done
+        completed_at: "2026-05-02"
+        details: |
+          app/core/services.py SERVICE_TYPE_MAP → granular keys added
+          scripts/seed_client_services.py → restaurant.menu, store.products, store.cart
+          scripts/seed_unified_clients.py → caracas + footlab updated
+
+      - id: 47.4
+        name: "TenantModuleNav organism + wire into module pages"
+        status: done
+        completed_at: "2026-05-02"
+        details: |
+          design-system/organisms/TenantModuleNav.jsx — new organism:
+            uses useTenantConfig() → navItems (built by getNavItems())
+            accent color from config.primary_color
+            sticky top bar, active-route highlighting, mobile hamburger
+          useTenantConfig.js → returns navItems (from getNavItems()) automatically
+          MenuPage.jsx + StorePage.jsx → TenantModuleNav added (pt-14 offset)
+
+    implementation_order:
+      - "47.1 ✅ → service-catalog.js"
+      - "47.2 ✅ → /config endpoint extended"
+      - "47.3 ✅ → seed granular keys"
+      - "47.4 ✅ → TenantModuleNav wired"
+
+  # ──────────────────────────────────────────────────────────────────────────
+
+    implementation_order:
+      - "46.1 → prisma schema additions (ClientService + Restaurant + Store models)"
+      - "46.2 → fix Customer.phone uniqueness"
+      - "46.11 → require_service() dependency"
+      - "46.5 → create caracas + footlab Client records"
+      - "46.6 → migrate cafe data"
+      - "46.7 → restaurant public API"
+      - "46.8 → restaurant admin API"
+      - "46.9 → store public API"
+      - "46.10 → store admin API"
+      - "46.12 → scaffold caracas frontend"
+      - "46.13 → scaffold footlab frontend"
+      - "46.14 → retire old servers"
+
+    merge_risks:
+      - risk: "Cafe DB منفصلة — نقل البيانات يدوياً"
+        mitigation: "اعمل backup أولاً + اختبر على staging"
+      - risk: "caracas tenants live على الـ Cafe server"
+        mitigation: "لا تطفئ الـ server القديم قبل اكتمال الاختبار"
+      - risk: "Customer.phone uniqueness migration — قد تكسر records موجودة"
+        mitigation: "فحص تعارضات قبل تشغيل migration: SELECT phone, COUNT(*) FROM customers GROUP BY phone HAVING COUNT(*) > 1"
+
+    schema_source_of_truth: "old servers/unified_db_schema.html"
+    analysis_doc: "old servers/merge_analysis.md"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 48: Catalog Module API + Sheets Wire + Platform Services
+# القرار: 2026-05-03 | الأولوية: high
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 48
+    name: "Catalog Module API + Platform Services Admin + Sheets Wire"
+    status: in_progress
+    priority: high
+    started_at: "2026-05-03"
+    description: |
+      بناء API كامل لـ CatalogCategory + CatalogItem (جداول موجودة في DB).
+      إضافة Super Admin endpoints لإدارة PlatformService.
+      ربط sheets_service بـ registration + status-change (43.3 + 43.4).
+      إضافة service key "catalog" + service_type "services".
+      Frontend: CatalogPage generic لأي tenant.
+
+    schema_context: |
+      Hybrid approach:
+        real_estate  → Unit → Booking
+        restaurant   → RestaurantConfig → MenuCategory → MenuItem
+        ecommerce    → StoreCategory → StoreProduct
+        services/*   → CatalogCategory → CatalogItem + metadata Json
+      service_type على Client يحدد أي جداول تُستخدم.
+      active_services (Json) يحدد ماذا يظهر في nav.
+
+    tasks:
+
+      - id: 48.1
+        name: "Public Catalog API"
+        file: "app/api/v1/public/catalog.py"
+        status: planned
+        details: |
+          GET /public/catalog/categories?module_key=&parent_id=
+          GET /public/catalog/categories/{id}/items
+          GET /public/catalog/items/{id}
+          gate: require_service("catalog")
+          multi-tenancy: client_slug param → clientId في كل query
+
+      - id: 48.2
+        name: "Admin Catalog API"
+        file: "app/api/v1/admin/catalog.py"
+        status: planned
+        details: |
+          GET/POST   /admin/catalog/categories
+          PATCH/DELETE /admin/catalog/categories/{id}
+          GET/POST   /admin/catalog/items
+          PATCH/DELETE /admin/catalog/items/{id}
+          soft delete: isActive=false (لا حذف حقيقي)
+
+      - id: 48.3
+        name: "Super Admin — Platform Services API"
+        file: "app/api/v1/super/platform_services.py"
+        status: planned
+        details: |
+          GET    /super/platform-services
+          POST   /super/platform-services
+          PATCH  /super/platform-services/{id}
+          PATCH  /super/platform-services/{id}/toggle
+          GET    /super/clients/{id}/services
+          PATCH  /super/clients/{id}/services → toggle + sync_selected_services()
+
+      - id: 48.4
+        name: "Wire sheets_service — 43.3 + 43.4"
+        status: planned
+        details: |
+          43.3: registration_service.py → append_client_row في BackgroundTasks
+          43.4: super/clients.py → update_client_status في BackgroundTasks
+          كلاهما يستخدم selected_services snapshot في الـ payload
+
+      - id: 48.5
+        name: "Service key catalog + service_type services"
+        status: planned
+        details: |
+          app/core/services.py: SERVICE_TYPE_MAP["services"] = ["catalog"]
+          service-catalog.js: catalog key → /[slug]/catalog route
+          seed_platform_services.py: إضافة "catalog" service entry
+
+      - id: 48.6
+        name: "Frontend CatalogPage — generic"
+        file: "frontend/src/pages/[slug]/normal/CatalogPage.jsx"
+        status: planned
+        details: |
+          صفحة generic تعمل لأي tenant عنده "catalog" service
+          يجلب categories من /public/catalog/categories
+          category tabs + items grid
+          accent = config.primary_color
+          GlassCard + design system atoms
+
+    implementation_order:
+      - "48.5 → service key (5 min)"
+      - "48.1 → Public Catalog API (30 min)"
+      - "48.2 → Admin Catalog API (30 min)"
+      - "wire __init__.py (5 min)"
+      - "48.3 → Super Admin Platform Services (20 min)"
+      - "48.4 → Wire sheets 43.3+43.4 (20 min)"
+      - "48.6 → CatalogPage frontend (30 min)"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 49: Catalog Display Templates — 3 طرق عرض للكاتيجوريز
+# القرار: 2026-05-03 | بعد استقرار Phase 48
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 49
+    name: "Catalog Display Templates — Grid / List / Showcase"
+    status: planned
+    priority: high
+    description: |
+      كل كاتيجوري يختار صاحب العمل طريقة عرضه من 3 قوالب.
+      يُخزَّن display_template على CatalogCategory (حقل جديد).
+      Frontend يحمّل التمبلت المناسب تلقائياً.
+      المرجع: old servers/Multy_store — نفس المنطق بـ sortOrder.
+
+    templates:
+      grid:     "شبكة 2-4 أعمدة — بطاقات زجاجية — للصالونات والخدمات العامة"
+      list:     "صفوف أفقية (صورة + وصف + سعر) — للمطاعم وقوائم الأسعار"
+      showcase: "بطاقات كبيرة editorial — للباقات والعروض المميزة"
+
+    tasks:
+
+      - id: 49.1
+        name: "Schema — إضافة display_template على CatalogCategory"
+        file: "prisma/schema.prisma"
+        status: planned
+        details: |
+          إضافة حقل:
+            displayTemplate  String  @default("grid") @map("display_template")
+          القيم الصحيحة: "grid" | "list" | "showcase"
+          Migration: ALTER TABLE catalog_categories ADD COLUMN display_template TEXT NOT NULL DEFAULT 'grid';
+          ثم: npx prisma db push (DIRECT_URL port 5432)
+
+      - id: 49.2
+        name: "Backend — تحديث Schemas + Endpoints"
+        file: "app/api/v1/admin/catalog.py"
+        status: planned
+        details: |
+          CategoryCreate: إضافة display_template: str = "grid"
+          CategoryUpdate: إضافة display_template: Optional[str] = None
+          create_category + update_category → يخزن "displayTemplate"
+          Public _fmt_category() → يرجع "display_template" في الـ response
+
+      - id: 49.3
+        name: "Frontend — 3 Template Components"
+        status: planned
+        details: |
+          frontend/src/pages/catalog/templates/
+          ├── CatalogGrid.jsx      ← repeat(auto-fill, minmax(220px, 1fr)) — GlassCard
+          ├── CatalogList.jsx      ← صف أفقي: صورة 100x100 + name + desc + price (RTL)
+          └── CatalogShowcase.jsx  ← بطاقات 16:9 كبيرة، 2 col desktop، وصف كامل + CTA
+
+          كل component: يستقبل { items, accent }
+          لا منطق — عرض بحت
+
+      - id: 49.4
+        name: "Frontend — Resolver في CatalogPage"
+        file: "frontend/src/pages/catalog/CatalogPage.jsx"
+        status: planned
+        details: |
+          import CatalogGrid / CatalogList / CatalogShowcase
+          const TEMPLATE_MAP = { grid: CatalogGrid, list: CatalogList, showcase: CatalogShowcase }
+          const TemplateComponent = TEMPLATE_MAP[activeCategory?.display_template || 'grid']
+          <TemplateComponent items={items} accent={accent} />
+
+      - id: 49.5
+        name: "Admin — Template Picker UI"
+        status: planned
+        priority: low
+        details: |
+          في Admin catalog tab (عند إضافة/تعديل كاتيجوري):
+          3 بطاقات clickable: Grid | List | Showcase
+          كل بطاقة: اسم عربي + mini-preview SVG + وصف متى تُستخدم
+          على النقر: يُحدث displayTemplate في الـ form + PATCH /admin/catalog/categories/{id}
+
+    implementation_order:
+      - "49.1 → Schema migration (10 min)"
+      - "49.2 → Backend update (15 min)"
+      - "49.3 → 3 template components (45 min)"
+      - "49.4 → Resolver في CatalogPage (10 min)"
+      - "49.5 → Admin picker (30 min — لاحقاً)"
+
+    design_doc: ".claudedocs/design/infinite-sites-ai-scaffolding.md"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 50: Tenant Onboarding UX — Page Type + Trial Routing
+# القرار: 2026-05-03 | الأولوية: high | قبل أي tenant حقيقي جديد
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 50
+    name: "Tenant Onboarding — Page Type Selection + Trial Routing"
+    status: planned
+    priority: high
+    description: |
+      عند إنشاء tenant جديد، يختار: صفحة عادية (normal) أم showcase.
+      أثناء فترة التجربة: لا subdomain — الروابط تحت auth.salmansaas.com.
+      بعد الاشتراك الحقيقي: يُعطى subdomain slug.salmansaas.com.
+
+    routing_design:
+      trial_public:  "auth.salmansaas.com/demo/{slug}"
+      trial_admin:   "auth.salmansaas.com/{slug}/dashboard"
+      trial_tabs:    "units | site-build | bookings | settings"
+      production_public: "{slug}.salmansaas.com"
+      production_admin:  "{slug}.salmansaas.com/admin"
+
+    page_type_field:
+      model: "Client"
+      field: "pageType  String  @default('normal')"
+      values:
+        normal:   "صفحة عادية — CatalogPage / MenuPage / StorePage"
+        showcase: "صفحة عرض سينمائية — ShowcaseTemplate (GSAP + Framer Motion)"
+
+    tasks:
+
+      - id: 50.1
+        name: "Schema — إضافة pageType على Client"
+        file: "prisma/schema.prisma"
+        status: planned
+        details: |
+          إضافة: pageType  String  @default("normal") @map("page_type")
+          القيم: "normal" | "showcase"
+          يُقرأ من /config endpoint → frontend يختار المسار
+
+      - id: 50.2
+        name: "Trial Routing — auth.salmansaas.com/demo/{slug}"
+        status: planned
+        details: |
+          App.jsx: إضافة route جديد:
+            <Route path="/demo/:slug/*" element={<TrialTenantResolver />} />
+
+          TrialTenantResolver:
+            يقرأ slug من params
+            يجلب config: GET /api/v1/public/{slug}/config
+            إذا pageType === 'showcase' → يرندر ShowcaseTemplate
+            إذا pageType === 'normal'   → يرندر حسب service_type:
+              restaurant → MenuPage
+              store      → StorePage
+              services   → CatalogPage
+
+          يستخدم مكونات موجودة — لا تكرار
+
+      - id: 50.3
+        name: "Trial Admin Routing — auth.salmansaas.com/{slug}/dashboard"
+        status: planned
+        details: |
+          Route: <Route path="/:slug/dashboard/*" element={<TrialAdminDashboard />} />
+
+          TrialAdminDashboard:
+            نفس SmarAdminDashboard لكن بـ:
+              - Header يعرض "🧪 نسخة تجريبية" بدل الـ logo
+              - Tab extra: "site-build" → Site Builder UI
+              - Tab: "upgrade" → ترقية للاشتراك
+
+          Tabs حسب service_type:
+            real_estate: units | bookings | gallery | settings
+            restaurant:  menu | orders | settings
+            store:       products | orders | settings
+            services:    catalog | bookings | settings
+
+      - id: 50.4
+        name: "Showcase Background — ConfigurableHero"
+        status: planned
+        details: |
+          مكوّن جديد: frontend/src/components/ConfigurableHero.jsx
+          يستقبل:
+            page_type:    "normal" | "showcase"
+            template_key: "beauty-salon-women" | "store-fashion-grid" | ...
+            primary_color: "#e91e8c"
+            content:      { hero_title_ar, hero_subtitle_ar, cover_url }
+
+          إذا page_type === 'showcase':
+            يرندر ShowcaseHero (GSAP split-image أو full-bleed-video)
+          إذا page_type === 'normal':
+            يرندر SimpleHero (GlassCard + title + CTA)
+
+          يُستخدم في TrialTenantResolver + production pages
+
+      - id: 50.5
+        name: "SSOLoginPage — redirect لـ Trial Admin بعد login"
+        file: "frontend/src/pages/auth/SSOLoginPage.jsx"
+        status: planned
+        details: |
+          resolveRedirect() حالياً يرسل لـ slug.salmansaas.com/admin
+          التعديل:
+            if (client.status === 'trial' || client.status === 'demo') {
+              → redirect: auth.salmansaas.com/{slug}/dashboard
+            } else {
+              → redirect: {slug}.salmansaas.com/admin (كالحال)
+            }
+
+      - id: 50.6
+        name: "Super Admin — تحديد page_type عند إنشاء tenant"
+        file: "frontend/src/pages/super-admin/ClientsManager.jsx"
+        status: planned
+        details: |
+          إضافة radio في "Add Client" form:
+            ○ صفحة عادية (normal)
+            ○ صفحة عرض (showcase)
+          يُرسَل في PATCH /api/v1/super/clients/{id}/settings
+
+    implementation_order:
+      - "50.1 → Schema (5 min)"
+      - "50.2 → Trial public routing (45 min)"
+      - "50.4 → ConfigurableHero (30 min)"
+      - "50.3 → Trial Admin dashboard (60 min)"
+      - "50.5 → SSO redirect fix (15 min)"
+      - "50.6 → Super Admin form (20 min)"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 51: Infinite Sites — AI-Powered Tenant Scaffolding
+# القرار: 2026-05-03 | الأولوية: future | بعد اكتمال DB + Schema
+# المرجع الكامل: .claudedocs/design/infinite-sites-ai-scaffolding.md
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 51
+    name: "Infinite Sites — AI Scaffolding via n8n + Claude Agent"
+    status: future
+    priority: high
+    blocked_by:
+      - "Phase 49 — Display Templates (يجب أن يعمل قبل الـ scaffolding)"
+      - "Phase 50 — Trial Routing (يجب أن يكون جاهزاً)"
+      - "Phase 50.4 — ConfigurableHero (الـ agent يحتاجه)"
+    description: |
+      نظام يولّد tenant كاملاً (DB + dashboard + صفحة عرض) من JSON واحد.
+      الـ JSON يُنتَج من محادثة WhatsApp عبر n8n → يُرسَل لـ Claude Agent.
+      الـ Agent ينفذ الـ 8 خطوات (create client, seed services, seed categories...).
+      النتيجة: الزبون يُرسَل له رابط dashboard جاهز ليبدأ إضافة محتواه.
+
+    template_library:
+      total: 20
+      categories:
+        fashion:    4  # store-fashion-grid, store-fashion-editorial, store-shoes, store-accessories
+        food:       4  # food-restaurant, food-cafe, food-fastfood, food-bakery
+        beauty:     4  # beauty-salon-women, beauty-barber, beauty-nails, beauty-spa
+        health:     4  # health-clinic, health-dental, health-gym, health-pharmacy
+        services:   4  # service-mechanic, service-education, service-photography, service-general
+
+    json_payload_keys:
+      required:
+        - client.slug
+        - client.owner_phone
+        - admin_account.email
+        - design.primary_color
+        - design.template_key
+        - services_config.active_services
+      optional:
+        - client.name_ar / name_en
+        - design.hero_style
+        - services_config.catalog.seed_categories
+        - services_config.store_config (has_sizes, filter_types...)
+        - content.hero_title_ar
+
+    agent_steps:
+      1: "POST /public/register → client_id + slug"
+      2: "PATCH /super/clients/{id}/settings → color, template, config"
+      3: "PATCH /super/clients/{id}/services × N → activate each service"
+      4: "POST /super/clients/{id}/seed-categories → bulk catalog categories"
+      5: "[if store] POST /super/clients/{id}/store-config"
+      6: "[if restaurant] POST /super/clients/{id}/restaurant-config"
+      7: "PATCH /admin/settings → hero content, whatsapp greeting"
+      8: "POST notify → WhatsApp + email للزبون بالرابط + كلمة المرور"
+
+    n8n_nodes:
+      - "WhatsApp Webhook"
+      - "LLM Extractor (Claude) — يستخرج client info من المحادثة"
+      - "JSON Validator — يتحقق من الحقول الإلزامية"
+      - "Template Matcher — يختار template_key + default colors"
+      - "AI Scaffolding Agent (Claude opus-4-7 + HTTP tools)"
+      - "Notification Node — WhatsApp + email"
+      - "Google Sheet Update — يضيف الزبون للـ CRM"
+
+    prerequisites_backend:
+      - "POST /api/v1/super/clients/{id}/seed-categories (bulk)"
+      - "PATCH /api/v1/super/clients/{id}/settings"
+      - "frontend/src/config/template-registry.js (20 templates)"
+
+    design_doc: ".claudedocs/design/infinite-sites-ai-scaffolding.md"
+    estimated_effort: "3-5 أيام (بعد Phase 49 + 50)"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE 52: Self-Service Onboarding — Plan B
+# القرار: 2026-05-04 | الأولوية: high | قبل أي زبون حقيقي جديد
+#
+# الهدف: الزبون يشترك بنفسه → يسجّل معلوماته → يفتح موقعه جاهزاً
+#        بالقالب الذي اختاره الـ Agent → يضيف صوره وعناوينه مباشرة.
+#
+# الفرق عن Plan A (tenant-seeder agent يعمل كل شي):
+#   Plan A: Agent يسجّل + يضبط + يرسل للزبون credentials
+#   Plan B: Agent يضبط القالب → يرسل للزبون رابط ساين أب →
+#           الزبون يسجّل بنفسه → يفتح dashboard جاهز
+# ══════════════════════════════════════════════════════════════════════════
+
+  - id: 52
+    name: "Self-Service Onboarding Plan B — Sign-up Page + Generic Admin Dashboard"
+    status: in_progress
+    priority: high
+    decision_date: "2026-05-04"
+    started_at: "2026-05-04"
+    estimated_effort: "أسبوعان"
+    blocked_by: []   # unblocked — all prereqs done
+
+    context: |
+      الوضع الحالي (2026-05-04 — بعد Session):
+        ✅ Backend register → DB → catalog service مزروع تلقائياً
+        ✅ /demo/{slug} تعرض القالب والتصنيفات
+        ✅ /{slug}/dashboard route موجود (محمي بـ JWT)
+        ✅ GenericAdminDashboard.jsx مبني (52.2)
+        ✅ CatalogTab.jsx مبني (52.3)
+        ✅ SettingsTab.jsx مبني (52.4)
+        ✅ App.jsx: /:slug/dashboard → GenericAdminDashboard (52.6)
+        ✅ TenantRegisterPage.jsx مبني (52.1)
+        ✅ /register route محدّث → TenantRegisterPage عند وجود ?template=
+        ❌ useImageUpload.js hook (52.5) — لم يُبنَ بعد
+        ❌ Registration one-shot با template_key في الـ endpoint (52.7) — اختياري
+
+    flow_design: |
+      1. Agent يستخرج بيانات الزبون من WhatsApp
+      2. Agent يختار القالب + اللون من template-registry.js
+      3. Agent يولّد رابط ساين أب مخصص:
+           https://salmansaas.com/register?template=fashion-grid&color=%23E8E8E8&slug=layla-boutique
+      4. يرسل الرابط للزبون عبر WhatsApp
+      5. الزبون يفتح الرابط → يرى صفحة ساين أب جاهزة (القالب محدد مسبقاً)
+      6. يملأ: اسمه + بريده + كلمة مرور
+      7. يضغط "أنشئ متجري" → POST /auth/register
+      8. Backend: register → PATCH settings (template+color) → seed categories
+         (كل هذا في خطوة واحدة بـ URL params)
+      9. Redirect → /{slug}/dashboard (Generic Admin Dashboard)
+      10. Dashboard جاهز: يضيف صوره + عناوينه + أسعاره
+
+    tasks:
+
+      - id: 52.1
+        name: "صفحة Sign-Up للزبون — /register"
+        file: "frontend/src/pages/auth/TenantRegisterPage.jsx"
+        status: done
+        completed_at: "2026-05-04"
+        priority: critical
+        details: |
+          Route: /register?template=&color=&slug=
+
+          الحقول:
+            - business_name_ar    (اسم المتجر)
+            - owner_name          (اسم صاحب العمل)
+            - email
+            - password            (min 8)
+            - whatsapp_number
+
+          القالب محدد مسبقاً من URL params (hidden fields).
+          يعرض mini-preview للقالب بالجانب (اسم + اللون الرئيسي).
+
+          عند الإرسال:
+            POST /api/v1/auth/register
+            بعد نجاح التسجيل → تلقائياً:
+              POST /auth/users/login (بنفس credentials)
+              PATCH /admin/settings (template + color من URL params)
+              POST /admin/catalog/seed-from-template (seedCategories من registry)
+            Redirect → /{slug}/dashboard?welcome=true
+
+          الـ welcome=true يُظهر onboarding tooltip: "ابدأ بإضافة أول منتج 🎉"
+
+      - id: 52.2
+        name: "Generic Admin Dashboard — لكل tenant جديد"
+        file: "frontend/src/pages/generic-admin/GenericAdminDashboard.jsx"
+        status: done
+        completed_at: "2026-05-04"
+        priority: critical
+        details: |
+          Dashboard عام يشتغل مع أي tenant عنده catalog service.
+          يحل محل SmarAdminDashboard في route /:slug/dashboard.
+
+          Tabs حسب active_services:
+            catalog  → CatalogTab   (التصنيفات + المنتجات)
+            settings → SettingsTab  (اسم، لون، شعار، واتساب)
+            [future] booking → AppointmentsTab
+            [future] store   → OrdersTab
+
+          Header:
+            - اسم المتجر + primary_color
+            - "نسخة تجريبية — X يوم متبقٍ" إذا status=trial
+            - زر "ترقية للاشتراك"
+
+          يقرأ slug من useParams() فقط — لا hardcode.
+
+      - id: 52.3
+        name: "CatalogTab — إدارة التصنيفات والمنتجات"
+        file: "frontend/src/pages/generic-admin/tabs/CatalogTab.jsx"
+        status: done
+        completed_at: "2026-05-04"
+        priority: critical
+        details: |
+          القسمان:
+          ── التصنيفات:
+            - قائمة التصنيفات الموجودة (من seed-from-template)
+            - إضافة تصنيف جديد (اسم عربي + إنجليزي + نوع العرض)
+            - حذف (soft delete: isActive=false)
+
+          ── المنتجات (داخل كل تصنيف):
+            - إضافة منتج:
+                name_ar    (اسم المنتج)
+                name_en    (اختياري)
+                price      (السعر)
+                currency   (USD | LBP | ...)
+                image_url  (رفع صورة أو رابط)
+                description_ar (وصف قصير)
+                is_featured    (toggle)
+            - تعديل / حذف منتج موجود
+            - ترتيب المنتجات بـ drag (sort_order)
+
+          API calls:
+            GET    /admin/catalog/categories
+            POST   /admin/catalog/categories
+            DELETE /admin/catalog/categories/{id}
+            GET    /admin/catalog/categories/{id}/items  (admin endpoint)
+            POST   /admin/catalog/items
+            PATCH  /admin/catalog/items/{id}
+            DELETE /admin/catalog/items/{id}
+
+      - id: 52.4
+        name: "SettingsTab Generic — اسم + لون + لوغو + واتساب"
+        file: "frontend/src/pages/generic-admin/tabs/SettingsTab.jsx"
+        status: done
+        completed_at: "2026-05-04"
+        priority: high
+        details: |
+          حقول قابلة للتعديل:
+            - name_ar, name_en        → PATCH /admin/settings
+            - primary_color           → color picker hex → PATCH /admin/settings
+            - whatsapp_number         → PATCH /admin/settings
+            - logo_url                → رفع صورة لـ Supabase Storage أو رابط مباشر
+
+          لا حقول smar-specific (لا hero_video_url، لا unit_types).
+
+      - id: 52.5
+        name: "Image Upload — Supabase Storage للـ catalog items"
+        file: "frontend/src/hooks/useImageUpload.js"
+        status: planned
+        priority: medium
+        details: |
+          hook عام: useImageUpload(bucket, folder)
+          يرفع الصورة إلى: properties/{slug}/catalog/{category_id}/{filename}
+          يرجع: public URL
+
+          في CatalogTab:
+            <input type="file" accept="image/*" onChange={handleUpload} />
+            عند الاختيار → useImageUpload → يُخزَّن الـ URL في form state → PATCH item
+
+      - id: 52.6
+        name: "App.jsx — wire route /:slug/dashboard لـ GenericAdminDashboard"
+        file: "frontend/src/App.jsx"
+        status: done
+        completed_at: "2026-05-04"
+        priority: critical
+        details: |
+          تغيير:
+            كان:  <SmarAdminDashboard />   (للكل)
+            يصير: <GenericAdminDashboard /> (للكل — smar مستثنى via check)
+
+          الـ GenericAdminDashboard يقرأ active_services من /admin/settings
+          ويبني الـ tabs ديناميكياً.
+
+          smar يبقى على /smar/admin → SmarAdminDashboard (لا تغيير)
+
+      - id: 52.7
+        name: "Registration endpoint — قبول template params مباشرة"
+        file: "app/api/v1/admin/auth.py"
+        status: planned
+        priority: medium
+        details: |
+          إضافة optional fields لـ TenantRegistrationRequest:
+            template_key:  Optional[str] = None
+            primary_color: Optional[str] = None
+            page_type:     Optional[str] = "normal"
+
+          في register_new_tenant() بعد إنشاء user + services:
+            if template_key:
+              await repo.update_client_design(client.id, {
+                "templateKey":   template_key,
+                "primary_color": primary_color or TEMPLATE_DEFAULTS[template_key]["color"],
+                "pageType":      page_type,
+              })
+              await repo.seed_categories_from_template(client.id, template_key)
+
+          هكذا كل شي بـ POST واحد — لا PATCH منفصل.
+
+    implementation_order:
+      - "52.6 → تغيير route في App.jsx (10 دقائق)"
+      - "52.2 → GenericAdminDashboard skeleton (2 ساعة)"
+      - "52.3 → CatalogTab (3 ساعات)"
+      - "52.4 → SettingsTab (1 ساعة)"
+      - "52.1 → صفحة Sign-Up (2 ساعة)"
+      - "52.5 → Image Upload hook (1 ساعة)"
+      - "52.7 → Registration one-shot (1 ساعة)"
+
+    success_criteria: |
+      ✅ الزبون يفتح رابط الساين أب
+      ✅ يملأ 5 حقول ويضغط "أنشئ متجري"
+      ✅ يُعاد توجيهه تلقائياً للـ dashboard
+      ✅ يرى تصنيفاته جاهزة (من القالب)
+      ✅ يضيف منتجاً بصورة في أقل من دقيقتين
+      ✅ /demo/{slug} يعكس التغييرات فوراً

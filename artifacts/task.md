@@ -1,0 +1,4 @@
+- [x] فحص مسارات الباك إند (PMS, CMS, Upselling, Health Monitors, RBAC).
+- [x] فحص واجهة المستخدم للوحة التحكم (Block Builder UI).
+- [x] فحص واجهة المستخدم لعرض البيانات (Frontend rendering of CMS blocks).
+- [x] إعداد التقرير النهائي (Audit Report).

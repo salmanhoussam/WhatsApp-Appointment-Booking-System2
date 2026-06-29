@@ -1,0 +1,204 @@
+/**
+ * Infinite Sites - Template Registry
+ * يحتوي هذا الملف على 20 قالباً جاهزاً موزعة على 5 فئات رئيسية.
+ * يُستخدم هذا الملف في:
+ * 1. واجهة المستخدم (Frontend) لعرض خيارات القوالب.
+ * 2. الباك-إند (Backend) عبر الـ AI Agent لمعرفة التصنيفات الافتراضية (Seed Categories) والألوان لكل قالب.
+ */
+
+export const templateCategories = [
+  { id: 'fashion', name: 'أزياء' },
+  { id: 'food', name: 'طعام' },
+  { id: 'beauty', name: 'تجميل' },
+  { id: 'health', name: 'صحة' },
+  { id: 'services', name: 'خدمات' }
+];
+
+export const templateRegistry = {
+  // ==========================================
+  // 1. فئة الأزياء (Fashion)
+  // ==========================================
+  'fashion-grid': {
+    name: 'متجر شبكي',
+    categoryId: 'fashion',
+    defaultColor: '#1A1A1A', // أسود أنيق
+    heroStyle: 'minimal',
+    catalogLayout: 'grid',
+    seedCategories: ['وصل حديثاً', 'ملابس رجالية', 'ملابس نسائية', 'تخفيضات']
+  },
+  'fashion-showcase': {
+    name: 'عرض افتتاحي',
+    categoryId: 'fashion',
+    defaultColor: '#8B0000', // أحمر داكن
+    heroStyle: 'showcase',
+    catalogLayout: 'showcase',
+    seedCategories: ['تشكيلة الصيف', 'تشكيلة الشتاء', 'المميزة', 'أزياء فاخرة']
+  },
+  'fashion-shoes': {
+    name: 'متجر أحذية',
+    categoryId: 'fashion',
+    defaultColor: '#FF4500', // برتقالي رياضي
+    heroStyle: 'split-screen',
+    catalogLayout: 'grid',
+    seedCategories: ['أحذية رياضية', 'كلاسيك', 'نسائي', 'أطفال']
+  },
+  'fashion-accessories': {
+    name: 'إكسسوارات',
+    categoryId: 'fashion',
+    defaultColor: '#D4AF37', // ذهبي
+    heroStyle: 'centered',
+    catalogLayout: 'grid',
+    seedCategories: ['ساعات', 'نظارات', 'حقائب', 'مجوهرات']
+  },
+
+  // ==========================================
+  // 2. فئة الطعام (Food)
+  // ==========================================
+  'food-restaurant': {
+    name: 'مطعم فاخر',
+    categoryId: 'food',
+    defaultColor: '#800000', // عنابي
+    heroStyle: 'background-image',
+    catalogLayout: 'list',
+    seedCategories: ['المقبلات', 'الأطباق الرئيسية', 'المشويات', 'الحلويات', 'المشروبات']
+  },
+  'food-cafe': {
+    name: 'كافيه',
+    categoryId: 'food',
+    defaultColor: '#6F4E37', // بني قهوة
+    heroStyle: 'split-screen',
+    catalogLayout: 'grid',
+    seedCategories: ['قهوة ساخنة', 'مشروبات باردة', 'معجنات', 'كيك', 'إفطار']
+  },
+  'food-fastfood': {
+    name: 'وجبات سريعة',
+    categoryId: 'food',
+    defaultColor: '#FFCC00', // أصفر
+    heroStyle: 'bold-action',
+    catalogLayout: 'grid',
+    seedCategories: ['برجر', 'بيتزا', 'وجبات التوفير', 'أطباق جانبية', 'عصائر']
+  },
+  'food-bakery': {
+    name: 'مخبز وحلويات',
+    categoryId: 'food',
+    defaultColor: '#E2725B', // قرميدي
+    heroStyle: 'centered',
+    catalogLayout: 'grid',
+    seedCategories: ['خبز طازج', 'فطائر', 'كعك المناسبات', 'بسكويت']
+  },
+
+  // ==========================================
+  // 3. فئة التجميل (Beauty)
+  // ==========================================
+  'beauty-salon-women': {
+    name: 'صالون نسائي',
+    categoryId: 'beauty',
+    defaultColor: '#FF69B4', // وردي
+    heroStyle: 'showcase',
+    catalogLayout: 'list',
+    seedCategories: ['عناية بالشعر', 'مكياج', 'عناية بالبشرة', 'باقات العروس']
+  },
+  'beauty-barber': {
+    name: 'حلاق رجالي',
+    categoryId: 'beauty',
+    defaultColor: '#2F4F4F', // رمادي داكن
+    heroStyle: 'minimal',
+    catalogLayout: 'list',
+    seedCategories: ['قص شعر', 'حلاقة ذقن', 'عناية بالبشرة', 'باقات العريس']
+  },
+  'beauty-nails': {
+    name: 'صالون أظافر',
+    categoryId: 'beauty',
+    defaultColor: '#FFB6C1', // وردي فاتح
+    heroStyle: 'centered',
+    catalogLayout: 'grid',
+    seedCategories: ['مانيكير', 'باديكير', 'أكريليك', 'عناية باليدين']
+  },
+  'beauty-spa': {
+    name: 'مركز سبا',
+    categoryId: 'beauty',
+    defaultColor: '#48D1CC', // تركواز مهدئ
+    heroStyle: 'background-image',
+    catalogLayout: 'list',
+    seedCategories: ['مساج استرخائي', 'حمام مغربي', 'عناية بالجسم', 'جلسات تأمل']
+  },
+
+  // ==========================================
+  // 4. فئة الصحة (Health)
+  // ==========================================
+  'health-clinic': {
+    name: 'عيادة طبية',
+    categoryId: 'health',
+    defaultColor: '#005CE6', // أزرق طبي
+    heroStyle: 'split-screen',
+    catalogLayout: 'list',
+    seedCategories: ['الاستشارات', 'الفحوصات', 'التحاليل', 'المتابعة الدورية']
+  },
+  'health-dental': {
+    name: 'عيادة أسنان',
+    categoryId: 'health',
+    defaultColor: '#00BFFF', // أزرق سماوي
+    heroStyle: 'minimal',
+    catalogLayout: 'list',
+    seedCategories: ['تنظيف وتلميع', 'تبييض', 'تقويم', 'زراعة', 'حشوات']
+  },
+  'health-gym': {
+    name: 'نادي رياضي',
+    categoryId: 'health',
+    defaultColor: '#E60000', // أحمر طاقة
+    heroStyle: 'bold-action',
+    catalogLayout: 'grid',
+    seedCategories: ['الاشتراكات الشهرية', 'تدريب شخصي', 'حصص جماعية', 'مكملات غذائية']
+  },
+  'health-pharmacy': {
+    name: 'صيدلية',
+    categoryId: 'health',
+    defaultColor: '#32CD32', // أخضر
+    heroStyle: 'centered',
+    catalogLayout: 'grid',
+    seedCategories: ['أدوية وصفية', 'فيتامينات', 'عناية بالطفل', 'عناية شخصية', 'أجهزة طبية']
+  },
+
+  // ==========================================
+  // 5. فئة الخدمات (Services)
+  // ==========================================
+  'services-mechanic': {
+    name: 'ميكانيكي سيارات',
+    categoryId: 'services',
+    defaultColor: '#555555', // رمادي معدني
+    heroStyle: 'bold-action',
+    catalogLayout: 'list',
+    seedCategories: ['فحص دوري', 'تغيير زيت', 'كهرباء سيارات', 'سمكرة ودهان', 'قطع غيار']
+  },
+  'services-education': {
+    name: 'تعليم وتدريب',
+    categoryId: 'services',
+    defaultColor: '#4B0082', // نيلي/بنفسجي
+    heroStyle: 'split-screen',
+    catalogLayout: 'grid',
+    seedCategories: ['دورات لغات', 'تطوير برمجيات', 'إدارة أعمال', 'حصص تقوية']
+  },
+  'services-photography': {
+    name: 'استوديو تصوير',
+    categoryId: 'services',
+    defaultColor: '#000000', // أسود
+    heroStyle: 'showcase',
+    catalogLayout: 'grid',
+    seedCategories: ['تصوير زفاف', 'جلسات تصوير شخصية', 'تصوير منتجات', 'تغطية فعاليات']
+  },
+  'services-general': {
+    name: 'خدمات عامة / صيانة',
+    categoryId: 'services',
+    defaultColor: '#FF8C00', // برتقالي داكن
+    heroStyle: 'centered',
+    catalogLayout: 'list',
+    seedCategories: ['سباكة', 'كهرباء', 'تنظيف منازل', 'نقل عفش', 'مكافحة حشرات']
+  }
+};
+
+/**
+ * دالة مساعدة لجلب بيانات القالب بناءً على المفتاح
+ */
+export const getTemplateDetails = (templateKey) => {
+  return templateRegistry[templateKey] || null;
+};

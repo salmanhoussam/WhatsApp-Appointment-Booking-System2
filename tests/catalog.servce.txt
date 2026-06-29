@@ -1,0 +1,165 @@
+from fastapi import HTTPException
+from typing import List, Dict, Any, Optional
+# نفترض وجود طبقة الـ Repository (سيتم إنشاؤها/تحديثها لاحقاً بواسطة Claude)
+from app.repositories import catalog_repository as repo
+
+# ==========================================
+# Shared Formatters (تنسيق البيانات الموحد)
+# ==========================================
+
+def _fmt_category(category: Any) -> Dict[str, Any]:
+    """تنسيق بيانات القسم للإرجاع (إخفاء التفاصيل غير الضرورية)"""
+    if not category:
+        return {}
+    return {
+        "id": category.id,
+        "name": category.name,
+        "slug": category.slug,
+        "image_url": getattr(category, "image_url", None),
+        "order": getattr(category, "order", 0),
+        "is_active": getattr(category, "is_active", True)
+    }
+
+def _fmt_item(item: Any) -> Dict[str, Any]:
+    """تنسيق بيانات العنصر (المنتج/الخدمة)"""
+    if not item:
+        return {}
+    return {
+        "id": item.id,
+        "category_id": item.category_id,
+        "title": item.title,
+        "description": getattr(item, "description", ""),
+        "price": float(item.price) if item.price else 0.0,
+        "image_url": getattr(item, "image_url", None),
+        "is_available": getattr(item, "is_available", True),
+        "is_featured": getattr(item, "is_featured", False)
+    }
+
+# ==========================================
+# Admin Services: Categories (لوحة تحكم الأدمن - الأقسام)
+# ==========================================
+
+async def admin_list_categories(client_id: str) -> List[Dict[str, Any]]:
+    categories = await repo.get_categories(client_id=client_id)
+    return [_fmt_category(cat) for cat in categories]
+
+async def admin_create_category(client_id: str, data: Any) -> Dict[str, Any]:
+    # Validation & Data Build
+    if not data.name:
+        raise HTTPException(status_code=400, detail="Category name is required")
+    
+    # التأكد من عدم تكرار الاسم لنفس العميل (اختياري حسب الـ Business Logic)
+    existing = await repo.get_category_by_name(client_id=client_id, name=data.name)
+    if existing:
+        raise HTTPException(status_code=400, detail="Category with this name already exists")
+
+    created = await repo.create_category(client_id=client_id, data=data)
+    return _fmt_category(created)
+
+async def admin_update_category(client_id: str, cat_id: str, data: Any) -> Dict[str, Any]:
+    # 404 Check - العزل مطبق بفضل تمرير client_id
+    existing = await repo.get_category_by_id(client_id=client_id, category_id=cat_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    updated = await repo.update_category(client_id=client_id, category_id=cat_id, data=data)
+    return _fmt_category(updated)
+
+async def admin_delete_category(client_id: str, cat_id: str) -> bool:
+    existing = await repo.get_category_by_id(client_id=client_id, category_id=cat_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    return await repo.delete_category(client_id=client_id, category_id=cat_id)
+
+async def admin_seed_from_template(client_id: str, categories_names: List[str]) -> List[Dict[str, Any]]:
+    """الزرع الجماعي للأقسام بناءً على مصفوفة أسماء (يُستخدم في Phase 51)"""
+    if not categories_names:
+        raise HTTPException(status_code=400, detail="Categories list cannot be empty")
+    
+    seeded_categories = []
+    # Loop over template categories and create them
+    for i, name in enumerate(categories_names):
+        data = {"name": name, "order": i} # بناء هيكل البيانات المبدئي
+        created = await repo.create_category(client_id=client_id, data=data)
+        seeded_categories.append(created)
+        
+    return [_fmt_category(c) for c in seeded_categories]
+
+# ==========================================
+# Admin Services: Items (لوحة تحكم الأدمن - العناصر)
+# ==========================================
+
+async def admin_list_items(client_id: str) -> List[Dict[str, Any]]:
+    items = await repo.get_items(client_id=client_id)
+    return [_fmt_item(item) for item in items]
+
+async def admin_create_item(client_id: str, data: Any) -> Dict[str, Any]:
+    # Category Ownership Check (أهم خطوة أمنية للعزل)
+    cat = await repo.get_category_by_id(client_id=client_id, category_id=data.category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found or does not belong to you")
+    
+    # Validation + Data Build
+    if not data.title:
+        raise HTTPException(status_code=400, detail="Item title is required")
+        
+    created = await repo.create_item(client_id=client_id, data=data)
+    return _fmt_item(created)
+
+async def admin_update_item(client_id: str, item_id: str, data: Any) -> Dict[str, Any]:
+    # 404 Check
+    existing = await repo.get_item_by_id(client_id=client_id, item_id=item_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    # إذا تم محاولة تغيير القسم، تأكد أن القسم الجديد يخص العميل
+    if getattr(data, "category_id", None):
+        cat = await repo.get_category_by_id(client_id=client_id, category_id=data.category_id)
+        if not cat:
+            raise HTTPException(status_code=404, detail="Target category not found or unauthorized")
+
+    updated = await repo.update_item(client_id=client_id, item_id=item_id, data=data)
+    return _fmt_item(updated)
+
+async def admin_delete_item(client_id: str, item_id: str) -> bool:
+    existing = await repo.get_item_by_id(client_id=client_id, item_id=item_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    return await repo.delete_item(client_id=client_id, item_id=item_id)
+
+# ==========================================
+# Public Services (للعرض العام للعملاء النهائيين)
+# ==========================================
+
+async def list_categories_public(client_id: str) -> List[Dict[str, Any]]:
+    # جلب الأقسام المفعلة فقط
+    categories = await repo.get_categories(client_id=client_id, is_active=True)
+    return [_fmt_category(cat) for cat in categories]
+
+async def get_category_items_public(client_id: str, cat_id: str) -> List[Dict[str, Any]]:
+    # 404 Check للقسم نفسه أولاً
+    cat = await repo.get_category_by_id(client_id=client_id, category_id=cat_id)
+    if not cat or not getattr(cat, "is_active", True):
+        raise HTTPException(status_code=404, detail="Category not found")
+        
+    items = await repo.get_items_by_category(client_id=client_id, category_id=cat_id, is_available=True)
+    return [_fmt_item(item) for item in items]
+
+async def get_item_public(client_id: str, item_id: str) -> Dict[str, Any]:
+    item = await repo.get_item_by_id(client_id=client_id, item_id=item_id)
+    if not item or not getattr(item, "is_available", True):
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    formatted_item = _fmt_item(item)
+    
+    # إضافة أي بيانات إضافية (أبناء، خيارات، إضافات) - (Add children format)
+    # formatted_item["variants"] = await repo.get_item_variants(item_id)
+    
+    return formatted_item
+
+async def list_featured_public(client_id: str) -> List[Dict[str, Any]]:
+    # جلب العناصر المميزة (Featured) فقط
+    items = await repo.get_featured_items(client_id=client_id)
+    return [_fmt_item(item) for item in items]

@@ -1,0 +1,51 @@
+{
+  "_schema_version": "2.0",
+  "_description": "Template for onboarding a new SalmanSaaS tenant. Filled by المحقق كونان (Gemini extraction agent) from WhatsApp conversation, then reviewed by Salman before running seed scripts.",
+  "_usage": "Copy this file, rename it to {slug}.json, fill all required fields, then run scripts/seed_new_tenant.py --data scripts/data/{slug}.json",
+
+  "client": {
+    "slug": null,
+    "name_ar": null,
+    "name_en": null,
+    "service_type": null,
+    "status": "trial",
+    "currency": "USD",
+    "country_code": null,
+    "trial_ends_at": null
+  },
+
+  "owner": {
+    "name": null,
+    "whatsapp": null,
+    "email": null,
+    "password_temp": null
+  },
+
+  "design": {
+    "primary_color": null,
+    "page_type": "normal",
+    "template_key": null,
+    "hero_style": null
+  },
+
+  "services_config": {
+    "active_services": ["catalog"]
+  },
+
+  "catalog": {
+    "seed_from_template": true,
+    "categories": []
+  },
+
+  "restaurant_config": null,
+  "booking_config": null,
+  "store_config": null,
+
+  "meta": {
+    "extracted_by": "konaan-v2",
+    "extracted_at": null,
+    "conversation_id": null,
+    "confidence": "high | medium | low",
+    "needs_review": []
+  }
+}

@@ -1,0 +1,206 @@
+[
+  {
+    "category": "Hair Care",
+    "name_ar": "قص شعر",
+    "name_en": "Haircut",
+    "price": 15.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 30
+    },
+    "id": "6beca885-2a6c-4dda-8771-1f2af456bb4d"
+  },
+  {
+    "category": "Hair Care",
+    "name_ar": "صبغة شعر",
+    "name_en": "Hair Coloring",
+    "price": 45.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 90
+    },
+    "id": "402b7488-7c96-47dc-9fd8-90d1e4e98917"
+  },
+  {
+    "category": "Hair Care",
+    "name_ar": "بلو شعر",
+    "name_en": "Blowout",
+    "price": 20.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 45
+    },
+    "id": "c662b3c0-90c4-48a9-a7c9-81b1e56f007b"
+  },
+  {
+    "category": "Hair Care",
+    "name_ar": "كيراتين",
+    "name_en": "Keratin Treatment",
+    "price": 80.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 120
+    },
+    "id": "941806ef-1724-42b2-8edc-b0a19e9b2d57"
+  },
+  {
+    "category": "Hair Care",
+    "name_ar": "هايلايت",
+    "name_en": "Highlights",
+    "price": 60.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 90
+    },
+    "id": "4e25fa21-92e5-472f-9bdc-7cf6048f9765"
+  },
+  {
+    "category": "Skin Care",
+    "name_ar": "تنظيف بشرة",
+    "name_en": "Deep Cleansing Facial",
+    "price": 35.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 60
+    },
+    "id": "447d5251-86ad-437b-b399-214d0d162ad2"
+  },
+  {
+    "category": "Skin Care",
+    "name_ar": "مساج وجه",
+    "name_en": "Face Massage",
+    "price": 25.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 30
+    },
+    "id": "d6c7dc01-457e-4d29-9e9c-f8975fb45726"
+  },
+  {
+    "category": "Skin Care",
+    "name_ar": "ماسك مرطّب",
+    "name_en": "Hydrating Mask",
+    "price": 20.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 30
+    },
+    "id": "471ae5b3-d654-4800-8013-dfa9dbf50d90"
+  },
+  {
+    "category": "Skin Care",
+    "name_ar": "تقشير بشرة",
+    "name_en": "Skin Exfoliation",
+    "price": 30.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 45
+    },
+    "id": "74ae4b18-9dee-4607-bee1-40c5484ade57"
+  },
+  {
+    "category": "Nails",
+    "name_ar": "مانيكير",
+    "name_en": "Manicure",
+    "price": 15.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 30
+    },
+    "id": "45589bb0-cb13-4c02-b1a9-ed0d6ecd6e54"
+  },
+  {
+    "category": "Nails",
+    "name_ar": "باديكير",
+    "name_en": "Pedicure",
+    "price": 20.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 40
+    },
+    "id": "cf389d0d-6b43-4aa8-b8e6-6ad1ed9818f4"
+  },
+  {
+    "category": "Nails",
+    "name_ar": "أظافر جل",
+    "name_en": "Gel Nails",
+    "price": 30.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 60
+    },
+    "id": "409e8dc7-ce73-40f3-b4cb-c9768197a27a"
+  },
+  {
+    "category": "Nails",
+    "name_ar": "نقش أظافر",
+    "name_en": "Nail Art",
+    "price": 25.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 45
+    },
+    "id": "e14b3a59-3c60-4c60-8d9a-e798da793a23"
+  },
+  {
+    "category": "Makeup",
+    "name_ar": "مكياج يومي",
+    "name_en": "Daily Makeup",
+    "price": 30.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 45
+    },
+    "id": "00e8d645-14a1-4193-84d1-34386d1e5a9e"
+  },
+  {
+    "category": "Makeup",
+    "name_ar": "مكياج سهرة",
+    "name_en": "Evening Makeup",
+    "price": 55.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 60
+    },
+    "id": "96bcf30b-7078-4e39-ab04-aab74936f5af"
+  },
+  {
+    "category": "Makeup",
+    "name_ar": "مكياج عروس",
+    "name_en": "Bridal Makeup",
+    "price": 150.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 120
+    },
+    "id": "daca84eb-46e2-4001-af56-a65c3593a19c"
+  },
+  {
+    "category": "Makeup",
+    "name_ar": "تثبيت مكياج",
+    "name_en": "Makeup Setting",
+    "price": 15.0,
+    "currency": "USD",
+    "is_available": true,
+    "metadata": {
+      "duration_min": 15
+    },
+    "id": "d8bdf156-e48d-49dd-a262-be8865b2b9f9"
+  }
+]

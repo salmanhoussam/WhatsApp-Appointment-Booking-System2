@@ -1,0 +1,29 @@
+[
+  {
+    "id": "98f5fe34-8dc7-4cec-8b8f-e1a67aa48838",
+    "old_id": "326e00a7-d58f-4848-b8f8-525c404cb688",
+    "name_ar": "أحذية",
+    "name_en": "Shoes",
+    "sort_order": 1,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "9d681f78-9869-408f-b869-d439c9043b30",
+    "old_id": "d3f1e1ed-2d68-45cf-b187-ca5b8d6085d4",
+    "name_ar": "ملابس",
+    "name_en": "Clothing",
+    "sort_order": 2,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "2e2683fe-d2ee-44cd-9dc3-ed431116a11f",
+    "old_id": "57fb1d90-7892-4ec8-9f53-6eb0bf4012bc",
+    "name_ar": "إكسسوارات",
+    "name_en": "Accessories",
+    "sort_order": 3,
+    "display_template": "grid",
+    "image_url": null
+  }
+]

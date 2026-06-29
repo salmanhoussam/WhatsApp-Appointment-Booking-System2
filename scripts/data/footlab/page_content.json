@@ -1,0 +1,83 @@
+{
+  "_meta": {
+    "slug": "footlab",
+    "module_key": "store",
+    "based_on": "page_templates/store.json",
+    "note": "Footlab — shoe & sneaker store"
+  },
+  "template_key": "store_classic",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "Footlab — أحذية بلا حدود",
+        "subtitle_ar": "أحدث تصاميم الأحذية والسنيكرز — جودة عالية وأسعار تنافسية",
+        "cta_text_ar": "تسوق الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_offers",
+      "type": "offers",
+      "order": 1,
+      "data": {
+        "heading_ar": "عروض خاصة",
+        "items": [
+          { "title_ar": "تخفيضات End of Season", "desc_ar": "على جميع إصدارات الموسم الماضي", "badge": "40% OFF", "accent": "#8b5cf6" },
+          { "title_ar": "شحن مجاني", "desc_ar": "على الطلبات فوق $50", "badge": "مجاني", "accent": "#3ecf8e" }
+        ]
+      }
+    },
+    {
+      "id": "s_categories",
+      "type": "categories_grid",
+      "order": 2,
+      "data": {
+        "heading_ar": "تصفح حسب النوع",
+        "show_count": true,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "الأكثر مبيعاً",
+        "limit": 8,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "آراء المتسوقين",
+        "items": [
+          { "text_ar": "أحذية أصلية 100% والتوصيل وصل في 48 ساعة!", "author": "طارق ع.", "rating": 5 },
+          { "text_ar": "تشكيلة رائعة وخدمة العملاء ممتازة", "author": "دانا م.", "rating": 5 },
+          { "text_ar": "اشتريت من Footlab 3 مرات ودائماً راضي عن الجودة", "author": "سامر ح.", "rating": 5 }
+        ]
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 5,
+      "data": {
+        "text_ar": "اشتر الآن وادفع عند الاستلام — لا مخاطرة",
+        "link": "",
+        "accent": "#8b5cf6",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

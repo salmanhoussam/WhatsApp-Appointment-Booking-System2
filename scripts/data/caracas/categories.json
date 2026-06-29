@@ -1,0 +1,92 @@
+[
+  {
+    "id": "6631cbb9-ce75-4890-9804-3a0578a6a58f",
+    "old_id": "2ae64042-6cab-4a48-b787-d82beb474840",
+    "name_ar": "ساندويش غربي",
+    "name_en": "Western Sandwiches",
+    "sort_order": 0,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Western%20Sandwiches.jfif"
+  },
+  {
+    "id": "4dd1cc99-ead1-4542-bc29-e65aac7622d1",
+    "old_id": "abe6d724-9e85-4445-9c0e-f3aafc7efb0e",
+    "name_ar": "ساندويش شرقي",
+    "name_en": "Oriental Sandwiches",
+    "sort_order": 1,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Oriental%20Sandwiches.jfif"
+  },
+  {
+    "id": "f68dc83d-171c-4d01-b543-9728269b89bd",
+    "old_id": "6179f636-6eee-410c-b40d-b7b2bdee04fd",
+    "name_ar": "وجبات مميزة",
+    "name_en": "Special Meals",
+    "sort_order": 2,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Special%20Meals.jfif"
+  },
+  {
+    "id": "a6eb70ec-654e-41bc-80c4-832d6ce690b8",
+    "old_id": "5a5bef65-b803-47b2-9434-58a47a1c587f",
+    "name_ar": "وجبات",
+    "name_en": "Meals",
+    "sort_order": 3,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Meals.jfif"
+  },
+  {
+    "id": "9a169b28-d79b-4989-ae12-dbf019126b73",
+    "old_id": "5525e4e5-7668-4d63-bab6-c5cc92e8ee4d",
+    "name_ar": "كوشينيا (دزينة)",
+    "name_en": "Coxinha (Dozen)",
+    "sort_order": 4,
+    "display_template": "grid",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Coxinha%20(Dozen).jfif"
+  },
+  {
+    "id": "ec0ff257-d4c3-4acc-9db3-00577b719516",
+    "old_id": "8adfd2a9-3aca-443e-83a4-036c927c1361",
+    "name_ar": "مشروبات باردة",
+    "name_en": "Cold Drinks",
+    "sort_order": 5,
+    "display_template": "grid",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Cold%20Drinks.jfif"
+  },
+  {
+    "id": "73044752-85f3-4afe-b03b-a9cfd7207852",
+    "old_id": "221b405b-715b-4528-b300-728d684fe086",
+    "name_ar": "مازة",
+    "name_en": "Appetizers",
+    "sort_order": 6,
+    "display_template": "grid",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Appetizers.jfif"
+  },
+  {
+    "id": "3d2c6251-9365-479e-9f16-f71e0196c547",
+    "old_id": "cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9",
+    "name_ar": "ترويقة",
+    "name_en": "Breakfast",
+    "sort_order": 7,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/breakfast.jfif"
+  },
+  {
+    "id": "9d426045-b05c-4d7f-98ef-6f59d162fadc",
+    "old_id": "e14953ee-9c2b-4f25-be08-dfd47c642e8a",
+    "name_ar": "متبلات (1كغ)",
+    "name_en": "Marinated (1Kg)",
+    "sort_order": 8,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Marinated.jfif"
+  },
+  {
+    "id": "9230a523-2935-4e1d-adbf-565347e73755",
+    "old_id": "2fb9824a-dfa5-49b4-bd8f-822116544a9f",
+    "name_ar": "قطع دجاج نيء (1كغ)",
+    "name_en": "Raw Chicken Parts (1Kg)",
+    "sort_order": 9,
+    "display_template": "list",
+    "image_url": "https://gdzthjcvzvhfpsvoxhbm.supabase.co/storage/v1/object/public/menu/carakas/Raw%20Chicken%20Parts.jfif"
+  }
+]

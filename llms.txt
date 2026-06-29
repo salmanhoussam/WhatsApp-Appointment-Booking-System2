@@ -1,0 +1,63 @@
+# SalmanSaaS — AI Agents for Local Business Automation
+
+## Overview
+SalmanSaaS is an AI-native automation platform designed for local businesses in the MENA region. We provide intelligent agents that work 24/7 to automate bookings, customer management, order processing, and business operations via WhatsApp and integrated channels.
+
+## Core Offering
+- **AI Booking Agents**: Automated WhatsApp-based booking system with instant confirmations and smart rescheduling
+- **Customer Engagement**: Intelligent follow-up messages, reminders, loyalty programs, and surveys
+- **Inventory Management**: Real-time product/availability tracking with automatic customer updates
+- **Order Automation**: Seamless order processing, payment handling, and fulfillment tracking
+- **Analytics & Insights**: Live dashboards with daily sales, customer trends, and profit recommendations
+- **Local Data Storage**: All customer data stored securely on your server, never sent to third parties
+
+## Technology Stack
+- **Frontend**: React 19 + Vite + Tailwind CSS
+- **Backend**: FastAPI + Supabase PostgreSQL
+- **AI Layer**: LLM-powered agents for intent understanding and automation
+- **Security**: AES-256 encryption, GDPR-compliant, regular security audits
+
+## Key Features
+1. **WhatsApp Integration**: Direct two-way communication with customers
+2. **No-Code Setup**: Configure automation recipes without technical knowledge
+3. **Multi-Tenant SaaS**: Fully isolated tenants with independent configurations
+4. **Real-Time Notifications**: Instant updates to customers and staff
+5. **Payment Processing**: Secure local payment handling with invoice generation
+6. **Multi-Language Support**: Arabic and English with RTL optimization
+
+## Use Cases
+- **Restaurants**: Menu management, order automation, delivery tracking
+- **Salons & Services**: Appointment booking, reminder automation, customer retention
+- **Real Estate**: Property inquiries, viewing requests, document automation
+- **E-Commerce**: Order fulfillment, inventory sync, customer follow-up
+- **Hotels & Hospitality**: Room booking, guest services automation, check-in flow
+
+## Business Model
+- **SaaS Subscription**: Per-module pricing (booking, restaurant, store, loyalty)
+- **Custom Automation Recipes**: Tailored workflows for specific business needs
+- **White-Label**: Available for agencies and resellers
+
+## Data & Privacy
+- Local storage guarantee: Customer data remains on your infrastructure
+- No data selling or third-party sharing
+- Compliance with MENA data protection regulations
+- Automated encrypted backups
+
+## Security Standards
+- AES-256 encryption for all data
+- Regular third-party security audits
+- Automated intrusion detection
+- GDPR and CCPA compliance
+
+## Contact & Support
+- **Website**: https://salmansaas.com
+- **Email**: support@salmansaas.com
+- **WhatsApp**: +961-78-727986
+- **Documentation**: https://docs.salmansaas.com
+
+## Company
+Founded in 2024, SalmanSaaS is building the AI automation infrastructure for thousands of local businesses across the MENA region, helping them grow without the overhead of manual operations.
+
+---
+
+**AI Crawler Discovery**: This file is optimized for AI agents and crawlers to quickly understand SalmanSaaS's capabilities, technology, and positioning. For human visitors, please visit our main website.

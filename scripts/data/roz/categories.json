@@ -1,0 +1,30 @@
+[
+  {
+    "id": "a1a40b83-4e96-46a5-93c4-d3b051f944b7",
+    "name_ar": "عناية بالشعر",
+    "name_en": "Hair Care",
+    "sort_order": 0,
+    "display_template": "grid"
+  },
+  {
+    "id": "9da1a817-fda3-4dae-bccf-4603a61c85ea",
+    "name_ar": "عناية بالبشرة",
+    "name_en": "Skin Care",
+    "sort_order": 1,
+    "display_template": "grid"
+  },
+  {
+    "id": "23b411be-faeb-46cc-81e5-20ff6cc6b742",
+    "name_ar": "أظافر",
+    "name_en": "Nails",
+    "sort_order": 2,
+    "display_template": "grid"
+  },
+  {
+    "id": "21c24f84-725c-43c6-b877-dbf88176206a",
+    "name_ar": "مكياج",
+    "name_en": "Makeup",
+    "sort_order": 3,
+    "display_template": "grid"
+  }
+]

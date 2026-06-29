@@ -1,0 +1,3 @@
+name: n8n-automation
+description: WhatsApp webhook triggers and n8n workflow integrations.
+user-invocable: trueWhen building the WhatsApp booking flows:1. The TriggerWhen a user confirms a booking, the backend MUST send a POST request to the n8n Webhook URL.Payload must include: customerName, customerPhone, checkIn, checkOut, listingTitle, and tenantSlug.2. Intent StatesStatus starts as whatsapp_pending in the Prisma database.The n8n workflow will send an interactive WhatsApp message (Yes/No buttons) to the customer.3. The Callbackn8n will send a webhook back to our FastAPI /api/v1/webhooks/whatsapp endpoint.The backend updates the booking status to CONFIRMED or CANCELLED.

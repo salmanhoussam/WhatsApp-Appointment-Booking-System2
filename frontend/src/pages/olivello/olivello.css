@@ -1,0 +1,161 @@
+/* ═══════════════════════════════════════════════════════════════
+   olivello.css — Scoped styles for Olivello tenant
+   ALL rules MUST be under body[data-slug="olivello"]
+   ═══════════════════════════════════════════════════════════════ */
+
+body[data-slug="olivello"] {
+  --olive-dark:    oklch(22% 0.05 100);   /* ليل جبلي — خلفية رئيسية */
+  --olive-mid:     oklch(48% 0.08 100);   /* الزيتون الكلاسيكي */
+  --stone-warm:    oklch(68% 0.04 85);    /* حجر المعصرة */
+  --gold-harvest:  oklch(72% 0.12 75);    /* ذهب الحصاد */
+  --cream-press:   oklch(92% 0.02 90);    /* نص على خلفية داكنة */
+  --oil-gold:      oklch(78% 0.16 72);    /* لون الزيت النقي */
+  --primary:       #7A6E4A;
+  --secondary:     #C8A84B;
+
+  background-color: var(--olive-dark);
+  color: var(--cream-press);
+  font-family: 'Tajawal', system-ui, sans-serif;
+}
+
+/* ── Typography ─────────────────────────────────────────────── */
+body[data-slug="olivello"] h1,
+body[data-slug="olivello"] h2,
+body[data-slug="olivello"] h3 {
+  font-family: 'Playfair Display', 'Tajawal', Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+body[data-slug="olivello"] ::-webkit-scrollbar {
+  width: 4px;
+}
+body[data-slug="olivello"] ::-webkit-scrollbar-track {
+  background: var(--olive-dark);
+}
+body[data-slug="olivello"] ::-webkit-scrollbar-thumb {
+  background: var(--gold-harvest);
+  border-radius: 2px;
+}
+
+/* ── Section base ───────────────────────────────────────────── */
+body[data-slug="olivello"] .ov-section {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* ── Glass card ─────────────────────────────────────────────── */
+body[data-slug="olivello"] .ov-glass {
+  background: rgba(122, 110, 74, 0.12);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(200, 168, 75, 0.18);
+  border-radius: 16px;
+}
+
+/* ── CTA Button ─────────────────────────────────────────────── */
+body[data-slug="olivello"] .ov-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--gold-harvest);
+  color: var(--olive-dark);
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+body[data-slug="olivello"] .ov-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(200, 168, 75, 0.35);
+}
+
+body[data-slug="olivello"] .ov-btn-ghost {
+  background: transparent;
+  color: var(--cream-press);
+  border: 1px solid rgba(255,255,255,0.25);
+}
+body[data-slug="olivello"] .ov-btn-ghost:hover {
+  border-color: var(--gold-harvest);
+  color: var(--gold-harvest);
+  box-shadow: none;
+}
+
+/* ── Grain texture overlay (SVG noise) ──────────────────────── */
+body[data-slug="olivello"] .ov-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+
+/* ── Progress HUD dots ──────────────────────────────────────── */
+body[data-slug="olivello"] .ov-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(200, 168, 75, 0.3);
+  border: 1px solid rgba(200, 168, 75, 0.5);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+body[data-slug="olivello"] .ov-progress-dot.active {
+  background: var(--gold-harvest);
+  transform: scale(1.4);
+  box-shadow: 0 0 8px rgba(200, 168, 75, 0.6);
+}
+
+/* ── Millstone spin animation ───────────────────────────────── */
+@keyframes olivello-millstone {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Golden drop fill animation ─────────────────────────────── */
+@keyframes olivello-fill-drop {
+  from { clip-path: inset(100% 0 0 0); }
+  to   { clip-path: inset(0% 0 0 0); }
+}
+
+/* ── Confetti particle ──────────────────────────────────────── */
+body[data-slug="olivello"] .ov-confetti-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold-harvest);
+  pointer-events: none;
+}
+
+/* ── Mobile: disable parallax layers ────────────────────────── */
+@media (max-width: 640px) {
+  body[data-slug="olivello"] .ov-parallax-layer {
+    transform: none !important;
+  }
+}
+
+/* ── Smooth scrolling ───────────────────────────────────────── */
+body[data-slug="olivello"] {
+  scroll-behavior: smooth;
+}
+
+/* ── Reduced motion — disable all scroll animations ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  body[data-slug="olivello"] *,
+  body[data-slug="olivello"] *::before,
+  body[data-slug="olivello"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    /* Framer Motion respects this via its own media query check */
+  }
+}

@@ -1,0 +1,7 @@
+/* Caracas — tenant accent vars only. Layout/components handled by Tailwind + design system. */
+body[data-slug="caracas"] {
+  --accent:     #c0392b;
+  --accent-dim: rgba(192, 57, 43, 0.12);
+  --accent-glow: rgba(192, 57, 43, 0.35);
+  background: #0a0a0f;
+}

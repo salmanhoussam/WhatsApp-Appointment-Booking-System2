@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="de" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wichtige Frage für Mona 🌸</title>
+    
+    <!-- Schöne Schriftarten -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            background-color: #fdf6f5; /* Sanfter, cremiger/rosa Hintergrund */
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden; /* Verhindert Scrollbalken wegen des weglaufenden Buttons oder der Blüten */
+            color: #5c2b36; /* Schöne weinrote Textfarbe */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Sakura-Blüteneffekt im Hintergrund */
+        .sakura {
+            position: absolute;
+            top: -10%;
+            z-index: 0;
+            font-size: 1.5rem;
+            user-select: none;
+            pointer-events: none;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0.2; }
+        }
+
+        /* Inhaltskarte (leicht transparent/Milchglas-Effekt) */
+        .card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            z-index: 10;
+            position: relative;
+            transition: all 0.4s ease;
+        }
+
+        /* Button-Styles */
+        .btn-yes {
+            background-color: #ffb6c1; /* Pastellrosa */
+            color: #b53856;
+            transition: transform 0.2s;
+        }
+        .btn-yes:hover { transform: scale(1.05); background-color: #ff9eab; }
+        
+        .btn-no {
+            background-color: #e6e6fa; /* Pastellviolett */
+            color: #7b6ba1;
+            position: relative; /* Wird per JS verschoben */
+            transition: all 0.2s ease-out; 
+            cursor: not-allowed;
+        }
+
+        /* GIFs/Bilder */
+        .cute-img {
+            width: 140px;
+            height: 140px;
+            border-radius: 1.5rem;
+            object-fit: cover;
+            margin: 0 auto 1.5rem auto;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        /* Essen-Auswahlraster */
+        .food-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .food-item {
+            background-color: #f7f3fc;
+            padding: 1rem 0.5rem;
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .food-item:hover {
+            background-color: #eadef5;
+            transform: translateY(-3px);
+        }
+        .food-item.selected {
+            background-color: #ffb6c1;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        /* Eingabefelder */
+        input[type="date"], input[type="time"] {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border-radius: 1rem;
+            border: 2px solid #f0e6e6;
+            background-color: #fff;
+            color: #5c2b36;
+            font-family: inherit;
+            margin-bottom: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="date"]:focus, input[type="time"]:focus {
+            border-color: #ffb6c1;
+        }
+
+        /* Versteckte Bildschirme */
+        .hidden-screen {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sakura-Blüten-Behälter -->
+    <div id="sakura-container"></div>
+
+    <!-- Screen 0: Romantische Reise-Nachricht -->
+    <div id="screen-0" class="card" style="max-width: 500px;">
+        <div class="text-4xl mb-3" id="globe-emoji">🌍</div>
+
+        <!-- Animierte Textzeilen -->
+        <div id="story-lines" style="text-align: left; line-height: 2;">
+            <p class="story-line" style="opacity:0; font-size:1rem; color:#7b4f5e; font-weight:700;">Jahrelang habe ich die Welt bereist...</p>
+            <p class="story-line" style="opacity:0; font-size:0.9rem; color:#9c6b78;">Von den Straßen Tokyos bis zu den Cafés von Paris. 🗺️</p>
+            <p class="story-line" style="opacity:0; font-size:0.9rem; color:#9c6b78;">Ich habe Berge erklommen, Ozeane überquert,</p>
+            <p class="story-line" style="opacity:0; font-size:0.9rem; color:#9c6b78;">die schönsten Orte der Welt gesehen.</p>
+            <p class="story-line" style="opacity:0; font-size:1rem; color:#7b4f5e; font-weight:700; margin-top:0.8rem;">Und dann... kam ich nach Hause. 🏠</p>
+            <p class="story-line" style="opacity:0; font-size:1rem; color:#7b4f5e; font-weight:700;">Und sah dich.</p>
+            <p class="story-line" style="opacity:0; font-size:1.15rem; color:#b53856; font-weight:800; margin-top:0.8rem;">Du bist das Schönste, was mir je begegnet ist, Mona.</p>
+            <p class="story-line" style="opacity:0; font-size:1rem; color:#9c6b78; font-style:italic;">Das Schönste auf der ganzen Welt. 🌸</p>
+        </div>
+
+        <!-- Weiter-Button erscheint nach der Nachricht -->
+        <div id="next-btn-wrap" style="display:none; margin-top:1.8rem;">
+            <button onclick="goToScreen(1)" class="btn-yes px-8 py-3 rounded-full font-bold text-lg shadow-md">
+                Weiter ✨
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 1: Date-Anfrage -->
+    <div id="screen-1" class="card hidden-screen">
+        <img src="https://media.tenor.com/zVq77k2v-HMAAAAi/cat-cute.gif" alt="Süße Katze" class="cute-img">
+        <h1 class="text-2xl font-bold mb-6">🌸 Mona, möchtest du mit mir auf ein Date gehen? 🌸</h1>
+        
+        <div class="flex justify-center gap-4 mt-6">
+            <button onclick="goToScreen(2)" class="btn-yes px-8 py-3 rounded-full font-bold text-lg shadow-md">
+                Ja! 💖
+            </button>
+            <button id="no-btn" class="btn-no px-8 py-3 rounded-full font-bold text-lg shadow-md">
+                Nein... 🐾
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 2: Überraschung (SpongeBob) -->
+    <div id="screen-2" class="card hidden-screen">
+        <img src="https://media.tenor.com/39lQ0wVzU7MAAAAi/spongebob-squarepants-happy.gif" alt="Fröhlicher SpongeBob" class="cute-img">
+        <h1 class="text-2xl font-bold mb-2">Warte, du hast wirklich JA gesagt?? 😭</h1>
+        <p class="text-sm opacity-70 mb-6 font-bold">Ich war so bereit dafür, dass du Nein sagst 😅</p>
+        
+        <button onclick="goToScreen(3)" class="btn-yes px-8 py-3 rounded-full font-bold shadow-md">
+            Okay, okay! ➔
+        </button>
+    </div>
+
+    <!-- Screen 3: Datum & Uhrzeit auswählen -->
+    <div id="screen-3" class="card hidden-screen">
+        <div class="text-4xl mb-4">🗓️🐾</div>
+        <h1 class="text-2xl font-bold mb-6">So... wann hast du Zeit?</h1>
+        
+        <div class="text-left">
+            <label class="block text-sm font-bold mb-2 opacity-80">Wähle einen Tag ✨</label>
+            <input type="date" id="date-input">
+            
+            <label class="block text-sm font-bold mb-2 opacity-80 mt-2">Um wie viel Uhr? ⏰</label>
+            <input type="time" id="time-input">
+        </div>
+
+        <button onclick="checkDateAndGo()" class="btn-yes px-8 py-3 rounded-full font-bold w-full mt-4 shadow-md">
+            Termin festlegen! 💌
+        </button>
+        <p id="date-error" class="text-red-500 text-sm mt-2 hidden">Bitte wähle ein Datum und eine Uhrzeit aus!</p>
+    </div>
+
+    <!-- Screen 4: Essen aussuchen -->
+    <div id="screen-4" class="card hidden-screen">
+        <h1 class="text-2xl font-bold mb-2">Worauf hast du Lust zu essen? 🍝✨</h1>
+        
+        <div class="food-grid">
+            <div class="food-item" onclick="selectFood(this)">🍕<br>Pizza</div>
+            <div class="food-item" onclick="selectFood(this)">🍣<br>Sushi</div>
+            <div class="food-item" onclick="selectFood(this)">🍔<br>Burger</div>
+            <div class="food-item" onclick="selectFood(this)">🍝<br>Pasta</div>
+            <div class="food-item" onclick="selectFood(this)">🌮<br>Tacos</div>
+            <div class="food-item" onclick="selectFood(this)">🍜<br>Ramen</div>
+        </div>
+    </div>
+
+    <!-- Screen 5: Finale (Shrek) -->
+    <div id="screen-5" class="card hidden-screen">
+        <img src="https://media.tenor.com/4z8222L-kEwAAAAi/shrek-rizz.gif" alt="Lächelnder Shrek" class="cute-img" style="width: 160px; height: 160px;">
+        <h1 class="text-2xl font-bold mb-4 leading-relaxed">
+            Schön, dass du nicht Nein gesagt hast.<br>
+            Sei um 6 bereit, ich hole dich ab! 🚗
+        </h1>
+        <p class="text-xs opacity-50 mt-4 font-bold">
+            P.S. Diese Website wurde extra für dich gemacht!
+        </p>
+    </div>
+
+    <script>
+        // --- 1. Sakura-Blüteneffekt im Hintergrund ---
+        function createSakura() {
+            const container = document.getElementById('sakura-container');
+            const sakura = document.createElement('div');
+            sakura.classList.add('sakura');
+            sakura.innerText = '🌸';
+            
+            // Zufällige Startposition und Geschwindigkeit
+            sakura.style.left = Math.random() * 100 + 'vw';
+            sakura.style.animationDuration = (Math.random() * 3 + 4) + 's'; // Zwischen 4 und 7 Sekunden
+            sakura.style.fontSize = (Math.random() * 1 + 1) + 'rem'; // Zufällige Größe
+            
+            container.appendChild(sakura);
+            
+            // Entfernt die Blüte nach Ablauf der Animation
+            setTimeout(() => {
+                sakura.remove();
+            }, 7000);
+        }
+        setInterval(createSakura, 300); // Erstellt alle 300ms eine Blüte
+
+        // --- 2. Der weglaufende "Nein"-Button ---
+        const noBtn = document.getElementById('no-btn');
+        
+        const moveBtn = () => {
+            // Position auf fixed ändern, um sie überall auf dem Bildschirm zu platzieren
+            noBtn.style.position = 'fixed';
+            
+            // Maximal verfügbare Breite und Höhe berechnen
+            const maxX = window.innerWidth - noBtn.offsetWidth;
+            const maxY = window.innerHeight - noBtn.offsetHeight;
+            
+            // Zufällige Koordinaten generieren
+            const randomX = Math.floor(Math.random() * maxX);
+            const randomY = Math.floor(Math.random() * maxY);
+            
+            noBtn.style.left = randomX + 'px';
+            noBtn.style.top = randomY + 'px';
+        };
+
+        // Aktiviert das Weglaufen bei Hover (PC) und Touch (Mobil)
+        noBtn.addEventListener('mouseenter', moveBtn);
+        noBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Verhindert versehentliches Klicken auf Mobilgeräten
+            moveBtn();
+        });
+
+        // --- 0. Screen 0 — Staggered Story Reveal ---
+        (function initStory() {
+            const lines = document.querySelectorAll('.story-line');
+            const globe = document.getElementById('globe-emoji');
+            const nextWrap = document.getElementById('next-btn-wrap');
+
+            // Globe sanft drehen
+            globe.style.display = 'inline-block';
+            globe.style.animation = 'spinGlobe 8s linear infinite';
+
+            // CSS-Keyframe für Globe-Rotation
+            const styleEl = document.createElement('style');
+            styleEl.textContent = `
+                @keyframes spinGlobe {
+                    0%   { transform: rotate(0deg) scale(1); }
+                    50%  { transform: rotate(180deg) scale(1.15); }
+                    100% { transform: rotate(360deg) scale(1); }
+                }
+                .story-line { transition: opacity 0.8s ease, transform 0.8s ease; transform: translateY(12px); }
+                .story-line.visible { opacity: 1 !important; transform: translateY(0); }
+            `;
+            document.head.appendChild(styleEl);
+
+            // Zeilen nacheinander einblenden
+            lines.forEach((line, i) => {
+                setTimeout(() => {
+                    line.classList.add('visible');
+                    // Nach letzter Zeile: Weiter-Button zeigen
+                    if (i === lines.length - 1) {
+                        setTimeout(() => {
+                            nextWrap.style.display = 'block';
+                            nextWrap.style.animation = 'fadeInUp 0.6s ease both';
+                            const btnStyle = document.createElement('style');
+                            btnStyle.textContent = `@keyframes fadeInUp { from { opacity:0; transform:translateY(14px);} to { opacity:1; transform:translateY(0);} }`;
+                            document.head.appendChild(btnStyle);
+                        }, 600);
+                    }
+                }, 600 + i * 700); // 700ms zwischen jeder Zeile
+            });
+        })();
+
+        // --- 3. Navigation zwischen den Screens ---
+        function goToScreen(screenNumber) {
+            // Versteckt alle Screens
+            document.querySelectorAll('.card').forEach(card => {
+                card.classList.add('hidden-screen');
+            });
+            // Zeigt den gewünschten Screen
+            document.getElementById('screen-' + screenNumber).classList.remove('hidden-screen');
+        }
+
+        // --- 4. Datum & Uhrzeit prüfen ---
+        function checkDateAndGo() {
+            const date = document.getElementById('date-input').value;
+            const time = document.getElementById('time-input').value;
+            const errorMsg = document.getElementById('date-error');
+            
+            if(date && time) {
+                errorMsg.classList.add('hidden');
+                goToScreen(4);
+            } else {
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        // --- 5. Essen auswählen und Finale ---
+        function selectFood(element) {
+            // Entfernt die Auswahl von allen anderen Gerichten
+            document.querySelectorAll('.food-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Markiert das ausgewählte Gericht
+            element.classList.add('selected');
+            
+            // Kurze Pause, um die Auswahl zu sehen, dann zum Finale
+            setTimeout(() => {
+                goToScreen(5);
+            }, 600);
+        }
+    </script>
+</body>
+</html>
