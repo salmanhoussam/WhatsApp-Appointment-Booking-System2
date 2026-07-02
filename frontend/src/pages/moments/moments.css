@@ -1,0 +1,92 @@
+/* Moments Module — Scoped CSS */
+
+.moments-page {
+  min-height: 100vh;
+  background: #060b18;
+  color: #fff;
+  font-family: 'Cairo', sans-serif;
+}
+
+/* Per-type theme overrides via data-type attribute */
+[data-type="wedding"]     { --accent: #d4a853; --accent-glow: rgba(212,168,83,0.35); }
+[data-type="anniversary"] { --accent: #e11d48; --accent-glow: rgba(225,29,72,0.35); }
+[data-type="birthday"]    { --accent: #8b5cf6; --accent-glow: rgba(139,92,246,0.35); }
+[data-type="engagement"]  { --accent: #f472b6; --accent-glow: rgba(244,114,182,0.35); }
+[data-type="graduation"]  { --accent: #3b82f6; --accent-glow: rgba(59,130,246,0.35); }
+[data-type="other"]       { --accent: #ff1a55; --accent-glow: rgba(255,26,85,0.35); }
+
+/* Particle / orb backgrounds */
+.moments-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  animation: orb-drift 20s ease-in-out infinite alternate;
+}
+.moments-orb--1 {
+  width: 500px; height: 500px;
+  top: -150px; right: -100px;
+  background: radial-gradient(circle, var(--accent-glow, rgba(212,168,83,0.3)) 0%, transparent 70%);
+}
+.moments-orb--2 {
+  width: 350px; height: 350px;
+  bottom: -80px; left: -60px;
+  background: radial-gradient(circle, rgba(120,50,255,0.1) 0%, transparent 70%);
+  animation-duration: 28s;
+  animation-direction: alternate-reverse;
+}
+@keyframes orb-drift {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(30px, 20px); }
+}
+
+/* RSVP form */
+.moments-input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: #fff;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.25s;
+  box-sizing: border-box;
+}
+.moments-input:focus {
+  border-color: var(--accent, #d4a853);
+}
+.moments-input::placeholder {
+  color: rgba(255,255,255,0.25);
+}
+
+/* Countdown */
+.countdown-box {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 2rem 0;
+}
+.countdown-unit {
+  text-align: center;
+  min-width: 64px;
+}
+.countdown-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--accent, #d4a853);
+  line-height: 1;
+}
+.countdown-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.35);
+  font-family: 'Space Mono', monospace;
+  margin-top: 4px;
+}

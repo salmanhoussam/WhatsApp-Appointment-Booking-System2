@@ -57,4 +57,10 @@ export const tenantRegistry = {
     defaultRedirect: 'home',     // canonical: demo.salmansaas.com/olivello/home
     theme:           'olive-dark',
   },
+
+  moments: {
+    routes:          lazy(() => import('./moments.routes')),
+    defaultRedirect: 'create',   // canonical: demo.salmansaas.com/moments/create
+    theme:           'gold-dark',
+  },
 };

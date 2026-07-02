@@ -864,3 +864,70 @@ model DriverConsent {
   @@schema("public")
 }
 
+// ═══════════════════════════════════════════════════
+// MOMENTS MODULE — Personal Occasion Pages
+// ═══════════════════════════════════════════════════
+
+model OccasionCreator {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  phone         String         @unique
+  email         String?        @unique
+  password_hash String
+  is_active     Boolean        @default(true)
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+
+  pages         OccasionPage[]
+
+  @@map("occasion_creators")
+  @@schema("public")
+}
+
+model OccasionPage {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creator_id    String    @db.Uuid
+  slug          String    @unique
+  // wedding | anniversary | birthday | engagement | graduation | other
+  type          String
+  title_ar      String
+  title_en      String?
+  message_ar    String
+  message_en    String?
+  event_date    DateTime  @db.Timestamptz(6)
+  location_ar   String?
+  location_en   String?
+  cover_image   String?
+  // per-type theme color: #d4a853 wedding, #e11d48 anniversary, #8b5cf6 birthday
+  theme_color   String    @default("#d4a853")
+  max_guests    Int?
+  rsvp_enabled  Boolean   @default(true)
+  is_active     Boolean   @default(true)
+  expires_at    DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  creator       OccasionCreator @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  rsvps         OccasionRSVP[]
+
+  @@index([creator_id])
+  @@index([slug])
+  @@map("occasion_pages")
+  @@schema("public")
+}
+
+model OccasionRSVP {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  page_id       String    @db.Uuid
+  guest_name    String
+  guest_phone   String?
+  guest_count   Int       @default(1)
+  message       String?
+  attending     Boolean   @default(true)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  page          OccasionPage @relation(fields: [page_id], references: [id], onDelete: Cascade)
+
+  @@index([page_id])
+  @@map("occasion_rsvps")
+  @@schema("public")
+}
+
