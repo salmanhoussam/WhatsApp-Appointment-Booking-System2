@@ -3,6 +3,8 @@ import { useTranslation } from '../../hooks/useTranslation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { REGISTER_URL } from '../../config';
+import VideoGenerationCard from './VideoGenerationCard';
+import RomanceDateCard     from './RomanceDateCard';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -31,28 +33,34 @@ const IconStore = () => (
 
 const SERVICES = [
   {
-    num: '01',
-    Icon: IconBooking,
+    num:    '01',
+    Icon:   IconBooking,
     titleKey: 's1Title',
     descKey:  's1Desc',
     ctaKey:   's1Btn',
     href:     REGISTER_URL,
+    stat:   { ar: 'أتمتة ١٠٠٪', en: '100% Automated' },
+    accent: '#3b82f6',
   },
   {
-    num: '02',
-    Icon: IconMenu,
+    num:    '02',
+    Icon:   IconMenu,
     titleKey: 's2Title',
     descKey:  's2Desc',
     ctaKey:   null,
     href:     REGISTER_URL,
+    stat:   { ar: '+٤٠٪ مبيعات', en: '+40% Sales' },
+    accent: '#f59e0b',
   },
   {
-    num: '03',
-    Icon: IconStore,
+    num:    '03',
+    Icon:   IconStore,
     titleKey: 's3Title',
     descKey:  's3Desc',
     ctaKey:   null,
     href:     REGISTER_URL,
+    stat:   { ar: '٢٤/٧ بيع', en: '24/7 Sales' },
+    accent: '#22c55e',
   },
 ];
 
@@ -117,6 +125,10 @@ export default function ServicesSection() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '1.5rem',
         }}>
+          {/* ── New service cards (SVC_04 / SVC_05) ── */}
+          <VideoGenerationCard lang={isAr ? 'ar' : 'en'} />
+          <RomanceDateCard     lang={isAr ? 'ar' : 'en'} />
+
           {SERVICES.map((svc, i) => (
             <div
               key={svc.num}
@@ -130,8 +142,8 @@ export default function ServicesSection() {
                 cursor: 'default',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255,26,85,0.4)';
-                e.currentTarget.style.boxShadow   = '0 0 30px rgba(255,26,85,0.12)';
+                e.currentTarget.style.borderColor = `${svc.accent}66`;
+                e.currentTarget.style.boxShadow   = `0 0 30px ${svc.accent}22`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
@@ -143,20 +155,35 @@ export default function ServicesSection() {
                 position: 'absolute', top: 10, [isAr ? 'left' : 'right']: 16,
                 fontFamily: "'Space Mono', monospace",
                 fontSize: '4.5rem', fontWeight: 700,
-                color: 'rgba(255,26,85,0.06)',
+                color: `${svc.accent}0f`,
                 lineHeight: 1, pointerEvents: 'none',
                 userSelect: 'none',
               }}>
                 {svc.num}
               </span>
 
+              {/* Stat badge — top corner */}
+              <div style={{
+                position: 'absolute', top: 14, [isAr ? 'right' : 'left']: 14,
+                fontFamily: "'Space Mono', monospace",
+                fontSize: '0.62rem', letterSpacing: '0.06em',
+                color: svc.accent,
+                background: `${svc.accent}18`,
+                border: `1px solid ${svc.accent}44`,
+                padding: '0.22rem 0.65rem',
+                fontWeight: 700,
+              }}>
+                {isAr ? svc.stat.ar : svc.stat.en}
+              </div>
+
               {/* Icon */}
               <div style={{
                 width: 48, height: 48,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,26,85,0.08)',
-                border: '1px solid rgba(255,26,85,0.2)',
+                background: `${svc.accent}14`,
+                border: `1px solid ${svc.accent}33`,
                 marginBottom: '1.4rem',
+                marginTop: '2.2rem',
               }}>
                 <svc.Icon />
               </div>
@@ -165,7 +192,7 @@ export default function ServicesSection() {
               <span style={{
                 fontFamily: "'Space Mono', monospace",
                 fontSize: '0.62rem', letterSpacing: '0.12em',
-                color: '#ff1a55', textTransform: 'uppercase',
+                color: svc.accent, textTransform: 'uppercase',
                 display: 'block', marginBottom: '0.6rem',
               }}>
                 SVC_{svc.num}
@@ -176,6 +203,7 @@ export default function ServicesSection() {
                 fontWeight: 700, fontSize: '1.15rem',
                 color: '#ffffff', marginBottom: '0.8rem',
               }}>
+                <span style={{ color: svc.accent, marginInlineEnd: '0.3rem' }}>◆</span>
                 {t[svc.titleKey]}
               </h3>
 
@@ -193,8 +221,8 @@ export default function ServicesSection() {
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     fontFamily: "'Space Mono', monospace",
                     fontSize: '0.7rem', letterSpacing: '0.06em',
-                    color: '#ff1a55', textDecoration: 'none',
-                    borderBottom: '1px solid rgba(255,26,85,0.35)',
+                    color: svc.accent, textDecoration: 'none',
+                    borderBottom: `1px solid ${svc.accent}55`,
                     paddingBottom: 2,
                     transition: 'opacity 0.2s',
                   }}

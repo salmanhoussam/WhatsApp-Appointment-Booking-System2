@@ -61,6 +61,10 @@
 - Python venv + Prisma setup (post-format) — venv, requirements, prisma generate, start_dev.bat — ✅ Done 2026-06-29
 - Memory system initialized — 8 files in projects/memory/ — ✅ Done 2026-06-29
 - Mona Page Screen 0 — German travel story, staggered reveal, globe animation — ✅ Done 2026-06-29
+- Phase 75-A: DatePage DB model + dating_repo + dating_service + dating router + maintenance cron — ✅ Done 2026-06-30
+- Showcase canvas black screen fix (100vw×100vh wrapper) + GLSL pow() clamp — ✅ Done 2026-06-30
+- Saudi glass tower shader (4×20 curtain-wall, golden frames) + RoomEnvironment CSS photo layer — ✅ Done 2026-06-30
+- Page structure pivot: Hero→400vh zoom→content (tower IS the hero) — ✅ Done 2026-06-30
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
@@ -73,10 +77,20 @@
 
 ## 🟠 In Progress / Carry Forward
 
+- ✅ Done 2026-07-01 — **Showcase tower extended to 5 floors** (Video #a855f7 y=-6, Romance #e11d48 y=-12, 15-waypoint camera, VideoGenerationCard, RomanceDateCard, 5 HUD dots, 560vh void)
+- ✅ Done 2026-07-01 — **Marketing page integrated** — `frontend/src/pages/marketing/` (18 files from Home-Page-main), `/marketing` route, demo links per service
+- ✅ Done 2026-07-01 — **Design Intelligence System** — PRODUCT.md + DESIGN.md rebuilt (OKLCH, GS MAR tokens, absolute bans), gs-mar-components.md (10 recipes), frontend-architect.md upgraded to builder protocol
+- ✅ Done 2026-07-01 — **Marketing page full redesign** — 5 sections rebuilt (ProblemSolution, WorkflowDemo, UseCases, Trust, CTA) + FAQSection added. GS MAR: dark bg #060b18, Space Mono labels, Cairo headings, FM spring animations, RTL dir attribute. Competitor best: before/after (مستقل), 3-step flow (Fiverr), category grid (خمسات), stats+testimonials (Upwork), FAQ accordion (Fiverr). REMOVED: gradient text ban violation in TrustSection.
+- [ ] **TEST FIRST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible, camera enters video+romance rooms on scroll
+- [ ] **Phase 75-B: DatingTemplate** — HeroSection + StorySection + ConfirmSection (running "لا" button) — `frontend/src/pages/dating/`
+- [ ] **Phase 75-C: DatingCreatePage** — multi-step form (5 steps) — `frontend/src/pages/dating/DatingCreatePage.jsx`
+- [ ] **Phase 75-D: ntfy test** — subscribe to `ntfy.sh/salman-dating-2026` on phone → test notification
+- [ ] **Phase 75-E: Railway cron** — `0 3 * * *` → `POST /api/v1/super/maintenance/cleanup-date-pages`
+- [ ] **`npx prisma db push`** — DatePage model → Railway DB (new from 2026-06-30)
+- [ ] **Showcase HeroSection** — hero text repositioning so tower crown is visible above it
 - [ ] **AI Integration Phase** — قرار: نبدأ بـ RAG chatbot للمطعم/المتجر — repo awesome-llm-apps محمّل
 - [ ] **DemoLauncher navigation fix** — بعد الإنشاء يوجّه لـ `/{slug}/menu` (restaurant) أو `/{slug}/store` (store) بدل `/{slug}/home` دائماً
 - [ ] **Phase 72 visual validation** — جرّب `localhost:5173/olivello/home`، تحقق olive size + slot positions
-- [ ] **Phase 67 — اختبار يدوي** — افتح `/{slug}/dashboard` → "محرر الصفحة"، تحقق من 3 panels + interactions + toast
 - [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
 
 ## 🟡 Upcoming (بالأولوية)

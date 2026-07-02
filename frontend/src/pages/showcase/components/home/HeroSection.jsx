@@ -3,6 +3,7 @@ import { useTranslation } from '../../hooks/useTranslation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { REGISTER_URL, WHATSAPP_NUMBER } from '../../config';
+import { scrollState } from '../../canvas/scrollState';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -18,13 +19,28 @@ export default function HeroSection() {
   const whatsappNumber = WHATSAPP_NUMBER;
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-      tl.from(h1Ref.current,  { opacity: 0, y: 60, duration: 1,    delay: 0.3  })
-        .from(subRef.current,  { opacity: 0, y: 30, duration: 0.8              }, '-=0.5')
-        .from(ctaRef.current,  { opacity: 0, y: 20, duration: 0.7              }, '-=0.4');
-    }, heroRef);
-    return () => ctx.revert();
+    // Keep text invisible until the camera has zoomed out (progress ≥ 0.07)
+    gsap.set([h1Ref.current, subRef.current, ctaRef.current], { opacity: 0 });
+
+    let rafId;
+    let triggered = false;
+
+    const poll = () => {
+      if (!triggered && scrollState.progress >= 0.07) {
+        triggered = true;
+        const ctx = gsap.context(() => {
+          const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+          tl.fromTo(h1Ref.current,  { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 1.1 })
+            .fromTo(subRef.current, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.9 }, '-=0.5')
+            .fromTo(ctaRef.current, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.75 }, '-=0.45');
+        }, heroRef);
+        return; // stop polling
+      }
+      rafId = requestAnimationFrame(poll);
+    };
+
+    rafId = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(rafId);
   }, []);
 
   const handleEmailSend = () => {

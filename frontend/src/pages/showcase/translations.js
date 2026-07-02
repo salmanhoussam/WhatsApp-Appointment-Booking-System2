@@ -9,11 +9,11 @@ export const translations = {
     navContact: "تواصل معنا",
 
     // HERO
-    heroTitle1: "ارتقِ بأعمالك للمستقبل.",
-    heroTitle2: "بأنظمة ذكية وسريعة.",
+    heroTitle1: "شغّل عملك على أتمتة.",
+    heroTitle2: "زبائنك يعودون وأنت نايم.",
     heroDesc:
-      "أنظمة سحابية متطورة لإدارة الحجوزات، القوائم الإلكترونية، والمتاجر. صُممت باللون الفضي والبنفسجي لتعكس فخامة علامتك التجارية.",
-    heroSubDesc: "أنظمة سحابية متطورة لإدارة الحجوزات والقوائم الإلكترونية، صممت لتعكس فخامة علامتك التجارية.",
+      "أنظمة سحابية تشغيل كامل — حجوزات، طلبات، متاجر. بدون فوضى، بدون موظف إضافي. زبائنك يُكملون رحلتهم وحدهم.",
+    heroSubDesc: "أتمتة كاملة لعملك: كل حجز، كل طلب، كل بيعة — تصلك تلقائياً وتُؤكَّد بدون تدخل.",
 
     emailPlaceholder: "أدخل بريدك الإلكتروني ليصلك جديدنا...",
     send: "إرسال",
@@ -34,25 +34,25 @@ export const translations = {
     dashUpcoming: "المواعيد القادمة",
 
     // SERVICES
-    servicesTitle: "تطبيقات مصممة للتميز",
+    servicesTitle: "أنظمة تزيد زبائنك وتريحك",
     servicesDesc:
-      "نقدم لك حلولاً سحابية متكاملة مصممة لتسهيل إدارة أعمالك وزيادة تفاعل عملائك.",
+      "مش بس إدارة — أتمتة حقيقية تشغّل عملك لوحدها وتعيد الزبون تلقائياً.",
 
-    s1Title: "نظام الحجز الذكي المربوط بواتساب",
+    s1Title: "حجوزات واتساب بالأتمتة",
     s1Desc:
-      "نظام متكامل لحجز المواعيد عبر الإنترنت وربطها مباشرة مع منصة واتساب للأعمال (WhatsApp Business API). مزود بلوحة تحكم شاملة لتنظيم الأوقات، إدارة العملاء، وإرسال تنبيهات تلقائية.",
-    s1Btn: "اطلب النظام الآن ←",
+      "كل حجز يصلك فوري على واتساب مع تأكيد تلقائي للزبون. بدون موظف بالخط، بدون فوضى. النظام ينظّم، يُذكّر، ويتابع.",
+    s1Btn: "ابدأ الأتمتة الآن ←",
 
-    s2Title: "المنيو الذكي",
-    s2Desc: "حركات سلسة وتصميم جذاب يشبه التطبيقات الأصلية.",
+    s2Title: "منيو ذكي يرفع مبيعاتك",
+    s2Desc: "زبائنك يطلبون من هاتفهم بدون انتظار. النظام يتذكر تفضيلاتهم ويقترح عليهم — متوسط الفاتورة يرتفع.",
 
-    s3Title: "المتجر الإلكتروني",
-    s3Desc: "منصة بيع متكاملة مع عربة تسوق، وبوابات دفع.",
+    s3Title: "متجر يبيع 24/7 بدون توقف",
+    s3Desc: "طلبات، دفع، وتسليم — كل شيء أوتوماتيك. ما تحتاج تكون موجود عشان تبيع.",
 
-    service1Title: "نظام الحجز الذكي",
-    service1Desc: "إدارة احترافية للمواعيد عبر واتساب للأعمال.",
-    service2Title: "المنيو والمتجر الإلكتروني",
-    service2Desc: "قوائم تفاعلية ومتاجر إلكترونية جاهزة لعملك.",
+    service1Title: "حجوزات واتساب أوتوماتيك",
+    service1Desc: "كل حجز يُؤكَّد ويُتابَع بدون تدخل يدوي.",
+    service2Title: "منيو وبيع إلكتروني",
+    service2Desc: "قوائم تفاعلية ومتاجر 24/7 تزيد إيراداتك.",
 
     // FOOTER
     footerRights: "جميع الحقوق محفوظة.",
@@ -69,11 +69,11 @@ export const translations = {
     navContact: "Contact Us",
 
     // HERO
-    heroTitle1: "Elevate your business.",
-    heroTitle2: "With smart, fast systems.",
+    heroTitle1: "Automate your business.",
+    heroTitle2: "Customers return while you sleep.",
     heroDesc:
-      "Advanced cloud systems for managing bookings, digital menus, and stores. Designed in silver and purple to reflect your brand's luxury.",
-    heroSubDesc: "Advanced cloud-based systems for managing bookings and digital menus, crafted to reflect your brand's excellence.",
+      "Full-automation systems — bookings, orders, stores. No chaos, no extra staff. Customers complete their journey on their own.",
+    heroSubDesc: "Full automation: every booking, every order, every sale — confirmed automatically, zero manual work.",
 
     emailPlaceholder: "Enter your email for updates...",
     send: "Send",
@@ -94,25 +94,25 @@ export const translations = {
     dashUpcoming: "Upcoming Dates",
 
     // SERVICES
-    servicesTitle: "Apps Designed for Excellence",
+    servicesTitle: "Systems That Grow Your Customers",
     servicesDesc:
-      "We offer integrated cloud solutions designed to simplify your business and increase customer engagement.",
+      "Not just management — real automation that runs your business and brings customers back on its own.",
 
-    s1Title: "Smart WhatsApp Booking System",
+    s1Title: "WhatsApp Bookings on Autopilot",
     s1Desc:
-      "Integrated appointment booking via WhatsApp Business API. Featuring a dashboard for scheduling, client management, and automated alerts.",
-    s1Btn: "Order Now ←",
+      "Every booking hits your WhatsApp instantly, auto-confirmed to the customer. No staff on the line. No chaos. System organises, reminds, and follows up.",
+    s1Btn: "Start Automation Now ←",
 
-    s2Title: "Smart Menu",
-    s2Desc: "Smooth animations and attractive design mimicking native applications.",
+    s2Title: "Smart Menu That Drives Sales",
+    s2Desc: "Customers order from their phone with no wait. System remembers preferences and upsells — average ticket climbs.",
 
-    s3Title: "E-commerce Store",
-    s3Desc: "Complete selling platform with shopping carts and payment gateways.",
+    s3Title: "Store That Sells 24/7 Non-Stop",
+    s3Desc: "Orders, payments, delivery — fully automatic. You don't need to be there to make sales.",
 
-    service1Title: "Smart Booking System",
-    service1Desc: "Professional appointment management via WhatsApp Business.",
-    service2Title: "Menu & E-commerce Store",
-    service2Desc: "Interactive menus and ready-to-launch online stores for your business.",
+    service1Title: "WhatsApp Auto-Bookings",
+    service1Desc: "Every booking confirmed and followed up with zero manual work.",
+    service2Title: "Menu & Online Store",
+    service2Desc: "Interactive menus and 24/7 stores that grow your revenue.",
 
     // FOOTER
     footerRights: "All rights reserved.",

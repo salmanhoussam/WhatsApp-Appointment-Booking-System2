@@ -1,80 +1,74 @@
 # PRODUCT.md — SalmanSaaS Platform
+# Read by /impeccable before any design work — do not remove.
+# Last updated: 2026-07-01
+
+---
 
 ## What is SalmanSaaS?
 
-منصة SaaS عربية موحدة تُقدم لأصحاب الأعمال (مطاعم، فنادق، متاجر) نظاماً كاملاً لإدارة الحجوزات، القوائم الإلكترونية، والمتاجر — مع ربط مباشر بواتساب.
+Arabic-first multi-tenant SaaS that gives small Arabic businesses a complete digital presence — bookings, restaurant menus, and e-commerce stores — all managed through WhatsApp AI agents.
 
-**Tagline:** ارتقِ بأعمالك للمستقبل. بأنظمة ذكية وسريعة.
-
----
-
-## Core Products
-
-### 1. Smart Booking System (نظام الحجز الذكي)
-- Online appointment booking via WhatsApp Business API
-- Admin dashboard: scheduling, client management, automated alerts
-- Target: hotels, chalets, villas, salons, clinics
-- Live example: smar.salmansaas.com (Beit Smar — mountain chalets)
-
-### 2. Smart Menu (المنيو الذكي)
-- Digital menu with smooth animations and native-app feel
-- QR code access, category filtering, Arabic/English support
-- Target: restaurants, cafes, food trucks
-
-### 3. E-commerce Store (المتجر الإلكتروني)
-- Complete selling platform with shopping cart and payment gateways
-- Product catalog, order management, delivery tracking
-- Target: fashion, accessories, local shops
+**Tagline:** أتمتة كاملة لعملك عبر واتساب — Full Automation for Your Business via WhatsApp.
 
 ---
 
-## Plans & Pricing
+## register
 
-### Normal (Basic)
-- Pre-built template from registry
-- Arabic + English support
-- Basic booking or menu functionality
-- Subdomain: `{slug}.salmansaas.com`
+`brand`
 
-### Showcase / VIP
-- Cyberpunk/premium visual design
-- GSAP animations + WebGL background
-- Advanced dashboard features
-- Custom domain support
-
-### Pro
-- AI-designed custom website (Claude-powered brief)
-- Unique design tailored to brand
-- All features unlocked
-- Dedicated support
+For marketing pages, showcase, landing pages, tenant demos: design IS the product.
+For admin dashboards, booking flows: design SERVES the product (switch to `product`).
 
 ---
 
-## Target Customers
+## Users
 
-- أصحاب الشاليهات والفلل (Lebanon, GCC)
-- أصحاب المطاعم الصغيرة والمتوسطة
-- المتاجر المحلية التي تريد online presence
-- الشركات التي تريد حجز مواعيد مدار عبر واتساب
+| User | Who | Design needs |
+|------|-----|-------------|
+| **Tenant Admin** | Arabic SMB owner (restaurant, chalet, store) | Trust signal, professionalism, Arabic-native UI |
+| **End Customer** | Arabic-speaking consumer | Frictionless booking / menu / cart |
+| **Salman** | SUPER_ADMIN, platform builder | Technical clarity, full control |
+
+Primary audience for **brand-register** pages: the Tenant Admin deciding to subscribe.
+They're evaluating: "Is this professional enough for my brand?"
+
+---
+
+## Brand Identity
+
+**Three-word brief:** Cinematic · Arabic · Luxury
+
+**Feeling:** Like stepping into a high-end digital hotel lobby — dark, quiet, expensive.
+
+**Voice:** Direct and confident. No filler phrases. No "we are passionate about." 
+Arabic copy first, English translation secondary.
+Every word earns its place or it's cut.
+
+**Two accent systems:**
+- **Marketing / Showcase** (`/marketing`, `/showcase`): `#ff1a55` — crimson red, bold, conversion urgency
+- **Smar / Booking** (`/smar/*`): `#d4a853` — gold, luxury, heritage
+
+---
+
+## Anti-References
+
+| Reference | Why it's wrong |
+|-----------|----------------|
+| Notion | Too white, too neutral, no personality, Western-only |
+| Stripe | Cold gray minimalism, no Arabic warmth |
+| Linear | Tech startup aesthetic — doesn't speak to Arabic SMBs |
+| Generic SaaS cream | `#f9fafb` backgrounds, Inter, Helvetica — invisible in MENA market |
+| Decorative glassmorphism | Blurs everywhere for decoration with no hierarchy |
+| Canva-style colorful | Rainbow gradients, playful fonts — no luxury signal |
 
 ---
 
 ## Key Differentiators
 
-1. **WhatsApp-first**: كل إشعار وتأكيد عبر واتساب — لا email، لا app
-2. **Arabic-native**: RTL، خطوط Cairo، نصوص عربية من اليوم الأول
-3. **Multi-tenant**: سيرفر واحد، DB واحد، عزل كامل بين العملاء
-4. **3-minute setup**: من التسجيل لأول حجز في 3 دقائق
-
----
-
-## Tech Stack (للـ agents)
-
-- Frontend: React 19 + Vite + Framer Motion + GSAP + R3F
-- Backend: FastAPI + Prisma + Supabase (PostgreSQL)
-- AI: Anthropic Claude API (claude-haiku-4-5 for chatbot)
-- Deploy: Railway (backend) + Vercel (frontend)
-- WhatsApp: WhatsApp Business API
+1. **WhatsApp-first**: every notification and confirmation via WhatsApp — no app download
+2. **Arabic-native**: RTL, Cairo font, Arabic copy from day one
+3. **Multi-tenant**: one server, one DB, full isolation between clients
+4. **3-minute setup**: from registration to first booking in 3 minutes
 
 ---
 
@@ -88,4 +82,17 @@
 
 ---
 
-*Last updated: 2026-05-15*
+## Core Products
+
+### 1. Smart Booking (نظام الحجز الذكي)
+Online appointment booking via WhatsApp Business API.
+Target: hotels, chalets, villas, salons, clinics.
+Live: smar.salmansaas.com
+
+### 2. Smart Menu (المنيو الذكي)
+Digital menu with animations, QR access, Arabic/English.
+Target: restaurants, cafes, food trucks.
+
+### 3. E-commerce Store (المتجر الإلكتروني)
+Shopping cart + payment gateways + order management.
+Target: fashion, accessories, local shops.

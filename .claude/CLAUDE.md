@@ -77,7 +77,7 @@ frontend/ -- gs-mar-design-system, admin-dashboard-builder, awwwards-animations,
              webgl-awwwards, frontend-component-builder, ai-agent-canvas,
              ui-ux-pro-max, frontend-design,
              tanstack-query (React Query v5 — multi-tenant cache layer)
-shared/   -- auto-reporting, project-health
+shared/   -- auto-reporting, project-health, motion-design (Higgsfield video ads — /motion-design)
 general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, + more
 
 ## Critical Rules (always in mind)

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لآية 🌸</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:   #ff5c8a;
+      --pink-l: #ffb6c1;
+      --purple: #b48be0;
+      --dark:   #5c2b36;
+      --bg:     #fff0f6;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      overflow-x: hidden;
+    }
+
+    /* ── Petals background ── */
+    .petal {
+      position: fixed;
+      top: -8%;
+      z-index: 0;
+      font-size: 1.3rem;
+      pointer-events: none;
+      user-select: none;
+      animation: fallDown linear infinite;
+    }
+    @keyframes fallDown {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(108vh) rotate(380deg); opacity: 0; }
+    }
+
+    /* ── Scroll sections ── */
+    .section {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-section {
+      background: linear-gradient(160deg, #fff0f6 0%, #f5ecff 100%);
+      flex-direction: column;
+      text-align: center;
+    }
+
+    /* Reveal animation */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s ease, transform 0.9s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Cards ── */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 2rem;
+      box-shadow: 0 20px 50px rgba(180, 60, 100, 0.10);
+      padding: 2.6rem 2rem;
+      width: 92%;
+      max-width: 460px;
+      text-align: center;
+    }
+
+    /* ── Emoji art (replaces broken GIFs) ── */
+    .emoji-art {
+      font-size: 5rem;
+      line-height: 1;
+      margin-bottom: 1.2rem;
+      display: block;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+
+    h1.hero-title {
+      font-size: clamp(2.6rem, 8vw, 4.2rem);
+      font-weight: 900;
+      color: var(--pink);
+      line-height: 1.2;
+      margin-bottom: 0.8rem;
+    }
+    h2.section-title {
+      font-size: clamp(1.6rem, 5vw, 2.2rem);
+      font-weight: 800;
+      line-height: 1.5;
+      margin-bottom: 0.8rem;
+    }
+    p.section-body {
+      font-size: 1.05rem;
+      font-weight: 600;
+      line-height: 1.85;
+      opacity: 0.78;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Scroll hint */
+    .scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      font-size: 2rem;
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1.8rem;
+    }
+    .btn {
+      padding: 0.8rem 2rem;
+      border-radius: 999px;
+      font-family: 'Tajawal', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.18s;
+      outline: none;
+    }
+    .btn-yes {
+      background: linear-gradient(135deg, #ff85a1, #ff5c8a);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(255, 92, 138, 0.38);
+    }
+    .btn-yes:hover  { transform: scale(1.06); }
+    .btn-yes:active { transform: scale(0.97); }
+    .btn-no {
+      background: #ede9f7;
+      color: #7b6ba1;
+    }
+
+    /* ── Date & food input styles ── */
+    .field-label {
+      display: block;
+      text-align: right;
+      font-size: 0.92rem;
+      font-weight: 700;
+      opacity: 0.72;
+      margin: 0.8rem 0 0.35rem;
+    }
+    input[type="date"], input[type="time"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 1rem;
+      border: 2px solid #f0e0ee;
+      background: #fff;
+      color: var(--dark);
+      font-family: 'Tajawal', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      outline: none;
+      transition: border-color 0.2s;
+      direction: rtl;
+    }
+    input:focus { border-color: var(--pink); }
+
+    .food-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 1.2rem;
+    }
+    .food-item {
+      background: #f7f3fc;
+      padding: 0.9rem 0.3rem;
+      border-radius: 1rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 800;
+      line-height: 1.7;
+      transition: all 0.18s;
+      border: 2px solid transparent;
+    }
+    .food-item:hover { background: #ede7f8; transform: translateY(-3px); }
+    .food-item.selected {
+      background: linear-gradient(135deg, #ffb6c1, #ff85a1);
+      color: #fff;
+      border-color: #ff85a1;
+      transform: scale(1.05);
+    }
+
+    /* ── Overlays (shown after yes/date/food) ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(80, 20, 40, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.active { display: flex; }
+    .overlay-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 2rem;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+      padding: 2.4rem 1.8rem;
+      width: 92%;
+      max-width: 420px;
+      text-align: center;
+      animation: popIn 0.5s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.88) translateY(24px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .final-highlight { color: var(--pink); font-weight: 900; }
+    .error-msg { color: #e53e3e; font-size: 0.88rem; margin-top: 0.5rem; font-weight: 700; }
+
+    /* Decorative divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      margin: 0.6rem 0;
+      opacity: 0.4;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Petals container (JS fills this) -->
+  <div id="petals"></div>
+
+  <!-- ─────────────────────────────────────────────
+       SECTION 1 — HERO
+  ───────────────────────────────────────────────── -->
+  <section class="section hero-section">
+    <div class="reveal" style="text-align:center;">
+      <span style="font-size:3.5rem; display:block; margin-bottom:1rem; animation: float 3s ease-in-out infinite;">🌸</span>
+      <h1 class="hero-title">يا هلا بآية الغالية</h1>
+      <p class="section-body" style="max-width:360px; margin: 0.8rem auto 0;">
+        في شي مهم بدي أقوللك إياه...<br>
+        اسكرولي شوي 🥺
+      </p>
+    </div>
+    <div class="scroll-hint">👇</div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────
+       SECTION 2 — COMPLIMENT 1
+  ───────────────────────────────────────────────── -->
+  <section class="section" style="background: linear-gradient(160deg, #fff5fb 0%, #f3eeff 100%);">
+    <div class="glass-card reveal">
+      <span class="emoji-art">✨</span>
+      <h2 class="section-title">في ناس بتحمل طاقة حلوة معها...</h2>
+      <div class="divider">🌸 🌸 🌸</div>
+      <p class="section-body">
+        ما بكل مكان تلاقي حدا إجو أثر وطريقته بالكلام تحس فيها بصدق
+      </p>
+      <p class="section-body">
+        وانت من هاد النوع 🌷
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────
+       SECTION 3 — COMPLIMENT 2
+  ───────────────────────────────────────────────── -->
+  <section class="section" style="background: linear-gradient(160deg, #fef0f8 0%, #fff5e6 100%);">
+    <div class="glass-card reveal">
+      <span class="emoji-art">🌷</span>
+      <h2 class="section-title">ضحكتك بتنور المكان</h2>
+      <div class="divider">💕 💕 💕</div>
+      <p class="section-body">
+        وشخصيتك الطيبة شي ما بتحسي فيه بكل مكان
+      </p>
+      <p class="section-body">
+        أحلى من ما بتتخيلي 🥺
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────
+       SECTION 4 — TRANSITION
+  ───────────────────────────────────────────────── -->
+  <section class="section" style="background: linear-gradient(160deg, #f5f0ff 0%, #fff0f6 100%);">
+    <div class="glass-card reveal" style="text-align:center;">
+      <span class="emoji-art">💭</span>
+      <h2 class="section-title">وعشان هيك...</h2>
+      <p class="section-body" style="font-size: 1.15rem; opacity:0.85;">
+        حبيت أسألك سؤال واحد
+      </p>
+      <p class="section-body" style="margin-top:0.5rem;">اسكرولي كمان شوي 👇</p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────
+       SECTION 5 — DATE REQUEST (end of scroll)
+  ───────────────────────────────────────────────── -->
+  <section class="section" style="background: linear-gradient(160deg, #fff0f6 0%, #f5ecff 100%);">
+    <div class="glass-card reveal">
+      <span class="emoji-art">🌸</span>
+      <h2 class="section-title">آية...<br>تحبي تيجي معي على موعد؟ 💕</h2>
+      <p class="section-body" style="font-size:0.92rem;">بسيطة بس بتكون حلوة 😊</p>
+      <div class="btn-row">
+        <button class="btn btn-yes" onclick="showReaction()">أيه! 💖</button>
+        <button class="btn btn-no" id="no-btn">لأ... 🐾</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       OVERLAY 1 — YES REACTION
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="overlay-reaction">
+    <div class="overlay-card">
+      <span class="emoji-art" style="font-size:6rem;">🙀</span>
+      <h2 style="font-size:1.5rem; font-weight:800; margin-bottom:0.6rem;">
+        انتظري، قلتي أيه فعلاً؟؟ 😭
+      </h2>
+      <p class="section-body">كنت متأكد إنك رح تقولي لأ 😅</p>
+      <div class="btn-row" style="margin-top:1.4rem;">
+        <button class="btn btn-yes" onclick="showDatePicker()">يلا كمّل! ✨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       OVERLAY 2 — DATE PICKER
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="overlay-date">
+    <div class="overlay-card">
+      <span class="emoji-art" style="font-size:4rem;">🗓️</span>
+      <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:0.2rem;">متى بتكوني فاضية؟</h2>
+      <p class="section-body" style="font-size:0.9rem;">اختاري اليوم والوقت المناسبين ✨</p>
+
+      <label class="field-label">اختاري يوم 🌟</label>
+      <input type="date" id="date-input">
+      <label class="field-label">الساعة كم؟ ⏰</label>
+      <input type="time" id="time-input">
+
+      <button class="btn btn-yes" onclick="submitDate()" style="width:100%; margin-top:1rem;">تمام، احجزي الموعد! 💌</button>
+      <p id="date-error" class="error-msg" style="display:none;">⚠️ اختاري التاريخ والوقت أول!</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       OVERLAY 3 — FOOD PICKER
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="overlay-food">
+    <div class="overlay-card">
+      <span class="emoji-art" style="font-size:4rem;">🍽️</span>
+      <h2 style="font-size:1.4rem; font-weight:800;">شو بتحبي تاكلي؟</h2>
+      <p class="section-body" style="font-size:0.9rem;">اختاري واحدة والباقي علينا 😉</p>
+      <div class="food-grid">
+        <div class="food-item" onclick="selectFood(this)">🍕<br>بيتزا</div>
+        <div class="food-item" onclick="selectFood(this)">🍣<br>سوشي</div>
+        <div class="food-item" onclick="selectFood(this)">🍔<br>برغر</div>
+        <div class="food-item" onclick="selectFood(this)">🍝<br>باستا</div>
+        <div class="food-item" onclick="selectFood(this)">🥗<br>سلطة</div>
+        <div class="food-item" onclick="selectFood(this)">🧁<br>حلويات</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       OVERLAY 4 — FINAL MESSAGE
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="overlay-final">
+    <div class="overlay-card">
+      <span class="emoji-art" style="font-size:6rem;">🐱💝</span>
+      <h2 style="font-size:1.5rem; font-weight:900; line-height:1.7; margin-bottom:1rem;">
+        تمام يا آية! 🎉<br>
+        كوني جاهزة الساعة <span class="final-highlight" id="final-time">__</span><br>
+        رح آجي آخذك! 🚗💨
+      </h2>
+      <p style="font-size:0.8rem; opacity:0.4; font-weight:700;">
+        P.S. هالصفحة انعملت خصيصاً إلك 🌸
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ── Petals ──
+    const EMOJIS = ['🌸', '💖', '✨', '💕', '🌷', '🩷', '🫧'];
+    function spawnPetal() {
+      const el = document.createElement('div');
+      el.className = 'petal';
+      el.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+      el.style.left = Math.random() * 100 + 'vw';
+      el.style.fontSize = (Math.random() * 0.8 + 0.85) + 'rem';
+      const dur = Math.random() * 3 + 4;
+      el.style.animationDuration = dur + 's';
+      document.getElementById('petals').appendChild(el);
+      setTimeout(() => el.remove(), (dur + 0.5) * 1000);
+    }
+    setInterval(spawnPetal, 380);
+
+    // ── Scroll reveal (IntersectionObserver) ──
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target); // reveal once
+        }
+      });
+    }, { threshold: 0.2 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // ── Running "no" button ──
+    const noBtn = document.getElementById('no-btn');
+    function runAway(e) {
+      if (e.type === 'touchstart') e.preventDefault();
+      noBtn.style.position = 'fixed';
+      const maxX = window.innerWidth  - noBtn.offsetWidth  - 10;
+      const maxY = window.innerHeight - noBtn.offsetHeight - 10;
+      noBtn.style.left = Math.max(8, Math.floor(Math.random() * maxX)) + 'px';
+      noBtn.style.top  = Math.max(8, Math.floor(Math.random() * maxY)) + 'px';
+      noBtn.style.zIndex = 200;
+    }
+    noBtn.addEventListener('mouseenter', runAway);
+    noBtn.addEventListener('touchstart', runAway, { passive: false });
+
+    // ── Show overlay helpers ──
+    function showOverlay(id) {
+      document.getElementById(id).classList.add('active');
+    }
+    function hideOverlay(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // ── Yes → reaction overlay ──
+    function showReaction() {
+      showOverlay('overlay-reaction');
+    }
+
+    // ── Reaction → date picker ──
+    function showDatePicker() {
+      hideOverlay('overlay-reaction');
+      showOverlay('overlay-date');
+    }
+
+    // ── Submit date → food picker ──
+    let _date = '', _time = '';
+    function submitDate() {
+      _date = document.getElementById('date-input').value;
+      _time = document.getElementById('time-input').value;
+      const err = document.getElementById('date-error');
+      if (_date && _time) {
+        err.style.display = 'none';
+        // ntfy notification — topic: aya-date-salman-2026
+        fetch('https://ntfy.sh/aya-date-salman-2026', {
+          method: 'POST',
+          body: `Aya said YES!\nDate: ${_date}\nTime: ${_time}`,
+          headers: { 'Title': 'Aya confirmed the date!', 'Priority': 'high' }
+        }).catch(() => {});
+        hideOverlay('overlay-date');
+        showOverlay('overlay-food');
+      } else {
+        err.style.display = 'block';
+      }
+    }
+
+    // ── Food selection → final ──
+    function selectFood(el) {
+      document.querySelectorAll('.food-item').forEach(i => i.classList.remove('selected'));
+      el.classList.add('selected');
+      const food = el.innerText.replace('\n', ' ');
+      fetch('https://ntfy.sh/aya-date-salman-2026', {
+        method: 'POST',
+        body: `Aya chose: ${food}\nDate: ${_date} at ${_time}`,
+        headers: { 'Title': 'Aya chose the food!' }
+      }).catch(() => {});
+      document.getElementById('final-time').textContent = _time;
+      setTimeout(() => {
+        hideOverlay('overlay-food');
+        showOverlay('overlay-final');
+      }, 650);
+    }
+
+    // Close overlay when clicking outside card
+    document.querySelectorAll('.overlay').forEach(ov => {
+      ov.addEventListener('click', (e) => {
+        if (e.target === ov) ov.classList.remove('active');
+      });
+    });
+  </script>
+</body>
+</html>

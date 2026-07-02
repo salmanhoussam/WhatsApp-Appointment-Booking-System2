@@ -1,0 +1,131 @@
+import React, { useEffect, useState } from 'react';
+
+/**
+ * RoomEnvironment - CSS overlay for displaying high-fidelity rooms
+ * utilizing photo backgrounds with smooth mouse-parallax effects and glassmorphism UIs.
+ */
+export function RoomEnvironment({ imgSrc, accentColor = '#3b82f6', title, subtitle, isVisible, children }) {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [rendered, setRendered] = useState(isVisible);
+
+  // Manage visibility transition and pointer events cleanly
+  useEffect(() => {
+    if (isVisible) {
+      setRendered(true);
+    } else {
+      const timer = setTimeout(() => setRendered(false), 800); // match duration-800
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible]);
+
+  // Handle high performance parallax locally on mousemove (decoupled from R3F rendering loop)
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleMouseMove = (e) => {
+      // Normalize mouse coordinates to [-0.5, 0.5]
+      const x = (e.clientX / window.innerWidth) - 0.5;
+      const y = (e.clientY / window.innerHeight) - 0.5;
+      setMousePos({ x, y });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isVisible]);
+
+  if (!rendered) return null;
+
+  // Parallax offset variables (Image is scaled to 1.15 to ensure no edges are visible during motion)
+  const parallaxStyle = {
+    transform: `translate(${mousePos.x * -25}px, ${mousePos.y * -15}px) scale(1.15)`,
+    transition: isVisible ? 'transform 0.15s ease-out' : 'transform 0.8s ease',
+  };
+
+  return (
+    <div
+      className={`fixed inset-0 z-10 flex items-center justify-end p-6 md:p-16 transition-all duration-1000 ease-in-out ${
+        isVisible ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-105'
+      }`}
+      style={{ direction: 'rtl' }}
+    >
+      {/* Background Image Wrapper with Parallax */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <img
+          src={imgSrc}
+          alt={title}
+          style={parallaxStyle}
+          className="w-full h-full object-cover transition-opacity duration-1000"
+        />
+        {/* Deep atmospheric overlay matching the R3F scene fog */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: `radial-gradient(circle at 30% 50%, rgba(6, 11, 24, 0.15) 0%, rgba(6, 11, 24, 0.8) 100%)`
+          }}
+        />
+      </div>
+
+      {/* Glassmorphism Panel on the Right Side */}
+      <div 
+        className="relative z-20 w-full max-w-lg p-8 md:p-10 rounded-2xl border transition-all duration-1000 delay-100 transform"
+        style={{
+          background: 'rgba(10, 18, 36, 0.65)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderColor: `${accentColor}33`,
+          boxShadow: `0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 30px ${accentColor}11`,
+          transform: isVisible ? 'translateX(0) scale(1)' : 'translateX(50px) scale(0.95)'
+        }}
+      >
+        {/* HUD Indicator Bar */}
+        <div className="flex items-center gap-3 mb-6">
+          <span 
+            className="w-2.5 h-2.5 rounded-full animate-pulse" 
+            style={{ backgroundColor: accentColor, boxShadow: `0 0 10px ${accentColor}` }}
+          />
+          <span className="text-xs font-mono uppercase tracking-widest text-gray-400" style={{ color: `${accentColor}cc` }}>
+            {title}
+          </span>
+        </div>
+
+        {/* Header */}
+        <h2 className="text-2xl md:text-3.5xl font-extrabold text-white mb-3 tracking-tight">
+          {subtitle}
+        </h2>
+
+        {/* Divider with active accent color gradient */}
+        <div 
+          className="h-[2px] w-24 mb-6 rounded-full" 
+          style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }}
+        />
+
+        {/* Core Content Box */}
+        <div className="text-gray-200 leading-relaxed space-y-4 text-base md:text-lg">
+          {children}
+        </div>
+
+        {/* Action Button */}
+        <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+          <button 
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 transform hover:scale-102 flex items-center gap-2 text-white"
+            style={{ 
+              backgroundColor: `${accentColor}22`, 
+              border: `1px solid ${accentColor}44`,
+              boxShadow: `0 4px 15px ${accentColor}11`
+            }}
+            onClick={() => {
+              // Trigger scroll back to navigation or simple page close action
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <span>← العودة للمبنى</span>
+          </button>
+
+          <span className="text-xs text-gray-500 font-mono select-none">
+            SALMANSAAS // 2026
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -261,3 +261,8 @@ __marimo__/
 # Claude AI Agent Files
 .claude/worktrees/
 .claude/settings.local.json
+.claude/projects/
+
+# DB Dumps — never commit real data
+_db_dump.json
+*.db_dump.json

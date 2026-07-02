@@ -10,6 +10,8 @@ const GeneralPrivacyPage  = lazy(() => import('../pages/showcase/pages/GeneralPr
 const PrivacyTermsPage    = lazy(() => import('../pages/showcase/pages/PrivacyTermsPage'));
 const SpecificPrivacyPage = lazy(() => import('../pages/showcase/pages/SpecificPrivacyPage'));
 const RegistrationPage    = lazy(() => import('../pages/showcase/pages/RegistrationPage'));
+const PricingPage         = lazy(() => import('../pages/showcase/pages/PricingPage'));
+const MarketingApp        = lazy(() => import('../pages/marketing/MarketingApp'));
 
 const PageFallback = () => (
   <div style={{ width: '100vw', height: '100vh', background: '#090412' }} />
@@ -40,6 +42,9 @@ function ShowcaseRoutes() {
         <Route path="terms" element={<Suspense fallback={<PageFallback />}><PrivacyTermsPage /></Suspense>} />
         <Route path="whatsapp-privacy" element={<Suspense fallback={<PageFallback />}><SpecificPrivacyPage /></Suspense>} />
         <Route path="register" element={<Suspense fallback={<PageFallback />}><RegistrationPage /></Suspense>} />
+        <Route path="pricing" element={<Suspense fallback={<PageFallback />}><PricingPage /></Suspense>} />
+        {/* Marketing landing page — previously on Cloudflare, now integrated */}
+        <Route path="landing" element={<Suspense fallback={<PageFallback />}><MarketingApp /></Suspense>} />
         {/* /contact scrolls to CTA section on home — no dedicated page yet */}
         <Route path="contact" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

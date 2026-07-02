@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import properties, bookings, dashboard, units, settings, team, services, gallery, restaurant, store, catalog, upload, reservations, client_services
+from . import properties, bookings, dashboard, units, settings, team, services, gallery, restaurant, store, catalog, upload, reservations, client_services, fleet
 
 router = APIRouter()
 
@@ -17,3 +17,4 @@ router.include_router(store.router,            prefix="/store",           tags=[
 router.include_router(catalog.router,          prefix="/catalog",         tags=["Admin Catalog"])
 router.include_router(reservations.router,     prefix="/reservations",    tags=["Admin Reservations"])
 router.include_router(client_services.router)  # mounts /api/v1/admin/client-services (prefix in router)
+router.include_router(fleet.router)            # mounts /api/v1/admin/fleet           (prefix in router)

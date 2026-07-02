@@ -44,6 +44,13 @@ const ShowcaseRoutes        = lazy(() => import('./router/showcase.routes'));
 const ClientsManager        = lazy(() => import('./pages/super-admin/ClientsManager'));
 const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'));
 
+// Marketing landing page — formerly on Cloudflare, now integrated
+const MarketingApp = lazy(() => import('./pages/marketing/MarketingApp'));
+
+// Dating module (Phase 75) — standalone, before /:slug/* catch-all
+const DatingPageResolver = lazy(() => import('./pages/dating/DatingPageResolver'));
+const DatingCreatePage   = lazy(() => import('./pages/dating/DatingCreatePage'));
+
 // Detect subdomain mode at module scope (stable across renders)
 const _h = window.location.hostname;
 const IS_SUBDOMAIN_MODE =
@@ -190,6 +197,19 @@ function App() {
           {!IS_SHOWCASE_DOMAIN && !IS_SUBDOMAIN_MODE && (
             <Route path="/showcase/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />
           )}
+
+          {/* ── Marketing landing (accessible everywhere, before tenant catch-all) ── */}
+          <Route path="/marketing" element={
+            <Suspense fallback={null}><MarketingApp /></Suspense>
+          } />
+
+          {/* ── Dating module routes (must be before /:slug/*) ── */}
+          <Route path="/dating/create" element={
+            <Suspense fallback={null}><DatingCreatePage /></Suspense>
+          } />
+          <Route path="/dating/:slug" element={
+            <Suspense fallback={null}><DatingPageResolver /></Suspense>
+          } />
 
           {/* ── Dynamic tenant routes (must be last) ──
                Subdomain mode: /* so smar.domain.com/showcase resolves cleanly

@@ -75,6 +75,14 @@ model Client {
   // null = not yet assigned (trial tenants start without a template)
   templateKey String? @map("template_key")
 
+  // -- Fleet module (Phase 76 — Vicale) ----------------------------------------
+  fleetVehicles  FleetVehicle[]
+  fleetDrivers   FleetDriver[]
+  fleetTrips     FleetTrip[]
+  samsaraEvents  SamsaraEvent[]
+  driverAlerts   DriverAlert[]
+  driverConsents DriverConsent[]
+
   @@map("clients")
   @@schema("public")
 }
@@ -670,6 +678,189 @@ model Reservation {
   @@index([clientId, moduleKey, reservedAt])
   @@index([clientId, status])
   @@map("reservations")
+  @@schema("public")
+}
+
+// ================================================================================
+// DATING MODULE (Phase 75) — Personalized date invitation pages
+// No clientId: standalone micro-SaaS feature, not tenant-gated.
+// Slug = the URL key and only access credential (no auth on view).
+// ================================================================================
+
+model DatePage {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String    @unique
+  her_name    String
+  config      Json      // { theme, message, food_options[], emoji, custom_bg_url? }
+  ntfy_topic  String
+  owner_phone String
+  her_phone   String?
+  event_date  DateTime? @db.Timestamptz(6)
+  chosen_food String?
+  answered_at DateTime? @db.Timestamptz(6)
+  answer      String?   // "yes" | "later" | "no"
+  is_deleted  Boolean   @default(false)
+  expires_at  DateTime  @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([slug])
+  @@index([expires_at, is_deleted])
+  @@map("date_pages")
+  @@schema("public")
+}
+
+// ================================================================================
+// FLEET MODULE (Phase 76 — Vicale Fleet Platform)
+// Manages vehicles + drivers for Uber fleet operators.
+// Data sources: Samsara (GPS / safety webhooks) + Uber (CSV import → FleetTrip).
+// Gated by client_services.serviceKey = "fleet".
+// DSGVO note: GPS data = personenbezogene Daten — consent required per driver.
+// ================================================================================
+
+model FleetVehicle {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String    @map("client_id") @db.Uuid
+  samsaraId     String?   @unique @map("samsara_id")
+  uberVehicleId String?   @map("uber_vehicle_id")
+  plateNumber   String    @map("plate_number")
+  make          String?
+  model         String?
+  year          Int?
+  status        String    @default("active") @map("status")
+  // active | idle | maintenance | offline
+  lastLat       Float?    @map("last_lat")
+  lastLng       Float?    @map("last_lng")
+  lastSeenAt    DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  driver        FleetDriver?
+  trips         FleetTrip[]
+  samsaraEvents SamsaraEvent[]
+
+  @@index([clientId])
+  @@index([clientId, status])
+  @@map("fleet_vehicles")
+  @@schema("public")
+}
+
+model FleetDriver {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String  @map("client_id") @db.Uuid
+  vehicleId    String? @unique @map("vehicle_id") @db.Uuid
+  samsaraId    String? @map("samsara_id")
+  uberDriverId String? @map("uber_driver_id")
+  name         String
+  phone        String?
+  safetyScore  Float?  @map("safety_score")
+  totalTrips   Int     @default(0) @map("total_trips")
+  totalEarnings Float  @default(0) @map("total_earnings")
+  uberToken    String? @map("uber_token")
+  // encrypted OAuth token — Phase 2
+  isActive     Boolean @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client   Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle  FleetVehicle? @relation(fields: [vehicleId], references: [id])
+  trips    FleetTrip[]
+  alerts   DriverAlert[]
+  consents DriverConsent[]
+
+  @@index([clientId])
+  @@map("fleet_drivers")
+  @@schema("public")
+}
+
+model FleetTrip {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  vehicleId   String    @map("vehicle_id") @db.Uuid
+  driverId    String?   @map("driver_id") @db.Uuid
+  uberTripRef String?   @unique @map("uber_trip_ref")
+  startTime   DateTime  @map("start_time") @db.Timestamptz(6)
+  endTime     DateTime? @map("end_time") @db.Timestamptz(6)
+  revenue     Float?
+  distanceKm  Float?    @map("distance_km")
+  city        String?
+  status      String    @default("completed") @map("status")
+  // started | completed | cancelled
+  source      String    @default("csv") @map("source")
+  // csv | api | manual
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client  Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle FleetVehicle @relation(fields: [vehicleId], references: [id])
+  driver  FleetDriver? @relation(fields: [driverId], references: [id])
+
+  @@index([clientId, startTime])
+  @@index([clientId, vehicleId])
+  @@map("fleet_trips")
+  @@schema("public")
+}
+
+model SamsaraEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  vehicleId   String?  @map("vehicle_id") @db.Uuid
+  eventType   String   @map("event_type")
+  // SpeedingEventStarted | SevereSpeedingEnded | GeofenceEntry | GeofenceExit
+  // AlertIncident | EngineOn | EngineOff | DriverCreated | DriverUpdated
+  severity    String?  // low | medium | high
+  lat         Float?
+  lng         Float?
+  speed       Float?
+  rawPayload  Json     @map("raw_payload")
+  isRead      Boolean  @default(false) @map("is_read")
+  occurredAt  DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client  Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle FleetVehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@index([clientId, eventType])
+  @@index([clientId, occurredAt])
+  @@map("samsara_events")
+  @@schema("public")
+}
+
+model DriverAlert {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  driverId     String   @map("driver_id") @db.Uuid
+  type         String
+  // speeding | harsh_brake | idling | geofence | engine_fault | severe_speeding
+  message      String
+  severity     String   @default("warning")
+  // info | warning | critical
+  isRead       Boolean  @default(false) @map("is_read")
+  sentWhatsApp Boolean  @default(false) @map("sent_whatsapp")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  driver FleetDriver @relation(fields: [driverId], references: [id])
+
+  @@index([clientId, isRead])
+  @@index([driverId])
+  @@map("driver_alerts")
+  @@schema("public")
+}
+
+model DriverConsent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  driverId    String    @map("driver_id") @db.Uuid
+  consentType String    @map("consent_type")
+  // "gps_tracking" | "data_processing" | "uber_oauth"
+  signedAt    DateTime  @default(now()) @map("signed_at") @db.Timestamptz(6)
+  signedBy    String    @map("signed_by")
+  ipAddress   String?   @map("ip_address")
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  client Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  driver FleetDriver @relation(fields: [driverId], references: [id])
+
+  @@index([clientId, driverId])
+  @@map("driver_consents")
   @@schema("public")
 }
 
