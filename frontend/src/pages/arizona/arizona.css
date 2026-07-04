@@ -1,0 +1,5 @@
+body[data-slug="arizona"] {
+  --accent:     #e67e22;
+  --accent-dim: rgba(230,126,34,0.18);
+  --accent-glow: rgba(230,126,34,0.35);
+}

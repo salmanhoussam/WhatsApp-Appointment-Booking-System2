@@ -17,7 +17,8 @@ import ProtectedRoute from '../ProtectedRoute';
 import { TenantConfigProvider, useTenantConfigContext } from '../../context/TenantConfigContext';
 
 // ── Lazy page imports ─────────────────────────────────────────────────────────
-const CatalogPage           = lazy(() => import('../../pages/generic/normal/CatalogPage'));
+const HomePage              = lazy(() => import('../../pages/caracas/normal/HomePage'));
+const MenuPage              = lazy(() => import('../../pages/caracas/normal/MenuPage'));
 const CartPage              = lazy(() => import('../../pages/generic/normal/CartPage'));
 const ReservePage           = lazy(() => import('../../pages/generic/normal/ReservePage'));
 const CaracasAdminDashboard = lazy(() => import('../../pages/caracas/admin/CaracasAdminDashboard'));
@@ -63,7 +64,8 @@ export default function CaracasRoutes() {
   return (
     <TenantConfigProvider slug="caracas">
       <Routes>
-        <Route path="menu"    element={<Lazy component={CatalogPage} />} />
+        <Route path="home"    element={<Lazy component={HomePage} />} />
+        <Route path="menu"    element={<Lazy component={MenuPage} />} />
         <Route path="cart"    element={<Lazy component={CartPage} />} />
         <Route path="reserve" element={<ReserveGuard />} />
 
@@ -73,8 +75,8 @@ export default function CaracasRoutes() {
           </ProtectedRoute>
         } />
 
-        <Route path=""  element={<Navigate to="menu" replace />} />
-        <Route path="*" element={<Navigate to="menu" replace />} />
+        <Route path=""  element={<Navigate to="home" replace />} />
+        <Route path="*" element={<Navigate to="home" replace />} />
       </Routes>
     </TenantConfigProvider>
   );

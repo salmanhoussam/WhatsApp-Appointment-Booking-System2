@@ -68,25 +68,31 @@
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
+- [ ] **حذف المشروع القديم** — `gdzthjcvzvhfpsvoxhbm` — كل البيانات والصور انتقلت ✅ (يمكن الحذف الآن)
 - [ ] **Install Git** — `winget install Git.Git` — needed for deploy workflow (post-format)
 - [ ] **`cd frontend && npm install`** — frontend packages not installed yet (post-format)
-- [ ] **`npx prisma db push`** — run on Railway backend to activate `status`/`trial_ends_at`/`service_type` fields in DB
+- [ ] **`python -m prisma db push`** — 5 schema changes معلّقة: `Client.tier` + OccasionCreator + OccasionPage + OccasionRSVP + DatePage (Railway subscription lapsed) — لا تستخدم `npx prisma` على هذا الجهاز
 - [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain في Pages → Custom Domains
 - [ ] **SEC-03 (partial):** Supabase service key + Resend API key — rotation يدوي في الداشبوردات
 - [ ] **Mona page hosting** — `frontend/public/mona.html` جاهز — ارفعه على Netlify Drop أو Cloudflare Pages
+- [ ] **`floor-video.mp4`** — حمّل dark-tech video من pexels.com (search: "dark technology screen") → احفظه في `frontend/public/videos/floor-video.mp4`
 
 ## 🟠 In Progress / Carry Forward
 
+- ✅ Done 2026-07-02 — **Moments Module full-stack** (4 backend files + 4 frontend files + routing registry)
+- ✅ Done 2026-07-02 — **Scroll-Video FLOOR_04** (RoomEnvironment videoSrc/videoRef props + RAF scrub loop in HomePage)
+- ✅ Done 2026-07-02 — **Pricing Tiers** (Regular $15 / Pro $22 / Ultra $35 — documented in PRODUCT.md + schema + service-system + memory)
 - ✅ Done 2026-07-01 — **Showcase tower extended to 5 floors** (Video #a855f7 y=-6, Romance #e11d48 y=-12, 15-waypoint camera, VideoGenerationCard, RomanceDateCard, 5 HUD dots, 560vh void)
 - ✅ Done 2026-07-01 — **Marketing page integrated** — `frontend/src/pages/marketing/` (18 files from Home-Page-main), `/marketing` route, demo links per service
 - ✅ Done 2026-07-01 — **Design Intelligence System** — PRODUCT.md + DESIGN.md rebuilt (OKLCH, GS MAR tokens, absolute bans), gs-mar-components.md (10 recipes), frontend-architect.md upgraded to builder protocol
 - ✅ Done 2026-07-01 — **Marketing page full redesign** — 5 sections rebuilt (ProblemSolution, WorkflowDemo, UseCases, Trust, CTA) + FAQSection added. GS MAR: dark bg #060b18, Space Mono labels, Cairo headings, FM spring animations, RTL dir attribute. Competitor best: before/after (مستقل), 3-step flow (Fiverr), category grid (خمسات), stats+testimonials (Upwork), FAQ accordion (Fiverr). REMOVED: gradient text ban violation in TrustSection.
-- [ ] **TEST FIRST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible, camera enters video+romance rooms on scroll
+- [ ] **TEST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible (after scroll-video revert)
+- [ ] **TEST: Restaurant pages** — `localhost:5173/caracas/menu` + `localhost:5173/arizona/menu` — تحقق المنيو ظاهر مع الصور المنقولة
 - [ ] **Phase 75-B: DatingTemplate** — HeroSection + StorySection + ConfirmSection (running "لا" button) — `frontend/src/pages/dating/`
 - [ ] **Phase 75-C: DatingCreatePage** — multi-step form (5 steps) — `frontend/src/pages/dating/DatingCreatePage.jsx`
 - [ ] **Phase 75-D: ntfy test** — subscribe to `ntfy.sh/salman-dating-2026` on phone → test notification
 - [ ] **Phase 75-E: Railway cron** — `0 3 * * *` → `POST /api/v1/super/maintenance/cleanup-date-pages`
-- [ ] **`npx prisma db push`** — DatePage model → Railway DB (new from 2026-06-30)
+- [ ] **`python -m prisma db push`** — DatePage model → Railway DB (new from 2026-06-30)
 - [ ] **Showcase HeroSection** — hero text repositioning so tower crown is visible above it
 - [ ] **AI Integration Phase** — قرار: نبدأ بـ RAG chatbot للمطعم/المتجر — repo awesome-llm-apps محمّل
 - [ ] **DemoLauncher navigation fix** — بعد الإنشاء يوجّه لـ `/{slug}/menu` (restaurant) أو `/{slug}/store` (store) بدل `/{slug}/home` دائماً

@@ -49,12 +49,12 @@ NEW_DB_URL = os.getenv(
 )
 
 # Old slugs (as stored in the old DBs)
-OLD_RESTAURANT_SLUG = os.getenv("OLD_RESTAURANT_SLUG", "caracas")  # restaurants.slug in old DB
-OLD_STORE_SLUG      = os.getenv("OLD_STORE_SLUG",      "footlab")  # StoreCategory.clientSlug in old DB
+OLD_RESTAURANT_SLUGS = os.getenv("OLD_RESTAURANT_SLUGS", "caracas,arizona").split(",")
+OLD_STORE_SLUG       = os.getenv("OLD_STORE_SLUG",       "footlab")  # StoreCategory.clientSlug in old DB
 
-# New slugs (as stored in the new clients table)
-NEW_CARACAS_SLUG = os.getenv("NEW_CARACAS_SLUG", "caracas")
-NEW_FOOTLAB_SLUG = os.getenv("NEW_FOOTLAB_SLUG", "footlab")
+# New slugs (as stored in the new clients table) — same as old slugs in this project
+NEW_RESTAURANT_SLUGS = os.getenv("NEW_RESTAURANT_SLUGS", "caracas,arizona").split(",")
+NEW_FOOTLAB_SLUG     = os.getenv("NEW_FOOTLAB_SLUG",     "footlab")
 
 
 # ── DB helpers ─────────────────────────────────────────────────────────────────
@@ -369,17 +369,21 @@ def main():
 
             # Resolve new client UUIDs
             print("\n── Resolving client IDs in new DB ───────────────────────────────")
-            caracas_client_id = lookup_client_id(new_cur, NEW_CARACAS_SLUG) if do_restaurant else None
-            footlab_client_id = lookup_client_id(new_cur, NEW_FOOTLAB_SLUG) if do_store      else None
+            restaurant_client_ids = {}
+            if do_restaurant:
+                for slug in NEW_RESTAURANT_SLUGS:
+                    cid = lookup_client_id(new_cur, slug)
+                    restaurant_client_ids[slug] = cid
+                    print(f"   {slug} -> {cid}")
 
-            if caracas_client_id:
-                print(f"   caracas → {caracas_client_id}")
+            footlab_client_id = lookup_client_id(new_cur, NEW_FOOTLAB_SLUG) if do_store else None
             if footlab_client_id:
-                print(f"   footlab → {footlab_client_id}")
+                print(f"   footlab -> {footlab_client_id}")
 
             # Run migrations
             if do_restaurant:
-                migrate_restaurant(old_cur, new_cur, OLD_RESTAURANT_SLUG, caracas_client_id, args.dry_run)
+                for old_slug, new_slug in zip(OLD_RESTAURANT_SLUGS, NEW_RESTAURANT_SLUGS):
+                    migrate_restaurant(old_cur, new_cur, old_slug, restaurant_client_ids[new_slug], args.dry_run)
 
             if do_store:
                 migrate_store(old_cur, new_cur, OLD_STORE_SLUG, footlab_client_id, args.dry_run)

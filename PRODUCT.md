@@ -72,6 +72,34 @@ Every word earns its place or it's cut.
 
 ---
 
+## Pricing Tiers
+
+| Tier | Price | Key | Target |
+|------|-------|-----|--------|
+| **Regular** | $15/mo | `regular` | SMBs starting out — booking / menu / store basics |
+| **Pro** | $22/mo | `pro` | Growing businesses — advanced analytics, multi-branch |
+| **Ultra** | $35/mo | `ultra` | Premium clients — immersive 3D showcase pages, AI agent, full automation |
+
+**No free tier.**
+
+### Feature Gates by Tier
+
+| Feature | Regular | Pro | Ultra |
+|---------|---------|-----|-------|
+| Booking / Menu / Store | ✅ | ✅ | ✅ |
+| WhatsApp AI bot | ✅ | ✅ | ✅ |
+| Admin dashboard | ✅ | ✅ | ✅ |
+| Multi-branch | ❌ | ✅ | ✅ |
+| Advanced analytics | ❌ | ✅ | ✅ |
+| **Immersive 3D showcase** (`immersive_3d`) | ❌ | ❌ | ✅ |
+| Custom domain | ❌ | ✅ | ✅ |
+| Priority support | ❌ | ❌ | ✅ |
+
+**Rule for agents:** Never scaffold an `immersive_3d` page unless `client.tier === 'ultra'` is confirmed.
+The `immersive_3d` serviceKey in `client_services` is only activated by SUPER_ADMIN (Salman).
+
+---
+
 ## Current Live Tenants
 
 | Tenant | Domain | Module | Status |

@@ -35,10 +35,14 @@ model Client {
   payment_methods String[]       @map("payment_methods")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  // -- Trial & Lifecycle --------------------------------------------------------
-  status        String    @default("trial")       @map("status")
-  trial_ends_at DateTime? @map("trial_ends_at")   @db.Timestamptz(6)
-  service_type  String?   @default("real_estate") @map("service_type")
+  // -- Subscription tier -------------------------------------------------------
+  // regular=$15 | pro=$22 | ultra=$35 - set by SUPER_ADMIN only
+  // ultra unlocks: immersive_3d showcase pages
+  tier          String    @default("regular")      @map("tier")
+  // -- Trial & Lifecycle -------------------------------------------------------
+  status        String    @default("trial")        @map("status")
+  trial_ends_at DateTime? @map("trial_ends_at")    @db.Timestamptz(6)
+  service_type  String?   @default("real_estate")  @map("service_type")
   notes         String?   @map("notes")
   bookings        Booking[]
   customers       Customer[]
@@ -62,20 +66,20 @@ model Client {
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations      Reservation[]
   // -- CRM snapshot -----------------------------------------------------------
-  // Denormalized list of active service keys — updated on every ClientService change.
+  // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
   // Example: ["booking", "gallery", "restaurant.menu"]
   selected_services Json? @default("[]") @map("selected_services")
 
   // -- Template & UX (Phase 49/50/51) -----------------------------------------
-  // pageType: "normal" → standard catalog/menu/store page
-  //           "showcase" → cinematic ShowcaseTemplate (GSAP + Framer Motion)
+  // pageType: "normal" -> standard catalog/menu/store page
+  //           "showcase" -> cinematic ShowcaseTemplate (GSAP + Framer Motion)
   pageType    String  @default("normal") @map("page_type")
   // templateKey: maps to TEMPLATE_REGISTRY in frontend (e.g. "beauty-salon-women")
   // null = not yet assigned (trial tenants start without a template)
   templateKey String? @map("template_key")
 
-  // -- Fleet module (Phase 76 — Vicale) ----------------------------------------
+  // -- Fleet module (Phase 76 - Vicale) ----------------------------------------
   fleetVehicles  FleetVehicle[]
   fleetDrivers   FleetDriver[]
   fleetTrips     FleetTrip[]
@@ -180,7 +184,7 @@ model Unit {
 
   // Block Builder JSON -- array of {type, content, style?, icon?, title?}
   // Types: section_title, highlight_item, paragraph
-  // Example: [{"type":"section_title","content":"Serenity 🌿","style":{"size":"large","color":"gold","bold":true}}]
+  // Example: [{"type":"section_title","content":"Serenity [plant]","style":{"size":"large","color":"gold","bold":true}}]
   content_blocks Json? @map("content_blocks")
 
   // Amenities -- array of {icon, label, label_ar?}
@@ -386,9 +390,9 @@ model CatalogCategory {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   // -- Display Template (Phase 49) ---------------------------------------------
-  // "grid"     → 2-4 col card grid (default — universal)
-  // "list"     → horizontal rows: image + name + desc + price (menus, price lists)
-  // "showcase" → large editorial cards, full desc + CTA (packages, VIP services)
+  // "grid"     -> 2-4 col card grid (default - universal)
+  // "list"     -> horizontal rows: image + name + desc + price (menus, price lists)
+  // "showcase" -> large editorial cards, full desc + CTA (packages, VIP services)
   displayTemplate String @default("grid") @map("display_template")
 
   client   Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -488,7 +492,7 @@ model RestaurantConfig {
   @@schema("public")
 }
 
-// MenuCategory + MenuItem removed — replaced by CatalogCategory/CatalogItem (module_key = 'restaurant')
+// MenuCategory + MenuItem removed - replaced by CatalogCategory/CatalogItem (module_key = 'restaurant')
 
 model RestaurantOrder {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -554,9 +558,9 @@ model StoreCustomer {
   @@schema("public")
 }
 
-// StoreBrand + StoreCategory + StoreProduct removed — replaced by CatalogCategory/CatalogItem (module_key = 'store')
+// StoreBrand + StoreCategory + StoreProduct removed - replaced by CatalogCategory/CatalogItem (module_key = 'store')
 // Brand info moved to CatalogItem.metadata.brand
-// StoreReview + StoreWishlist removed — not replaced (no feature parity planned)
+// StoreReview + StoreWishlist removed - not replaced (no feature parity planned)
 
 model StoreCart {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -640,11 +644,11 @@ model StoreOrderItem {
 // Works across all service types via moduleKey.
 // Gated by client_services.serviceKey = "reservations".
 //
-// moduleKey → use case:
-//   "restaurant"   → table reservation (metadata: table_label, party_size)
-//   "services"     → appointment booking (metadata: service_name, staff_id)
-//   "real_estate"  → property viewing (metadata: unit_id, guests, viewing_type)
-//   "hotel"        → check-in appointment or room viewing
+// moduleKey -> use case:
+//   "restaurant"   -> table reservation (metadata: table_label, party_size)
+//   "services"     -> appointment booking (metadata: service_name, staff_id)
+//   "real_estate"  -> property viewing (metadata: unit_id, guests, viewing_type)
+//   "hotel"        -> check-in appointment or room viewing
 // ================================================================================
 
 model Reservation {
@@ -666,9 +670,9 @@ model Reservation {
   notes         String?  @map("notes")
 
   // module-specific payload:
-  // restaurant  → { "table_label": "A4", "party_size": 4 }
-  // services    → { "service_name": "قص شعر", "staff_id": "uuid" }
-  // real_estate → { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
+  // restaurant  -> { "table_label": "A4", "party_size": 4 }
+  // services    -> { "service_name": "haircut", "staff_id": "uuid" }
+  // real_estate -> { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
   metadata      Json?    @map("metadata")
 
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -682,7 +686,7 @@ model Reservation {
 }
 
 // ================================================================================
-// DATING MODULE (Phase 75) — Personalized date invitation pages
+// DATING MODULE (Phase 75) - Personalized date invitation pages
 // No clientId: standalone micro-SaaS feature, not tenant-gated.
 // Slug = the URL key and only access credential (no auth on view).
 // ================================================================================
@@ -710,11 +714,11 @@ model DatePage {
 }
 
 // ================================================================================
-// FLEET MODULE (Phase 76 — Vicale Fleet Platform)
+// FLEET MODULE (Phase 76 - Vicale Fleet Platform)
 // Manages vehicles + drivers for Uber fleet operators.
-// Data sources: Samsara (GPS / safety webhooks) + Uber (CSV import → FleetTrip).
+// Data sources: Samsara (GPS / safety webhooks) + Uber (CSV import -> FleetTrip).
 // Gated by client_services.serviceKey = "fleet".
-// DSGVO note: GPS data = personenbezogene Daten — consent required per driver.
+// DSGVO note: GPS data = personenbezogene Daten - consent required per driver.
 // ================================================================================
 
 model FleetVehicle {
@@ -756,7 +760,7 @@ model FleetDriver {
   totalTrips   Int     @default(0) @map("total_trips")
   totalEarnings Float  @default(0) @map("total_earnings")
   uberToken    String? @map("uber_token")
-  // encrypted OAuth token — Phase 2
+  // encrypted OAuth token - Phase 2
   isActive     Boolean @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -864,9 +868,9 @@ model DriverConsent {
   @@schema("public")
 }
 
-// ═══════════════════════════════════════════════════
-// MOMENTS MODULE — Personal Occasion Pages
-// ═══════════════════════════════════════════════════
+// ===================================================
+// MOMENTS MODULE - Personal Occasion Pages
+// ===================================================
 
 model OccasionCreator {
   id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

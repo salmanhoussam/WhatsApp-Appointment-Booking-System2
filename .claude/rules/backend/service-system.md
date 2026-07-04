@@ -35,6 +35,7 @@ model ClientService {
 | `delivery_zones`      | Store      | 📋 Planned |
 | `loyalty`             | Shared     | 📋 Planned |
 | `analytics`           | Shared     | 📋 Planned |
+| `immersive_3d`        | Showcase   | 🔒 Ultra tier only ($35/mo) — 3D scroll-driven camera page |
 | `whatsapp_blast`      | Shared     | 📋 Planned |
 | `ai_bot`              | Shared     | 📋 Planned |
 
@@ -118,4 +119,74 @@ STORE_EXTRAS      = ["store"]
 Every module endpoint MUST check client_services before serving.
 A tenant that doesn't have the service activated → 403.
 This applies even if the tenant has data in that module's tables.
+```
+
+---
+
+## 8. New Client — Route Setup Checklist
+
+عند بناء routes لعميل/module جديد، اتبع هذا الترتيب بالضبط:
+
+### الخطوة 1 — أضف serviceKey لقائمة Valid Service Keys (Section 2 أعلاه)
+
+```
+| `your_module` | YourModule | 🔄 In development |
+```
+
+### الخطوة 2 — أضف serviceKey لـ SERVICE_TYPE_MAP في `app/core/services.py`
+
+```python
+SERVICE_TYPE_MAP = {
+    "restaurant": ["restaurant"],
+    "store":      ["store"],
+    "your_type":  ["your_module"],  # ← أضف هنا
+}
+```
+
+### الخطوة 3 — أنشئ Router بالـ dependencies الصحيحة
+
+```python
+# app/api/v1/public/your_module.py
+from fastapi import APIRouter, Depends
+from app.db.dependencies import get_current_tenant
+from app.core.services   import require_service
+from app.services.your_service import your_service
+
+router = APIRouter(prefix="/your-module", tags=["Your Module"])
+
+@router.get("/items")
+async def list_items(
+    tenant = Depends(get_current_tenant),
+    _svc   = Depends(require_service("your_module")),  # ← MANDATORY — أول dependency
+):
+    return {"success": True, "data": await your_service.list(tenant["id"])}
+```
+
+### الخطوة 4 — سجّل الـ Router في `app/api/v1/public/__init__.py`
+
+```python
+from app.api.v1.public.your_module import router as your_module_router
+router.include_router(your_module_router)
+```
+
+### الخطوة 5 — Seed الـ ClientService row في DB
+
+```bash
+# عبر super admin API:
+PATCH /api/v1/super/clients/{client_id}/services
+Body: { "serviceKey": "your_module", "isActive": true }
+
+# أو عبر seed script:
+python scripts/seed_unified_clients.py  # يجب أن يشمل your_module
+```
+
+### الخطوة 6 — تحقق قبل Deploy
+
+```
+□ كل route فيها require_service() كأول dependency بعد get_current_tenant
+□ كل DB query فيها clientId في الـ where clause
+□ لا Prisma calls في routes أو services
+□ Pydantic schema لكل input body
+□ ClientService row موجود في DB للعميل المستهدف
+□ Router مسجّل في __init__.py
 ```

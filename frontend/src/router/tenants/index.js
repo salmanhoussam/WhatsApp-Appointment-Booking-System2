@@ -30,8 +30,14 @@ export const tenantRegistry = {
 
   caracas: {
     routes:          lazy(() => import('./caracas.routes')),
-    defaultRedirect: 'menu',     // canonical: demo.salmansaas.com/caracas/menu
-    theme:           'red-dark',
+    defaultRedirect: 'home',     // canonical: demo.salmansaas.com/caracas/home
+    theme:           'dark-ember',
+  },
+
+  arizona: {
+    routes:          lazy(() => import('./arizona.routes')),
+    defaultRedirect: 'home',     // canonical: demo.salmansaas.com/arizona/home
+    theme:           'yellow-teal',
   },
 
   footlab: {

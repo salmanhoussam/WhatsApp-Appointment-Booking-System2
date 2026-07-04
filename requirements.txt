@@ -15,7 +15,9 @@ supafunc>=0.10.0
 
 # Security & Authentication
 PyJWT==2.11.0
+python-jose[cryptography]==3.5.0
 bcrypt==5.0.0
+passlib[bcrypt]==1.7.4
 slowapi==0.1.9
 
 # Utils, Environment & Network

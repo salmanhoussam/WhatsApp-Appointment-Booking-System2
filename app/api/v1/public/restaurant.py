@@ -138,7 +138,7 @@ async def get_category_items(
 
     return {
         "success": True,
-        "data": _fmt_category(category),
+        "data": [_fmt_item(i) for i in (category.items or []) if i.isActive],
     }
 
 
