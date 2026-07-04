@@ -85,9 +85,15 @@
 - ✅ Done 2026-07-01 — **Showcase tower extended to 5 floors** (Video #a855f7 y=-6, Romance #e11d48 y=-12, 15-waypoint camera, VideoGenerationCard, RomanceDateCard, 5 HUD dots, 560vh void)
 - ✅ Done 2026-07-01 — **Marketing page integrated** — `frontend/src/pages/marketing/` (18 files from Home-Page-main), `/marketing` route, demo links per service
 - ✅ Done 2026-07-01 — **Design Intelligence System** — PRODUCT.md + DESIGN.md rebuilt (OKLCH, GS MAR tokens, absolute bans), gs-mar-components.md (10 recipes), frontend-architect.md upgraded to builder protocol
-- ✅ Done 2026-07-01 — **Marketing page full redesign** — 5 sections rebuilt (ProblemSolution, WorkflowDemo, UseCases, Trust, CTA) + FAQSection added. GS MAR: dark bg #060b18, Space Mono labels, Cairo headings, FM spring animations, RTL dir attribute. Competitor best: before/after (مستقل), 3-step flow (Fiverr), category grid (خمسات), stats+testimonials (Upwork), FAQ accordion (Fiverr). REMOVED: gradient text ban violation in TrustSection.
-- [ ] **TEST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible (after scroll-video revert)
-- [ ] **TEST: Restaurant pages** — `localhost:5173/caracas/menu` + `localhost:5173/arizona/menu` — تحقق المنيو ظاهر مع الصور المنقولة
+- ✅ Done 2026-07-01 — **Marketing page full redesign** — 5 sections rebuilt (ProblemSolution, WorkflowDemo, UseCases, Trust, CTA) + FAQSection added. GS MAR: dark bg #060b18, Space Mono labels, Cairo headings, FM spring animations, RTL dir attribute.
+- ✅ Done 2026-07-04 — **Arizona tenant scaffold** — arizona.css + hooks + store + MenuPage (lime-yellow #E3E55E Burrito Libre aesthetic) + HomePage (Relume Carousel, parallax, dashed cards)
+- ✅ Done 2026-07-04 — **Caracas HomePage** — dark cinematic #0D0503, split hero editorial, hover dish cards, expandable photo strip, ambient glow CTA
+- ✅ Done 2026-07-04 — **Relume UI** — @relume_io/relume-ui + tailwind plugin installed, .npmrc legacy-peer-deps fix
+- ✅ Done 2026-07-04 — **hookCategoryId '__all__' guard** — Arizona MenuPage bug fix
+- ✅ Done 2026-07-04 — **Backend rules v2** — security.md (new), api-rules + architecture + service-system updated
+- [ ] **git push origin main** — Commit جاهز (100ded0)، افتح terminal وشغّل `git push origin main`
+- [ ] **TEST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible
+- [ ] **TEST: Arizona + Caracas pages** — `/arizona/home`, `/arizona/menu`, `/caracas/home`, `/caracas/menu`
 - [ ] **Phase 75-B: DatingTemplate** — HeroSection + StorySection + ConfirmSection (running "لا" button) — `frontend/src/pages/dating/`
 - [ ] **Phase 75-C: DatingCreatePage** — multi-step form (5 steps) — `frontend/src/pages/dating/DatingCreatePage.jsx`
 - [ ] **Phase 75-D: ntfy test** — subscribe to `ntfy.sh/salman-dating-2026` on phone → test notification
