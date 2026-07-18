@@ -2,6 +2,8 @@
 
 Governs implementation against `.claudedocs/adr/ADR-0002.md` (specifically §7 and the resolved §9.1–9.3). Any change during coding gets measured against **this document**, not developer judgment in the moment. Scope is the first slice only — no Subscription/Plan/Payment/Invoice/Usage entities, all deferred per ADR-0002 §6.
 
+**Status: implemented and verified.** All 6 items in §6 now have real evidence — 2 of the 6 (cache correctness via the real PATCH endpoints, end-to-end onboarding regression) were only closed during the Post-Implementation Review, not during the original implementation passes. One requirement (migration tested against a staging/copied dataset, §6 + the §7 pre-migration snapshot) was **not met** — the real migration ran directly against the shared live database with no staging rehearsal and no explicit snapshot beforehand. See `.claudedocs/reviews/ADR-0002_POST_IMPLEMENTATION_REVIEW.md` for the full account, including why this is flagged rather than hidden.
+
 ## 1. Scope
 
 Separate the administrative concept — **Tenant Status** (`Client.status`, narrowed going forward to `active`/`suspended` only, Hard Block, unchanged from ADR-0001) — from the lifecycle concept — **Account Lifecycle State** (new column `lifecycle_state`, values: `trial`, `paid`, `grace_period`, `expired`, `cancelled`, `archived`, `evergreen`).
