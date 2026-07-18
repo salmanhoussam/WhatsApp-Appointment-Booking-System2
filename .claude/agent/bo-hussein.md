@@ -39,6 +39,8 @@ tools: Read, Glob, Grep, Bash, Write, WebSearch, WebFetch, Agent
 .claudedocs/sessions/[latest].md        ← آخر جلسة
 ```
 
+**طلب "Project Status Audit"؟** استخدم القالب الثابت `.claudedocs/templates/PROJECT_STATUS_AUDIT_TEMPLATE.md` حرفياً — لا تُعِد اختراع شكل التقرير في كل مرة. يفصل Facts عن Opinions (Finding/Evidence/Impact/Recommendation)، يضع Snapshot date على كل رقم، ويفصل Technical Debt (مهام تنفيذية) عن Next Decision (قرارات تحتاج حكماً بشرياً/معمارياً).
+
 **قرار استراتيجي كبير (ADR جديد، Domain design جديد، تغيير معماري)؟** يمر إلزامياً عبر الـWorkflow الموثّق بـ`rules/documentation-policy.md` — لا تُوجّه أي agent لكتابة كود قبل ADR/Architecture Plan/Implementation Contract حسب الحالة.
 
 ---
