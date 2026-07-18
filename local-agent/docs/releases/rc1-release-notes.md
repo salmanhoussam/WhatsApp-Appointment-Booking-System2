@@ -30,7 +30,8 @@ RC1 is considered feature complete for the current scope. The purpose of this re
 - Error handling is not classified into validation/bug/infrastructure-failure types — everything surfaces as a generic `{"error": "..."}`.
 - No automated test suite exists — every verification so far has been manual.
 - The Postgres plugin has full code parity with the SQLite plugin but has never been run against a live Postgres server.
-- **Real Ollama tool-selection has never been exercised end-to-end.** Every verification of the LLM→tool→service→plugin chain so far used a realistic mock for the LLM's decision, because Ollama isn't installed in the development environment this was built in. This is the single most important thing RC1 needs to prove.
+- Real Ollama tool-selection **has now been verified end-to-end** (2026-07-16, `qwen2.5:3b`) — see Exit Criteria below. Remaining unknowns: only 3 real requests so far (not the ≥100 needed), and only 2 tools exercised (`create_customer`, `list_customers`, `create_product`) — most tools (invoices, catalog import/search) are still untested against a real model.
+- **First LLM call after a fresh Ollama/model load is very slow on modest hardware** (observed: 224s cold vs. ~9-14s warm on an NVIDIA MX110 GPU with `qwen2.5:3b`). Not a bug — the model has to load into memory once — but worth knowing before assuming a hang.
 
 ---
 
@@ -38,7 +39,7 @@ RC1 is considered feature complete for the current scope. The purpose of this re
 
 Each item should be checked off with real evidence (an event-log Job #, a dataset name/path, a Decision Log entry in `dogfooding-checklist.md`) — not a feeling.
 
-- [ ] Ollama verified end-to-end (a real tool-call, not mocked)
+- [x] Ollama verified end-to-end (a real tool-call, not mocked) — 2026-07-16, `qwen2.5:3b`, `logs/events.log` Job #1 (`create_customer`) and Job #2 (`list_customers`) in that server run, plus a further Job #1 (`create_product`) after a restart. See Decision Log in `dogfooding-checklist.md`.
 - [ ] At least 5 real datasets imported
 - [ ] At least 100 successful natural-language requests executed
 - [ ] No architecture changes required
@@ -70,4 +71,4 @@ Any enhancement request discovered during RC1 is recorded only. It is not implem
 
 The Local AI Agent is now considered feature-complete for its current scope. Development enters a controlled dogfooding period. The objective is to validate the product through real-world usage, not to expand its functionality. Phase 3 (Vision, WhatsApp, OCR, and external integrations) will begin only after RC1 exit criteria are satisfied.
 
-See `.claudelocaldocs/dogfooding-checklist.md` for the day-to-day usage plan and Decision Log.
+See [`dogfooding-checklist.md`](dogfooding-checklist.md) for the day-to-day usage plan and Decision Log.
