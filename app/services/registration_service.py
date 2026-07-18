@@ -95,6 +95,10 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         )
 
     venue_type    = data.get("venue_type", "real_estate")
+    # ADR-0002 §9.2: 14 days is the unified default trial duration across
+    # every onboarding path (this one already matched; demo_service.py's
+    # separate 7-day default was retired to match it). Stored per-tenant
+    # via trial_ends_at (existing field) - not a hardcoded platform config.
     trial_ends_at = datetime.now(timezone.utc) + timedelta(days=14)
 
     client = await repo.create_client({
@@ -111,7 +115,11 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "features":        json.dumps(_DEFAULT_FEATURES),
         "payment_methods": data.get("payment_methods", ["cash", "card"]),
         "unit_types":      VENUE_TYPE_MAP.get(venue_type, ["chalet"]),
-        "status":          "trial",
+        # ADR-0002 §9.2: Tenant Status (active/suspended, ADR-0001 Hard
+        # Block) is independent of Account Lifecycle State (trial here) -
+        # new tenants are always "active" at creation, never "suspended".
+        "status":          "active",
+        "lifecycle_state": "trial",
         "trial_ends_at":   trial_ends_at,
         "service_type":    venue_type,
     })

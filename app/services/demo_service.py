@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-TRIAL_DAYS = 7
+# ADR-0002 §9.2: unified to 14 days, matching registration_service.py's
+# default (was 7 - the exact inconsistency ADR-0002 was written to fix).
+TRIAL_DAYS = 14
 
 _SERVICE_MAP: dict[str, list[str]] = {
     "restaurant": ["restaurant", "gallery", "catalog"],
@@ -260,7 +262,10 @@ async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_
         "features":      json.dumps(_DEFAULT_FEATURES),
         "payment_methods": ["cash", "card"],
         "unit_types":    [],
-        "status":        "trial",
+        # ADR-0002 §9.2: same split as registration_service.py - active
+        # Tenant Status, trial Account Lifecycle State.
+        "status":          "active",
+        "lifecycle_state": "trial",
         "trial_ends_at": trial_ends_at,
         "service_type":  service_type,
     })
