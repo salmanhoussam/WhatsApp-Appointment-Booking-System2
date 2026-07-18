@@ -17,6 +17,8 @@ from fastapi.responses import JSONResponse
 from app.adapters.samsara_adapter import verify_samsara_webhook
 from app.db.client import prisma_client
 from app.services.samsara_service import dispatch_event
+from app.core.tenant import is_status_blocked
+from app.services.security_audit_service import log_security_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Fleet — Samsara Webhook"])
@@ -55,11 +57,29 @@ async def samsara_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 async def _process_event(org_identifier: str, payload: dict) -> None:
-    """Resolve client by slug then dispatch. Runs in background task."""
+    """
+    Resolve client by slug then dispatch. Runs in background task, after the
+    webhook's HTTP response was already sent — the event is always accepted
+    (ADR-0001 §8.4). Only the data-mutating dispatch is gated by tenant
+    status; the lookup itself is intentionally not status-filtered, so the
+    event is still found/logged even for a suspended/expired tenant.
+    """
     try:
         client = await prisma_client.client.find_first(where={"slug": org_identifier})
         if not client:
             logger.warning("No client found for Samsara org '%s' — ignoring", org_identifier)
+            return
+        if is_status_blocked(client.status):
+            await log_security_event(
+                event_type=f"tenant_{client.status}",
+                client_id=client.id,
+                endpoint="/api/v1/webhooks/samsara",
+                detail={"status": client.status, "event_type": payload.get("eventType")},
+            )
+            logger.info(
+                "Samsara event received for '%s' but tenant status=%s — event accepted, dispatch skipped",
+                org_identifier, client.status,
+            )
             return
         await dispatch_event(client.id, payload)
     except Exception:

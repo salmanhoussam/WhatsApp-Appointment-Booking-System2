@@ -8,6 +8,7 @@ from . import properties, units, bookings, listings, registration, restaurant, s
 from app.core.limiter import limiter
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_client
+from app.core.tenant import resolve_tenant_status
 from app.core.services import require_service
 from app.services import public_service
 from app.services import catalog_service
@@ -35,7 +36,13 @@ class BookingRequest(BaseModel):
 # Defined explicitly before includes to prevent shadowing
 
 @router.get("/{slug}/config", tags=["Public Tenant"])
-async def get_tenant_config_by_slug(slug: str):
+async def get_tenant_config_by_slug(slug: str, request: Request):
+    # ADR-0001: centralized tenant-status gate (blocks suspended/expired).
+    # Preserves existing behavior for active/trial and existing error
+    # messages — public_service.get_tenant_config() keeps its own
+    # unrelated isActive-based lookup + smar auto-provisioning logic below,
+    # untouched (out of scope for this migration).
+    await resolve_tenant_status(slug, endpoint=request.url.path)
     data = await public_service.get_tenant_config(prisma_client, slug)
     if not data:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -45,11 +52,14 @@ async def get_tenant_config_by_slug(slug: str):
 @router.get("/{slug}/listings", tags=["Public Tenant"])
 async def get_listings_by_slug(
     slug: str,
+    request: Request,
     check_in: Optional[date] = None,
     check_out: Optional[date] = None,
     guests: int = 1,
     type: Optional[str] = Query(None, description="villa | chalet | restaurant | pool"),
 ):
+    # ADR-0001: centralized tenant-status gate — see note on the /config route above.
+    await resolve_tenant_status(slug, endpoint=request.url.path)
     if check_in and check_out and check_in >= check_out:
         raise HTTPException(status_code=400, detail="check_out must be after check_in")
     if check_in and check_in < date.today():
@@ -65,6 +75,8 @@ async def get_listings_by_slug(
 @router.post("/{slug}/bookings", tags=["Public Tenant"])
 @limiter.limit("10/minute")
 async def create_booking_by_slug(request: Request, slug: str, data: BookingRequest):
+    # ADR-0001: centralized tenant-status gate.
+    await resolve_tenant_status(slug, endpoint=request.url.path)
     if data.check_in and data.check_out and data.check_in >= data.check_out:
         raise HTTPException(status_code=400, detail="تاريخ الخروج غير منطقي")
 
@@ -78,9 +90,24 @@ async def create_booking_by_slug(request: Request, slug: str, data: BookingReque
         "customer_id": result.customerId,
     }
 
+async def _resolve_tenant_or_404(slug: str, request: Request) -> dict:
+    """
+    Shared by the 4 routes below: ADR-0001 centralized status gate, with the
+    original Arabic "not found" message preserved for slug-not-found (only
+    the new suspended/expired 403 behavior is actually new here).
+    """
+    try:
+        return await resolve_tenant_status(slug, endpoint=request.url.path)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+        raise
+
+
 @router.get("/{slug}/price", tags=["Public Tenant"])
 async def get_price_by_slug(
     slug: str,
+    request: Request,
     unit_id: str = Query(...),
     check_in: date = Query(...),
     check_out: date = Query(...),
@@ -89,12 +116,10 @@ async def get_price_by_slug(
     from datetime import timedelta
     from app.services import price_service
 
-    client = await public_repo.find_active_client_by_slug(slug)
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+    client = await _resolve_tenant_or_404(slug, request)
 
     unit = await public_repo.find_unit_by_id(unit_id)
-    if not unit or unit.clientId != client.id:
+    if not unit or unit.clientId != client["id"]:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
     if unit.capacity < guests:
         raise HTTPException(status_code=400, detail=f"هذه الوحدة تستوعب {unit.capacity} أشخاص كحد أقصى")
@@ -117,14 +142,13 @@ async def get_price_by_slug(
 @router.get("/{slug}/services", tags=["Public Tenant"])
 async def get_services_by_slug(
     slug: str,
+    request: Request,
     unit_id: str = Query(...),
 ):
-    client = await public_repo.find_active_client_by_slug(slug)
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+    client = await _resolve_tenant_or_404(slug, request)
 
     unit = await public_repo.find_unit_by_id(unit_id)
-    if not unit or unit.clientId != client.id:
+    if not unit or unit.clientId != client["id"]:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
     services = await public_repo.list_active_services_for_client(unit.clientId)
@@ -141,16 +165,14 @@ async def get_services_by_slug(
     ]
 
 @router.get("/{slug}/units/{unit_id}/gallery", tags=["Public Tenant"])
-async def get_unit_gallery(slug: str, unit_id: str):
-    client = await public_repo.find_active_client_by_slug(slug)
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+async def get_unit_gallery(slug: str, unit_id: str, request: Request):
+    client = await _resolve_tenant_or_404(slug, request)
 
     unit = await public_repo.find_unit_by_id(unit_id)
-    if not unit or unit.clientId != client.id:
+    if not unit or unit.clientId != client["id"]:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
-    images = await public_repo.list_gallery_images_for_unit(unit_id, client.id)
+    images = await public_repo.list_gallery_images_for_unit(unit_id, client["id"])
     return [
         {
             "id":         img.id,
@@ -164,18 +186,16 @@ async def get_unit_gallery(slug: str, unit_id: str):
 
 
 @router.get("/{slug}/units/{unit_id}/calendar", tags=["Public Tenant"])
-async def get_unit_calendar(slug: str, unit_id: str):
+async def get_unit_calendar(slug: str, unit_id: str, request: Request):
     from datetime import timedelta
 
-    client = await public_repo.find_active_client_by_slug(slug)
-    if not client:
-        raise HTTPException(status_code=404, detail="المنتجع غير موجود")
+    client = await _resolve_tenant_or_404(slug, request)
 
     unit = await public_repo.find_unit_by_id(unit_id)
-    if not unit or unit.clientId != client.id:
+    if not unit or unit.clientId != client["id"]:
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
-    bookings_list = await public_repo.list_active_bookings_for_unit(unit_id, client.id)
+    bookings_list = await public_repo.list_active_bookings_for_unit(unit_id, client["id"])
     disabled_set = set()
     for b in bookings_list:
         current = b.checkIn.date() if hasattr(b.checkIn, "date") else b.checkIn
@@ -184,7 +204,7 @@ async def get_unit_calendar(slug: str, unit_id: str):
             disabled_set.add(current.strftime("%Y-%m-%d"))
             current += timedelta(days=1)
 
-    prices = await public_repo.list_prices_for_unit(unit_id, client.id)
+    prices = await public_repo.list_prices_for_unit(unit_id, client["id"])
     price_overrides = {}
     for p in prices:
         d = p.date.date() if hasattr(p.date, "date") else p.date

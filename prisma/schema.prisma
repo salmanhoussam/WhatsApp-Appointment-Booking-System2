@@ -87,6 +87,9 @@ model Client {
   driverAlerts   DriverAlert[]
   driverConsents DriverConsent[]
 
+  // -- Security & Audit (ADR-0001) ---------------------------------------------
+  securityAuditLogs SecurityAuditLog[]
+
   @@map("clients")
   @@schema("public")
 }
@@ -932,6 +935,30 @@ model OccasionRSVP {
 
   @@index([page_id])
   @@map("occasion_rsvps")
+  @@schema("public")
+}
+
+// -- Security & Audit (ADR-0001: Tenant Status Enforcement, .claudedocs/decisions/0001-*) ---
+model SecurityAuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  timestamp DateTime @default(now()) @map("timestamp") @db.Timestamptz(6)
+  eventType String   @map("event_type")
+  // tenant_suspended | tenant_expired | authorization_denied | invalid_signature
+  // | login_failed | admin_action | policy_violation - extensible, not an enum by design
+  clientId  String?  @map("client_id") @db.Uuid
+  // Nullable, no cascade delete (onDelete: SetNull below): denial history must
+  // outlive the tenant record for investigations (ADR-0001 §10).
+  endpoint  String?  @map("endpoint")
+  detail    Json?    @map("detail")
+  actor     String?  @map("actor")
+  // userId / clientId / "system" - who or what triggered the event, when known
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@map("security_audit_log")
   @@schema("public")
 }
 

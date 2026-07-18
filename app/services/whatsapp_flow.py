@@ -53,6 +53,8 @@ from app.services.whatsapp_service import WhatsAppService
 from app.services.booking_service import BookingService
 from app.repositories.booking_repo import BookingRepository
 from app.repositories.customer_repo import CustomerRepository
+from app.core.tenant import is_status_blocked
+from app.services.security_audit_service import log_security_event
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +195,26 @@ async def _dispatch(
     client = await _resolve_client(display_phone)
     if not client:
         logger.warning("⚠️  No client found for display_phone=%s", display_phone)
+        return
+
+    # ADR-0001 §8.4/§8.4b: the message itself was already "accepted" (found,
+    # logged) above — this gates the mutating half of the conversation flow
+    # (which can create Customer/Booking rows) for suspended/expired
+    # tenants. No customer-facing reply is sent for the blocked case,
+    # matching the Samsara webhook's silent-skip pattern — deciding whether
+    # end customers should see a "business unavailable" message is a UX/
+    # business decision outside this ADR's scope, not made here.
+    if is_status_blocked(client.status):
+        await log_security_event(
+            event_type=f"tenant_{client.status}",
+            client_id=client.id,
+            endpoint="/api/v1/webhook/whatsapp",
+            detail={"status": client.status, "customer_phone": customer_phone},
+        )
+        logger.info(
+            "WhatsApp message received for '%s' but tenant status=%s — accepted, dispatch skipped",
+            client.slug, client.status,
+        )
         return
 
     session = _get_session(phone_number_id, customer_phone)
@@ -504,15 +526,21 @@ async def _resolve_client(display_phone: str):
     """
     Match the WABA display phone number to a Client record.
     Normalises both sides by stripping non-digit characters.
+
+    ADR-0001 §8.4/§8.4b: deliberately NOT filtered by isActive or status —
+    this is the "always accept/find" half of the two-tier webhook policy.
+    A suspended/expired tenant must still be found here so the incoming
+    message is logged and handled (not silently dropped); the mutating
+    half of the conversation (_dispatch, below) is what's actually gated.
     """
     if not display_phone:
         return None
     normalised = "".join(filter(str.isdigit, display_phone))
-    clients = await prisma_client.client.find_many(where={"isActive": True})
+    clients = await prisma_client.client.find_many()
     for c in clients:
         if c.phone and "".join(filter(str.isdigit, c.phone)) == normalised:
             return c
-    # Fallback: return the first active client (single-tenant deployments)
+    # Fallback: return the first client (single-tenant deployments)
     return clients[0] if clients else None
 
 

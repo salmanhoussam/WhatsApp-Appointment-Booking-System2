@@ -17,7 +17,7 @@ from prisma import Json
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.tenant import invalidate_tenant_cache
+from app.core.tenant import assert_client_active, invalidate_tenant_cache
 from app.db.client import prisma_client
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,11 @@ async def ai_settings_agent(
     client = await prisma_client.client.find_first(where={"slug": payload.client_slug})
     if not client:
         raise HTTPException(status_code=404, detail=f"Client '{payload.client_slug}' not found")
+
+    # ADR-0001 §8.3: this is a paid-feature, interactive-use endpoint (n8n
+    # relays a live tenant's own direct request; it is not an autonomous
+    # external data source) — full stop, not the two-tier webhook policy.
+    await assert_client_active(client, endpoint="/api/v1/webhook/ai-settings")
 
     tool_input = await _run_claude_agent(payload.message, client)
 
