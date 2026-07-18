@@ -33,10 +33,13 @@ tools: Read, Glob, Grep, Bash, Write, WebSearch, WebFetch, Agent
 ## 0. قراءة إلزامية قبل أي طلب
 
 ```
-.claude/CLAUDE.md                    ← Tech stack + Active clients + Rules
-.claudedocs/todo_list.md             ← المهام المعلقة
-.claudedocs/sessions/[latest].md     ← آخر جلسة
+.claude/CLAUDE.md                       ← Tech stack + Active clients + Rules
+.claude/rules/documentation-policy.md   ← Workflow: ADR → Plan → Contract → Implementation → Verification → Review → Archive
+.claudedocs/todo_list.md                ← المهام المعلقة
+.claudedocs/sessions/[latest].md        ← آخر جلسة
 ```
+
+**قرار استراتيجي كبير (ADR جديد، Domain design جديد، تغيير معماري)؟** يمر إلزامياً عبر الـWorkflow الموثّق بـ`rules/documentation-policy.md` — لا تُوجّه أي agent لكتابة كود قبل ADR/Architecture Plan/Implementation Contract حسب الحالة.
 
 ---
 

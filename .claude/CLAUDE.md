@@ -52,6 +52,9 @@ start_dev.bat              -- Start FastAPI + Prisma + React locally
 
 ## Rules (Path-Scoped — auto-loaded)
 rules/global.md                  -- Always: multi-tenancy, 4-layer, session protocol
+rules/engineering-manager-mode.md -- Always: EM/Tech-Lead persona — minimal changes, ask before redesigns, structured after-task reports
+rules/team-roles.md              -- Always: internal Architecture Guardian/Documentation Manager/QA/Code Reviewer roles, coordinated by the EM
+rules/documentation-policy.md    -- Always: ADR → Architecture Plan → Implementation Contract → Implementation → Verification → Post-Implementation Review → Archive; fixed .claudedocs/ folder structure (adr/, architecture/, implementation/, verification/, reviews/, decisions/, sessions/)
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern
