@@ -1,6 +1,6 @@
 # Implementation Contract — ADR-0001 Tenant Status Enforcement
 
-Governs implementation against `0001-tenant-status-enforcement.md`. Any change during coding gets measured against **this document**, not developer judgment in the moment.
+Governs implementation against `../adr/ADR-0001.md`. Any change during coding gets measured against **this document**, not developer judgment in the moment.
 
 **Status: fully executed, including the follow-up.** `app/api/v1/ai_settings_agent.py` was originally excluded from the first implementation pass pending §8.4a (see prior revisions of this file). §8.4a closed 2026-07-18 with §8.3 reaffirmed; a Post-Implementation Review then caught that the file's implementation had been missed rather than deliberately dropped, and it was implemented and verified in the same session — see the row below and the ADR's §8.3.
 
