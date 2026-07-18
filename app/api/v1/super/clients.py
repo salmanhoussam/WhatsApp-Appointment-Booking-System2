@@ -20,7 +20,14 @@ from app.services import super_service, sheets_service
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Super Admin"])
 
-_VALID_STATUSES = {"active", "trial", "demo", "suspended", "expired"}
+# ADR-0002: Tenant Status narrowed to active/suspended only - "trial"/"demo"/
+# "expired" moved to lifecycle_state (see _VALID_LIFECYCLE_STATES below).
+_VALID_STATUSES = {"active", "suspended"}
+
+# ADR-0002 §2/§7 - Account Lifecycle State values.
+_VALID_LIFECYCLE_STATES = {
+    "trial", "paid", "grace_period", "expired", "cancelled", "archived", "evergreen",
+}
 
 
 class StatusUpdate(BaseModel):
@@ -31,6 +38,17 @@ class StatusUpdate(BaseModel):
     def check_status(cls, v: str) -> str:
         if v not in _VALID_STATUSES:
             raise ValueError(f"status must be one of: {sorted(_VALID_STATUSES)}")
+        return v
+
+
+class LifecycleStateUpdate(BaseModel):
+    lifecycle_state: str
+
+    @field_validator("lifecycle_state")
+    @classmethod
+    def check_lifecycle_state(cls, v: str) -> str:
+        if v not in _VALID_LIFECYCLE_STATES:
+            raise ValueError(f"lifecycle_state must be one of: {sorted(_VALID_LIFECYCLE_STATES)}")
         return v
 
 
@@ -106,10 +124,31 @@ async def update_client_status(
     body: StatusUpdate = ...,
     _user=Depends(require_super_admin),
 ):
-    """Change a tenant's lifecycle status. SUPER_ADMIN only."""
+    """
+    Change a tenant's Tenant Status (ADR-0001 Hard Block: active/suspended).
+    SUPER_ADMIN only. Does NOT touch Account Lifecycle State - use
+    PATCH /clients/{client_id}/lifecycle for that (ADR-0002 §9).
+    """
     result = await super_service.update_client_status(prisma_client, client_id, body.status)
     logger.info("👑 Super: %s status → %s", client_id, body.status)
     background_tasks.add_task(sheets_service.update_client_status, result["slug"], body.status)
+    return {"success": True, "data": result}
+
+
+@router.patch("/clients/{client_id}/lifecycle")
+async def update_client_lifecycle(
+    client_id: str = Path(..., description="Client UUID"),
+    body: LifecycleStateUpdate = ...,
+    _user=Depends(require_super_admin),
+):
+    """
+    Change a tenant's Account Lifecycle State (ADR-0002 §9: trial/paid/
+    grace_period/expired/cancelled/archived/evergreen). SUPER_ADMIN only.
+    Independent of Tenant Status - use PATCH /clients/{client_id}/status
+    for suspend/reactivate (ADR-0001 Hard Block).
+    """
+    result = await super_service.update_client_lifecycle_state(prisma_client, client_id, body.lifecycle_state)
+    logger.info("👑 Super: %s lifecycle_state → %s", client_id, body.lifecycle_state)
     return {"success": True, "data": result}
 
 

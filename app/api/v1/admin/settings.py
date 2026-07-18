@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles
+from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles, allow_during_soft_block
 from app.repositories import admin_client_repo as _client_repo
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,10 @@ class SettingsUpdateRequest(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/settings")
-async def get_settings(tenant: dict = Depends(get_current_tenant)):
+async def get_settings(
+    _soft_block = Depends(allow_during_soft_block),  # ADR-0002 §9.1: first live Soft Block allowlist consumer - must be declared first
+    tenant: dict = Depends(get_current_tenant),
+):
     """Return all editable branding/config fields for this tenant's Client row."""
     try:
         client = await _client_repo.find_client_by_id(tenant["id"])
@@ -77,6 +80,7 @@ async def get_settings(tenant: dict = Depends(get_current_tenant)):
 @router.patch("/settings")
 async def update_settings(
     body: SettingsUpdateRequest,
+    _soft_block = Depends(allow_during_soft_block),  # ADR-0002 §9.1 - must be declared before get_current_tenant/require_roles
     tenant: dict = Depends(get_current_tenant),
     _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):

@@ -26,7 +26,8 @@ async def list_clients(db: Prisma) -> list[dict]:
             "name":         c.name or getattr(c, "name_en", None) or c.slug,
             "name_ar":      getattr(c, "name_ar", None),
             "slug":         c.slug,
-            "status":       getattr(c, "status", "trial"),
+            "status":           getattr(c, "status", "active"),
+            "lifecycle_state":  getattr(c, "lifecycle_state", "trial"),
             "service_type": getattr(c, "service_type", None),
             "trial_ends_at": trial_ends.isoformat() if trial_ends else None,
             "days_left":    days_left,
@@ -40,6 +41,7 @@ async def list_clients(db: Prisma) -> list[dict]:
 
 
 async def update_client_status(db: Prisma, client_id: str, status: str) -> dict:
+    """Tenant Status only (ADR-0001, Hard Block) - active/suspended."""
     repo = SuperRepository(db)
     updated = await repo.update_client_status(client_id, status)
     invalidate_tenant_cache(updated.slug)
@@ -47,4 +49,16 @@ async def update_client_status(db: Prisma, client_id: str, status: str) -> dict:
         "id":     updated.id,
         "slug":   updated.slug,
         "status": getattr(updated, "status", status),
+    }
+
+
+async def update_client_lifecycle_state(db: Prisma, client_id: str, lifecycle_state: str) -> dict:
+    """Account Lifecycle State only (ADR-0002 §9) - independent of Tenant Status."""
+    repo = SuperRepository(db)
+    updated = await repo.update_client_lifecycle_state(client_id, lifecycle_state)
+    invalidate_tenant_cache(updated.slug)
+    return {
+        "id":              updated.id,
+        "slug":            updated.slug,
+        "lifecycle_state": getattr(updated, "lifecycle_state", lifecycle_state),
     }
