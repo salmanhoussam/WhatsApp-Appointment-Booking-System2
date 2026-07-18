@@ -13,53 +13,62 @@ datasource db {
 }
 
 model Client {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  name            String         @map("name")
-  name_ar         String?        @map("name_ar")
-  name_en         String?        @map("name_en")
-  slug            String         @unique @map("slug")
-  phone           String         @unique @map("phone")
-  email           String?        @map("email")
-  password_hash   String?        @map("password_hash")
-  isActive        Boolean        @default(true) @map("is_active")
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  name              String             @map("name")
+  name_ar           String?            @map("name_ar")
+  name_en           String?            @map("name_en")
+  slug              String             @unique @map("slug")
+  phone             String             @unique @map("phone")
+  email             String?            @map("email")
+  password_hash     String?            @map("password_hash")
+  isActive          Boolean            @default(true) @map("is_active")
   // -- Branding & config (merged from TenantConfig) --------------------------
-  primary_color   String?        @map("primary_color")
-  hero_video_url  String?        @map("hero_video_url")
-  whatsapp_number String?        @map("whatsapp_number")
-  instagram_url   String?        @map("instagram_url")
-  maps_url        String?        @map("maps_url")
-  currency        String         @default("SAR") @map("currency")
-  features        Json?          @map("features")
-  config          Json?          @default("{}") @map("config")
-  unit_types      String[]       @map("unit_types")
-  payment_methods String[]       @map("payment_methods")
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  primary_color     String?            @map("primary_color")
+  hero_video_url    String?            @map("hero_video_url")
+  whatsapp_number   String?            @map("whatsapp_number")
+  instagram_url     String?            @map("instagram_url")
+  maps_url          String?            @map("maps_url")
+  currency          String             @default("SAR") @map("currency")
+  features          Json?              @map("features")
+  config            Json?              @default("{}") @map("config")
+  unit_types        String[]           @map("unit_types")
+  payment_methods   String[]           @map("payment_methods")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
   // -- Subscription tier -------------------------------------------------------
   // regular=$15 | pro=$22 | ultra=$35 - set by SUPER_ADMIN only
   // ultra unlocks: immersive_3d showcase pages
-  tier          String    @default("regular")      @map("tier")
+  tier              String             @default("regular") @map("tier")
   // -- Trial & Lifecycle -------------------------------------------------------
-  status        String    @default("trial")        @map("status")
-  trial_ends_at DateTime? @map("trial_ends_at")    @db.Timestamptz(6)
-  service_type  String?   @default("real_estate")  @map("service_type")
-  notes         String?   @map("notes")
-  bookings        Booking[]
-  customers       Customer[]
-  prices          Price[]
-  properties      Property[]
-  services        Service[]
-  units           Unit[]
-  users           User[]
-  galleryImages   GalleryImage[]
+  // status: Tenant Status only going forward (ADR-0002) - valid values narrow
+  //   to "active" | "suspended" (Hard Block, ADR-0001), enforced at the
+  //   application layer, not a DB constraint. Existing "trial"/"demo" rows are
+  //   migrated to lifecycle_state by scripts/migrate_lifecycle_state.py.
+  status            String             @default("trial") @map("status")
+  // lifecycle_state: Account Lifecycle State (ADR-0002) - separate from status.
+  //   Values: trial | paid | grace_period | expired | cancelled | archived | evergreen.
+  //   "expired" is Soft Block (allowlist-based), distinct from status="suspended"'s
+  //   Hard Block. See .claudedocs/adr/ADR-0002.md and its Implementation Contract.
+  lifecycle_state   String             @default("trial") @map("lifecycle_state")
+  trial_ends_at     DateTime?          @map("trial_ends_at") @db.Timestamptz(6)
+  service_type      String?            @default("real_estate") @map("service_type")
+  notes             String?            @map("notes")
+  bookings          Booking[]
+  customers         Customer[]
+  prices            Price[]
+  properties        Property[]
+  services          Service[]
+  units             Unit[]
+  users             User[]
+  galleryImages     GalleryImage[]
   // -- Module gate ------------------------------------------------------------
-  clientServices  ClientService[]
+  clientServices    ClientService[]
   // -- Restaurant module -------------------------------------------------------
   restaurantConfigs RestaurantConfig[]
   // -- Store module ------------------------------------------------------------
-  storeCarts      StoreCart[]
-  storeOrders     StoreOrder[]
-  storeCustomers  StoreCustomer[]
+  storeCarts        StoreCart[]
+  storeOrders       StoreOrder[]
+  storeCustomers    StoreCustomer[]
   // -- Generic Catalog module --------------------------------------------------
   catalogCategories CatalogCategory[]
   catalogItems      CatalogItem[]
@@ -69,7 +78,7 @@ model Client {
   // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
   // Example: ["booking", "gallery", "restaurant.menu"]
-  selected_services Json? @default("[]") @map("selected_services")
+  selected_services Json?              @default("[]") @map("selected_services")
 
   // -- Template & UX (Phase 49/50/51) -----------------------------------------
   // pageType: "normal" -> standard catalog/menu/store page
@@ -325,22 +334,22 @@ model BookingService {
 }
 
 model GalleryImage {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId       String       @map("client_id") @db.Uuid
-  unitId         String?      @map("unit_id") @db.Uuid
-  catalogItemId  String?      @map("catalog_item_id") @db.Uuid
-  imageType      String       @default("gallery") @map("image_type")
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String       @map("client_id") @db.Uuid
+  unitId        String?      @map("unit_id") @db.Uuid
+  catalogItemId String?      @map("catalog_item_id") @db.Uuid
+  imageType     String       @default("gallery") @map("image_type")
   // image_type values: gallery | cover | catalog | page_hero | page_logo
-  url            String       @map("url")
-  sort_order     Int          @default(0) @map("sort_order")
-  span_size      String       @default("small") @map("span_size")
-  caption_ar     String?      @map("caption_ar")
-  caption_en     String?      @map("caption_en")
-  isActive       Boolean      @default(true) @map("is_active")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  unit           Unit?        @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  catalogItem    CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+  url           String       @map("url")
+  sort_order    Int          @default(0) @map("sort_order")
+  span_size     String       @default("small") @map("span_size")
+  caption_ar    String?      @map("caption_ar")
+  caption_en    String?      @map("caption_en")
+  isActive      Boolean      @default(true) @map("is_active")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  client        Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  unit          Unit?        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  catalogItem   CatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([unitId])
@@ -357,8 +366,8 @@ model GalleryImage {
 
 model PlatformService {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key           String   @unique @map("key")           // "booking" | "restaurant.menu" | "store.products"
-  moduleKey     String   @map("module_key")            // "booking" | "restaurant" | "store"
+  key           String   @unique @map("key") // "booking" | "restaurant.menu" | "store.products"
+  moduleKey     String   @map("module_key") // "booking" | "restaurant" | "store"
   nameAr        String   @map("name_ar")
   nameEn        String   @map("name_en")
   descriptionAr String?  @map("description_ar")
@@ -487,8 +496,8 @@ model RestaurantConfig {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  orders     RestaurantOrder[]
+  client Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders RestaurantOrder[]
 
   @@index([clientId])
   @@map("restaurant_configs")
@@ -519,12 +528,12 @@ model RestaurantOrder {
 }
 
 model RestaurantOrderItem {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId       String   @map("order_id") @db.Uuid
-  catalogItemId String   @map("catalog_item_id") @db.Uuid
-  quantity      Int      @default(1) @map("quantity")
-  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
-  notes         String?  @map("notes")
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String  @map("order_id") @db.Uuid
+  catalogItemId String  @map("catalog_item_id") @db.Uuid
+  quantity      Int     @default(1) @map("quantity")
+  unitPrice     Decimal @map("unit_price") @db.Decimal(10, 2)
+  notes         String? @map("notes")
 
   order       RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   catalogItem CatalogItem     @relation(fields: [catalogItemId], references: [id])
@@ -552,8 +561,8 @@ model StoreCustomer {
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  orders    StoreOrder[]
+  client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orders StoreOrder[]
 
   @@unique([clientId, email])
   @@index([clientId])
@@ -655,30 +664,30 @@ model StoreOrderItem {
 // ================================================================================
 
 model Reservation {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId      String   @map("client_id") @db.Uuid
-  moduleKey     String   @map("module_key")
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String @map("client_id") @db.Uuid
+  moduleKey String @map("module_key")
   // "restaurant" | "services" | "real_estate" | "hotel"
 
-  customerName  String   @map("customer_name")
-  customerPhone String   @map("customer_phone")
-  customerEmail String?  @map("customer_email")
+  customerName  String  @map("customer_name")
+  customerPhone String  @map("customer_phone")
+  customerEmail String? @map("customer_email")
 
-  reservedAt    DateTime @map("reserved_at") @db.Timestamptz(6)
-  durationMin   Int      @default(60) @map("duration_min")
+  reservedAt  DateTime @map("reserved_at") @db.Timestamptz(6)
+  durationMin Int      @default(60) @map("duration_min")
 
-  status        String   @default("pending") @map("status")
+  status String @default("pending") @map("status")
   // pending | confirmed | arrived | cancelled | no_show
 
-  notes         String?  @map("notes")
+  notes String? @map("notes")
 
   // module-specific payload:
   // restaurant  -> { "table_label": "A4", "party_size": 4 }
   // services    -> { "service_name": "haircut", "staff_id": "uuid" }
   // real_estate -> { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
-  metadata      Json?    @map("metadata")
+  metadata Json? @map("metadata")
 
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -698,14 +707,14 @@ model DatePage {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug        String    @unique
   her_name    String
-  config      Json      // { theme, message, food_options[], emoji, custom_bg_url? }
+  config      Json // { theme, message, food_options[], emoji, custom_bg_url? }
   ntfy_topic  String
   owner_phone String
   her_phone   String?
   event_date  DateTime? @db.Timestamptz(6)
   chosen_food String?
   answered_at DateTime? @db.Timestamptz(6)
-  answer      String?   // "yes" | "later" | "no"
+  answer      String? // "yes" | "later" | "no"
   is_deleted  Boolean   @default(false)
   expires_at  DateTime  @db.Timestamptz(6)
   created_at  DateTime  @default(now()) @db.Timestamptz(6)
@@ -752,23 +761,23 @@ model FleetVehicle {
 }
 
 model FleetDriver {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId     String  @map("client_id") @db.Uuid
-  vehicleId    String? @unique @map("vehicle_id") @db.Uuid
-  samsaraId    String? @map("samsara_id")
-  uberDriverId String? @map("uber_driver_id")
-  name         String
-  phone        String?
-  safetyScore  Float?  @map("safety_score")
-  totalTrips   Int     @default(0) @map("total_trips")
-  totalEarnings Float  @default(0) @map("total_earnings")
-  uberToken    String? @map("uber_token")
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  vehicleId     String?  @unique @map("vehicle_id") @db.Uuid
+  samsaraId     String?  @map("samsara_id")
+  uberDriverId  String?  @map("uber_driver_id")
+  name          String
+  phone         String?
+  safetyScore   Float?   @map("safety_score")
+  totalTrips    Int      @default(0) @map("total_trips")
+  totalEarnings Float    @default(0) @map("total_earnings")
+  uberToken     String?  @map("uber_token")
   // encrypted OAuth token - Phase 2
-  isActive     Boolean @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  client   Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  vehicle  FleetVehicle? @relation(fields: [vehicleId], references: [id])
+  client   Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle  FleetVehicle?   @relation(fields: [vehicleId], references: [id])
   trips    FleetTrip[]
   alerts   DriverAlert[]
   consents DriverConsent[]
@@ -806,20 +815,20 @@ model FleetTrip {
 }
 
 model SamsaraEvent {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId    String   @map("client_id") @db.Uuid
-  vehicleId   String?  @map("vehicle_id") @db.Uuid
-  eventType   String   @map("event_type")
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  vehicleId  String?  @map("vehicle_id") @db.Uuid
+  eventType  String   @map("event_type")
   // SpeedingEventStarted | SevereSpeedingEnded | GeofenceEntry | GeofenceExit
   // AlertIncident | EngineOn | EngineOff | DriverCreated | DriverUpdated
-  severity    String?  // low | medium | high
-  lat         Float?
-  lng         Float?
-  speed       Float?
-  rawPayload  Json     @map("raw_payload")
-  isRead      Boolean  @default(false) @map("is_read")
-  occurredAt  DateTime @map("occurred_at") @db.Timestamptz(6)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  severity   String? // low | medium | high
+  lat        Float?
+  lng        Float?
+  speed      Float?
+  rawPayload Json     @map("raw_payload")
+  isRead     Boolean  @default(false) @map("is_read")
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client  Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   vehicle FleetVehicle? @relation(fields: [vehicleId], references: [id])
@@ -876,44 +885,44 @@ model DriverConsent {
 // ===================================================
 
 model OccasionCreator {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name          String
-  phone         String         @unique
-  email         String?        @unique
+  phone         String   @unique
+  email         String?  @unique
   password_hash String
-  is_active     Boolean        @default(true)
-  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
 
-  pages         OccasionPage[]
+  pages OccasionPage[]
 
   @@map("occasion_creators")
   @@schema("public")
 }
 
 model OccasionPage {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creator_id    String    @db.Uuid
-  slug          String    @unique
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creator_id   String    @db.Uuid
+  slug         String    @unique
   // wedding | anniversary | birthday | engagement | graduation | other
-  type          String
-  title_ar      String
-  title_en      String?
-  message_ar    String
-  message_en    String?
-  event_date    DateTime  @db.Timestamptz(6)
-  location_ar   String?
-  location_en   String?
-  cover_image   String?
+  type         String
+  title_ar     String
+  title_en     String?
+  message_ar   String
+  message_en   String?
+  event_date   DateTime  @db.Timestamptz(6)
+  location_ar  String?
+  location_en  String?
+  cover_image  String?
   // per-type theme color: #d4a853 wedding, #e11d48 anniversary, #8b5cf6 birthday
-  theme_color   String    @default("#d4a853")
-  max_guests    Int?
-  rsvp_enabled  Boolean   @default(true)
-  is_active     Boolean   @default(true)
-  expires_at    DateTime? @db.Timestamptz(6)
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  theme_color  String    @default("#d4a853")
+  max_guests   Int?
+  rsvp_enabled Boolean   @default(true)
+  is_active    Boolean   @default(true)
+  expires_at   DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
 
-  creator       OccasionCreator @relation(fields: [creator_id], references: [id], onDelete: Cascade)
-  rsvps         OccasionRSVP[]
+  creator OccasionCreator @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  rsvps   OccasionRSVP[]
 
   @@index([creator_id])
   @@index([slug])
@@ -922,16 +931,16 @@ model OccasionPage {
 }
 
 model OccasionRSVP {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  page_id       String    @db.Uuid
-  guest_name    String
-  guest_phone   String?
-  guest_count   Int       @default(1)
-  message       String?
-  attending     Boolean   @default(true)
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  page_id     String   @db.Uuid
+  guest_name  String
+  guest_phone String?
+  guest_count Int      @default(1)
+  message     String?
+  attending   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  page          OccasionPage @relation(fields: [page_id], references: [id], onDelete: Cascade)
+  page OccasionPage @relation(fields: [page_id], references: [id], onDelete: Cascade)
 
   @@index([page_id])
   @@map("occasion_rsvps")
@@ -961,4 +970,3 @@ model SecurityAuditLog {
   @@map("security_audit_log")
   @@schema("public")
 }
-
