@@ -3,8 +3,8 @@ CLAUDE.md -- SalmanSaaS Platform
 ## Vision
 منصة SaaS عربية موحدة — سيرفر واحد، DB واحد، 3 modules:
   booking   → حجز شاليهات/فلل/فنادق  (smar — Live ✅)
-  restaurant → قوائم مطاعم + طلبات   (caracas — migration pending)
-  store      → متجر إلكتروني          (footlab — migration pending)
+  restaurant → قوائم مطاعم + طلبات   (caracas, arizona — Live ✅)
+  store      → متجر إلكتروني          (footlab, olivello, anas — Live ✅)
 
 ## Stack
 FastAPI (Python) · Prisma + Supabase (PostgreSQL) · React/Vite · Framer Motion · GS MAR Glassmorphism
@@ -25,18 +25,23 @@ frontend/src/
 prisma/
   schema.prisma   -- Single source of truth — ALL modules here
 
-## Active Clients
-smar      → booking    → smar.salmansaas.com          ✅ Live (subdomain)
-caracas   → restaurant → caracas.salmansaas.com        🔄 Migration pending
-footlab   → store      → footlab.salmansaas.com        🔄 Migration pending
+### Active Clients & Canonical Demo URLs (Updated 2026-07-18)
 
-## Canonical Demo URLs (RULE — one URL per tenant, no duplicates)
-smar      → demo.salmansaas.com/smar/home
-olivello  → demo.salmansaas.com/olivello/home
-caracas   → demo.salmansaas.com/caracas/menu
-footlab   → demo.salmansaas.com/footlab/store
-Rule: /demo/{slug} auto-redirects to /{slug}/{defaultRedirect} for registry tenants.
-Only auto-onboarded (generic) tenants use /demo/{slug} directly.
+*Note: The status below reflects the codebase tenant registry and build state. The manual Cloudflare DNS binding for `demo.salmansaas.com` is pending, so live resolution may vary.*
+
+| Slug | Module | Status | Verification Source |
+| :--- | :--- | :--- | :--- |
+| **smar** | booking | Live ✅ | Original baseline |
+| **caracas** | restaurant | Live ✅ | `memory.md` (Phase 63: Done 2026-05-15) |
+| **footlab** | store | Live ✅ | `memory.md` (Phase 62: Done 2026-05-15) |
+| **arizona** | restaurant | Live ✅ | `memory.md` (Phase 70) + `tenantRegistry` |
+| **olivello** | store/showcase | Live ✅ | `tenantRegistry` + Canonical URLs |
+| **moments** | occasion pages | Live ✅ | `memory.md` (Commit b9448f3) |
+| **anas** | store (ceramics) | Live (Placeholder) | `memory.md` (2026-07-13/14) |
+| **sneakers-lb** | store | Registered (Unverified) | In registry, lacks standalone `pages/` |
+| **sneakers-beirut** | store | Registered (Unverified) | In registry, lacks standalone `pages/` |
+
+Rule: `/demo/{slug}` auto-redirects to `/{slug}/{defaultRedirect}` for registry tenants. Only auto-onboarded (generic) tenants use `/demo/{slug}` directly.
 
 ## Commands
 start_dev.bat              -- Start FastAPI + Prisma + React locally
