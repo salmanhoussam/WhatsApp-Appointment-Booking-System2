@@ -69,4 +69,10 @@ export const tenantRegistry = {
     defaultRedirect: 'create',   // canonical: demo.salmansaas.com/moments/create
     theme:           'gold-dark',
   },
+
+  'beit-al-fakhar': {
+    routes:          lazy(() => import('./beit-al-fakhar.routes')),
+    defaultRedirect: 'home',     // canonical: demo.salmansaas.com/beit-al-fakhar/home
+    theme:           'terracotta-cream',
+  },
 };

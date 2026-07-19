@@ -1,0 +1,11 @@
+/* beit-al-fakhar.css — scoped to body[data-slug="beit-al-fakhar"] only, per scaffolding rules */
+body[data-slug="beit-al-fakhar"] {
+  --baf-terracotta: #C1683A;
+  --baf-sage: #7A9E7E;
+  --baf-cream: #F5EFE6;
+  --baf-dark: #2A2420;
+  font-family: 'Cairo', sans-serif;
+}
+body[data-slug="beit-al-fakhar"] * {
+  box-sizing: border-box;
+}
