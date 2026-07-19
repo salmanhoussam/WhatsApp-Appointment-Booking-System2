@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import useTenantConfig from '../../../hooks/useTenantConfig';
-import HeroSection from '../sections/HeroSection';
+import HeroExperience from '../sections/hero/HeroExperience';
 import AboutSection from '../sections/AboutSection';
 import CategoriesSection from '../sections/CategoriesSection';
 import FeaturedSection from '../sections/FeaturedSection';
@@ -45,10 +45,16 @@ export default function BeitAlFakharHomePage() {
         </div>
       </nav>
 
-      <HeroSection waLink={waLink} />
-      <AboutSection />
+      <HeroExperience waLink={waLink} />
+      {/*
+        Categories (Plates) comes immediately after the Hero, not About —
+        the door opens, the camera walks forward, and the first thing the
+        visitor lands on is the shop's real products. About/story comes
+        after, once the visitor has already "arrived".
+      */}
       <CategoriesSection />
       <FeaturedSection />
+      <AboutSection />
       <GallerySection />
       <WhyUsSection />
       <ReviewsSection />
