@@ -1,29 +1,34 @@
 import { useRef } from 'react';
 import { motion, useScroll } from 'framer-motion';
-import DoorScene from './DoorScene';
+import FrameSequenceCanvas from './FrameSequenceCanvas';
 import HeroContent from './HeroContent';
-import { useDoorSequence } from './useDoorSequence';
-import { heroAssets } from './heroAssets';
+import { useHeroSequence } from './useHeroSequence';
+import { walkthroughAssets } from './walkthroughAssets';
 
-// Tall pinned scroll range so the closed -> real -> open storyboard has
-// room to breathe instead of racing past in one viewport-height of scroll.
-const SCROLL_RANGE_VH = 280;
+// Tall pinned scroll range so scrubbing through ~22s of real footage
+// doesn't feel rushed.
+const SCROLL_RANGE_VH = 320;
 
 /**
- * HeroExperience — the reusable cinematic door-opening Hero.
+ * HeroExperience — the reusable "walk into the shop" Hero.
  *
- * Owns the single scroll container and the resulting 0->1 progress value;
- * everything else (which assets, how the progress maps to opacity/scale,
- * what's drawn) is delegated to heroAssets / useDoorSequence / DoorScene /
- * HeroContent so each concern can change independently:
- *   - swap the door photos  -> edit heroAssets.js only
- *   - re-time the storyboard -> edit useDoorSequence.js only
- *   - restyle the layer stack -> edit DoorScene.jsx only
+ * Real footage, not AI-generated stills: scroll position directly scrubs
+ * through a preloaded frame sequence extracted from the real Beit
+ * Al-Fakhar storefront video (see walkthroughAssets.js), rendered on a
+ * canvas. This replaced an earlier three-still crossfade design (closed
+ * door / real photo / AI-generated open door) that mixed independently
+ * generated images with mismatched framing — this version has one
+ * continuous, consistent source the whole way through.
+ *
+ * Concerns stay separated the same way as before:
+ *   - swap the footage        -> edit walkthroughAssets.js only
+ *   - re-time overlay/handoff -> edit useHeroSequence.js only
+ *   - change how frames paint -> edit FrameSequenceCanvas.jsx only
  *   - restyle the title/CTA   -> edit HeroContent.jsx only
  *
- * FM12: this component uses useScroll/useTransform, so it must only ever
- * be mounted from a lazy-loaded route (already true — HomePage.jsx is
- * lazy-loaded in beit-al-fakhar.routes.jsx).
+ * FM12: uses useScroll/useTransform, so it must only ever be mounted from
+ * a lazy-loaded route (already true — HomePage.jsx is lazy-loaded in
+ * beit-al-fakhar.routes.jsx).
  */
 export default function HeroExperience({ waLink }) {
   const containerRef = useRef(null);
@@ -32,37 +37,22 @@ export default function HeroExperience({ waLink }) {
     offset: ['start start', 'end start'],
   });
 
-  const {
-    closedOpacity,
-    realOpacity,
-    openOpacity,
-    sceneScale,
-    sceneY,
-    contentOpacity,
-    contentY,
-    heroExitOpacity,
-  } = useDoorSequence(scrollYProgress);
+  const { contentOpacity, contentY, sceneScale, heroExitOpacity } = useHeroSequence(scrollYProgress);
 
   return (
     <section ref={containerRef} style={{ position: 'relative', height: `${SCROLL_RANGE_VH}vh` }}>
       <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
         <motion.div style={{ position: 'absolute', inset: 0, opacity: heroExitOpacity }}>
-          <DoorScene
-            assets={heroAssets}
-            closedOpacity={closedOpacity}
-            realOpacity={realOpacity}
-            openOpacity={openOpacity}
-            scale={sceneScale}
-            y={sceneY}
-          />
+          <motion.div style={{ position: 'absolute', inset: 0, scale: sceneScale }}>
+            <FrameSequenceCanvas assets={walkthroughAssets} progress={scrollYProgress} />
+          </motion.div>
 
-          {/* Darken for text legibility — eases off as the door opens so the
-              lit interior can read as bright once revealed. */}
+          {/* Darken for text legibility over the courtyard/entrance frames */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(to top, rgba(20,15,10,0.75) 5%, rgba(20,15,10,0.2) 55%, rgba(20,15,10,0.4) 100%)',
+              background: 'linear-gradient(to top, rgba(20,15,10,0.75) 5%, rgba(20,15,10,0.15) 55%, rgba(20,15,10,0.35) 100%)',
             }}
           />
 
