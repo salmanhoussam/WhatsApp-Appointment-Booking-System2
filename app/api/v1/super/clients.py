@@ -15,7 +15,7 @@ from app.db.client import prisma_client
 from app.core.tenant import require_super_admin
 from app.core.security import get_password_hash
 from app.core.config import settings
-from app.services import super_service, sheets_service
+from app.services import super_service, sheets_service, subscription_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Super Admin"])
@@ -49,6 +49,21 @@ class LifecycleStateUpdate(BaseModel):
     def check_lifecycle_state(cls, v: str) -> str:
         if v not in _VALID_LIFECYCLE_STATES:
             raise ValueError(f"lifecycle_state must be one of: {sorted(_VALID_LIFECYCLE_STATES)}")
+        return v
+
+
+class SubscriptionAssign(BaseModel):
+    plan_key: str
+    # Starting status for the new Subscription. Defaults to the Client's
+    # current lifecycle_state if omitted (subscription_service.assign_plan's
+    # continuity default) - not a required decision at the API layer.
+    status: str | None = None
+
+    @field_validator("status")
+    @classmethod
+    def check_status(cls, v):
+        if v is not None and v not in _VALID_LIFECYCLE_STATES:
+            raise ValueError(f"status must be one of: {sorted(_VALID_LIFECYCLE_STATES)}")
         return v
 
 
@@ -146,9 +161,39 @@ async def update_client_lifecycle(
     grace_period/expired/cancelled/archived/evergreen). SUPER_ADMIN only.
     Independent of Tenant Status - use PATCH /clients/{client_id}/status
     for suspend/reactivate (ADR-0001 Hard Block).
+
+    Re-routed through subscription_service.set_lifecycle_state (ADR-0002
+    Implementation Contract 02, Decision 9.1) instead of writing
+    Client.lifecycle_state directly. This is now the ONLY write path to
+    that field, shared with PATCH /clients/{client_id}/subscription below -
+    eliminates the dual-write drift risk named in the contract.
     """
-    result = await super_service.update_client_lifecycle_state(prisma_client, client_id, body.lifecycle_state)
+    result = await subscription_service.set_lifecycle_state(prisma_client, client_id, body.lifecycle_state)
     logger.info("👑 Super: %s lifecycle_state → %s", client_id, body.lifecycle_state)
+    return {"success": True, "data": result}
+
+
+@router.patch("/clients/{client_id}/subscription")
+async def assign_client_subscription(
+    client_id: str = Path(..., description="Client UUID"),
+    body: SubscriptionAssign = ...,
+    _user=Depends(require_super_admin),
+):
+    """
+    Assign or change a tenant's Plan (ADR-0002 §11). Ends any existing
+    active Subscription and starts a new one on the given Plan; syncs
+    Client.lifecycle_state to match through subscription_service - the
+    same single write path used by PATCH /clients/{client_id}/lifecycle
+    above (Decision 9.1). SUPER_ADMIN only. Manual assignment only - no
+    self-service plan-change flow exists (Implementation Contract 02 §1).
+    """
+    try:
+        result = await subscription_service.assign_plan(
+            prisma_client, client_id, body.plan_key, status=body.status,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    logger.info("👑 Super: %s plan → %s", client_id, body.plan_key)
     return {"success": True, "data": result}
 
 

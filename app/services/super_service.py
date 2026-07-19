@@ -53,7 +53,15 @@ async def update_client_status(db: Prisma, client_id: str, status: str) -> dict:
 
 
 async def update_client_lifecycle_state(db: Prisma, client_id: str, lifecycle_state: str) -> dict:
-    """Account Lifecycle State only (ADR-0002 §9) - independent of Tenant Status."""
+    """
+    SUPERSEDED, kept but unused (ADR-0002 Implementation Contract 02,
+    Decision 9.1): app/api/v1/super/clients.py's PATCH /lifecycle route no
+    longer calls this - it calls subscription_service.set_lifecycle_state
+    instead, which is now the only write path to Client.lifecycle_state.
+    This function still writes the column directly and must not gain a
+    new caller; flagged rather than deleted, per the project's minimal-
+    change discipline (out of this phase's explicit scope to remove).
+    """
     repo = SuperRepository(db)
     updated = await repo.update_client_lifecycle_state(client_id, lifecycle_state)
     invalidate_tenant_cache(updated.slug)
