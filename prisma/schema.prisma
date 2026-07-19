@@ -99,6 +99,13 @@ model Client {
   // -- Security & Audit (ADR-0001) ---------------------------------------------
   securityAuditLogs SecurityAuditLog[]
 
+  // -- Subscription & Plan (ADR-0002 §11, Implementation Contract 02) ----------
+  // Subscription.clientId -> Client only (§11.0a) - no Organization/Account
+  // layer exists. Subscription is the new source of truth for lifecycle;
+  // Client.lifecycle_state above stays a cached mirror (Option A, §11.2),
+  // updated exclusively by app/services/subscription_service.py.
+  subscriptions Subscription[]
+
   @@map("clients")
   @@schema("public")
 }
@@ -968,5 +975,54 @@ model SecurityAuditLog {
   @@index([eventType])
   @@index([timestamp])
   @@map("security_audit_log")
+  @@schema("public")
+}
+
+// ── Subscription & Plan (ADR-0002 §11, Implementation Contract 02) ───────────
+// Design-approved, minimal domain only - see .claudedocs/adr/ADR-0002.md §11
+// and .claudedocs/implementation/ADR-0002_IMPLEMENTATION_CONTRACT_02.md.
+// Schema-only change (Phase 1): zero application code reads or writes these
+// models yet. No behavior change to app/core/tenant.py or any route/service.
+
+model Plan {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key           String   @unique @map("key")
+  // "regular" | "pro" | "ultra" today, matching Client.tier's existing values
+  name_ar       String   @map("name_ar")
+  name_en       String   @map("name_en")
+  // Provisional field (§11.0b, Product-vs-Price question still open) - may
+  // move to a separate PricingVersion/PriceBook entity in a future slice.
+  monthly_price Decimal  @map("monthly_price")
+  currency      String   @default("USD") @map("currency")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+  @@schema("public")
+}
+
+model Subscription {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Owner: Client (Tenant) only, decided in ADR-0002 §11.0a - not
+  // Organization/Account (neither exists in this codebase today). If that
+  // layer is ever introduced, this is the specific field that would change.
+  clientId  String    @map("client_id") @db.Uuid
+  planId    String    @map("plan_id") @db.Uuid
+  startedAt DateTime  @map("started_at") @db.Timestamptz(6)
+  // Best-effort proxy during migration (Client.createdAt) for pre-existing
+  // tenants, not true history - see Implementation Contract 02 §5.
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+  status    String    @map("status")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([clientId])
+  @@index([planId])
+  @@map("subscriptions")
   @@schema("public")
 }
