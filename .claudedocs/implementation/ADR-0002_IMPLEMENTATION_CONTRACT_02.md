@@ -1,5 +1,7 @@
 # Implementation Contract — ADR-0002 Second Slice (Subscription & Plan Domain)
 
+**Status: Completed and Archived (2026-07-19).** All 4 phases implemented and verified (`.claudedocs/verification/ADR-0002_CONTRACT02_PHASE_1.md` through `_PHASE_4.md`); Post-Implementation Review complete and recommends Ready to Archive (`.claudedocs/reviews/ADR-0002_CONTRACT02_POST_IMPLEMENTATION_REVIEW.md`). Two follow-ups named there, tracked as Tech Debt in `.claudedocs/todo_list.md`, not blocking this archival: removing `SuperRepository.update_client_lifecycle_state()`'s residual dual-write capability, and wiring `assign_plan()` into `registration_service.py`/`demo_service.py` at tenant creation.
+
 Governs implementation against `.claudedocs/adr/ADR-0002.md` §11 (Subscription & Plan Domain design) and §12 (confirms Subscription Operations automation is a separate future slice, not part of this contract). Any change during coding gets measured against **this document**, not developer judgment in the moment.
 
 ## 1. Scope
