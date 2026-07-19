@@ -9,19 +9,29 @@ import { motion } from 'framer-motion';
 export default function DoorScene({ assets, closedOpacity, realOpacity, openOpacity, scale, y }) {
   return (
     <motion.div style={{ position: 'absolute', inset: 0, scale, y }}>
+      {/*
+        All three layers mount immediately (not conditionally on progress),
+        so the browser starts fetching all of them right away — no pop-in
+        mid-scroll waiting for a layer to start loading. The closed frame
+        is the true LCP candidate (visible at 0%), so it gets fetchpriority.
+      */}
       <motion.img
         src={assets.doorClosed.src}
         alt={assets.doorClosed.alt}
+        loading="eager"
+        fetchPriority="high"
         style={{ ...layerStyle, opacity: closedOpacity }}
       />
       <motion.img
         src={assets.doorReal.src}
         alt={assets.doorReal.alt}
+        loading="eager"
         style={{ ...layerStyle, opacity: realOpacity }}
       />
       <motion.img
         src={assets.doorOpen.src}
         alt={assets.doorOpen.alt}
+        loading="eager"
         style={{ ...layerStyle, opacity: openOpacity }}
       />
     </motion.div>
