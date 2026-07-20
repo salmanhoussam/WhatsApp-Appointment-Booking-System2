@@ -1,0 +1,46 @@
+# Salman Local AI Agent
+
+> A local AI agent that runs entirely on one machine and talks to a local SQLite/Postgres database through a plugin system, driven by a fully local LLM via Ollama. No data or prompts leave the machine. Currently RC1 (`0.1.0-rc1`), feature-frozen, in real-usage dogfooding.
+
+## Start here
+
+- [AGENTS.md](../AGENTS.md) — operational instructions for AI coding agents (commands, hard layering rule, conventions)
+- [README.md](../README.md) — human quickstart (prerequisites, setup, run, try-it curl examples)
+- [STATUS.md](STATUS.md) — current phase, what's frozen, what's next, right now
+
+## Architecture (how it actually works)
+
+- [architecture/overview.md](architecture/overview.md) — the `Agent → Tools → Services → Plugin Manager → Plugin` layering
+- [architecture/agent.md](architecture/agent.md) — request lifecycle, command_agent/database_agent, the vision_agent stub
+- [architecture/llm.md](architecture/llm.md) — Ollama integration, tool-calling contract, failure handling
+- [architecture/plugins.md](architecture/plugins.md) — the `Plugin.execute()` contract, sqlite/postgres, adding a plugin
+- [architecture/database.md](architecture/database.md) — schema, repositories, the decoupled catalog-import reference table
+- [architecture/logging.md](architecture/logging.md) — the event log, Job # tracing, per-stage structured logs
+- [architecture/asset-inventory.md](architecture/asset-inventory.md) — real asset inventory + sensitivity classification (services, data stores, credentials)
+
+## Guides (how do I...)
+
+- [guides/getting-started.md](guides/getting-started.md)
+- [guides/adding-a-plugin.md](guides/adding-a-plugin.md)
+- [guides/importing-a-catalog.md](guides/importing-a-catalog.md)
+- [guides/switching-database.md](guides/switching-database.md)
+
+## Decisions (why is it built this way)
+
+- [decisions/0001-plugin-interface-over-repository-factory.md](decisions/0001-plugin-interface-over-repository-factory.md)
+- [decisions/0002-shared-vs-concrete-abstraction-rule.md](decisions/0002-shared-vs-concrete-abstraction-rule.md)
+- [decisions/0003-catalog-import-decoupled-from-operational-schema.md](decisions/0003-catalog-import-decoupled-from-operational-schema.md)
+- [decisions/0004-rc1-declared.md](decisions/0004-rc1-declared.md)
+
+## Process / releases
+
+- [releases/rc1-release-notes.md](releases/rc1-release-notes.md)
+- [releases/dogfooding-checklist.md](releases/dogfooding-checklist.md)
+- [releases/dogfooding-session-log.md](releases/dogfooding-session-log.md) — detailed per-request session history
+- [roadmap.md](roadmap.md) — Phase 3+ (not started)
+
+## Historical verification evidence
+
+- [verification/phase1-architecture-review.md](verification/phase1-architecture-review.md)
+- [verification/phase2-llm-integration.md](verification/phase2-llm-integration.md)
+- [verification/phase2.5-data-validation-report.md](verification/phase2.5-data-validation-report.md)

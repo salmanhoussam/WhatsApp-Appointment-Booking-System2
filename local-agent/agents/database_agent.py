@@ -39,7 +39,15 @@ def handle_message(text: str) -> str:
     job_id = telemetry.next_job_id()
     started = time.monotonic()
 
+    telemetry.log_stage(job_id, "request_received", detail={"input": text})
+
+    llm_started = time.monotonic()
     decision = llm.ask(text)
+    telemetry.log_stage(
+        job_id, "llm_call",
+        detail={"decision_type": decision["type"], "model": settings.OLLAMA_MODEL},
+        duration_ms=round((time.monotonic() - llm_started) * 1000, 1),
+    )
 
     if decision["type"] == "error":
         telemetry.log_event(
@@ -57,7 +65,20 @@ def handle_message(text: str) -> str:
         )
         return decision["content"]
 
+    telemetry.log_stage(
+        job_id, "tool_selected",
+        detail={"tool": decision["name"], "arguments": decision["arguments"]},
+    )
+
+    tool_started = time.monotonic()
     result = call_tool(decision["name"], decision["arguments"])
+    telemetry.log_stage(
+        job_id, "plugin_execute",
+        detail={"tool": decision["name"], "plugin": settings.ACTIVE_PLUGIN,
+                "status": "error" if "error" in result else "success"},
+        duration_ms=round((time.monotonic() - tool_started) * 1000, 1),
+    )
+
     telemetry.log_event(
         job_id, text, tool=decision["name"], plugin=settings.ACTIVE_PLUGIN,
         status="error" if "error" in result else "success",

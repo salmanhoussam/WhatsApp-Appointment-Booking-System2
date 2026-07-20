@@ -33,9 +33,33 @@ def log_event(job_id: int, input_text: str, tool: str | None, plugin: str | None
         "duration_ms": duration_ms,
         "detail": detail,
     }
+    _write(event)
+    return event
+
+
+def log_stage(job_id: int, stage: str, detail=None, duration_ms: float | None = None) -> dict:
+    """
+    Additional trace line for one step of a request's lifecycle (request
+    received, LLM call, tool selection, plugin execution, ...). Written to
+    the same events.log file as log_event()'s final summary line, but with
+    a distinct `stage` key so existing consumers filtering on `status`/`tool`
+    (the final-event fields) are unaffected — this is purely additive detail
+    for tracing where time went and what happened at each step.
+    """
+    event = {
+        "job_id": job_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "stage": stage,
+        "detail": detail,
+        "duration_ms": duration_ms,
+    }
+    _write(event)
+    return event
+
+
+def _write(event: dict) -> None:
     log_path = settings.LOGS_DIR / "events.log"
-    line = json.dumps(event, ensure_ascii=False)
+    line = json.dumps(event, ensure_ascii=False, default=str)
     with _lock:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
-    return event
