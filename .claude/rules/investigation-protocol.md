@@ -47,3 +47,33 @@ things and stay labeled as such, even when done in the same turn by the same per
 
 Never fuse "I found X" and "I fixed X" into one sentence. A reader auditing this weeks later needs
 to see the seam between diagnosis and action, not just the outcome.
+
+## Runtime Before Assumption
+
+Established 2026-07-21, same beit-al-fakhar `/store` investigation, second real lesson from it —
+a real earlier report proved the backend/API returned correct data, and was rightly rejected for
+stopping there. **Backend success ≠ Feature success.** For any user-facing bug, verification is
+only complete once the full chain has been traced and confirmed, not assumed from an earlier link:
+
+```
+Data → Transformation → State update → Render → Visible UI
+```
+
+An investigation that stops at "the API returns the right data" has verified one link, not the
+feature. If no real browser/runtime access exists to verify the remaining links, that gap is an
+**Unknown** (per the Report Structure above) — never treated as closed just because the earlier
+links checked out. When runtime access genuinely isn't available, the investigation should say so
+explicitly rather than stop; if it becomes available (e.g., a real browser binary + its DevTools
+Protocol, even without a pre-installed automation framework), use it rather than asking the human
+to relay console output by hand.
+
+## Independent Causes Are Allowed
+
+A single symptom does not imply a single root cause. When an investigation finds one real bug,
+that doesn't mean it found *the* bug — report it as *a* confirmed cause and keep tracing the rest
+of the chain above; a second, independent, equally real cause can be sitting further down it. The
+same beit-al-fakhar investigation found two: intermittent Supabase pooler connectivity (affecting
+whether the config request succeeds at all) and a React 18 StrictMode `mountedRef` bug (affecting
+whether a *successful* response ever reaches state/render). Neither explained the other. Don't
+collapse two real, independently-verified causes into one narrative for tidiness — report both,
+distinctly, each with its own evidence.
