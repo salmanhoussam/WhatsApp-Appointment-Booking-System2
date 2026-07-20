@@ -84,6 +84,8 @@
 - **Salman Local AI Agent — Phase 1** (new standalone product, `local-agent/`) — local-only agent (Ollama LLM, no cloud calls) managing customers/products/invoices via natural language against a local SQLite/Postgres DB; refactored to a `plugins/` architecture (`Plugin.execute(action, payload)`) with a full event log; verified end-to-end except the actual Ollama LLM call — ✅ Done 2026-07-14
 - **Tenant Identity Migration: `anas` → `beit-al-fakhar`** — full DB/storage/frontend rename ("بيت الفخار"), canonical URL now `/beit-al-fakhar/home`; 25 real uploaded plate photos imported as real `CatalogItem` rows (honest generic naming, no fabricated prices/descriptions) — ✅ Done 2026-07-20
 - **Beit Al-Fakhar Hero — real-video scroll-scrubbed frame sequence** — canvas paints preloaded real video frames by scroll position (replaced a failed AI-still crossfade attempt that cost 28/31 Higgsfield credits); `PlateHero` compositor architecture (basePlate/decorationLayer/optionalShadow/optionalHighlight, decoration layer not yet populated); new reusable skill `.claude/skills/frontend/frame-sequence-canvas/SKILL.md`; new `documentation-policy.md` rule 6 (per-role evidence logging in multi-contributor contracts) — ✅ Done 2026-07-20
+- **tenant-seeder → Frontend Architect handoff, real gap fixed** — auditing `pilot-test-20260720` (the first real `tenant-seeder` Service run) against `DynamicPage.jsx`'s `SECTION_MAP` found 3 of its 8 real seeded section types (`offers`, `testimonials`, `hours`) had no matching renderer anywhere in the codebase — silently dropped, no error. Built `OffersSection.jsx`/`TestimonialsSection.jsx`/`HoursSection.jsx`, registered them in `dynamic-sections/index.js` + `SECTION_MAP`, confirmed via a real `GET /config` call that all 8 sections now resolve. Also fixed the CTA section's empty `link` (button was not rendering at all) → wired to the fixture's WhatsApp number. Added a permanent "Frontend Handoff Checklist" to `tenant-seeder.md`'s Service Contract so future template-based tenants get this check before being called "finished." — ✅ Done 2026-07-20
+- **Strategic decisions captured** (`.claudedocs/decisions/2026-07-20-cash-only-billing.md`, `.claudedocs/architecture/TEMPLATE_ROADMAP_VISION.md`): billing stays manual/cash-only (no gateway integration), which unblocks but does not schedule Super Admin Dashboard work; template roadmap fixed as Restaurant → Store → Clinic, sequential, one at a time — ✅ Done 2026-07-20
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
@@ -95,6 +97,12 @@
 - [ ] **local-agent: install Ollama** — `ollama pull qwen2.5:7b` + `ollama serve` على جهاز المستخدم، ثم تحقق فعلي من `/agent/command` (كل الطبقات تحته متحقق منها، بس نداء الـ LLM نفسه لسا ما انجرب)
 
 ## 🟠 In Progress / Carry Forward
+
+- [ ] **Restaurant template — visual confirmation in an actual browser** (`localhost:5173/demo/pilot-test-20260720`) — all 8 sections now resolve to real components and the CTA link is wired (verified via `GET /config`, matches the same "verified via API, never visually confirmed" gap already logged for Arizona/Caracas above); no screenshot tool available in this environment
+- [ ] **Restaurant template — reference-quality sign-off** — once visually confirmed, `pilot-test-20260720` becomes the documented reference for `food-restaurant`/`module_key: restaurant`; only then does Store (step 2) start, per `.claudedocs/architecture/TEMPLATE_ROADMAP_VISION.md`
+- [ ] **Store template** (step 2 of the roadmap) — not started, queued behind Restaurant sign-off
+- [ ] **Clinic (dental booking) template** (step 3) — not started, queued behind Store
+- [ ] **Super Admin Dashboard build** — gate opened 2026-07-20 (`.claudedocs/decisions/2026-07-20-cash-only-billing.md`), design already exists (`SUPER_ADMIN_DASHBOARD_PLAN.md`), but queued behind all 3 templates per Salman's explicit sequencing — do not start early
 
 - [ ] **TEST: Arizona + Caracas pages in browser** — `/arizona/home`, `/caracas/home`, `/caracas/special` (crossfade revert) — built and lint/transform/API-verified, never visually confirmed in an actual browser (no screenshot tool available in this environment)
 - [ ] **beit-al-fakhar (formerly anas): real contact info** — owner needs to provide real WhatsApp number/address/hours (currently honest "قريباً" placeholders in `ContactSection.jsx`); admin login is now under the new slug post-rename

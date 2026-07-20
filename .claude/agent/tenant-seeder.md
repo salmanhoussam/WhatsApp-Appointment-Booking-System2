@@ -233,6 +233,24 @@ link (this Service still runs same-thread, not via any dispatcher). **[existing]
 `Frontend Architect` picks up right after Step 4 succeeds (Step 5 above), same-thread,
 informally — this is the real current handoff, not a formal "Next Agent" dispatch field.
 
+#### Frontend Handoff Checklist — [new, 2026-07-20, added after a real gap was found]
+When Frontend Architect picks up a tenant seeded by this Service, before doing any visual polish:
+1. **Diff every section `type` in the seeded `page_content.json` against
+   `SECTION_MAP` in `frontend/src/pages/generic/normal/DynamicPage.jsx`.** A type with no
+   matching component is silently dropped — no crash, no console warning, nothing visibly wrong
+   until someone counts sections by hand. Real case: seeding `pilot-test-20260720` from
+   `page_templates/restaurant.json` produced 8 sections (`hero`, `offers`, `categories_grid`,
+   `featured_items`, `gallery`, `testimonials`, `hours`, `cta`); `SECTION_MAP` only had renderers
+   for 5 of them — `offers`, `testimonials`, `hours` had never been built. Found by reading the
+   real config response, not assumed from the template file. Fixed same day — see
+   `frontend/src/components/dynamic-sections/{Offers,Testimonials,Hours}Section.jsx`.
+2. Confirm every interactive element the template implies (cart add/remove, checkout CTA,
+   WhatsApp/contact CTA) is wired to a real store action or a real link — not a placeholder
+   `onClick={() => {}}`.
+3. This check is per-template, not per-tenant — once a `template_key` has been verified this way
+   once, later tenants seeded from the same template don't need to repeat step 1 unless the
+   template file itself changes.
+
 ### How It Runs Today
 **[existing]** One agent, same conversation, sequential 6-step execution (rule 2: "لا تتجاوز
 خطوة"). **[existing, corrected]** Demo Flow (`http://localhost:8000` — corrected from a stale

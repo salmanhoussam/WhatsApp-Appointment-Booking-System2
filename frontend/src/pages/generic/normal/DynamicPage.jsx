@@ -37,9 +37,17 @@ import {
   GallerySection,
   LocationSection,
   CtaSection,
+  OffersSection,
+  TestimonialsSection,
+  HoursSection,
 } from '../../../components/dynamic-sections'
 
 // ── Section component registry ────────────────────────────────────────────────
+// Every section `type` used by any file under scripts/data/page_templates/ MUST
+// have an entry here — a type without one is silently dropped (no crash, no
+// warning). Found missing for offers/testimonials/hours during the
+// pilot-test-20260720 handoff review, 2026-07-20 — see tenant-seeder.md's
+// Service Contract "Frontend Handoff Checklist".
 
 const SECTION_MAP = {
   hero:            HeroSection,
@@ -49,6 +57,9 @@ const SECTION_MAP = {
   gallery:         GallerySection,
   location:        LocationSection,
   cta:             CtaSection,
+  offers:          OffersSection,
+  testimonials:    TestimonialsSection,
+  hours:           HoursSection,
 }
 
 // ── Page type → catalog-module list ──────────────────────────────────────────

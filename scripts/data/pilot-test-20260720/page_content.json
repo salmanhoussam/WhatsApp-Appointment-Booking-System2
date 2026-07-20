@@ -92,7 +92,8 @@
       "order": 7,
       "data": {
         "text_ar": "اطلب عبر واتساب الآن واحصل على خصم 10%",
-        "link": "",
+        "button_ar": "تواصل عبر واتساب",
+        "link": "https://wa.me/10000000000",
         "accent": "#e85d26",
         "bg_image_url": "",
         "bg_type": "color"

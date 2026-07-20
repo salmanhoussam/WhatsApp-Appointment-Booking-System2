@@ -5,4 +5,4 @@
 - **Dispatch mode:** Same-Thread (per Contract — real dispatch is a Phase 2 question, not yet answered)
 - **Next agent:** none this run (Frontend Architect handoff not needed — generic/template tenant, see evidence.md Step 5)
 - **Last updated:** 2026-07-20
-- **Result:** All 6 Demo Flow steps + Step 4.5 succeeded with real evidence. Two real Contract errors found and fixed during setup (Base URL 8080→8000; schema source pointed at stale reference files, corrected earlier). See evidence.md and execution-context.md for full detail. Reviewed by Bo Hussein before being reported complete, per the Accountability Principle.
+- **Result:** All 6 Demo Flow steps + Step 4.5 succeeded with real evidence. Two real Contract errors found and fixed during setup (Base URL 8080→8000; schema source pointed at stale reference files, corrected earlier). Same-day second pass (Frontend Architect handoff): found and fixed 3 missing section renderers (offers/testimonials/hours) + 1 unwired CTA button — see evidence.md "Second pass" section. Reviewed by Bo Hussein before being reported complete, per the Accountability Principle.

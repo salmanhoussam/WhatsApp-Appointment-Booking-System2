@@ -103,5 +103,39 @@ Status: DEMO_LIVE — synthetic test fixture, not a real business, Production no
 1. Base URL `8080` → `8000` (fixed in `tenant-seeder.md` before Step 2)
 2. Context Investigation's schema source corrected earlier this session (before this run) to
    point at `01-parse-tenant-json.md`, not the two stale reference files
-3. Step 5's scope clarified: doesn't apply to generic/template-based tenants (new finding, not
-   yet folded into the Contract — recommend doing so next pass)
+3. Step 5's scope clarified: doesn't apply to generic/template-based tenants (folded into
+   `tenant-seeder.md` the same day)
+
+## Second pass — Frontend Architect handoff, 2026-07-20 (same day, per Salman's strategic update)
+
+Real gap found by diffing this tenant's own seeded `page_content.json` against
+`frontend/src/pages/generic/normal/DynamicPage.jsx`'s `SECTION_MAP`: 3 of the 8 real section
+types this tenant was seeded with (`offers`, `testimonials`, `hours`) had **no matching renderer
+anywhere in the codebase** — `SECTION_MAP[type]` resolves `undefined`, `DynamicPage` silently
+`return null`s for that section. No error, no console warning — confirmed by reading the actual
+component files under `frontend/src/components/dynamic-sections/` (only 7 existed:
+Hero/Story/FeaturedItems/CategoriesGrid/Gallery/Location/Cta — none for the other 3 despite them
+being real, live section types produced by `page_templates/restaurant.json`, the same template
+every future `food-restaurant` tenant seeds from).
+
+Fixed:
+- Built `OffersSection.jsx`, `TestimonialsSection.jsx`, `HoursSection.jsx` — same inline-style/
+  Cairo/RTL/spring-animation pattern as the 7 existing sections (no new dependencies, no design
+  tokens import — matches `CtaSection.jsx`/`GallerySection.jsx`'s established local style, not
+  `design-system/tokens.js`, since that's what the rest of `dynamic-sections/` already does).
+- Registered all 3 in `dynamic-sections/index.js` and `DynamicPage.jsx`'s `SECTION_MAP`.
+- Re-fetched `GET /api/v1/public/pilot-test-20260720/config` — confirmed real: all 8 section
+  types present, all 8 now have a matching component.
+- Separately found the `cta` section's `link` field was `""` (a leftover template placeholder)
+  — `CtaSection.jsx` only renders its button when `data.link` is truthy, so the button was
+  silently absent, not broken. Fixed to `https://wa.me/10000000000` (the fixture's own synthetic
+  WhatsApp number from `pilot-test-20260720.json`'s `owner.whatsapp`), re-seeded via
+  `seed_page_content.py`, confirmed live via a fresh `GET /config` (`cta.data.link` now present).
+- Added a permanent "Frontend Handoff Checklist" to `tenant-seeder.md`'s Service Contract
+  (Dependencies section) so this check — diff seeded section types against `SECTION_MAP` — runs
+  once per template, not something a future run has to rediscover from scratch.
+
+Environment note: `seed_page_content.py`'s Prisma client (connects via `DIRECT_URL`, port 5432)
+failed to connect on the first 2 attempts (`P1001`), succeeded on the 3rd — the same transient
+Supabase cold-start pattern already documented repeatedly this session; not a real connectivity
+problem, no code change needed.
