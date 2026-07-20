@@ -2,7 +2,7 @@
  * App.jsx  —  Root Router
  *
  * Static routes:
- *   /               →  redirect → /smar
+ *   /               →  redirect → /showcase
  *   /login          →  Login
  *   /dashboard/:slug/units  →  SmarAdminDashboard (admin portal)
  *   /404            →  NotFound
@@ -101,7 +101,7 @@ function App() {
               <Navigate to={
                 IS_SUBDOMAIN_MODE
                   ? (_h.startsWith('demo.') ? '/home' : '/showcase')
-                  : '/smar'
+                  : '/showcase'
               } replace />
             } />
           )}
