@@ -24,6 +24,12 @@ const TenantConfigContext = createContext(null);
 export function TenantConfigProvider({ slug, children }) {
   const { config, isLoading, error } = useTenantConfig(slug);
 
+  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
+  useEffect(() => {
+    console.log('[RUNTIME-TRACE] TenantConfigProvider MOUNTED', { slug });
+    return () => console.log('[RUNTIME-TRACE] TenantConfigProvider UNMOUNTED', { slug });
+  }, [slug]);
+
   // Inject CSS custom property so any component can use var(--tenant-primary)
   // without importing the context — useful for CSS modules and styled divs.
   useEffect(() => {

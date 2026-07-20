@@ -20,9 +20,13 @@ export default function useCatalog() {
   const slug = useTenantSlug()
   const { moduleKey, setConfig: setStoreConfig } = useGenericStore()
 
+  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
+  console.log('[RUNTIME-TRACE] useCatalog render', { slug, moduleKey, configLoading, hasConfig: !!config })
+
   // Push config into store so moduleKey gets derived from active_services
   useEffect(() => {
     if (config && !configLoading) {
+      console.log('[RUNTIME-TRACE] pushing config into store', { slug, active_services: config.active_services })
       setStoreConfig(config, config.active_services ?? [])
     }
   }, [config, configLoading, setStoreConfig])
@@ -39,30 +43,40 @@ export default function useCatalog() {
 
   // Fetch categories once moduleKey + slug are ready
   useEffect(() => {
+    console.log('[RUNTIME-TRACE] categories effect fired', { moduleKey, slug, willFetch: !!(moduleKey && slug) })
     if (!moduleKey || !slug) return
     setCatsLoading(true)
     fetchCategories(moduleKey, slug)
       .then(({ data }) => {
+        console.log('[RUNTIME-TRACE] categories fetch resolved', { count: data?.data?.length ?? 0 })
         if (!mountedRef.current) return
         const cats = data?.data ?? []
         setCategories(cats)
         if (cats.length) setActiveCatRaw(cats[0])
       })
-      .catch(() => { if (mountedRef.current) setCategories([]) })
+      .catch((err) => {
+        console.log('[RUNTIME-TRACE] categories fetch REJECTED', { message: err?.message, status: err?.response?.status })
+        if (mountedRef.current) setCategories([])
+      })
       .finally(() => { if (mountedRef.current) setCatsLoading(false) })
   }, [moduleKey, slug])
 
   // Fetch items when active category changes
   useEffect(() => {
+    console.log('[RUNTIME-TRACE] items effect fired', { activeCategory: activeCategory?.id, moduleKey, slug })
     if (!activeCategory || !moduleKey || !slug) return
     setItemsLoading(true)
     setItems([])
     fetchItems(moduleKey, slug, activeCategory.id)
       .then(({ data }) => {
+        console.log('[RUNTIME-TRACE] items fetch resolved', { count: data?.data?.length ?? 0 })
         if (!mountedRef.current) return
         setItems(data?.data ?? [])
       })
-      .catch(() => { if (mountedRef.current) setItems([]) })
+      .catch((err) => {
+        console.log('[RUNTIME-TRACE] items fetch REJECTED', { message: err?.message, status: err?.response?.status })
+        if (mountedRef.current) setItems([])
+      })
       .finally(() => { if (mountedRef.current) setItemsLoading(false) })
   }, [activeCategory, moduleKey, slug])
 
