@@ -27,3 +27,53 @@
 - **Recommendation:** raise the config query's React Query `retry` from 1 to 2 in `useTenantConfig.js`. Reason: absorbs the documented transient-backend-hiccup pattern cheaply on the frontend, since a single failed config fetch cascades into a blank catalog page. Risk: masks a real, persistent backend failure behind one extra retry if the backend is actually down for longer than a couple of request cycles — acceptable given the retry count is still small and bounded, not infinite.
 - **Decision:** proceeded without a separate approval step, consistent with this session's established working mode where Salman has repeatedly authorized this class of small, low-risk, well-justified fix during investigation — but recorded here explicitly as its own labeled step, not fused into the finding.
 - **Execution:** implemented in `frontend/src/hooks/useTenantConfig.js`, commit `86523dd`.
+
+---
+
+## Addendum, same day — Salman reported a fresh live 500, root cause now confirmed
+
+Previously logged under "Unknowns" (line above): the exact cause of the transient backend
+failure was inferred from a pattern, not proven. That gap is now closed with real evidence,
+not superseding the earlier honest "unknown" — this is what changed and how.
+
+**New raw evidence:** `burst-test.txt`, `uvicorn-traceback.txt` (this folder).
+
+### Confirmed Findings (new)
+
+- ✓ Reproduced the failure on demand: 20 concurrent requests to `/beit-al-fakhar/config`
+  produced 3 real HTTP 500s (`burst-test.txt`). Sequential requests before this were 100% clean —
+  the failure is concurrency-dependent, not constant, which is why earlier single-request checks
+  kept looking healthy.
+- ✓ Found the real server log (`/tmp/baf_migration/uvicorn.log`, located via `readlink
+  /proc/<pid>/fd/1`) and captured the actual traceback, not just a client-side status code
+  (`uvicorn-traceback.txt`). Root cause: `app/core/tenant.py:184`'s
+  `prisma_client.client.find_unique(where={"slug": slug})` intermittently raises
+  `prisma.errors.DataError: Can't reach database server at
+  aws-1-ap-southeast-2.pooler.supabase.com:6543` — Supabase's pooled connection endpoint,
+  under concurrent load, from the same process with zero code changes between a failing request
+  and a succeeding one moments later.
+- ✓ This confirms the retry bump (commit `86523dd`) was the right kind of mitigation for the
+  right kind of problem — a real, external, intermittent connection failure, not a code defect
+  in this repository.
+
+### Unknowns (still open, not closed by this addendum)
+
+- Why Supabase's pooler is intermittently unreachable from this environment under burst load —
+  that is Supabase/network-side, outside this repository's code, and not diagnosed further here.
+- Whether raising `connection_limit` on `DATABASE_URL`, or adding retry/backoff inside the
+  backend's own Prisma calls (not just the frontend's React Query retry), would reduce how often
+  this surfaces — a real, larger architectural question, not answered or implemented in this
+  investigation.
+- Whether the retry-of-2 is sufficient under real user traffic patterns (vs. the synthetic
+  20-50-request bursts used here) — not tested at production-like concurrency.
+
+### Recommendation → Decision → Execution (new)
+
+- **Recommendation:** treat this as confirmed external infrastructure flakiness for now; no
+  further code change beyond the already-applied retry bump. If this keeps surfacing, the next
+  real step is backend-side (Prisma `connection_limit` tuning or a retry wrapper around
+  `_verify_tenant`'s DB call specifically) — a separate, bigger decision, not a quick fix.
+- **Decision:** not implementing the backend-side change now — flagging it as an open
+  recommendation for Salman to weigh in on, not proceeding unilaterally, since it touches
+  connection-pool configuration shared by every endpoint, not just this one.
+- **Execution:** none beyond the evidence-gathering itself; no new commit from this addendum.

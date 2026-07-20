@@ -1,0 +1,34 @@
+Source: /tmp/baf_migration/uvicorn.log (found via readlink /proc/<uvicorn-pid>/fd/1 -
+the running uvicorn process's stdout is redirected here; not a file this project
+manages, just where this particular process happened to log).
+
+Real, repeated traceback captured from the burst tests in burst-test.txt (identical
+shape appears at multiple points in the log, e.g. lines 1420, 1505, 1576, 1661,
+1739, 1824, 1895, 1980, 2061, 2189, 2227, 2256, 2292):
+
+INFO:     127.0.0.1:42474 - "GET /api/v1/public/beit-al-fakhar/config HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  ...
+  File ".../app/api/v1/public/__init__.py", line 45, in get_tenant_config_by_slug
+    await resolve_tenant_status(slug, endpoint=request.url.path)
+  File ".../app/core/tenant.py", line 390, in resolve_tenant_status
+    return await _verify_tenant(slug, endpoint=endpoint)
+  File ".../app/core/tenant.py", line 184, in _verify_tenant
+    client = await prisma_client.client.find_unique(where={"slug": slug})
+  ...
+  File ".../venv/lib/python3.12/site-packages/prisma/engine/utils.py", line 181, in handle_response_errors
+    raise prisma_errors.DataError(data[0])
+prisma.errors.DataError: Can't reach database server at `aws-1-ap-southeast-2.pooler.supabase.com:6543`
+
+Please make sure your database server is running at `aws-1-ap-southeast-2.pooler.supabase.com:6543`.
+
+One of the SAME burst's later requests, same process, no restart in between:
+INFO:     127.0.0.1:52056 - "GET /api/v1/public/beit-al-fakhar/config HTTP/1.1" 200 OK
+
+Interpretation: the failure is not in this repo's code. `_verify_tenant` (app/core/tenant.py:184)
+does exactly one thing - a Prisma `find_unique` against the `Client` table - and that call itself
+intermittently can't reach Supabase's pooled endpoint (port 6543, DATABASE_URL) under concurrent
+load. The same process, same connection config, succeeds again moments later with zero code
+changes in between - consistent with a real, external connection-pool/network reliability issue
+between this environment and Supabase's pooler, not a bug introduced by this session's work.

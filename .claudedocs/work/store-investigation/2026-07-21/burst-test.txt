@@ -1,0 +1,13 @@
+Reproducing Salman's live 500 report by sending concurrent requests to the same
+endpoint that failed for him, rather than trusting a single clean curl.
+
+$ for i in $(seq 1 20); do curl -s -o /dev/null -w "%{http_code} " -H "Origin: http://localhost:5173" "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config" & done; wait
+200 200 200 200 200 200 200 500 200 500 200 200 200 200 200 200 200 500 200 200
+-> 3/20 failed under concurrency (single sequential requests before this all
+   returned 200 - the failure is real but load-dependent, not constant)
+
+$ for i in $(seq 1 25); do ... > /tmp/burst_$i.json & done; wait
+-> 0/25 failed (does not reproduce on every burst - intermittent)
+
+$ for i in $(seq 1 50); do ... > /tmp/burst2_$i.json & done; wait
+-> 0/50 failed
