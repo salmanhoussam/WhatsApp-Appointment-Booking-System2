@@ -1,0 +1,51 @@
+{
+  "_schema_version": "2.1",
+  "_description": "SYNTHETIC TEST FIXTURE — not a real business, not extracted by المحقق كونان. Authored manually 2026-07-20 to validate tenant-seeder's Service Contract with its first real execution. Uses obviously-fake owner contact details. Delete after the pilot run confirms the Contract, or keep as a reusable test fixture — do not treat as a real customer.",
+
+  "meta": {
+    "extracted_by": "manual-test-fixture",
+    "extracted_at": "2026-07-20T00:00:00Z",
+    "conversation_id": null,
+    "confidence": "high",
+    "needs_review": []
+  },
+
+  "client": {
+    "slug": "pilot-test-20260720",
+    "name_ar": "مطعم تجريبي - اختبار الطيار الأول",
+    "name_en": "Pilot Test Restaurant (Service Contract Validation)",
+    "service_type": "restaurant",
+    "status": "trial",
+    "currency": "USD",
+    "country_code": "LB",
+    "trial_ends_at": null
+  },
+
+  "owner": {
+    "name": "Test Fixture Owner",
+    "whatsapp": "+10000000000",
+    "email": "pilot-test-20260720@example.invalid",
+    "password_temp": "PilotTest2026"
+  },
+
+  "design": {
+    "primary_color": "#D4A017",
+    "page_type": "normal",
+    "template_key": "food-restaurant",
+    "module_key": "restaurant",
+    "hero_style": null
+  },
+
+  "services_config": {
+    "active_services": ["restaurant", "reservations"]
+  },
+
+  "catalog": {
+    "seed_from_template": true,
+    "categories": []
+  },
+
+  "restaurant_config": null,
+  "booking_config": null,
+  "store_config": null
+}
