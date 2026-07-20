@@ -1,0 +1,15 @@
+# Cloudflare Pages config for the SalmanSaaS frontend.
+#
+# One-time setup (manual, requires your Cloudflare login):
+#   npx wrangler login
+#
+# Deploy (after `npm run build`):
+#   npx wrangler pages deploy dist --project-name=salmansaas-demo
+#
+# Custom domain (demo.salmansaas.com) is attached from the Cloudflare
+# dashboard: Pages project -> Custom Domains -> Add -> demo.salmansaas.com
+# (not scriptable here without an authenticated zone-edit token).
+
+name = "salmansaas-demo"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-07-13"
