@@ -167,22 +167,38 @@ already-documented behavior prior to this pass.
 
 ### Mission
 **[existing]** Build a new SalmanSaaS tenant end-to-end from one validated JSON (schema v2.1),
-delivering a live demo link.
+delivering a live demo link. **[verified, 2026-07-20 review]** "v2.1" is confirmed against the
+file Step 1 actually runs — `.claude/skills/seeding/demo/01-parse-tenant-json.md` — which
+explicitly validates `_schema_version in ("2.0", "2.1")` and requires `design.module_key` as a
+v2.1 field, rejecting anything older. That's the real, currently-enforced ground truth. Two
+*reference* files are stale relative to it, not authoritative — noted below, not used as the
+schema source.
 
 ### Context Investigation — Service-Specific
-- **[new]** Real examples read: existing tenant JSON/data under `scripts/data/{smar,caracas,footlab,...}/`,
-  to confirm the shape actually seeded successfully before — this can drift from the written
-  spec, so real prior examples are checked, not just the schema doc from memory.
+- **[new]** Real input-schema source: `.claude/skills/seeding/demo/01-parse-tenant-json.md`'s
+  own validation code — not a JSON example file, the actual enforced field list and version
+  check.
+- **[new, tech debt found]** `scripts/data/tenant_onboarding_template.json` (schema "2.0",
+  missing `design.module_key`) and `konaan-onboarding-schema.md`'s worked example (schema "1.0",
+  a different structure — flat `services` array, `client.primary_color` instead of
+  `design.primary_color`) are both stale relative to the real v2.1 requirement above. Neither
+  should be treated as the schema source until updated — flagged in tech debt, not fixed as
+  part of this Contract pass. Also, `tenant_onboarding_template.json`'s own `_usage` field
+  references `scripts/seed_new_tenant.py`, which does not exist — a stale pointer to a
+  superseded script-based flow; the real, current flow is the API-based Steps 1-6 below.
+- **[corrected]** `scripts/data/{smar,caracas,footlab,...}/settings.json` etc. are **not** input
+  examples — they're this Service's own *output* from a prior Step 4.5 (a small `_meta` wrapper:
+  slug/module_key/currency/name). Real use for these: sanity-checking this run's own Step 4.5
+  output against previously-successful output shape, not for understanding the incoming JSON.
 - **[existing]** Registry/config read: `frontend/src/config/template-registry.js` — module_key/
   template_key are never guessed (already rule 1 of "قواعد صارمة" above).
-- **[new]** Also reads: `konaan-onboarding-schema.md` (the schema `المحقق كونان` itself follows,
-  used here to cross-check the incoming JSON's shape) and any prior evidence for this same slug
-  under `.claudedocs/work/tenant-seeder/{slug}/` from an earlier attempt, so a retry doesn't
-  blindly repeat already-verified steps.
+- **[new]** Also checks for prior evidence of this same slug under
+  `.claudedocs/work/tenant-seeder/{slug}/` from an earlier attempt, so a retry doesn't blindly
+  repeat already-verified steps.
 - **[new]** Fallback: no valid input JSON yet → stop, request one from `المحقق كونان` (do not
   invent tenant data). Raw business info supplied directly instead of a JSON → generate one
-  following the pattern actually observed in the real `scripts/data/` examples, not a hardcoded
-  template, then proceed.
+  following `01-parse-tenant-json.md`'s real, enforced v2.1 field list — not the stale template
+  files — then proceed.
 - Output: `.claudedocs/work/tenant-seeder/{slug}/execution-context.md`
 
 ### Inputs
