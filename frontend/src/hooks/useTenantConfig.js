@@ -24,6 +24,7 @@
  *   On error  → DEFAULT_CONFIG fallback so UI never hard-crashes
  */
 
+import { useMemo }    from 'react';
 import { useQuery }   from '@tanstack/react-query';
 import publicApi      from '../utils/publicApi';
 import useTenantSlug  from '../hooks/useTenantSlug';
@@ -69,8 +70,15 @@ export default function useTenantConfig(slugOverride) {
     enabled:   !!slug,
   });
 
-  // On error: fall back to DEFAULT_CONFIG so the page never hard-crashes
-  const config = isError ? { ...DEFAULT_CONFIG, slug } : (data ?? null);
+  // On error: fall back to DEFAULT_CONFIG so the page never hard-crashes.
+  // Memoized — an inline `{ ...DEFAULT_CONFIG, slug }` object literal here gets
+  // a new reference every render, which loops forever in any effect that
+  // depends on `config` (e.g. useCatalog.js pushing config into the Zustand
+  // store) — real bug hit on beit-al-fakhar's /home page, 2026-07-20.
+  const config = useMemo(
+    () => (isError ? { ...DEFAULT_CONFIG, slug } : (data ?? null)),
+    [isError, data, slug]
+  );
   const resolved = config ?? DEFAULT_CONFIG;
 
   return {
