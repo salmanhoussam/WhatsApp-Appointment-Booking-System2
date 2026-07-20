@@ -46,3 +46,9 @@ This mirrors ADR-0002's own established rule: build the first complete real use 
 ## Pointer
 
 Phase 1's record: `tenant-seeder`'s Service Contract (`.claude/agent/tenant-seeder.md`) and the Service Execution Constitution (`.claude/rules/service-execution-constitution.md`) it follows. When Phase 3's gate is actually met, this file is the starting point for the real ADR — not a spec to implement as-is, a record of what was proposed and why it waited.
+
+Agent Observability tooling (drift detection, LLM judges) and Multi-Agent State Governance (a
+supervisor preventing context pollution between concurrent agents) are the same category of
+premature — see `.claudedocs/architecture/AGENT_DRIFT_AND_OBSERVABILITY_VISION.md`. Observability
+belongs to Phase 3 (real live traffic to observe); State Governance belongs to Phase 2 (real
+concurrent dispatch to govern). Neither gets a separate gate — both inherit this one.
