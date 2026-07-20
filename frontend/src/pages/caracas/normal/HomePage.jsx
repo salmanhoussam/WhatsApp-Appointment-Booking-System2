@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MessageCircle, ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button, Badge } from '@relume_io/relume-ui';
+import CaracasStoryReel from '../spatial/CaracasStoryReel';
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 const C = {
@@ -23,83 +24,12 @@ const TICKER = [
   'مشاوي فاخرة', 'CARACAS KITCHEN', 'طعم لا يُنسى',
 ];
 
-const DISHES = [
-  {
-    name: 'مشاوي الفحم',
-    desc: 'أجود قطع اللحم مشوية على الفحم الطبيعي — طعم لا يُنسى',
-    tag: 'Signature',
-    img: 'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&fit=crop',
-  },
-  {
-    name: 'برغر كراكاس',
-    desc: 'برغر لحمة أنجوس مع صوص كراكاس السري — واحد ما بيكفي',
-    tag: 'Best Seller',
-    img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=800&fit=crop',
-  },
-  {
-    name: 'سلطة الموسم',
-    desc: 'خضار طازجة يومياً مع صوص الرمان والجوز',
-    tag: 'Fresh',
-    img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=800&fit=crop',
-  },
-  {
-    name: 'طبق الشيف',
-    desc: 'اختيار الشيف اليومي — مفاجأة الأسبوع من المطبخ مباشرةً',
-    tag: "Chef's Pick",
-    img: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=800&fit=crop',
-  },
-];
-
 const GALLERY = [
   'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=900&fit=crop',
   'https://images.unsplash.com/photo-1559847844-5315695dadae?q=80&w=900&fit=crop',
   'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=900&fit=crop',
   'https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=900&fit=crop',
 ];
-
-// ── Dish Card (hover reveal) ───────────────────────────────────────────────────
-function DishCard({ dish, delay }) {
-  const [hov, setHov] = useState(false);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }} transition={{ delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      onHoverStart={() => setHov(true)} onHoverEnd={() => setHov(false)}
-      className="relative overflow-hidden rounded-2xl cursor-pointer"
-      style={{ aspectRatio: '3/4', background: C.card }}
-    >
-      {/* Image */}
-      <motion.img src={dish.img} alt={dish.name}
-        animate={{ scale: hov ? 1.12 : 1.04 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-
-      {/* Permanent bottom gradient */}
-      <div className="absolute inset-0"
-        style={{ background: `linear-gradient(to top, ${C.bg} 0%, rgba(13,5,3,0.5) 50%, transparent 100%)` }} />
-
-      {/* Tag */}
-      <div className="absolute top-4 right-4">
-        <Badge style={{ background: C.orange, color: '#fff', border: 'none', fontSize: '0.68rem', fontWeight: 700 }}>
-          {dish.tag}
-        </Badge>
-      </div>
-
-      {/* Content — always visible at bottom, reveals more on hover */}
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        <h3 className="font-black text-lg mb-1" style={{ color: C.cream }}>{dish.name}</h3>
-        <motion.p
-          animate={{ opacity: hov ? 1 : 0, y: hov ? 0 : 8 }}
-          transition={{ duration: 0.35 }}
-          className="text-sm leading-relaxed" style={{ color: C.muted }}>
-          {dish.desc}
-        </motion.p>
-      </div>
-    </motion.div>
-  );
-}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CaracasHomePage() {
@@ -114,7 +44,7 @@ export default function CaracasHomePage() {
   const storyImgX = useTransform(storyScroll, [0, 1], ['8%', '-8%']);
 
   return (
-    <div dir="rtl" style={{ background: C.bg, minHeight: '100vh', fontFamily: "'Cairo', sans-serif", overflowX: 'hidden' }}>
+    <div dir="rtl" style={{ background: C.bg, minHeight: '100vh', fontFamily: "'Cairo', sans-serif" }}>
       <style>{`
         @keyframes crc-ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
         .crc-ticker { animation: crc-ticker 22s linear infinite; }
@@ -216,32 +146,8 @@ export default function CaracasHomePage() {
         </div>
       </div>
 
-      {/* ═══ SIGNATURE DISHES ════════════════════════════════════ */}
-      <section style={{ padding: '6rem 2rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '3.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
-              style={{ color: C.orange, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.22em', marginBottom: '0.6rem' }}>
-              من مطبخنا
-            </motion.p>
-            <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              style={{ fontWeight: 900, fontSize: 'clamp(2.2rem, 5vw, 3.8rem)', color: C.cream, lineHeight: 1, margin: 0 }}>
-              أطباقنا المميزة
-            </motion.h2>
-          </div>
-          <Link to="/caracas/menu">
-            <motion.span whileHover={{ x: -4 }} style={{ color: C.muted, fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              المنيو الكامل <ArrowLeft size={15} />
-            </motion.span>
-          </Link>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '1.25rem' }}>
-          {DISHES.map((dish, i) => (
-            <DishCard key={i} dish={dish} delay={i * 0.1} />
-          ))}
-        </div>
-      </section>
+      {/* ═══ SIGNATURE DISHES — chaptered scroll reel ═════════════ */}
+      <CaracasStoryReel />
 
       {/* ═══ STORY — editorial split ═════════════════════════════ */}
       <section ref={storyRef} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 560, overflow: 'hidden' }}>

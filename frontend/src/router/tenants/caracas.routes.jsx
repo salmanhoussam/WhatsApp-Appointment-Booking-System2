@@ -9,6 +9,7 @@
  *   /caracas/cart        → CartPage   (generic — place restaurant order)
  *   /caracas/reserve     → ReservePage (generic — guarded by "reservations" service)
  *   /caracas/admin       → CaracasAdminDashboard (JWT required)
+ *   /caracas/special     → SpecialPage (alternate red/white QSR-brand cinematic page — separate from /home)
  */
 
 import { lazy, Suspense } from 'react';
@@ -18,6 +19,7 @@ import { TenantConfigProvider, useTenantConfigContext } from '../../context/Tena
 
 // ── Lazy page imports ─────────────────────────────────────────────────────────
 const HomePage              = lazy(() => import('../../pages/caracas/normal/HomePage'));
+const SpecialPage           = lazy(() => import('../../pages/caracas/normal/SpecialPage'));
 const MenuPage              = lazy(() => import('../../pages/caracas/normal/MenuPage'));
 const CartPage              = lazy(() => import('../../pages/generic/normal/CartPage'));
 const ReservePage           = lazy(() => import('../../pages/generic/normal/ReservePage'));
@@ -65,6 +67,7 @@ export default function CaracasRoutes() {
     <TenantConfigProvider slug="caracas">
       <Routes>
         <Route path="home"    element={<Lazy component={HomePage} />} />
+        <Route path="special" element={<Lazy component={SpecialPage} />} />
         <Route path="menu"    element={<Lazy component={MenuPage} />} />
         <Route path="cart"    element={<Lazy component={CartPage} />} />
         <Route path="reserve" element={<ReserveGuard />} />

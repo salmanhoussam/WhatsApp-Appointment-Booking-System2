@@ -1,30 +1,13 @@
-import { useRef } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { MessageCircle, ArrowLeft, Star, Clock, MapPin } from 'lucide-react';
-import {
-  Button,
-  Badge,
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@relume_io/relume-ui';
+import { MessageCircle, Star, Clock, MapPin } from 'lucide-react';
+import { Button, Badge } from '@relume_io/relume-ui';
+import ArizonaStoryReel from '../spatial/ArizonaStoryReel';
 import '../arizona.css';
 
 const WA = `https://wa.me/96178727986?text=${encodeURIComponent('مرحباً 👋 أريد أطلب من مطعم أريزونا')}`;
 
 const TICKER = ['🥤 عصائر طازجة', '🍹 كوكتيل', '🧃 فريش يومي', '🥪 سناكات', '🍟 فريز', '🍓 فراولة', '🥭 مانجو', '🍋 ليمون نعنع'];
-
-const GALLERY = [
-  'https://images.unsplash.com/photo-1497534446932-c925b458314e?q=80&w=800&fit=crop',
-  'https://images.unsplash.com/photo-1551024709-8f23befc6f87?q=80&w=800&fit=crop',
-  'https://images.unsplash.com/photo-1543362906-acfc16c67564?q=80&w=800&fit=crop',
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=800&fit=crop',
-  'https://images.unsplash.com/photo-1572490122747-3968b75cc699?q=80&w=800&fit=crop',
-  'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=800&fit=crop',
-];
 
 const FEATURES = [
   { icon: '🥤', label: 'Fresh Daily', title: 'عصائر طازجة', body: 'كل يوم نعصر فريش — فراولة، مانجو، أفوكادو، ليمون نعنع، وأكثر' },
@@ -39,13 +22,8 @@ const STATS = [
 ];
 
 export default function ArizonaHomePage() {
-  const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
-  const bgY  = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
-  const fade = useTransform(scrollYProgress, [0, 0.65], [1, 0]);
-
   return (
-    <div data-slug="arizona" className="min-h-screen font-cairo overflow-x-hidden" dir="rtl"
+    <div data-slug="arizona" className="min-h-screen font-cairo" dir="rtl"
       style={{ fontFamily: "'Cairo', sans-serif", background: '#E3E55E' }}>
 
       <style>{`
@@ -79,63 +57,8 @@ export default function ArizonaHomePage() {
         </a>
       </nav>
 
-      {/* ═══ HERO ═════════════════════════════════════════════════ */}
-      <section ref={heroRef} className="relative flex items-end overflow-hidden"
-        style={{ height: '100vh', minHeight: 560 }}>
-
-        <motion.div className="absolute inset-0" style={{ y: bgY }}>
-          <img
-            src="https://images.unsplash.com/photo-1544145945-f90425340c7e?q=80&w=2070&fit=crop"
-            alt="" className="w-full h-full object-cover object-center scale-110"
-          />
-        </motion.div>
-
-        {/* gradient scrim */}
-        <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(to bottom, rgba(43,84,84,0.55) 0%, rgba(0,0,0,0.1) 45%, #E3E55E 100%)' }} />
-
-        {/* floating badge — logo card Burrito Libre style */}
-        <motion.div style={{ opacity: fade }}
-          className="absolute inset-x-0 bottom-0 flex justify-center pb-10 px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, type: 'spring', stiffness: 80, damping: 18 }}
-            className="relative bg-white rounded-2xl px-10 py-6 text-center shadow-2xl"
-            style={{ outline: '3px dashed #2B5454', outlineOffset: -8, maxWidth: 440 }}>
-
-            {/* eyebrow badge */}
-            <div className="flex justify-center mb-3">
-              <Badge className="rounded-full text-xs font-bold px-3 py-1"
-                style={{ background: '#E3E55E', color: '#2B5454', border: 'none' }}>
-                سناكات · عصائر · كوكتيل
-              </Badge>
-            </div>
-
-            <h1 className="font-black leading-none tracking-tight mb-1"
-              style={{ fontSize: 'clamp(3rem, 10vw, 5.5rem)', color: '#4A7A58' }}>
-              أريزونا
-            </h1>
-            <p className="text-sm mb-5" style={{ color: '#6A8888' }}>
-              كل شي طازج، كل شي بارد، كل شي بيشهي
-            </p>
-
-            <div className="flex gap-3 justify-center flex-wrap">
-              <Link to="/arizona/menu">
-                <Button className="rounded-full font-bold gap-2 px-6"
-                  style={{ background: '#2B5454', color: '#E3E55E', border: 'none' }}>
-                  شوف المنيو <ArrowLeft size={15} />
-                </Button>
-              </Link>
-              <a href={WA} target="_blank" rel="noreferrer">
-                <Button className="rounded-full font-bold gap-2 px-6"
-                  style={{ background: '#25D366', color: '#fff', border: 'none' }}>
-                  <MessageCircle size={15} /> واتساب
-                </Button>
-              </a>
-            </div>
-          </motion.div>
-        </motion.div>
-      </section>
+      {/* ═══ HERO — cinematic scroll-chaptered opening ═════════════ */}
+      <ArizonaStoryReel />
 
       {/* ═══ TICKER 1 ═════════════════════════════════════════════ */}
       <div className="overflow-hidden py-2.5" style={{ background: '#2B5454' }}>
@@ -189,39 +112,6 @@ export default function ArizonaHomePage() {
               </motion.div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ═══ GALLERY — Relume Carousel ════════════════════════════ */}
-      <section className="py-16 px-6" style={{ background: '#E8806E' }}>
-        <div className="max-w-5xl mx-auto">
-          <motion.h2 initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="font-black text-center mb-10 text-white"
-            style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
-            من مطبخنا 📸
-          </motion.h2>
-
-          <Carousel opts={{ align: 'start', loop: true }}
-            className="w-full">
-            <CarouselContent className="-ml-3">
-              {GALLERY.map((src, i) => (
-                <CarouselItem key={i} className="pl-3 basis-1/2 md:basis-1/3">
-                  <motion.div
-                    whileHover={{ scale: 1.04, rotate: i % 2 === 0 ? 1.5 : -1.5 }}
-                    className="overflow-hidden rounded-2xl border-4 border-white shadow-lg aspect-square">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
-                  </motion.div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <div className="flex justify-center gap-3 mt-6">
-              <CarouselPrevious className="static translate-y-0 rounded-full w-10 h-10"
-                style={{ background: '#2B5454', color: '#E3E55E', border: 'none' }} />
-              <CarouselNext className="static translate-y-0 rounded-full w-10 h-10"
-                style={{ background: '#2B5454', color: '#E3E55E', border: 'none' }} />
-            </div>
-          </Carousel>
         </div>
       </section>
 
