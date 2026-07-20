@@ -1,0 +1,31 @@
+$ grep -rln "getCatalog\|get_catalog\|build_catalog\|catalog_generator\|CatalogGenerator" \
+    --include=*.py --include=*.js --include=*.jsx . | grep -v node_modules | grep -v "\.git/"
+app/api/v1/public/__init__.py
+
+$ grep -n "getCatalog\|get_catalog\|build_catalog\|catalog_generator" app/api/v1/public/__init__.py
+252:async def get_catalog_item(
+
+-> The only match is a route HANDLER function named get_catalog_item (an ordinary FastAPI
+   endpoint), not a generator/build script. No getCatalog.py, no dedicated "catalog
+   generator" module exists anywhere in this repository.
+
+Real catalog-population mechanisms found (two DIFFERENT pipelines, for two different
+kinds of tenant):
+
+1. Generic/template tenants (e.g. pilot-test-20260720):
+   scripts/seed_catalog.py + POST /admin/catalog/seed-from-template
+   (this is tenant-seeder's Step 4, documented in .claude/agent/tenant-seeder.md)
+
+2. beit-al-fakhar specifically (custom tenant, NOT template-based):
+   scripts/onboard_anas.py                      -> ran once, created categories
+   scripts/import_beit_al_fakhar_plates.py      -> ran once (2026-07-20), created 25 items
+   scripts/import_beit_al_fakhar_bowls_vases.py -> ran once (2026-07-20), created 9 items
+   All three are idempotent one-off scripts (checked via existing sortOrder before
+   creating), not part of any recurring/automated generation pipeline. Nothing regenerates
+   or overwrites this data automatically - it only changes when one of these scripts is
+   run again by hand.
+
+CONCLUSION: there is no "getCatalog.py" and no automated catalog-generation step that
+could be stale or broken for beit-al-fakhar. The data was written directly, once, by real
+scripts already read in full this session, and confirmed present in the DB (step1) and
+served correctly by the real API (step2).

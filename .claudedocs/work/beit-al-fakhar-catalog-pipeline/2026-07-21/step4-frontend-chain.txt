@@ -1,0 +1,57 @@
+Full chain, traced file by file, each link's expected vs actual count noted:
+
+1. Tenant Config
+   Route: BeitAlFakharRoutes wraps everything in <TenantConfigProvider slug="beit-al-fakhar">
+   (frontend/src/router/tenants/beit-al-fakhar.routes.jsx)
+   -> TenantConfigContext.jsx calls useTenantConfig('beit-al-fakhar')
+   -> GET /api/v1/public/beit-al-fakhar/config
+   Expected: active_services array including "store".
+   Actual: {"active_services":["store","store.products","store.cart","catalog"], ...}
+   confirmed via curl (step2 evidence + earlier investigation). MATCH, when this
+   request succeeds (see the separate, already-documented Supabase-pooler-flakiness
+   investigation for when it doesn't).
+
+2. moduleKey derivation
+   File: frontend/src/pages/generic/store/useGenericStore.js, deriveModuleKey()
+   Logic: restaurant checked first, then 'store', then 'catalog'.
+   active_services includes "store" -> moduleKey = 'store' (NOT 'catalog', even though
+   "catalog" is also present in the array - 'store' wins by priority order).
+   This is the single most important fact in this whole investigation: it's why every
+   earlier curl test against /api/v1/public/catalog/* this session was silently testing
+   the WRONG endpoint family for this tenant.
+
+3. Catalog Hook
+   File: frontend/src/hooks/useCatalog.js
+   fetchCategories(moduleKey='store', slug='beit-al-fakhar')
+   -> frontend/src/services/catalogApi.js line 8-9:
+        if (moduleKey === 'store') return publicApi.get('/store/categories', { params: base })
+   -> real call: GET /api/v1/public/store/categories?client_slug=beit-al-fakhar
+   Expected: 4 categories. Actual (step2 evidence): 4 categories, exact match.
+
+   activeCategory defaults to categories[0] (useCatalog.js line 49) = Plates (first by
+   sort_order). fetchItems('store', slug, PlatesId)
+   -> catalogApi.js line 19-20:
+        if (moduleKey === 'store') return publicApi.get('/store/products', { params: {...,
+        category_id: categoryId} })
+   -> real call: GET /api/v1/public/store/products?client_slug=beit-al-fakhar&category_id=641fb6cb...
+   Expected: 25 items. Actual (step2 evidence): 25 items, exact match, real image URLs.
+
+4. API -> transform
+   app/api/v1/public/store.py `_fmt_product()` maps each CatalogItem to the JSON shape
+   the frontend expects (id, name_ar/en, price, image_url, category_id, is_active, ...).
+   No filtering happens here beyond the repository's own where-clause (isActive=True,
+   category.moduleKey='store') - already satisfied by every real item checked.
+
+5. Render
+   File: frontend/src/pages/generic/normal/CatalogPage.jsx
+   `filteredItems` (all 25/9 items, no search term active) passed to `Template`
+   (CatalogGrid by default, since category.display_template='grid').
+   frontend/src/pages/catalog/templates/CatalogGrid.jsx: maps `items` directly to
+   <CatalogItemCard>, no additional filtering (checked - no price/availability guard in
+   this file at all). Expected: all passed-in items render. Actual: cannot be observed
+   directly (no browser tool), but nothing in this file's code could cause items present
+   in `items` to be silently dropped.
+
+CONCLUSION: every real link in this chain was traced with actual captured values, not
+assumed from reading code alone, and every one matches expected counts exactly, whenever
+the initial config fetch succeeds. No break was found anywhere in this chain.

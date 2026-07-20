@@ -1,0 +1,28 @@
+$ find scripts/data -maxdepth 1 -iname "*fakhar*" -o -iname "*anas*"
+(no output - no scripts/data/beit-al-fakhar/ or scripts/data/anas/ folder exists)
+
+$ find . -iname "*fakhar*" (excluding node_modules/.git/venv/frontend source/scripts already known)
+./new-matirial/BeitAlFakharLanding.html   <- an unrelated static mockup, not catalog data
+
+$ Client.config column (real DB, Prisma):
+client id: 10e5cecd-0b6f-4041-91b6-e0f22ff8c5a6
+config field: None
+
+CONCLUSION: beit-al-fakhar has no scripts/data/{slug}/ files and no Client.config JSON.
+It does NOT go through the generic tenant-seeder / page_content pipeline at all (that
+pipeline is what pilot-test-20260720 uses). beit-al-fakhar is a custom-coded tenant
+(frontend/src/pages/beit-al-fakhar/, its own routes file) whose catalog data lives
+directly in the CatalogCategory/CatalogItem tables, written by three one-off scripts:
+  - scripts/onboard_anas.py                       -> created the 4 categories
+  - scripts/import_beit_al_fakhar_plates.py        -> created 25 Plates items + images
+  - scripts/import_beit_al_fakhar_bowls_vases.py   -> created 9 Bowls & Vases items + images
+There is no "generated catalog json" file for this tenant - the database rows ARE the
+source of truth, not a JSON intermediate.
+
+Real counts (direct Prisma query against Client 10e5cecd-0b6f-4041-91b6-e0f22ff8c5a6):
+  Plates (641fb6cb-ee16-43cd-9ccc-f4b750f39011):              25 items, 25 active
+  Bowls & Vases (d7639eb2-7fac-42a1-960f-9d8266d2fab1):        9 items,  9 active
+  Mugs (96bd1ece-69f7-4949-837a-fa59a4266e51):                 0 items
+  Decorative Figurines (88616325-54cb-4ed1-bcad-6ad51b633ec5): 0 items
+Total real products: 34, across 4 categories, 2 of which are genuinely empty (no photos
+ever supplied for Mugs/Figurines - not a bug, a known gap already logged in todo_list.md).

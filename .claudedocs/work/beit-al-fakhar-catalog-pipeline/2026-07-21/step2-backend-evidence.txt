@@ -1,0 +1,39 @@
+CRITICAL CORRECTION FROM THE PRIOR INVESTIGATION: all earlier backend checks this session
+tested /api/v1/public/catalog/categories and /api/v1/public/catalog/categories/{id}/items -
+the GENERIC catalog endpoints. Those are NOT the endpoints the beit-al-fakhar frontend
+actually calls. Traced the real call site (step4-frontend-chain.txt) and confirmed the
+frontend calls /api/v1/public/store/categories and /api/v1/public/store/products instead,
+because this tenant's moduleKey resolves to 'store', not 'catalog'. Re-tested against the
+REAL endpoint below - this had never actually been checked before now.
+
+$ curl -s -H "Origin: http://localhost:5173" \
+    "http://127.0.0.1:8000/api/v1/public/store/categories?client_slug=beit-al-fakhar"
+{
+  "success": true,
+  "data": [
+    {"id": "641fb6cb-...", "name_en": "Plates", ...},
+    {"id": "d7639eb2-...", "name_en": "Bowls & Vases", ...},
+    {"id": "96bd1ece-...", "name_en": "Mugs", ...},
+    {"id": "88616325-...", "name_en": "Decorative Figurines", ...}
+  ]
+}
+-> 4 categories, matches DB exactly.
+
+$ curl -s -H "Origin: http://localhost:5173" \
+    "http://127.0.0.1:8000/api/v1/public/store/products?client_slug=beit-al-fakhar&category_id=641fb6cb-ee16-43cd-9ccc-f4b750f39011"
+success: True
+count: 25
+first item: {"id": "5aa6e109-...", "name_en": "Hand-Painted Ceramic Plate #1",
+             "price": 0.0, "image_url": "https://.../catalog/641fb6cb.../5aa6e109.../main.jpg", ...}
+-> 25 items, matches DB exactly, real Supabase image URL present.
+
+$ curl -s -H "Origin: http://localhost:5173" \
+    "http://127.0.0.1:8000/api/v1/public/store/products?client_slug=beit-al-fakhar&category_id=d7639eb2-7fac-42a1-960f-9d8266d2fab1"
+Bowls & Vases count: 9
+-> matches DB exactly.
+
+NOTE (real, not the reported bug): _fmt_product in app/api/v1/public/store.py does
+`float(p.price) if p.price is not None else 0.0` - since these 34 items intentionally
+have price=null (no fabricated prices, per import_beit_al_fakhar_plates.py's own stated
+discipline), the API reports "price": 0.0 rather than "no price set". Cosmetic/data-
+completeness issue, not a missing-product issue - items ARE present with real images.
