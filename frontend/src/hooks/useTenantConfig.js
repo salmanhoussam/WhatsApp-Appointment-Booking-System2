@@ -66,7 +66,13 @@ export default function useTenantConfig(slugOverride) {
     queryFn:   () => publicApi.get(`/${slug}/config`).then(r => r.data),
     staleTime: 10 * 60 * 1000,   // 10 min — tenant config rarely changes
     gcTime:    30 * 60 * 1000,   // 30 min — keep in memory across navigation
-    retry:     1,
+    // 2, not 1 — the dev backend has repeatedly shown transient cold-start
+    // failures this session (Prisma engine spawn), and a failed config fetch
+    // here cascades into moduleKey staying null, which blanks category/item
+    // fetching downstream (useCatalog.js). One extra retry absorbs that
+    // known transient case cheaply; it does not fix the backend's own
+    // cold-start flakiness, which is a separate, bigger topic.
+    retry:     2,
     enabled:   !!slug,
   });
 
