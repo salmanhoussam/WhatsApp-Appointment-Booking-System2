@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-06-29
+# Last updated: 2026-07-20
 
 ## Completed Phases
 
@@ -46,7 +46,6 @@
 - Phase 70D: Olivello sections 4-7 — DonkeySection + PasteSection + PressSection + GoldenDropSection — ✅ Done 2026-05-21
 - Phase 70E: Olivello ProductsSection + store flow (CatalogPage/CartPage generic wired) — ✅ Done 2026-05-21
 - Phase 70F: /impeccable polish — fonts, perf, reduced-motion, SVG icons, config drift — ✅ Done 2026-05-21
-- New workflow rule: .claudedocs/plans/phase-XY.md per phase, per-agent division — ✅ Done 2026-05-21
 - Phase 71: OlivelloStory cinematic scroll (7 scenes × 130vh, real photos, CSS olive morphing) — ✅ Done 2026-05-22
 - Phase 72: 3D Olive R3F + Slot System (SphereGeometry PBR, 6 SlotPlane vignette shader, ScrollProgressContext) — ✅ Built 2026-05-26
 - cyber-sentinel agent — 10 threat classes — ✅ Done 2026-05-30
@@ -58,52 +57,76 @@
 - Phase E: POST /demo/create + auto-seed catalog + DemoLauncher.jsx — ✅ Done 2026-05-30
 - FIX: circular import crash (limiter → app.core.limiter) — ✅ Done 2026-05-30
 - ARCH Catalog Refactor (Phase 51 tech debt) — catalog_service.py expanded, admin+public routers cleaned — ✅ Done 2026-06-29
-- Python venv + Prisma setup (post-format) — venv, requirements, prisma generate, start_dev.bat — ✅ Done 2026-06-29
-- Memory system initialized — 8 files in projects/memory/ — ✅ Done 2026-06-29
 - Mona Page Screen 0 — German travel story, staggered reveal, globe animation — ✅ Done 2026-06-29
 - Phase 75-A: DatePage DB model + dating_repo + dating_service + dating router + maintenance cron — ✅ Done 2026-06-30
 - Showcase canvas black screen fix (100vw×100vh wrapper) + GLSL pow() clamp — ✅ Done 2026-06-30
 - Saudi glass tower shader (4×20 curtain-wall, golden frames) + RoomEnvironment CSS photo layer — ✅ Done 2026-06-30
 - Page structure pivot: Hero→400vh zoom→content (tower IS the hero) — ✅ Done 2026-06-30
+- Arizona tenant scaffold — arizona.css + hooks + store + MenuPage + HomePage — ✅ Done 2026-07-04
+- Caracas HomePage — dark cinematic #0D0503, split hero editorial — ✅ Done 2026-07-04
+- Relume UI installed + .npmrc legacy-peer-deps fix — ✅ Done 2026-07-04
+- Backend rules v2 — security.md + api-rules + architecture + service-system updated — ✅ Done 2026-07-04
+- **git push origin main** — confirmed already succeeded (GitHub has commit `100ded0` plus 2 later commits) — ✅ Done, no action needed
+- **`python -m prisma db push`** — confirmed already live: `Client.tier` + `OccasionCreator` + `OccasionPage` + `OccasionRSVP` + `DatePage` all present in production DB (verified by diffing `schema.prisma` against a live DDL dump — zero drift) — ✅ Done, no action needed
+- Phase 75-B/C/D: Dating module frontend — HeroSection/StorySection/DatePicker/FoodPicker/ConfirmSection, "Running No Button", 5-step DatingCreatePage.jsx, ntfy.sh notifications tested to Salman's phone — ✅ Done (per updated report from `new-matirial/`)
+- Ubuntu 24.04 migration — Node 20 (nvm), Python venv, Prisma client, git tracking restored, `start_dev.sh`, `.env.example` filled in — ✅ Done 2026-07-12
+- **DB `connection_limit` bug fixed** — `.env`'s `DATABASE_URL` had `connection_limit=1` hardcoded, bypassing `app/db/client.py`'s own safe-default guard (should be `connection_limit=10&pool_timeout=30`); this was the root cause of intermittent P1001/"tenant not found" errors — ✅ Done 2026-07-12
+- Caracas `CaracasStoryReel.jsx` — scroll-chaptered cinematic section (sticky pinned viewport, per-chapter opacity cross-fade, real dish content) replacing the static dish grid — ✅ Done 2026-07-12
+- Root domain routing fix — `localhost:5173/` now redirects to `/showcase` (real 3D homepage) instead of `/smar`, matching production behavior — ✅ Done 2026-07-12
+- Arizona `ArizonaStoryReel.jsx` — same scroll-chaptered technique applied to Arizona, using 4 real live-catalog sandwich items (Taouk/Spicy Steak/Twister/Philly Cheesesteak) with verified real Supabase photo URLs, replacing the static Relume Carousel gallery — ✅ Done 2026-07-12
+- `new-matirial/local-llm-learning-plan.md` — hardware-grounded local LLM learning guide (Ollama, no VM) — ✅ Done 2026-07-12
+- Higgsfield CLI + MCP pipeline proven end-to-end (video_analysis, product-photoshoot, generate_image/video, upscale_image, Supabase upload) — ✅ Done 2026-07-13
+- Caracas Special (`/caracas/special`) — 7 real Higgsfield videos generated + uploaded to Supabase; 3D cube-rotation reel built then reverted to flat crossfade per user feedback — ✅ Done 2026-07-13
+- **New tenant "anas"** (artisanal ceramics/pottery shop) — full onboarding: video-analyzed real footage, generated 4 category banners + used 6 real photos, seeded Client/User/categories (no fake products), built custom homepage (`frontend/src/pages/anas/`), registered routes — ✅ Done 2026-07-13
+- `anas.html` static page hero fixed — layered blurred-backdrop + sharp centered video, fixes blur/crop from forced `object-fit:cover` on portrait source footage — ✅ Done 2026-07-14
+- Cybersecurity portfolio consolidated — `new-matirial/Cybersecurity/portfolio/` indexes 3 real completed pieces + 1 honestly-labeled illustrative SQL piece — ✅ Done 2026-07-14
+- `frontend/wrangler.toml` added + Cloudflare Pages build-passthrough verified for `anas.html`/`mona.html` — ✅ Done 2026-07-14
+- **Salman Local AI Agent — Phase 1** (new standalone product, `local-agent/`) — local-only agent (Ollama LLM, no cloud calls) managing customers/products/invoices via natural language against a local SQLite/Postgres DB; refactored to a `plugins/` architecture (`Plugin.execute(action, payload)`) with a full event log; verified end-to-end except the actual Ollama LLM call — ✅ Done 2026-07-14
+- **Tenant Identity Migration: `anas` → `beit-al-fakhar`** — full DB/storage/frontend rename ("بيت الفخار"), canonical URL now `/beit-al-fakhar/home`; 25 real uploaded plate photos imported as real `CatalogItem` rows (honest generic naming, no fabricated prices/descriptions) — ✅ Done 2026-07-20
+- **Beit Al-Fakhar Hero — real-video scroll-scrubbed frame sequence** — canvas paints preloaded real video frames by scroll position (replaced a failed AI-still crossfade attempt that cost 28/31 Higgsfield credits); `PlateHero` compositor architecture (basePlate/decorationLayer/optionalShadow/optionalHighlight, decoration layer not yet populated); new reusable skill `.claude/skills/frontend/frame-sequence-canvas/SKILL.md`; new `documentation-policy.md` rule 6 (per-role evidence logging in multi-contributor contracts) — ✅ Done 2026-07-20
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
-- [ ] **حذف المشروع القديم** — `gdzthjcvzvhfpsvoxhbm` — كل البيانات والصور انتقلت ✅ (يمكن الحذف الآن)
-- [ ] **Install Git** — `winget install Git.Git` — needed for deploy workflow (post-format)
-- [ ] **`cd frontend && npm install`** — frontend packages not installed yet (post-format)
-- [ ] **`python -m prisma db push`** — 5 schema changes معلّقة: `Client.tier` + OccasionCreator + OccasionPage + OccasionRSVP + DatePage (Railway subscription lapsed) — لا تستخدم `npx prisma` على هذا الجهاز
-- [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain في Pages → Custom Domains
+- [ ] **حذف المشروع القديم** — `gdzthjcvzvhfpsvoxhbm` — كل البيانات والصور انتقلت (يمكن الحذف الآن، لسا ما انحذف)
+- [ ] **Cloudflare:** أضف `demo.salmansaas.com` كـ custom domain في Pages → Custom Domains (wrangler.toml جاهز، ينقص `wrangler login` + الخطوة اليدوية بالـ dashboard)
 - [ ] **SEC-03 (partial):** Supabase service key + Resend API key — rotation يدوي في الداشبوردات
 - [ ] **Mona page hosting** — `frontend/public/mona.html` جاهز — ارفعه على Netlify Drop أو Cloudflare Pages
-- [ ] **`floor-video.mp4`** — حمّل dark-tech video من pexels.com (search: "dark technology screen") → احفظه في `frontend/public/videos/floor-video.mp4`
+- [ ] **`floor-video.mp4`** — حمّل dark-tech video من pexels.com → `frontend/public/videos/floor-video.mp4`
+- [ ] **local-agent: install Ollama** — `ollama pull qwen2.5:7b` + `ollama serve` على جهاز المستخدم، ثم تحقق فعلي من `/agent/command` (كل الطبقات تحته متحقق منها، بس نداء الـ LLM نفسه لسا ما انجرب)
 
 ## 🟠 In Progress / Carry Forward
 
-- ✅ Done 2026-07-02 — **Moments Module full-stack** (4 backend files + 4 frontend files + routing registry)
-- ✅ Done 2026-07-02 — **Scroll-Video FLOOR_04** (RoomEnvironment videoSrc/videoRef props + RAF scrub loop in HomePage)
-- ✅ Done 2026-07-02 — **Pricing Tiers** (Regular $15 / Pro $22 / Ultra $35 — documented in PRODUCT.md + schema + service-system + memory)
-- ✅ Done 2026-07-01 — **Showcase tower extended to 5 floors** (Video #a855f7 y=-6, Romance #e11d48 y=-12, 15-waypoint camera, VideoGenerationCard, RomanceDateCard, 5 HUD dots, 560vh void)
-- ✅ Done 2026-07-01 — **Marketing page integrated** — `frontend/src/pages/marketing/` (18 files from Home-Page-main), `/marketing` route, demo links per service
-- ✅ Done 2026-07-01 — **Design Intelligence System** — PRODUCT.md + DESIGN.md rebuilt (OKLCH, GS MAR tokens, absolute bans), gs-mar-components.md (10 recipes), frontend-architect.md upgraded to builder protocol
-- ✅ Done 2026-07-01 — **Marketing page full redesign** — 5 sections rebuilt (ProblemSolution, WorkflowDemo, UseCases, Trust, CTA) + FAQSection added. GS MAR: dark bg #060b18, Space Mono labels, Cairo headings, FM spring animations, RTL dir attribute.
-- ✅ Done 2026-07-04 — **Arizona tenant scaffold** — arizona.css + hooks + store + MenuPage (lime-yellow #E3E55E Burrito Libre aesthetic) + HomePage (Relume Carousel, parallax, dashed cards)
-- ✅ Done 2026-07-04 — **Caracas HomePage** — dark cinematic #0D0503, split hero editorial, hover dish cards, expandable photo strip, ambient glow CTA
-- ✅ Done 2026-07-04 — **Relume UI** — @relume_io/relume-ui + tailwind plugin installed, .npmrc legacy-peer-deps fix
-- ✅ Done 2026-07-04 — **hookCategoryId '__all__' guard** — Arizona MenuPage bug fix
-- ✅ Done 2026-07-04 — **Backend rules v2** — security.md (new), api-rules + architecture + service-system updated
-- [ ] **git push origin main** — Commit جاهز (100ded0)، افتح terminal وشغّل `git push origin main`
-- [ ] **TEST: Showcase canvas** — open `localhost:5173/showcase`, confirm 5 floors visible
-- [ ] **TEST: Arizona + Caracas pages** — `/arizona/home`, `/arizona/menu`, `/caracas/home`, `/caracas/menu`
-- [ ] **Phase 75-B: DatingTemplate** — HeroSection + StorySection + ConfirmSection (running "لا" button) — `frontend/src/pages/dating/`
-- [ ] **Phase 75-C: DatingCreatePage** — multi-step form (5 steps) — `frontend/src/pages/dating/DatingCreatePage.jsx`
-- [ ] **Phase 75-D: ntfy test** — subscribe to `ntfy.sh/salman-dating-2026` on phone → test notification
+- [ ] **TEST: Arizona + Caracas pages in browser** — `/arizona/home`, `/caracas/home`, `/caracas/special` (crossfade revert) — built and lint/transform/API-verified, never visually confirmed in an actual browser (no screenshot tool available in this environment)
+- [ ] **beit-al-fakhar (formerly anas): real contact info** — owner needs to provide real WhatsApp number/address/hours (currently honest "قريباً" placeholders in `ContactSection.jsx`); admin login is now under the new slug post-rename
+- [ ] **beit-al-fakhar: real customer reviews** — `ReviewsSection.jsx` intentionally shows "coming soon"; add once the owner has real testimonials
+- [ ] **beit-al-fakhar: real per-item plate names/prices** — the 25 real `CatalogItem` rows imported 2026-07-20 use honest generic names ("طبق فخار مرسوم يدوياً رقم N") and `price=null` since no real per-item data exists yet — needs the shop owner, cannot be fabricated
+- [ ] **beit-al-fakhar: Hero source video quality** — the working frame-sequence Hero uses a WhatsApp-quality video as its source; Salman will personally film/source better footage — not an agent task
+- [ ] **beit-al-fakhar: rest of homepage** — Hero is one section; About/Gallery/WhyUs/Reviews/Contact and the Plates "Pattern Library" decoration system are still architecture/placeholder only
+- [ ] **beit-al-fakhar: Pattern Library** — only 1 of 4 planned decoration variants (Blue Floral/Olive Branch/Arabesque/Modern Minimal) is budget-feasible right now (3 of 31 Higgsfield credits remain, 7 credits/generation) — needs a credit top-up before continuing
+- [ ] **local-agent Phase 2** — WhatsApp Cloud API as an input layer in front of the same agent (deferred until Phase 1 proven with real Ollama)
+- [ ] **local-agent Phase 3** — MySQL/SQL Server/POS/Odoo/Square plugins (placeholder folders only, per `plugins/{mysql,sqlserver,pos}/README.md`)
+- [ ] **local-agent: `.claudelocaldocs/` full restructure** (architecture/roadmap/phases/decisions/research/logs subfolders) — explicitly deferred by user until architecture stabilizes
+- [ ] **local-agent: repo split** (SalmanSaaS vs. standalone "Salman Local AI Runtime") — explicitly deferred by user
+- [ ] **Showcase Homepage 3D Redesign** (per `new-matirial/قائمة المهام المحدثة_C.md`) — remove `CyberGrid.jsx` (cyberpunk look), replace with `Clouds`/`Fog`; wire `RoomEnvironment.jsx` into R3F Canvas at reduced brightness (~0.12); upgrade `BuildingTower.jsx` materials to `MeshPhysicalMaterial` for realistic glass
 - [ ] **Phase 75-E: Railway cron** — `0 3 * * *` → `POST /api/v1/super/maintenance/cleanup-date-pages`
-- [ ] **`python -m prisma db push`** — DatePage model → Railway DB (new from 2026-06-30)
+- [ ] **Phase 51 automation** — `POST /super/clients/{id}/seed-categories` endpoint, `PATCH /super/clients/{id}/settings` primary_color support, Higgsfield MCP orchestration layer (upload-to-Supabase + JSON config shaping — note: Higgsfield generation itself is already available via the connected MCP tools, only the orchestration/upload logic needs building)
 - [ ] **Showcase HeroSection** — hero text repositioning so tower crown is visible above it
 - [ ] **AI Integration Phase** — قرار: نبدأ بـ RAG chatbot للمطعم/المتجر — repo awesome-llm-apps محمّل
 - [ ] **DemoLauncher navigation fix** — بعد الإنشاء يوجّه لـ `/{slug}/menu` (restaurant) أو `/{slug}/store` (store) بدل `/{slug}/home` دائماً
 - [ ] **Phase 72 visual validation** — جرّب `localhost:5173/olivello/home`، تحقق olive size + slot positions
 - [ ] **Phase 61 n8n wiring** — backend done، ينتظر: أين n8n شغّال + أي WhatsApp provider
+
+### ADR-0002 (Tenant Lifecycle) — من مراجعة ما بعد التنفيذ (2026-07-18)
+- [ ] **مراجعة يدوية: `footlab`/`caracas`/`olivello`** — `lifecycle_state` لا يزال بالقيمة الافتراضية `trial` رغم أنها تينانتات حقيقية `active` — يحتاج Super Admin يحدد القيمة الصحيحة عبر `PATCH /clients/{id}/lifecycle`
+- [ ] **إشعار يدوي لـ9 تينانتات** حصلوا على grace period 5 أيام (`roz`, `magic-test`, `test-fashion`, `sneakers-beirut`, `cafe`, `test-catalog-fix`, `tastybites`, `sneakers-lb`, `assi`) — قبل **2026-07-23** (لا يوجد إشعار تلقائي بعد)
+- [ ] **anas: ضبط `trial_ends_at` الفعلي** عند إطلاق الفترة التجريبية فعلياً — حالياً `null` (الحقل جاهز معمارياً لكن الساعة لم تبدأ)
+- [ ] **دَين عملية موثَّق**: `scripts/migrate_lifecycle_state.py` نُفِّذ مباشرة على القاعدة الحية بدون staging أو snapshot صريح (لا يوجد أي منهما بالمشروع) — يجب إصلاح هذا قبل أي migration قادمة تلمس بيانات حية، انظر `.claudedocs/reviews/ADR-0002_POST_IMPLEMENTATION_REVIEW.md` §3
+- [ ] **`dating` module** لا يزال يتجاوز الـtenant registry (static routes بـ`App.jsx` بدل `tenantRegistry`) — اكتُشف بـProject Status Audit، لم يُصلَح بعد
+- [ ] **`.claudedocs/architecture/database_report.md`** قديم جداً (منذ 2026-05-05، يسبق توحيد Phase 54 — 29 model قديم مقابل 34 الحالي) — يحتاج regeneration كامل، لم يُلمَس عمداً لتفادي "false freshness"
+
+### ADR-0002 Contract 02 (Subscription/Plan) — Tech Debt من الـPost-Implementation Review (2026-07-19)
+- [ ] **إغلاق هيكلي (لا سلوكي فقط) لثغرة الـDual-Write**: حذف `SuperRepository.update_client_lifecycle_state()` (`app/repositories/super_repo.py`) بالكامل، وحذف `super_service.update_client_lifecycle_state()` المُعلَّمة كـsuperseded (`app/services/super_service.py`) — لضمان أن `subscription_service` هو المسار الوحيد هيكلياً لكتابة `Client.lifecycle_state`، لا سلوكياً فقط (لا مستدعٍ حالي، لكن الدالة لا تزال قابلة للاستدعاء)
+- [ ] **مصدر الحقيقة عند التسجيل**: تعديل `registration_service.py` و`demo_service.py` لاستدعاء `subscription_service.assign_plan()` فوراً عند إنشاء تينانت جديد (اشتراك Trial) — لا يجب أن يوجد `Client` بدون صف `Subscription` مرافق، ليبقى Subscription مصدر الحقيقة المطلق فعلياً، لا نظرياً فقط (اكتُشف بـ`.claudedocs/reviews/ADR-0002_CONTRACT02_POST_IMPLEMENTATION_REVIEW.md` §6)
 
 ## 🟡 Upcoming (بالأولوية)
 
@@ -111,6 +134,8 @@
 2. **Phase 73: Olivello .glb model** — real olive .glb + morph targets (squish/teardrop on scroll)
 3. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
 4. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
+
+5. **`.claudedocs/SYSTEM_ARCHITECTURE_INDEX.md`** — ليس مجرد فهرس أسماء، بل خريطة علاقات بين الوثائق (مثال: ADR-0002 → TENANT_LIFECYCLE_PLAN + SUPER_ADMIN_DASHBOARD_PLAN → مستقبلاً PAYMENT_ARCHITECTURE_PLAN/NOTIFICATION_ENGINE_PLAN/REPORTING_PLAN) — طلب المستخدم صراحة كتحسين مستقبلي، يُبنى بعد أن يصبح عندنا 5-6 وثائق معمارية، ليس عاجلاً الآن (وثيقتان فقط حالياً: TENANT_LIFECYCLE_PLAN.md وSUPER_ADMIN_DASHBOARD_PLAN.md)
 
 ## Sprint 2 — Code Review Findings (مستقبلي)
 
