@@ -74,10 +74,18 @@ Step 4.5: ⚠️ إنشاء ملفات الـ data — MANDATORY (راجع .clau
         → python scripts/seed_page_content.py {slug}
 
 Step 5: Frontend Architect (بعد نجاح Step 4 مباشرة)
-        → تحقق: هل /{slug}.routes.jsx موجود؟
-          YES → تأكد أنه مسجل في tenants/index.js
-          NO  → أنشئه من _template.routes.jsx
-        → استخدم module_key لاختيار الـ pages الصحيحة
+        → [تصحيح 2026-07-20، مكتشَف بأول Run حقيقي] هذه الخطوة تخص فقط
+          custom-built tenants (مثل beit-al-fakhar) اللي عندها صفحات مبنية يدوياً.
+          الـ tenants العامة (template-based، زي هذا الـpilot) لا تحتاج أي
+          routes.jsx — DynamicTenantResolver.jsx يتحقق تلقائياً: إذا الـslug
+          مش موجود بـtenantRegistry، يذهب مباشرة لـDynamicPage (sections-driven)
+          بدون أي خطوة يدوية. تحقق من هذا أولاً قبل افتراض حاجة لملف routes:
+        → هل الـtenant custom-built (بصفحات مخصصة مطلوبة)؟
+          NO  → لا شيء مطلوب — DynamicPage يعمل تلقائياً، تخطَّ لـStep 6
+          YES → تحقق: هل /{slug}.routes.jsx موجود؟
+                YES → تأكد أنه مسجل في tenants/index.js
+                NO  → أنشئه من _template.routes.jsx
+                → استخدم module_key لاختيار الـ pages الصحيحة
 
 Step 6: تحقق + سلّم الرابط
         → GET /api/v1/public/{slug}/config
@@ -129,9 +137,16 @@ getServicesForTemplate('beauty-barber')    // → ['reservations']
 ## الـ Base URL
 
 ```
-Development: http://localhost:8080     ← (ليس 8000)
+Development: http://localhost:8000
 Production:  https://api.salmansaas.com
 ```
+
+**[correction, 2026-07-20 — first real run]** This previously said `8080 (ليس 8000)` — verified
+wrong against three independent real sources while actually trying to execute: `.env`'s
+`PORT=8000`, `start_dev.sh`'s uvicorn default (`${PORT:-8000}`), and the frontend's own
+`publicApi.js`, which hardcodes `http://127.0.0.1:8000/api/v1/public`. All three agree on 8000;
+none support 8080. This is exactly the kind of error a real run exists to catch — the doc was
+confidently wrong until actually used.
 
 ---
 
@@ -220,7 +235,8 @@ informally — this is the real current handoff, not a formal "Next Agent" dispa
 
 ### How It Runs Today
 **[existing]** One agent, same conversation, sequential 6-step execution (rule 2: "لا تتجاوز
-خطوة"). **[existing]** Demo Flow (`http://localhost:8080`) is the default; Production Flow
+خطوة"). **[existing, corrected]** Demo Flow (`http://localhost:8000` — corrected from a stale
+`8080` reference, see Base URL section) is the default; Production Flow
 requires Salman's explicit approval (per the Production Flow section above).
 
 ### Logs & Evidence

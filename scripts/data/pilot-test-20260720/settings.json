@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "slug": "pilot-test-20260720",
+    "module_key": "restaurant",
+    "currency": "USD",
+    "client_name_en": "Pilot Test Restaurant (Service Contract Validation)",
+    "client_name_ar": "مطعم تجريبي - اختبار الطيار الأول",
+    "primary_color": "#D4A017",
+    "note": "SYNTHETIC TEST FIXTURE — first real tenant-seeder Service Contract validation run, 2026-07-20. Not a real business."
+  }
+}
