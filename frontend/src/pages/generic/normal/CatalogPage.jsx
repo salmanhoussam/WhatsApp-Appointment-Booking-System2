@@ -57,13 +57,6 @@ export default function CatalogPage({ layoutOverride } = {}) {
   const templateKey = layoutOverride ?? activeCategory?.display_template ?? 'grid'
   const Template    = TEMPLATE_MAP[templateKey] ?? CatalogGrid
 
-  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
-  console.log('[RUNTIME-TRACE] CatalogPage render', {
-    moduleKey, isLoading, itemsLoading,
-    categoriesCount: categories.length, itemsCount: filteredItems.length,
-    activeCategory: activeCategory?.id,
-  })
-
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl' }}>
       <TenantModuleNav />

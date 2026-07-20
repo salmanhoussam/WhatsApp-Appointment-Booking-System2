@@ -20,13 +20,9 @@ export default function useCatalog() {
   const slug = useTenantSlug()
   const { moduleKey, setConfig: setStoreConfig } = useGenericStore()
 
-  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
-  console.log('[RUNTIME-TRACE] useCatalog render', { slug, moduleKey, configLoading, hasConfig: !!config })
-
   // Push config into store so moduleKey gets derived from active_services
   useEffect(() => {
     if (config && !configLoading) {
-      console.log('[RUNTIME-TRACE] pushing config into store', { slug, active_services: config.active_services })
       setStoreConfig(config, config.active_services ?? [])
     }
   }, [config, configLoading, setStoreConfig])
@@ -38,45 +34,46 @@ export default function useCatalog() {
   const [catsLoading,   setCatsLoading]   = useState(false) // ← BUG FIX: false, not true
   const [itemsLoading,  setItemsLoading]  = useState(false)
 
+  // mountedRef must be reset to true in the effect's setup, not just useRef(true)'s
+  // initializer — under React 18 StrictMode's dev-mode mount→cleanup→remount cycle,
+  // the cleanup below runs once during that simulated unmount and (without this reset)
+  // permanently latches mountedRef.current to false for the rest of the component's
+  // real lifetime. Every subsequent `if (mountedRef.current)` guard in this file then
+  // silently no-ops forever - fetches resolve correctly but state updates are skipped -
+  // which was the confirmed root cause of the beit-al-fakhar /store infinite loading
+  // spinner (proven via direct headless-Chrome CDP capture, 2026-07-21).
   const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Fetch categories once moduleKey + slug are ready
   useEffect(() => {
-    console.log('[RUNTIME-TRACE] categories effect fired', { moduleKey, slug, willFetch: !!(moduleKey && slug) })
     if (!moduleKey || !slug) return
     setCatsLoading(true)
     fetchCategories(moduleKey, slug)
       .then(({ data }) => {
-        console.log('[RUNTIME-TRACE] categories fetch resolved', { count: data?.data?.length ?? 0 })
         if (!mountedRef.current) return
         const cats = data?.data ?? []
         setCategories(cats)
         if (cats.length) setActiveCatRaw(cats[0])
       })
-      .catch((err) => {
-        console.log('[RUNTIME-TRACE] categories fetch REJECTED', { message: err?.message, status: err?.response?.status })
-        if (mountedRef.current) setCategories([])
-      })
+      .catch(() => { if (mountedRef.current) setCategories([]) })
       .finally(() => { if (mountedRef.current) setCatsLoading(false) })
   }, [moduleKey, slug])
 
   // Fetch items when active category changes
   useEffect(() => {
-    console.log('[RUNTIME-TRACE] items effect fired', { activeCategory: activeCategory?.id, moduleKey, slug })
     if (!activeCategory || !moduleKey || !slug) return
     setItemsLoading(true)
     setItems([])
     fetchItems(moduleKey, slug, activeCategory.id)
       .then(({ data }) => {
-        console.log('[RUNTIME-TRACE] items fetch resolved', { count: data?.data?.length ?? 0 })
         if (!mountedRef.current) return
         setItems(data?.data ?? [])
       })
-      .catch((err) => {
-        console.log('[RUNTIME-TRACE] items fetch REJECTED', { message: err?.message, status: err?.response?.status })
-        if (mountedRef.current) setItems([])
-      })
+      .catch(() => { if (mountedRef.current) setItems([]) })
       .finally(() => { if (mountedRef.current) setItemsLoading(false) })
   }, [activeCategory, moduleKey, slug])
 

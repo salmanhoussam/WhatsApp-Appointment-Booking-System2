@@ -61,9 +61,6 @@ export default function useTenantConfig(slugOverride) {
   const autoSlug = useTenantSlug();
   const slug     = slugOverride ?? autoSlug ?? 'smar';
 
-  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
-  console.log('[RUNTIME-TRACE] useTenantConfig render', { slug })
-
   const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey:  [slug, 'config'],
     queryFn:   () => publicApi.get(`/${slug}/config`).then(r => r.data),
@@ -89,11 +86,6 @@ export default function useTenantConfig(slugOverride) {
     [isError, data, slug]
   );
   const resolved = config ?? DEFAULT_CONFIG;
-
-  // TEMP RUNTIME TRACE — 2026-07-21, remove once beit-al-fakhar /store investigation closes
-  console.log('[RUNTIME-TRACE] useTenantConfig result', {
-    slug, isLoading, isError, hasData: !!data, active_services: resolved.active_services,
-  })
 
   return {
     config:    resolved,
