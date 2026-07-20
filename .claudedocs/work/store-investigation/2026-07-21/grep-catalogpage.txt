@@ -1,0 +1,15 @@
+$ grep -rln "لا توجد عناصر في هذا القسم" frontend/src/
+frontend/src/pages/demo/DemoCatalogPage.jsx
+frontend/src/pages/generic/normal/CatalogPage.jsx
+frontend/src/pages/catalog/CatalogPage.jsx
+
+# Three files share this exact string. Confirmed which one /store actually
+# loads via grep-routes.txt: frontend/src/pages/generic/normal/CatalogPage.jsx
+# (line 112 of that file has the exact string) - not the other two.
+
+$ grep -rln "pages/catalog/CatalogPage\|from '\.\./catalog/CatalogPage'\|from '\./CatalogPage'" frontend/src/router/ frontend/src/pages/
+(no output - frontend/src/pages/catalog/CatalogPage.jsx has zero importers anywhere)
+
+$ stat -c '%y %n' frontend/src/pages/catalog/CatalogPage.jsx frontend/src/pages/generic/normal/CatalogPage.jsx
+2026-07-04 19:13:08.000000000 +0300 frontend/src/pages/catalog/CatalogPage.jsx
+2026-07-04 19:13:08.000000000 +0300 frontend/src/pages/generic/normal/CatalogPage.jsx

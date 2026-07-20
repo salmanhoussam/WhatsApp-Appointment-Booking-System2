@@ -1,0 +1,2 @@
+$ curl -s -o /dev/null -w "%{http_code}\n" -H "Origin: http://localhost:5173" "http://127.0.0.1:8000/api/v1/public/catalog/categories?client_slug=beit-al-fakhar"
+200

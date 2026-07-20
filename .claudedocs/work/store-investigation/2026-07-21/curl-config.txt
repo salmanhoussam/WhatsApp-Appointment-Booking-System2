@@ -1,0 +1,25 @@
+$ curl -s -D - -o /dev/null -H "Origin: http://localhost:5173" "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config"
+HTTP/1.1 200 OK
+date: Mon, 20 Jul 2026 21:09:51 GMT
+server: uvicorn
+content-length: 410
+content-type: application/json
+access-control-allow-origin: http://localhost:5173
+access-control-allow-credentials: true
+vary: Origin
+
+$ curl -s -D - -o /dev/null -X OPTIONS -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET" "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config"
+HTTP/1.1 200 OK
+date: Mon, 20 Jul 2026 21:09:59 GMT
+server: uvicorn
+vary: Origin
+access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+access-control-max-age: 600
+access-control-allow-credentials: true
+access-control-allow-origin: http://localhost:5173
+content-length: 2
+content-type: text/plain; charset=utf-8
+
+# Re-check after the retry bump, same session:
+$ curl -s -o /dev/null -w "%{http_code}\n" -H "Origin: http://localhost:5173" "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config"
+200

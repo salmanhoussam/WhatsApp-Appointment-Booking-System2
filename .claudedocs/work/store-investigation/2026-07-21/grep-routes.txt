@@ -1,0 +1,13 @@
+$ grep -n "beit-al-fakhar\|anas" frontend/src/router/tenants/index.js
+73:  'beit-al-fakhar': {
+74:    routes:          lazy(() => import('./beit-al-fakhar.routes')),
+75:    defaultRedirect: 'home',     // canonical: demo.salmansaas.com/beit-al-fakhar/home
+
+$ find frontend/src/router/tenants -iname "*fakhar*" -o -iname "*anas*"
+frontend/src/router/tenants/beit-al-fakhar.routes.jsx
+
+# Relevant excerpt from beit-al-fakhar.routes.jsx confirming /store's real target:
+const HomePage             = lazy(() => import('../../pages/beit-al-fakhar/normal/HomePage'));
+const CatalogPage          = lazy(() => import('../../pages/generic/normal/CatalogPage'));
+...
+<Route path="store" element={<Lazy component={CatalogPage} />} />

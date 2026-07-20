@@ -211,6 +211,11 @@ edit files himself, and does not execute a Service's own work. His responsibilit
   state is trustworthy: "Is the repository state trustworthy enough to start new work? YES/NO —
   Evidence: ..." See `.claude/rules/repository-hygiene.md`. A standing responsibility, not a
   one-time favor — first applied 2026-07-20 before the Store template's Service Contract.
+- Investigation Reporting — any bug/root-cause report follows `.claude/rules/investigation-
+  protocol.md`: real evidence files, a Confirmed/Side Findings/Unknowns structure, no claim
+  stronger than what was actually verified, and Recommendation/Decision/Execution kept as
+  separately labeled steps, not fused into one sentence. First applied 2026-07-21 (beit-al-fakhar
+  `/store` investigation, `.claudedocs/work/store-investigation/2026-07-21/`).
 
 ## Accountability Principle
 

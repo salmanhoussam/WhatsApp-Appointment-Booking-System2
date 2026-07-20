@@ -62,6 +62,7 @@ rules/team-roles.md              -- Always: internal Architecture Guardian/Docum
 rules/documentation-policy.md    -- Always: ADR → Architecture Plan → Implementation Contract → Implementation → Verification → Post-Implementation Review → Archive; fixed .claudedocs/ folder structure (adr/, architecture/, implementation/, verification/, reviews/, decisions/, sessions/)
 rules/service-execution-constitution.md -- Always: how every independent Service investigates context, leaves evidence, and handles missing input, before any Service Contract
 rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention
+rules/investigation-protocol.md  -- Always: bug/root-cause investigations write evidence files, report in Confirmed/Side Findings/Unknowns, separate Recommendation from Decision from Execution
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern
