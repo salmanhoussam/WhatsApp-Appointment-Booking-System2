@@ -83,7 +83,7 @@ cyber-sentinel         -- Security engineer: multi-tenancy leaks, auth, race con
 backend/  -- database-architecture, supabase-prisma, n8n-automation
 frontend/ -- gs-mar-design-system, admin-dashboard-builder, awwwards-animations,
              webgl-awwwards, frontend-component-builder, ai-agent-canvas,
-             ui-ux-pro-max, frontend-design,
+             ui-ux-pro-max, frontend-design, frame-sequence-canvas,
              tanstack-query (React Query v5 — multi-tenant cache layer)
 shared/   -- auto-reporting, project-health, motion-design (Higgsfield video ads — /motion-design)
 general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, + more
