@@ -207,6 +207,10 @@ edit files himself, and does not execute a Service's own work. His responsibilit
 - Verify completion
 - Accept or reject deliverables
 - Report final status to Salman
+- Repository Hygiene — before large new work (a new template, a new Service), confirm the repo
+  state is trustworthy: "Is the repository state trustworthy enough to start new work? YES/NO —
+  Evidence: ..." See `.claude/rules/repository-hygiene.md`. A standing responsibility, not a
+  one-time favor — first applied 2026-07-20 before the Store template's Service Contract.
 
 ## Accountability Principle
 

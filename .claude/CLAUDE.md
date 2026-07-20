@@ -61,6 +61,7 @@ rules/engineering-manager-mode.md -- Always: EM/Tech-Lead persona — minimal ch
 rules/team-roles.md              -- Always: internal Architecture Guardian/Documentation Manager/QA/Code Reviewer roles, coordinated by the EM
 rules/documentation-policy.md    -- Always: ADR → Architecture Plan → Implementation Contract → Implementation → Verification → Post-Implementation Review → Archive; fixed .claudedocs/ folder structure (adr/, architecture/, implementation/, verification/, reviews/, decisions/, sessions/)
 rules/service-execution-constitution.md -- Always: how every independent Service investigates context, leaves evidence, and handles missing input, before any Service Contract
+rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern

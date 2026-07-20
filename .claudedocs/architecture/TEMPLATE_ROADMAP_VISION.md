@@ -34,6 +34,13 @@ happens when their turn arrives, grounded in whatever the Restaurant pass actual
 (same discipline as `AI_OPERATIONS_PLATFORM_VISION.md`'s 3-phase gate: generalize from proven
 cases, not from prediction).
 
+It also does not treat Restaurant as an automatic baseline for Store/Clinic just because it went
+first — per the Reference Validation Rule (`.claude/rules/repository-hygiene.md`), Restaurant's
+Contract, architecture, and repository state need explicit audit and acceptance before Store
+adopts it as a starting point. As of 2026-07-20 that audit is in progress (repository drift
+audit) and visual browser confirmation is still pending (`todo_list.md`) — Restaurant is not yet
+formally accepted as the reference.
+
 ## Related
 
 - `.claudedocs/decisions/2026-07-20-cash-only-billing.md` — billing decision, unblocks but does
