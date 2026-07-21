@@ -5,17 +5,17 @@ architecture plan, per `.claude/rules/documentation-policy.md`. Follows the Serv
 Constitution's "real project state is the source of truth" principle throughout: every claim
 below about what exists was verified by reading the real files, not assumed.
 
-**Revision note (this pass, renamed from `TENANT_SELF_SERVICE_DASHBOARD_PLAN.md`)**: Salman's
-review identified that the document's own name was steering its thinking toward "the Dashboard"
-as the product, when the real product is a set of tenant Capabilities that the Dashboard is only
-one interface onto. This revision: (1) renames the document and reframes accordingly (§5), (2)
-adds an eighth capability, Site Configuration, broader than Theme (§12), (3) adds a Single Source
-of Truth Matrix, ranked above the Capability Matrix as the single most important table in this
-plan (§13), and (4) adds a formal Architecture Integrity Findings section (§15) so that code which
-exists but isn't wired in, or which routes around tenant boundaries, is tracked as an architecture
-concern rather than filed away as ordinary technical debt. Investigating that last point surfaced
-real, previously-unreported findings — a live Single-Source-of-Truth violation on `CatalogItem`
-writes, and a systemic pattern of admin routes bypassing the Services layer — reported in §15.
+**Revision note (this pass)**: Salman identified that "Capability" was being treated as the top of
+the tree, when it's actually one of three siblings. This revision: (1) corrects the Tenant OS
+anatomy to `Capability / Interface / Governance` (§5), naming a Governance layer that didn't exist
+in the plan before — Permissions, Draft/Publish, Audit, Versioning, Activity — as cross-cutting
+concerns built once, not re-implemented per Capability (§15); (2) adds a fifth Design Principle,
+the project's proposed constitution line, "One Capability. One Contract. One Service. One Source
+of Truth. Many Interfaces." (§3); (3) reclassifies every Architecture Integrity Finding into
+exactly one of three named types — Broken / Missing / Duplicate — per Salman's explicit taxonomy,
+which required re-verifying several write paths individually rather than leaving them in one
+undifferentiated "systemic bypass" bucket (§16); (4) sharpens the deferred Client Journey Audit
+(§18) from a checklist into a real qualitative first-time-user observation.
 
 ---
 
@@ -75,7 +75,7 @@ a developer can populate is not finished, no matter how it looks.
 
 ## 3. Design Principles
 
-Four standing principles every future Content/Template/Platform decision gets measured against.
+Five standing principles every future Content/Template/Platform decision gets measured against.
 
 1. **Content vs Structure stays a real, enforced boundary** — never a hope, always a mechanism
    (see §4's three layers).
@@ -95,25 +95,37 @@ Four standing principles every future Content/Template/Platform decision gets me
    appear on this exact page, with zero developer involvement?"** If yes, the architecture is
    correct. If no, the Product Page — however polished — is not actually done.
 
-   This principle applies retroactively as a lens, not just prospectively: it is exactly the gap
-   the Store Experience Review found in beit-al-fakhar (§2) — the Product Page itself passes this
-   test today (real products created via the dashboard's `CatalogTab` do appear on it), but the
-   generic numbered titles and the empty hero exist because *authoring good content* through that
-   same real mechanism hasn't happened yet. The mechanism existing is necessary; it is not
-   sufficient on its own without someone actually using it.
+   The name "how will the client edit this" no longer implicitly means "...from the Dashboard." It
+   means "...from *any* Capability consumer" — the Dashboard today, an AI assistant or the public
+   API tomorrow. A feature whose only answer is "there's a button in the Dashboard" has coupled a
+   Capability to one Interface, which §5 says not to do.
 
-   The name change in this revision (§5) sharpens this principle further: "how will the client
-   edit this" no longer implicitly means "...from the Dashboard." It means "...from *any* Capability
-   consumer" — the Dashboard today, an AI assistant or the public API tomorrow. A feature whose only
-   answer is "there's a button in the Dashboard" has coupled a Capability to one interface, which
-   §5 says not to do.
+5. **The project's proposed constitution line, adopted verbatim**:
+
+   > **One Capability. One Contract. One Service. One Source of Truth. Many Interfaces.**
+
+   Concretely: `Catalog → Capability Contract → Catalog Service → Catalog Repository →
+   CatalogItem`. Whatever in the world wants to change a Product — Dashboard, AI, an Importer, a
+   WhatsApp Bot, Mobile, the Public API — goes through that exact same path, always. This is not a
+   restatement of §13's Single Source of Truth Matrix; it's the principle that Matrix exists to
+   enforce, elevated here to a standing rule because, per Salman's own reasoning, the failure mode
+   it prevents is severe and easy to back into by accident: Dashboard writing through a Repository
+   here, AI writing through a Service there, an Importer writing raw SQL somewhere else — each
+   choice individually reasonable in isolation, and after a year of that, nobody knows where the
+   truth actually lives. §16's findings show this has already started happening in this codebase,
+   which is exactly why this principle is being written down now rather than after a second year.
 
 ---
 
 ## 4. The Three Layers — Platform / Template / Content
 
-This is the single most important structural distinction in this plan, and every other section is
-downstream of it.
+This is a different three-part model than §5's Capability/Interface/Governance anatomy — the two
+are not competing descriptions of the same thing and shouldn't be read as such. This section
+answers **"who owns a given piece of data or design"** (a Content-ownership question); §5 answers
+**"how is the system itself organized internally"** (a system-anatomy question). The same Content
+item (say, a Product's price) is simultaneously Content-layer-owned (§4, the tenant may edit it)
+and reached through the Catalog Capability (§5, via its one Contract/Service/Repository chain) —
+the two axes are orthogonal, not redundant.
 
 ### Layer 1 — Platform (المنصة). Owned by the developer only. Never touched by any tenant, ever.
 
@@ -130,21 +142,19 @@ determines which Content-layer Capabilities a tenant even sees.
 The shape of the Product Page; the shape of the Checkout page; where sections are placed;
 animation; card design. This is `CanvasPageEditor.jsx`'s `SECTION_TYPES` registry, the page
 component tree, the Framer Motion presets in `rules/frontend/animations.md` — real Structure. The
-correction the previous revision made explicit, unchanged here: **the Template layer is not
-automatically drag-and-drop-everything from day one.** A tenant may be allowed to pick a theme, a
-color, a font, or a bounded reordering of a small number of pre-defined slots — never arbitrary
-layout freedom, never a new section type, never CSS access. Exactly which of those narrow
-exceptions are granted (§10) is itself a Template-layer design decision the developer makes once
-per Template, not something the tenant negotiates per-instance.
+Template layer is not automatically drag-and-drop-everything from day one. A tenant may be allowed
+to pick a theme, a color, a font, or a bounded reordering of a small number of pre-defined slots —
+never arbitrary layout freedom, never a new section type, never CSS access. Exactly which of those
+narrow exceptions are granted (§10) is itself a Template-layer design decision the developer makes
+once per Template, not something the tenant negotiates per-instance.
 
 ### Layer 3 — Content (المحتوى). Owned by the tenant, fully, forever, with zero technical knowledge required.
 
 Everything Structure/Template was built to hold: Categories, Products, Images, Videos, Hero text,
 About, Contact info, WhatsApp number, Social Media links, SEO metadata, Home section content, all
-copy, all prices, product ordering, category ordering, publish/hide state for any item, and (this
-revision, §12) the broader Site Configuration surface. This is where the real product — the
-**Tenant OS** (§5) — lives. §6 maps every one of these to a real existing field; where none exists
-yet, it's marked as a Gap, not silently assumed.
+copy, all prices, product ordering, category ordering, publish/hide state for any item, and the
+broader Site Configuration surface (§12). §6 maps every one of these to a real existing field;
+where none exists yet, it's marked as a Gap, not silently assumed.
 
 ### The layer test
 
@@ -161,49 +171,51 @@ For any future feature request, ask in order:
 
 ---
 
-## 5. Tenant OS — Capabilities, not a Dashboard
+## 5. Tenant OS Anatomy — Capability / Interface / Governance
 
-Salman's central correction to this plan, and the reason the document itself is renamed. **The
-Dashboard is not the product.** It is one interface among several onto a set of independent,
-named Capabilities — the same relationship an operating system has to its applications:
+Salman's central correction, and the reason this section replaces the previous revision's tree.
+**Capability is not the top of the system — it's one of three siblings.** The corrected shape:
 
 ```
 Tenant OS
-  ├── Catalog
-  ├── Category
-  ├── Media
-  ├── Site Configuration
-  ├── Content
-  ├── Orders
-  ├── Customers
-  └── AI (reserved, §11)
+  │
+  ├── Capability
+  │      ├── Contract        (§12 — what the capability can do)
+  │      ├── Service          (the one canonical write path, §13)
+  │      ├── Repository       (Prisma queries only, no logic)
+  │      └── Database         (the real Prisma model — the actual source of truth)
+  │      [ one branch per domain: Catalog, Category, Media, Site Configuration,
+  │        Content, Orders, Customers — see §12 ]
+  │
+  ├── Interface
+  │      ├── Dashboard   — real, two implementations exist today (§1, §7)
+  │      ├── AI           — reserved, not built (§11)
+  │      ├── Mobile       — not built, a real Gap, not designed here
+  │      └── API          — a *tenant-authoring* API (distinct from the existing
+  │                         shopper-facing `/api/v1/public/*`, which already exists
+  │                         but serves customers, not tenants managing their own
+  │                         data) — not built, a real Gap, not designed here
+  │
+  └── Governance
+         ├── Permissions    — who may invoke a Capability (§14's Capability Matrix)
+         ├── Draft/Publish  — staged edits before going live (§8's Live Preview)
+         ├── Audit          — who changed what, when (real Gap, §15)
+         ├── Versioning     — content history / undo (real Gap, §15)
+         └── Activity       — a human-readable feed of recent changes (real Gap, §15)
 ```
 
-Each Capability may be reached through more than one **interface** — the Dashboard today, an AI
-Chat panel and the public API tomorrow, a Mobile app eventually — but every interface calls the
-**same** Capability, never a parallel implementation of it. This is the concrete reason §13's
-Single Source of Truth Matrix matters as much as it does: if "AI creates a product" and "the
-Dashboard creates a product" are two different code paths, they will drift the moment one of them
-gains a validation rule the other doesn't have. If they are the same Capability invoked from two
-interfaces, they cannot drift by construction.
+**Why this correction matters, concretely**: Draft/Publish, Audit, Versioning, and Activity are
+not properties of any one Capability. Catalog does not get its own separate audit log; Content does
+not get its own separate draft/publish mechanism. These are cross-cutting concerns, built **once**
+at the Governance layer, and every Capability inherits them automatically. Before this correction,
+the plan risked exactly the mistake this distinction prevents: treating "Draft/Publish" (§8) as
+something the Catalog Capability happens to need, rather than a Governance-layer mechanism every
+Capability plugs into identically. §15 is where this is made concrete.
 
-**What changes in practice because of this reframing**:
-
-- §12's "Dashboard Service Contracts" are renamed **Capability Contracts** — a Capability is
-  interface-agnostic by definition; calling it a "Dashboard Service" the way the first draft did
-  re-introduces the exact coupling this section exists to remove.
-- §14's Capability Matrix already expressed this correctly by accident — it asks "who may invoke
-  this Capability" (Client / AI), never "what does the Dashboard screen for this look like." This
-  revision keeps that framing and makes the reasoning behind it explicit.
-- §11's future AI Integration placeholder is strengthened, not changed: an AI assistant was already
-  required to act through the same Content-writing surface a human uses (§9's rule); the Tenant OS
-  framing makes clear *why* — AI is just another interface onto the same Capabilities, with the
-  same permission ceiling (§14), not a special case requiring its own integration work per
-  Capability.
-- Every future interface (Mobile, Public API, an Import Tool) inherits this for free **if and only
-  if** §13's single-write-path rule is actually followed — which, per §15's real findings, is not
-  fully true of this codebase today. That gap is exactly why §15 exists as its own section rather
-  than a footnote.
+**What this means for the rest of the document**: every section from here on is one of three
+things — Capability content (§6, §12, §13), Interface content (§7, §11), or Governance content
+(§8, §14, §15). None of them is "the top level" of anything; all three are children of the same
+Tenant OS, exactly as drawn above.
 
 ---
 
@@ -261,9 +273,9 @@ share this same stable shape), even though the two *current* dashboards (`Generi
 
 ## 7. Interface Design Philosophy — Direct Manipulation, Not Forms
 
-This section is about how the **Dashboard interface specifically** should feel — one Capability
-consumer among several (§5); an AI Chat interface or a future Mobile app will have their own
-natural interaction modes over the same Capabilities, not this one's.
+This section is about how the **Dashboard interface specifically** should feel — one of four
+Interface siblings (§5); an AI Chat interface or a future Mobile app will have their own natural
+interaction modes over the same Capabilities, not this one's.
 
 Salman's explicit framing: the deliverable is not "an admin panel with fewer forms." The Dashboard
 should feel the way Notion, Shopify, or Framer feel (named here as the *felt experience* to aim
@@ -291,22 +303,25 @@ number field"), continuing the real pattern `GalleryImage`'s reorder endpoint al
 
 ---
 
-## 8. Live Preview — architectural approach, not a UI design
+## 8. Live Preview — the Governance layer's Draft/Publish mechanism
 
-Requirement, not optional, per the brief. The architecturally sound approach, given what already
-exists: **the preview must render using the exact same public-facing components a real customer
-sees** — the same `CatalogPage.jsx`/`ProductPage.jsx`/tenant home components already built and
-validated this session — not a second, parallel "preview renderer" that could drift from the real
-page. This mirrors the exact lesson beit-al-fakhar's Product Page already proved: reuse
-(`CatalogGrid`, `useGenericStore`) beats reimplementation. Concretely, at the architecture level
-(no component design here): the dashboard's editing surface and the tenant's real public page
-render from the **same content source** (`Client.config.content`, the same `CatalogItem` rows),
-with the *only* difference being a `draft`/`live` distinction at the data layer (edits are staged,
-not written straight to what the public page reads, until the tenant hits Save/Publish) — not two
-different rendering codepaths. Whether that staging is a `draft_config` column, a separate
-`is_published` flag, or something else is deliberately **not decided here** — it's real schema
-work for a future Implementation Contract, gated by whichever module needs Live Preview first
-proving the shape (Abstraction Rule).
+Requirement, not optional, per the brief, and — per §5's corrected anatomy — this is the
+**Draft/Publish** piece of the Governance layer, not a Catalog-specific or Content-specific
+feature. Built once here, every Capability inherits it identically; no Capability designs its own.
+
+The architecturally sound approach, given what already exists: **the preview must render using the
+exact same public-facing components a real customer sees** — the same `CatalogPage.jsx`/
+`ProductPage.jsx`/tenant home components already built and validated this session — not a second,
+parallel "preview renderer" that could drift from the real page. This mirrors the exact lesson
+beit-al-fakhar's Product Page already proved: reuse (`CatalogGrid`, `useGenericStore`) beats
+reimplementation. Concretely, at the architecture level (no component design here): the dashboard's
+editing surface and the tenant's real public page render from the **same content source**
+(`Client.config.content`, the same `CatalogItem` rows), with the *only* difference being a
+`draft`/`live` distinction at the data layer (edits are staged, not written straight to what the
+public page reads, until the tenant hits Save/Publish) — not two different rendering codepaths.
+Whether that staging is a `draft_config` column, a separate `is_published` flag, or something else
+is deliberately **not decided here** — it's real schema work for a future Implementation Contract,
+gated by whichever Capability needs Live Preview first proving the shape (Abstraction Rule).
 
 ---
 
@@ -319,7 +334,7 @@ already collapses an entire branding form into one `PATCH /settings` call the te
 a single "choose photo" interaction. The architectural rule going forward is simply to hold this
 line as new Content types are added: **every interface interaction maps to exactly one save action
 from the tenant's point of view**, however many requests it takes underneath, and regardless of
-which interface (Dashboard, AI, Mobile) originated it. This is a constraint on future
+which Interface (Dashboard, AI, Mobile) originated it. This is a constraint on future
 Implementation Contracts, not new design work — the pattern to keep replicating already exists in
 two real files.
 
@@ -329,9 +344,9 @@ two real files.
 
 Explicitly not a full Theme Builder, per the brief, and explicitly **not** everything-drag-and-drop
 from day one, per §4's Template-layer correction. Note this section is deliberately narrower than
-§12's new Site Configuration Capability — Theme is specifically the *visual* tokens; Site
-Configuration is everything else about how the tenant's business itself is set up (§12). The
-boundary, using real existing fields:
+§12's Site Configuration Capability — Theme is specifically the *visual* tokens; Site Configuration
+is everything else about how the tenant's business itself is set up. The boundary, using real
+existing fields:
 
 | Editable (Content, tenant picks a value) | Real mechanism | Protected (Template, developer-owned) |
 |---|---|---|
@@ -350,24 +365,24 @@ drag-and-drop interaction pattern exists elsewhere in the Tenant OS.
 
 ## 11. Future AI Integration — where it plugs in, not how it works yet
 
-Explicitly **not built now**, per the brief. The architectural placeholder this plan leaves,
-sharpened by §5's reframing:
+Explicitly **not built now**, per the brief. AI is an **Interface** sibling (§5), not a Capability —
+the architectural placeholder this plan leaves:
 
-- An AI assistant is simply **another interface onto the Tenant OS's Capabilities** (§5) — it must
+- An AI assistant is simply **another Interface onto the Tenant OS's Capabilities** (§5) — it must
   act **through the same Capability a human uses**, never a separate privileged codepath. "Create a
   new category" from a chat prompt must resolve to the exact same Category Capability the "+ Add
   Category" button already triggers — never a shortcut that bypasses whatever validation/
   `require_service` gate protects that Capability normally.
 - The trust boundary stays exactly where §9 already puts it for humans: the AI may **draft**
-  changes (new copy, a reordered list, a suggested category) into the same `draft`/staged layer
-  §8's Live Preview already needs to exist — the tenant still reviews in Live Preview and hits Save
-  before anything goes live. This isn't a new concept invented for AI; it's the same Live-Preview
-  staging mechanism §8 already requires for humans, reused.
-- Its permission ceiling is not a new decision — it's §14's Capability Matrix, read directly: the
-  AI may invoke exactly the Capabilities marked ✅ for AI there, no more, no negotiation per
-  feature.
-- Concretely reserved, not designed: a chat-style interface surface, and a narrow, explicit
-  action-vocabulary the assistant is allowed to call (the same vocabulary every other interface
+  changes (new copy, a reordered list, a suggested category) into the same Governance-layer
+  Draft/Publish mechanism (§8) — the tenant still reviews in Live Preview and hits Save before
+  anything goes live. This isn't a new concept invented for AI; it's the same staging mechanism §8
+  already requires for humans, reused.
+- Its permission ceiling is not a new decision — it's §14's Capability Matrix (Governance:
+  Permissions), read directly: the AI may invoke exactly the Capabilities marked ✅ for AI there,
+  no more, no negotiation per feature.
+- Concretely reserved, not designed: a chat-style Interface surface, and a narrow, explicit
+  action-vocabulary the assistant is allowed to call (the same vocabulary every other Interface
   already exposes — nothing more). No model choice, no prompt design, no new endpoint is decided
   here.
 
@@ -380,12 +395,11 @@ project already uses "Service" for two different things — the Service Executio
 autonomous-agent "Service" (`tenant-seeder` and its siblings, `.claude/rules/service-execution-
 constitution.md`), and `service-system.md`'s per-tenant feature-flag "Service"
 (`client_services.serviceKey`, e.g. the real flag literally named `catalog`). What follows is a
-**third, different sense again** — a
-**Tenant OS Capability** (§5): a named, interface-agnostic unit of what a tenant can do (Catalog,
-Category, Media, Site Configuration, Content, Orders, Customers). Deliberately not called a
-"Service" at all in this revision (the first draft called these "Dashboard Service Contracts" —
-renamed here per §5's correction, so the word "Dashboard" no longer implies these belong to one
-interface, and the word "Service" doesn't collide a fourth time).
+**third, different sense again** — a **Tenant OS Capability** (§5): a named, interface-agnostic
+unit of what a tenant can do (Catalog, Category, Media, Site Configuration, Content, Orders,
+Customers). Deliberately not called a "Service" at all — that word is reserved for the one
+canonical write-path module each Capability owns internally (§5's tree: Contract → **Service** →
+Repository → Database).
 
 Each Capability lists its real sub-capabilities, marked against what this investigation actually
 verified — not proposed features. **Gap** means the sub-capability is a real, intended piece of the
@@ -422,7 +436,7 @@ Content layer (§4) that has no mechanism yet; it is not a suggestion to build i
 | Delete a unit gallery photo | ✅ Real | `DELETE /gallery/images/{id}` |
 | Browse/reuse previously uploaded media across contexts (a real Media Library) | ⚠️ Gap | No client-wide "list my media" endpoint exists — every upload is bound to one context, nothing is browsable/reusable across contexts today |
 
-### Site Configuration Capability (new in this revision — broader than Theme)
+### Site Configuration Capability (broader than Theme)
 
 Salman's explicit addition: not Theme (§10, narrowly visual), but everything about how the
 tenant's business itself is configured.
@@ -470,47 +484,51 @@ tenant's business itself is configured.
 | View customer list | ⚠️ Real code exists, but **not live** | `app/api/v1/admin/customers.py` defines full CRUD, but is never `include_router`'d in `app/api/v1/admin/__init__.py` — confirmed by reading that file's router list directly; this endpoint is unreachable today |
 | Edit / delete a customer | ⚠️ Same as above | same file, same unmounted status |
 
-See §15 for why this Capability's gap is treated as an Architecture Integrity Finding, not an
-ordinary Gap.
+See §16 for why this Capability's gap is treated as a formally-classified Architecture Integrity
+Finding, not an ordinary Gap.
 
 ---
 
 ## 13. Single Source of Truth Matrix — the most important table in this plan
 
 Salman's explicit framing, adopted verbatim: this table, not the Capability Matrix, is the real
-governing artifact. Its point is structural, not informational: **every Capability's data has
-exactly one model that owns it, and exactly one code path that may write to that model.** No
-interface — Dashboard, AI, public API, a future Import Tool — may ever write to the database
-directly; every write goes through that Capability's one canonical path.
+governing artifact — the direct expression of Design Principle 5 (§3): **One Capability. One
+Contract. One Service. One Source of Truth. Many Interfaces.** Its point is structural, not
+informational: **every Capability's data has exactly one model that owns it, and exactly one code
+path that may write to that model.** No Interface — Dashboard, AI, public API, a future Import
+Tool — may ever write to the database directly; every write goes through that Capability's one
+canonical path.
 
 | Capability | Source of Truth (model) | Intended single write path | Current reality |
 |---|---|---|---|
-| Products | `CatalogItem` | `catalog_service.py` | ⚠️ **Violated today** — see §15, Finding 1 |
-| Categories | `CatalogCategory` | `catalog_service.py` | ⚠️ **Violated today** — see §15, Finding 1 |
-| Units (Booking) | `Unit` | `unit_service.py` (exists) | ⚠️ **Violated today** — admin write routes bypass it (§15, Finding 2) |
-| Site Configuration / Theme / Home Sections | `Client.config` (Json) | No dedicated service exists yet | ⚠️ Gap — `settings.py` writes straight to `admin_client_repo`, bypassing even the orphaned `client_service.py` (§15, Finding 3) |
-| Orders (Store/Restaurant) | `StoreOrder` / restaurant order model | No dedicated service found | ⚠️ `store.py`/`restaurant.py` call repositories directly for order reads/status writes |
-| Customers | `Customer` | `customer_service.py` (exists, correctly used by `customers.py`) | ⚠️ Unreachable + unguarded — the service itself is fine; the route wrapping it is not mounted and lacks tenant scoping (§15, Finding 4) |
-| Gallery / Media | `GalleryImage` | No dedicated service — `storage_service.py` only handles upload/storage mechanics, not CRUD | ⚠️ `gallery.py` calls `gallery_repo` directly for all CRUD |
+| Products | `CatalogItem` | `catalog_service.py` | ⚠️ **Violated today** — §16, Duplicate Architecture |
+| Categories | `CatalogCategory` | `catalog_service.py` | ⚠️ **Violated today** — §16, Duplicate Architecture |
+| Units (Booking) | `Unit` | `unit_service.py` (exists) | ⚠️ **Violated today** — §16, Broken Architecture |
+| Site Configuration / Theme / Home Sections | `Client.config` (Json) | `client_service.py` (exists) | ⚠️ **Violated today** — §16, Broken Architecture |
+| Orders (Store/Restaurant) | `StoreOrder` / restaurant order model | No dedicated service exists | ⚠️ §16, Missing Architecture |
+| Customers | `Customer` | `customer_service.py` (exists, correctly used) | ⚠️ Route unreachable — §16, Missing Architecture |
+| Gallery / Media | `GalleryImage` | No dedicated service exists | ⚠️ §16, Missing Architecture |
+| Team / Staff | `User` | No dedicated service exists | ⚠️ §16, Missing Architecture |
 
 **Reading this table honestly, not optimistically**: almost no admin-side Capability has a clean
 single write path *today*. `catalog.py` is the one file in this entire codebase that does it
-correctly — Route → `catalog_service.py` → Repository. Every other admin route this investigation
-read skips the Service layer entirely. This is exactly the risk Salman named: without this fixed
-first, an AI assistant, a Mobile app, or an Import Tool arriving "after a year" would each face the
-same choice `store.py` and `restaurant.py` already made once — reimplement the write logic
-directly against a repository — and each would make it independently, compounding the exact
-problem this matrix exists to prevent. Closing this is real Implementation Contract work, not
-performed in this document; §15 names it formally so it isn't lost among smaller notes.
+correctly — Route → `catalog_service.py` → Repository. This is exactly the risk Salman named:
+without this fixed first, an AI assistant, a Mobile app, or an Import Tool arriving "after a year"
+would each face the same choice `store.py` and `restaurant.py` already made once — reimplement the
+write logic directly against a repository — and each would make it independently, compounding the
+exact problem this matrix exists to prevent. Closing this is real Implementation Contract work,
+not performed in this document; §16 classifies each violation formally so none of it is lost among
+smaller notes.
 
 ---
 
-## 14. Capability Matrix
+## 14. Capability Matrix — Governance: Permissions
 
 One table, all Capabilities, answering exactly the question Salman posed: not "does this feature
-exist" but "**who is allowed to invoke it**." The AI column is populated now, before any AI work
-begins, precisely so that when a future assistant is added it inherits this boundary automatically
-instead of needing its permissions re-litigated capability-by-capability.
+exist" but "**who is allowed to invoke it**." Per §5's anatomy, this table *is* the Permissions
+piece of the Governance layer — not a Capability-specific artifact. The AI column is populated
+now, before any AI work begins, precisely so that when a future assistant is added it inherits this
+boundary automatically instead of needing its permissions re-litigated capability-by-capability.
 
 **Legend**: ✅ allowed today · 🔜 intended for Client/AI once the Gap above is closed (still Content
 layer, just not built) · ❌ deliberately excluded, Platform/Template-owned, not a roadmap item for
@@ -539,7 +557,7 @@ operates inside the Client's own ceiling, never above it).
 | Edit SEO metadata | 🔜 | 🔜 |
 | View / update order status | ✅ | ✅ |
 | Export orders | 🔜 | 🔜 |
-| View / edit customer info | 🔜 (blocked on §15's unmounted-route finding) | 🔜 |
+| View / edit customer info | 🔜 (blocked on §16's Customers finding) | 🔜 |
 | **Activate/deactivate a paid module (`client_services`)** | ❌ | ❌ |
 | **Anything Platform-layer** (routing, checkout logic, WhatsApp integration, DB structure) | ❌ | ❌ |
 
@@ -550,94 +568,150 @@ front-end for first.
 
 ---
 
-## 15. Architecture Integrity Findings
+## 15. Governance Layer — Permissions, Draft/Publish, Audit, Versioning, Activity
 
-Salman's explicit instruction: code that exists but isn't wired into the system, or that routes
-around tenant boundaries, is **not** ordinary technical debt to note in passing — it's an
-architecture integrity concern with its own section, so it gets tracked and reviewed
-systematically rather than lost among smaller notes. Every finding below was verified by reading
-the real file during this revision, per this project's Zero Hallucination rule — none are inferred.
+Per §5's corrected anatomy, Governance is the third sibling alongside Capability and Interface —
+cross-cutting concerns built **once** and inherited by every Capability, never re-implemented per
+domain. Two of its five pieces already have real content elsewhere in this plan; three are named
+here for the first time as real Gaps.
 
-**Finding 1 — No single write path for Products/Categories (live today, not a future risk).**
-`catalog.py` correctly routes all `CatalogItem`/`CatalogCategory` CRUD through `catalog_service.py`.
-`store.py` and `restaurant.py` **independently perform the exact same CRUD on the exact same
-tables** by calling `admin_catalog_repo` directly (confirmed: `create_item`, `update_item`,
-`delete_item_by_filter`, `create_category`, `update_category`, `delete_category_by_filter` all
-called straight from both route files) — completely bypassing `catalog_service.py`. Three route
-files, two different patterns, one shared pair of tables: a real Single-Source-of-Truth violation,
-confirmed by direct grep of all three files, not a hypothetical one this plan is warning about in
-advance.
+- **Permissions** — already designed: §14's Capability Matrix, read directly. Not repeated here.
+- **Draft/Publish** — already designed: §8's Live Preview mechanism. Not repeated here.
+- **Audit** (who changed what, when) — ⚠️ **Gap, but with a real, structurally-suitable start**:
+  `SecurityAuditLog` (`prisma/schema.prisma`) already exists with exactly the right shape for this
+  — `clientId`, an extensible `eventType` string, `detail` (`Json?`), `actor` — but it is used
+  today only for **security/system events** (`tenant_suspended`, `authorization_denied`,
+  `login_failed`, `policy_violation`, per its own schema comment), never for tenant content-editing
+  activity (e.g., "tenant X changed Product Y's price from $10 to $12"). Extending its use to cover
+  Capability writes is a real, low-cost option for a future Implementation Contract — not decided
+  here, but named precisely so nobody re-derives "do we need a new audit table" from scratch.
+- **Versioning** (content history / undo) — ⚠️ **Gap**. No mechanism for reverting a Product,
+  Category, or Content edit to a prior state was found anywhere in this investigation.
+- **Activity** (a human-readable feed of recent changes, for the tenant themselves to see) — ⚠️
+  **Gap**, closely related to Audit above — if `SecurityAuditLog`'s use is ever extended to cover
+  tenant content edits, a tenant-facing Activity feed becomes a read view over the same data,
+  not a second mechanism.
 
-**Finding 2 — Systemic Route → Repository bypass on the admin write side.** Beyond Finding 1,
-`settings.py` (`admin_client_repo`), `gallery.py` (`gallery_repo`, `UnitRepository`), `units.py`
-(`UnitRepository`, `BookingRepository`, `CustomerRepository`, `price_repo`), and `team.py`
-(`user_repo`) all import Repositories directly into Routes, skipping the Services layer that
-`rules/backend/architecture.md`'s own 4-layer rule requires (Routes → Services → Repositories →
-DB). `catalog.py` is the only admin route file confirmed to do this correctly.
-
-**Finding 3 — Two Service files already exist for exactly the write paths that need them, but
-neither is used where it's needed.** `app/services/client_service.py` (24 lines — `create_client`,
-`get_client`, `update_client`) is never imported by any route in `app/api/` at all — confirmed by
-grep across the entire `app/` tree. `app/services/unit_service.py` is used, but only by
-public-facing read routes (`public/units.py`, `public_service.py`) — the admin write routes
-(`units.py`) bypass it entirely, going straight to `UnitRepository`. Neither file is a from-scratch
-job to fix Findings 1-2 for these two domains — both already exist and are a real head start — but
-`client_service.py` itself has its own defect worth noting: it calls `prisma_client` directly
-rather than delegating to a repository, which is itself a violation of "Zero Prisma calls outside
-Repositories" (`rules/backend/architecture.md`) — it would need that fixed before being wired in,
-not just imported as-is.
-
-**Finding 4 — `customers.py` is defined but never mounted, and is unguarded.** Restated formally
-here (first surfaced while writing §12's Customers Capability): `app/api/v1/admin/customers.py`
-defines full CRUD via the real `customer_service.py`, but is never added to
-`app/api/v1/admin/__init__.py`'s router list — confirmed by reading that file's include list
-directly, `customers` does not appear in it. Its endpoints also take `client_id` as an **unguarded
-query parameter** with no `get_current_tenant`/`get_current_admin_user`/`require_service`
-dependency anywhere in the file — unlike every other admin route this investigation read. If this
-file is ever wired back in, it needs the same JWT-tenant-resolution and role/service gating every
-other admin route already follows, not a client-supplied `client_id`.
-
-**Finding 5 — Orphaned frontend duplicate.** `frontend/src/pages/generic-admin/tabs/
-PageBuilderTab.jsx` — a ~1300-line near-duplicate of `CanvasPageEditor.jsx`, never imported
-anywhere. Carried forward from the first draft's §1 as the frontend-side instance of the same
-"exists but isn't connected to the system" category this section now formally tracks.
-
-**None of these five findings are fixed in this document.** Each is named, evidenced, and left for
-a future Implementation Contract — but per Salman's instruction, they are recorded here as
-Architecture Integrity Findings specifically, not folded into an undifferentiated technical-debt
-list, so a future review can check each one off individually rather than rediscover them.
+**Why this section exists as its own thing, not folded into §12's Capability Contracts**: none of
+these five concerns belongs to Catalog, or Orders, or any single Capability. A Draft/Publish
+mechanism built inside the Catalog Capability and a separate one built inside the Content Capability
+would themselves become a Duplicate Architecture finding (§16) the moment a second Capability
+needed it — exactly the mistake naming Governance as its own branch is meant to prevent before it
+happens once, let alone twice.
 
 ---
 
-## 16. Rollout Phases
+## 16. Architecture Integrity Findings
+
+Salman's explicit instruction: code that exists but isn't wired into the system, or that routes
+around tenant boundaries, is **not** ordinary technical debt to note in passing — it's an
+architecture integrity concern, and every finding must be classified into exactly one of three
+named types, so the result reads as a real assessment of the architecture's own health, not an
+undifferentiated TODO list:
+
+- **Broken Architecture** — a Service exists for this exact write path, and the Route bypasses it
+  anyway, going straight to a Repository. A clear, unambiguous break of an existing rule.
+- **Missing Architecture** — no Service exists for this Capability's writes at all. Not a bug;
+  a real, un-built piece of the architecture.
+- **Duplicate Architecture** — the same data is written by more than one independent code path,
+  each implemented differently, with no single canonical one.
+
+Every finding below was verified by reading the real file during this investigation, per this
+project's Zero Hallucination rule — none are inferred, and each was re-checked individually against
+the three definitions above rather than left in one undifferentiated bucket.
+
+### Broken Architecture
+
+**Finding — Site Configuration (`settings.py`).** `app/services/client_service.py` exists and
+already implements `create_client`/`get_client`/`update_client` — a real Service for exactly this
+write path. `settings.py` bypasses it entirely, calling `admin_client_repo` directly. (A second,
+smaller defect in the same file: `client_service.py` itself calls `prisma_client` directly rather
+than delegating to a repository, itself a break of "Zero Prisma calls outside Repositories" — it
+would need that fixed before being wired in as-is, not just imported.)
+
+**Finding — Units (`units.py`, admin write side).** `app/services/unit_service.py` exists and is
+correctly used by public-facing read routes (`public/units.py`, `public_service.py`). The admin
+write routes (`units.py`) bypass it entirely, importing `UnitRepository`/`BookingRepository`/
+`CustomerRepository`/`price_repo` directly.
+
+### Missing Architecture
+
+**Finding — Gallery/Media (`gallery.py`).** No service exists for `GalleryImage` CRUD/reorder at
+all; `storage_service.py` handles only upload/storage mechanics, not the CRUD logic, which lives
+directly in `gallery.py`'s route handlers via `gallery_repo`.
+
+**Finding — Team/Staff (`team.py`).** No service file exists for `User`/team management at all
+(confirmed against the full `app/services/` listing); `team.py` calls `user_repo` directly.
+
+**Finding — Orders, Store/Restaurant (`store.py`, `restaurant.py`).** No dedicated order service
+exists for either module (confirmed against the full `app/services/` listing — note Booking's
+own order-equivalent, Bookings, *does* have `booking_service.py`; this Gap is specific to
+Store/Restaurant); both route files call `store_admin_repo`/`restaurant_admin_repo` directly for
+all order reads and status updates.
+
+**Finding — Customers (`customers.py`).** The Service itself is correctly built (`customer_service.
+py`, real full CRUD) — the missing piece is one layer up: the route is never `include_router`'d in
+`app/api/v1/admin/__init__.py` (confirmed by reading that file's include list directly), so the
+Capability is unreachable end-to-end despite being internally correct. Once mounted, its endpoints
+also need a tenant-auth dependency added — they currently take `client_id` as an **unguarded query
+parameter** with no `get_current_tenant`/`get_current_admin_user`/`require_service` dependency
+anywhere in the file, unlike every other admin route this investigation read.
+
+### Duplicate Architecture
+
+**Finding — Products/Categories (`catalog.py` vs `store.py` + `restaurant.py`).** `catalog.py`
+correctly routes all `CatalogItem`/`CatalogCategory` CRUD through `catalog_service.py`. `store.py`
+and `restaurant.py` **independently perform the exact same CRUD on the exact same tables**
+(confirmed: `create_item`, `update_item`, `delete_item_by_filter`, `create_category`,
+`update_category`, `delete_category_by_filter` all called straight from both files via
+`admin_catalog_repo`) — completely bypassing `catalog_service.py`. Three route files, two
+different patterns, one shared pair of tables — Salman's own example of this category, confirmed
+real in this codebase, not hypothetical.
+
+**Finding — `PageBuilderTab.jsx` vs `CanvasPageEditor.jsx`.** `frontend/src/pages/generic-admin/
+tabs/PageBuilderTab.jsx` (~1300 lines) is a near-duplicate implementation of the same
+page/section-editing capability `CanvasPageEditor.jsx` provides — never imported anywhere, an
+abandoned parallel implementation rather than the canonical one.
+
+**None of these seven findings are fixed in this document.** Each is named, evidenced, and
+classified — left for a future Implementation Contract to resolve, one category at a time.
+
+---
+
+## 17. Rollout Phases
 
 Salman's explicit sequencing, adopted as this plan's own gating structure — starting the Client
 Journey Audit before the Tenant OS's own capability boundaries were written down would have
 produced a list of "this doesn't exist yet" rather than a real audit of a defined product:
 
-- **Phase 1 — Fix the vision.** ✅ Done: the three layers (§4), the Tenant OS/Capability framing
-  (§5), the Dashboard First Principle (§3), the Content Ownership Matrix (§6), the Theme boundaries
-  (§10).
-- **Phase 2 — Write the contract.** ✅ Done, this revision: Capability Contracts (§12), the Single
-  Source of Truth Matrix (§13), the Capability Matrix (§14), and the Architecture Integrity
-  Findings (§15) this investigation surfaced while writing it.
-- **Phase 3 — Client Journey Audit.** Deferred, explicitly gated on Phase 2 being reviewed (§17).
-  Only once every step of the owner's journey maps to a named, bounded Capability from §12 does
-  walking that journey measure a real, defined product rather than "what's missing."
+- **Phase 1 — Fix the vision.** ✅ Done: the three layers (§4), the Tenant OS anatomy (§5), the
+  Dashboard First Principle and constitution line (§3), the Content Ownership Matrix (§6), the
+  Theme boundaries (§10).
+- **Phase 2 — Write the contract.** ✅ Done: Capability Contracts (§12), the Single Source of Truth
+  Matrix (§13), the Capability Matrix (§14), the Governance layer (§15), and the classified
+  Architecture Integrity Findings (§16).
+- **Phase 3 — Client Journey Audit.** Deferred, explicitly gated on Phase 2 being reviewed (§18).
 
 ---
 
-## 17. Next Step — the Client Journey Audit (Phase 3, gated)
+## 18. Next Step — the Client Journey Audit (Phase 3, gated)
 
 Salman's explicit direction: **not yet**. The Client Journey Audit — reviewing the store owner's
 own onboarding-to-first-published-product journey, mirroring the role the Store Experience Review
 played for the shopper's journey
 (`.claudedocs/reviews/BEIT_AL_FAKHAR_STORE_EXPERIENCE_REVIEW.md`) — is real and still the right
-Phase 3, but remains explicitly **blocked on §12-15 being reviewed first**. Starting the audit
-before the capabilities were named would have produced a list of "this doesn't exist yet," not a
-real audit of a defined product — exactly the risk Salman flagged.
+Phase 3, but remains explicitly **blocked on §12-16 being reviewed first**.
 
-**Scope, unchanged, to be executed once Phase 2 is accepted**:
+**When it does run, it is explicitly not a checklist.** Not "does every button work" — a real,
+qualitative first-time-user observation: hand a genuinely non-technical person an empty account
+and ask them to publish a real store, then record, honestly:
+
+- Where did they stop?
+- What did they not understand?
+- Where did they need help?
+- Where did they feel like they needed a developer?
+
+**Scope, to be executed once Phase 2 is accepted**:
 
 ```
 Create the store account → choose a Template → upload the logo → set brand colors →
@@ -646,19 +720,20 @@ preview the live site → Publish
 ```
 
 Each step now maps to a named Capability from §12 (e.g. "create the first Product" = the Catalog
-Capability's `Create Product` row, already ✅ real) — so the audit, once run, will measure a real,
+Capability's `Create Product` row, already ✅ real) — so the audit, once run, measures a real,
 bounded product against a real, bounded contract, not a moving target.
 
-**Success bar, unchanged**: a non-technical person completing this journey in **15-20 minutes** is
-the standard every future Tenant OS addition is measured against, same as the Dashboard First
-Principle (§3) measures every individual feature.
+**Success bar**: a non-technical person completing this journey in **15-20 minutes**, with the
+qualitative observations above showing no point where they felt they needed a developer, is the
+standard every future Tenant OS addition is measured against — and, per Salman's closing framing,
+the real test of whether the Tenant OS is ready for genuine use, not just whether its screens work.
 
 **Status**: not yet conducted, and explicitly not started in this revision — gated on Phase 2's
 review, per Salman's direction.
 
 ---
 
-## 18. Architecture Boundaries — Generic / Tenant-specific / Plugin / Never
+## 19. Architecture Boundaries — Generic / Tenant-specific / Plugin / Never
 
 This table answers a different question than §4's three layers — §4 is about *who owns* a given
 piece of content or design; this table is about *where the code that renders it lives*. The two
@@ -682,18 +757,20 @@ be scoped per-service too, but this is a judgment call for that future contract,
 
 ---
 
-## 19. What this plan deliberately does not do
+## 20. What this plan deliberately does not do
 
 - No new API endpoints designed (the `CatalogItem`/`CatalogCategory` reorder gap, the Media
   Library, the Live Preview draft/publish mechanism, and the future AI action-vocabulary are all
   named, not designed).
 - No new Prisma models or migrations proposed — every Content item in §6/§12 maps to a field that
-  already exists, except the Gaps explicitly marked as such.
+  already exists, except the Gaps explicitly marked as such (Audit's extension of
+  `SecurityAuditLog`, §15, is named as an option, not decided).
 - No UI components, wireframes, or visual design.
 - No decision on unifying `GenericAdminDashboard.jsx` and `SmarAdminDashboard.jsx` into one
   codebase — that is a real Implementation Contract's job, informed by this plan's boundaries.
-- No resolution of the `client_services`-vs-role tab-gating conflict named in §18.
-- No fix to any of §15's five Architecture Integrity Findings — all five are named and evidenced,
-  none are fixed here; all are code changes outside this document's declared scope.
-- No Client Journey Audit conducted — explicitly deferred to Phase 3 (§17), gated on this
-  revision's §12-15 being reviewed first, per Salman's direction.
+- No resolution of the `client_services`-vs-role tab-gating conflict named in §19.
+- No fix to any of §16's seven classified Architecture Integrity Findings — all seven are named,
+  evidenced, and categorized, none are fixed here; all are code changes outside this document's
+  declared scope.
+- No Client Journey Audit conducted — explicitly deferred to Phase 3 (§18), gated on this
+  revision's §12-16 being reviewed first, per Salman's direction.
