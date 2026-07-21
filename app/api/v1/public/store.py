@@ -28,7 +28,11 @@ def _fmt_product(p, include_description: bool = False) -> dict:
         "id":               p.id,
         "name_ar":          p.nameAr,
         "name_en":          p.nameEn,
-        "price":            float(p.price) if p.price is not None else 0.0,
+        # None (not 0.0) when no real price is set — the frontend needs to
+        # distinguish "genuinely priced at zero" from "no price yet" (e.g. to
+        # show "Price upon request" instead of a misleading "$0"). Coercing to
+        # 0.0 here made that distinction impossible for every consumer.
+        "price":            float(p.price) if p.price is not None else None,
         "compare_at_price": meta.get("compare_at_price"),
         "image_url":        p.imageUrl,
         "images":           meta.get("images", []),
@@ -38,6 +42,14 @@ def _fmt_product(p, include_description: bool = False) -> dict:
         "category_id":      p.categoryId,
         "brand":            meta.get("brand"),
         "is_active":        p.isActive,
+        # Story line — same "known sub-key of metadata" pattern as
+        # compare_at_price/images/discount/variants/brand above. No tenant-
+        # specific default text here — this endpoint is shared across every
+        # store-module tenant (footlab included), not just beit-al-fakhar.
+        # None when absent; the tenant-specific frontend decides its own
+        # fallback copy.
+        "story_ar": meta.get("story_ar"),
+        "story_en": meta.get("story_en"),
     }
     if include_description:
         out["description_ar"] = p.descriptionAr

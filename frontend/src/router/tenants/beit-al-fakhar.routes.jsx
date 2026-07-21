@@ -7,6 +7,7 @@
  *   /beit-al-fakhar    → redirect → home
  *   /beit-al-fakhar/home        → HomePage (custom cinematic homepage — hero video, categories, gallery)
  *   /beit-al-fakhar/store       → CatalogPage (generic — store module, real categories/products)
+ *   /beit-al-fakhar/store/:itemId → ProductPage (tenant-specific — Premium Product Experience)
  *   /beit-al-fakhar/cart        → CartPage   (generic)
  *   /beit-al-fakhar/admin       → GenericAdminDashboard (JWT required — owner adds products here)
  */
@@ -19,6 +20,7 @@ import { TenantConfigProvider } from '../../context/TenantConfigContext';
 // ── Lazy page imports ─────────────────────────────────────────────────────────
 const HomePage             = lazy(() => import('../../pages/beit-al-fakhar/normal/HomePage'));
 const CatalogPage          = lazy(() => import('../../pages/generic/normal/CatalogPage'));
+const ProductPage          = lazy(() => import('../../pages/beit-al-fakhar/product/ProductPage'));
 const CartPage             = lazy(() => import('../../pages/generic/normal/CartPage'));
 const GenericAdminDashboard = lazy(() => import('../../pages/generic-admin/GenericAdminDashboard'));
 
@@ -39,10 +41,10 @@ function PageFallback() {
   );
 }
 
-function Lazy({ component: Component }) {
+function Lazy({ component: Component, ...props }) {
   return (
     <Suspense fallback={<PageFallback />}>
-      <Component />
+      <Component {...props} />
     </Suspense>
   );
 }
@@ -53,7 +55,10 @@ export default function BeitAlFakharRoutes() {
     <TenantConfigProvider slug="beit-al-fakhar">
       <Routes>
         <Route path="home"  element={<Lazy component={HomePage} />} />
-        <Route path="store" element={<Lazy component={CatalogPage} />} />
+        <Route path="store" element={
+          <Lazy component={CatalogPage} productLinkBase={(item) => `/beit-al-fakhar/store/${item.id}`} />
+        } />
+        <Route path="store/:itemId" element={<Lazy component={ProductPage} />} />
         <Route path="cart"  element={<Lazy component={CartPage} />} />
 
         <Route path="admin" element={

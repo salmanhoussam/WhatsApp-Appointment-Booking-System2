@@ -20,3 +20,14 @@ export function fetchItems(moduleKey, slug, categoryId) {
     return publicApi.get('/store/products', { params: { ...base, category_id: categoryId } })
   return publicApi.get(`/${slug}/catalog/categories/${categoryId}/items`, { params: base })
 }
+
+// GET a single item's full detail — module-aware endpoint routing.
+// Only the 'store' branch is verified/real today (GET /store/products/{id},
+// confirmed live 2026-07-21). No single-item endpoint exists for 'restaurant'
+// yet — do not guess a path for it until one is confirmed real.
+export function fetchItem(moduleKey, slug, itemId) {
+  const base = { client_slug: slug }
+  if (moduleKey === 'store')
+    return publicApi.get(`/store/products/${itemId}`, { params: base })
+  return Promise.reject(new Error(`fetchItem: no confirmed single-item endpoint for moduleKey "${moduleKey}"`))
+}

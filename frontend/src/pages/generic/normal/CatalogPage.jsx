@@ -37,8 +37,14 @@ function LoadingDot({ accent }) {
 // ── CatalogPage — thin wrapper ────────────────────────────────────────────────
 // Pass layoutOverride="list"|"grid"|"showcase" to force a specific template.
 // Without it, each category's display_template field determines the layout.
+//
+// productLinkBase — optional, additive only. When provided (a function
+// `(item) => path`), cards become clickable and navigate to that path — used
+// today only by beit-al-fakhar, which has a real Product Detail Page route.
+// Every other tenant using this shared page doesn't pass it, so their cards
+// keep behaving exactly as before (add-to-cart only, no navigation).
 
-export default function CatalogPage({ layoutOverride } = {}) {
+export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
   const base     = useTenantBase()
   const navigate = useNavigate()
   const { addItem, totalItems } = useGenericStore()
@@ -53,6 +59,14 @@ export default function CatalogPage({ layoutOverride } = {}) {
   const accent    = config?.primary_color ?? '#d4a853'
   const canOrder  = moduleKey === 'restaurant' || moduleKey === 'store'
   const onAddCart = useCallback((item) => addItem(item, 1), [addItem])
+
+  // Hooks must run unconditionally (Rules of Hooks) — always create the
+  // callback, only conditionally use its result below.
+  const navigateToProduct = useCallback(
+    (item) => { if (productLinkBase) navigate(productLinkBase(item)) },
+    [navigate, productLinkBase]
+  )
+  const onItemClick = productLinkBase ? navigateToProduct : undefined
 
   const templateKey = layoutOverride ?? activeCategory?.display_template ?? 'grid'
   const Template    = TEMPLATE_MAP[templateKey] ?? CatalogGrid
@@ -116,6 +130,7 @@ export default function CatalogPage({ layoutOverride } = {}) {
             items={filteredItems}
             accent={accent}
             onAddToCart={canOrder ? onAddCart : undefined}
+            onItemClick={onItemClick}
           />
         )}
       </div>

@@ -14,8 +14,13 @@ const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 
  *   item         — CatalogItem API response (id, name_ar, name_en, price, image_url, ...)
  *   accent       — tenant primary color (default: gold)
  *   onAddToCart  — optional, renders add-to-cart overlay when provided
+ *   onItemClick  — optional, additive only. When provided, clicking the card
+ *                  (outside the add-to-cart overlay) calls onItemClick(item).
+ *                  Omitted by default everywhere except where a real product
+ *                  detail route exists (beit-al-fakhar) — every other tenant's
+ *                  behavior is unchanged since this prop is simply never passed.
  */
-export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart }) {
+export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onItemClick }) {
   const [imgHovered, setImgHovered] = useState(false)
   const available = item.is_available !== false && item.is_active !== false
 
@@ -27,6 +32,8 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
       exit={{ opacity: 0, scale: 0.96 }}
       transition={cardTransition}
       whileHover={{ y: -4 }}
+      onClick={onItemClick ? () => onItemClick(item) : undefined}
+      style={onItemClick ? { cursor: 'pointer' } : undefined}
     >
       <div
         style={{

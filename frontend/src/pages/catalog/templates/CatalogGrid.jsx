@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { CatalogItemCard } from '../../../design-system/molecules'
 
-export default function CatalogGrid({ items = [], accent = '#d4a853', onAddToCart }) {
+export default function CatalogGrid({ items = [], accent = '#d4a853', onAddToCart, onItemClick }) {
   return (
     <motion.div
       layout
@@ -13,7 +13,7 @@ export default function CatalogGrid({ items = [], accent = '#d4a853', onAddToCar
     >
       <AnimatePresence mode="popLayout">
         {items.map((item) => (
-          <CatalogItemCard key={item.id} item={item} accent={accent} onAddToCart={onAddToCart} />
+          <CatalogItemCard key={item.id} item={item} accent={accent} onAddToCart={onAddToCart} onItemClick={onItemClick} />
         ))}
       </AnimatePresence>
     </motion.div>
