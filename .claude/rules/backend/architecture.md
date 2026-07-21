@@ -90,3 +90,29 @@ Use `FastAPI BackgroundTasks` for async ops — never block the HTTP response:
 background_tasks.add_task(whatsapp_service.send_confirmation, booking_id)
 background_tasks.add_task(email_service.send_welcome, customer_email)
 ```
+
+---
+
+## 9. One Capability, One Service, Many Interfaces
+
+Platform-wide principle, elevated here (not scoped to any one module) at Salman's explicit
+direction — it is exactly what Section 2's 4-Layer rule already requires, restated as a single
+governing line because the failure mode it prevents is easy to back into gradually, one route at a
+time:
+
+> **One Capability. One Contract. One Service. One Source of Truth. Many Interfaces.**
+
+Every domain capability — Booking, Restaurant, Store/Catalog, a future AI interface, any future
+Plugin (Coupons, Inventory, CRM, ...) — has exactly one model that owns its data and exactly one
+`app/services/*.py` module that may write to it. Every caller of that capability — an admin
+Dashboard route, a public route, an AI action, an import script, a future Mobile/API client — goes
+through that same Service, never straight to a Repository, never a second parallel write path.
+This is Section 2's Routes → Services → Repositories → DB direction, taken seriously as a rule
+about *data ownership*, not just *file placement*: a second route file writing to the same table
+through a different path is exactly as much a violation as a route skipping the Service layer
+entirely, even when each individual file "looks correct" in isolation.
+
+`.claudedocs/architecture/TENANT_OS_PLAN.md` is where this principle is being actively audited and
+enforced today (its Single Source of Truth Matrix and classified Architecture Integrity Findings)
+— that document does not own this rule, it demonstrates applying it. Any future domain plan should
+link back here rather than restate the principle itself.
