@@ -94,6 +94,16 @@ the visual theme (colors, showroom panel, typography) inside that one file/folde
 second tenant needs the same premium treatment later, extracting a shared layout + theme layer is
 a refactor of proven code, not a guess about what should be shared.
 
+## Correction — Phase 1 root-causing disproved this report's theory
+
+This report's Confirmed Finding stated the trigger was "mixing a scalar foreign key with a nested
+relation write." Empirical bisection in Phase 1 (`PHASE1_ROOT_CAUSE_AND_FIX.md`) disproved that —
+the real trigger is passing a bare `None` for the `Json?` `shippingAddress` field specifically,
+unrelated to the `items` relation at all. The Side Finding suspecting `restaurant_repo.py` shared
+the same bug is also retracted there: `RestaurantOrder` has no `Json?` fields, so it can't be hit
+by this specific cause. Left in place rather than edited, per this project's practice of appending
+corrections instead of quietly rewriting a prior finding.
+
 ## Recommendation → Decision → Execution
 
 - **Recommendation:** Fix the `create_store_order`/`create_restaurant_order` Prisma bug

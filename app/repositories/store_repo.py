@@ -6,6 +6,8 @@ All queries MUST filter by clientId. No business logic here.
 from datetime import datetime
 from typing import Optional
 
+from prisma import Json
+
 from app.db.client import prisma_client
 
 
@@ -120,23 +122,37 @@ async def delete_cart_item(cart_id: str, catalog_item_id: str):
 # ── Checkout ──────────────────────────────────────────────────────────────────
 
 async def create_store_order(client_id: str, data: dict):
-    """Create a StoreOrder with nested StoreOrderItems."""
-    return await prisma_client.storeorder.create(
-        data={
-            "clientId":        client_id,
-            "customerName":    data["customer_name"],
-            "customerPhone":   data.get("customer_phone"),
-            "customerEmail":   data.get("customer_email"),
-            "totalPrice":      data["total_price"],
-            "currency":        data.get("currency", "USD"),
-            "status":          "pending",
-            "paymentMethod":   data["payment_method"],
-            "shippingAddress": data.get("shipping_address"),
-            "notes":           data.get("notes"),
-            "items": {
-                "create": data["order_items"],
-            },
+    """
+    Create a StoreOrder with nested StoreOrderItems.
+
+    shippingAddress is a Json? field — Prisma's Python client rejects an explicit
+    `None` value for it (MissingRequiredValueError, empirically confirmed
+    2026-07-21: fails even with the `items` relation removed entirely, while the
+    same call with `shippingAddress` omitted, or another Optional[str] field like
+    `notes` set to None, succeeds), and a raw dict must be wrapped in `Json(...)`
+    when present (matches the established pattern already used elsewhere in this
+    codebase, e.g. catalog_service.py's `data["metadata"] = Json(metadata)`) — the
+    key is omitted entirely when there's no real address, never set to None.
+    """
+    create_data = {
+        "clientId":        client_id,
+        "customerName":    data["customer_name"],
+        "customerPhone":   data.get("customer_phone"),
+        "customerEmail":   data.get("customer_email"),
+        "totalPrice":      data["total_price"],
+        "currency":        data.get("currency", "USD"),
+        "status":          "pending",
+        "paymentMethod":   data["payment_method"],
+        "notes":           data.get("notes"),
+        "items": {
+            "create": data["order_items"],
         },
+    }
+    if data.get("shipping_address") is not None:
+        create_data["shippingAddress"] = Json(data["shipping_address"])
+
+    return await prisma_client.storeorder.create(
+        data=create_data,
         include={"items": True},
     )
 
