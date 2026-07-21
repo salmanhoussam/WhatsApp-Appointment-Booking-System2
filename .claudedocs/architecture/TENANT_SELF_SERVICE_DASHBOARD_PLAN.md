@@ -369,14 +369,175 @@ be scoped per-service too, but this is a judgment call for that future contract,
 
 ---
 
-## 13. Next Step — the Client Journey Audit (recommended gate before implementation begins)
+## 13. Rollout Phases
 
-Salman's explicit recommendation for the single task that should happen before any implementation
-starts, and this plan adopts it as the recommended gate — mirroring the role the Store Experience
-Review played for Phase 3 (`.claudedocs/reviews/BEIT_AL_FAKHAR_STORE_EXPERIENCE_REVIEW.md`), but
-for a different journey entirely: not the shopper's journey, the **store owner's** journey.
+Salman's explicit sequencing, adopted here as this plan's own gating structure — starting the
+Client Journey Audit before the dashboard's own capability boundaries are written down would
+produce a list of "this doesn't exist yet" rather than a real audit of a defined product:
 
-**Scope**: walk and document, step by step, real-account-to-first-published-product:
+- **Phase 1 — Fix the vision.** ✅ Done, this document: the three layers (§4), the Content OS
+  identity (§6), the Dashboard First Principle (§3), the Content Ownership Matrix (§5), the Theme
+  boundaries (§9).
+- **Phase 2 — Write the contract.** This revision: treat the dashboard not as one large admin
+  screen but as a set of independent capability domains, each with an explicit list of what it can
+  do (§14), plus a single Capability Matrix stating who may invoke each capability — Client, AI, or
+  Developer-only (§15).
+- **Phase 3 — Client Journey Audit.** Deferred, explicitly gated on Phase 2 being written and
+  reviewed (§16). Only once every step of the owner's journey maps to a named, bounded capability
+  from §14 does walking that journey measure a real, defined product rather than "what's missing."
+
+---
+
+## 14. Dashboard Service Contracts (Phase 2)
+
+**A fourth meaning of "Service" in this codebase, disambiguated on purpose**: §10 already
+distinguishes the Service Execution Constitution's autonomous-agent "Service" from
+`service-system.md`'s per-tenant feature-flag "Service" (`client_services.serviceKey`, e.g. the
+real flag literally named `catalog`). What follows is a **third, different sense again** — a
+**Dashboard Capability Domain**, Salman's proposed unit for organizing the Content OS itself
+(Catalog, Category, Media, Theme, Content, Orders, Customers). To avoid a naming collision with
+the real `catalog`/`store`/`restaurant` service **keys**, each domain below is written as
+"`<Name>` Capability Domain," not "`<Name>` Service" — same grouping Salman asked for, a name that
+doesn't collide with three already-overloaded uses of the word "Service" in this project.
+
+Each domain lists its real capabilities, marked against what this investigation actually verified
+(§1, §5, and fresh verification below) — not proposed features. **Gap** means the capability is a
+real, intended piece of the Content layer (§4) that has no mechanism yet; it is not a suggestion to
+build it now.
+
+### Catalog Capability Domain (Products)
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| Create Product | ✅ Real | `CatalogItem` CRUD (`catalog.py`, `CatalogTab.jsx`) |
+| Edit Product (name/description/price/currency) | ✅ Real | same |
+| Delete Product | ✅ Real | same |
+| Duplicate Product | ⚠️ Gap | No clone/duplicate endpoint found |
+| Reorder Products | ⚠️ Gap | `sortOrder` field exists; no reorder endpoint (§5) |
+| Archive / Hide Product | ✅ Real | `CatalogItem.isActive` |
+| Publish / Unpublish | ✅ Real today, provisional | Currently equivalent to `isActive`; will become a distinct action once §7's draft/publish mechanism exists |
+| Product-type extras (SKU, weight, variants) | ✅ Real | `CatalogItem.metadata` (`Json?`) |
+
+### Category Capability Domain
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| Create / Rename Category | ✅ Real | `CatalogCategory` CRUD |
+| Delete Category | ✅ Real | same |
+| Reorder Categories | ⚠️ Gap | same gap as Product reorder |
+| Show / Hide Category | ✅ Real | `CatalogCategory.isActive` |
+
+### Media Capability Domain
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| Upload image/video into a specific context (hero, logo, product, unit gallery) | ✅ Real | `upload.py`'s `FOLDER_MAP`/`IMAGE_TYPE_MAP`, `useImageUpload.js` |
+| Reorder unit gallery photos | ✅ Real (booking module only) | `PUT /gallery/{unit_id}/reorder` |
+| Delete a unit gallery photo | ✅ Real | `DELETE /gallery/images/{id}` |
+| Browse/reuse previously uploaded media across contexts (a real Media Library) | ⚠️ Gap, freshly verified | Confirmed by re-reading `gallery.py`/`upload.py` route lists directly: no client-wide "list my media" endpoint exists — every upload is bound to one context, nothing is browsable/reusable across contexts today |
+
+### Theme Capability Domain
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| Change primary color | ✅ Real | `Client.primary_color` |
+| Change font (from a curated list) | ✅ Real | `Client.config.font` |
+| Change hero media | ✅ Real | `Client.hero_video_url` / `config.content.hero` |
+| Reorder page sections (of an already-fixed set) | ✅ Real | `CanvasPageEditor.jsx` |
+| Show/hide a section | ✅ Real | per-section visibility flag in `config.content` |
+| Create a new section type / new layout | ❌ Never (Template/Platform) | Explicitly excluded, §9 |
+
+### Content Capability Domain (page copy, distinct from Catalog's product data)
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| Edit Hero headline/subtitle/CTA text | ✅ Real | `config.content` hero section |
+| Edit About/Story/Why-Us copy | ✅ Real | `config.content` story/testimonials sections |
+| Edit WhatsApp number, social links, maps link | ✅ Real | `Client.whatsapp_number`/`instagram_url`/`maps_url` |
+| Edit SEO metadata (title/description) | ⚠️ Gap | No real field found (§5) |
+
+### Orders Capability Domain
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| View orders | ✅ Real | `GET /{moduleKey}/orders` (`OrdersTab.jsx`) |
+| Update order status | ✅ Real | `PATCH /{moduleKey}/orders/{id}/status` |
+| Create an order manually (phone order) | ✅ Real for Booking only; ⚠️ Gap for Store/Restaurant | Booking's `AdminBookingModal` does this (`POST /bookings/`); no equivalent found for Store/Restaurant orders |
+| Export orders | ⚠️ Gap | Not found |
+| Cancel / refund distinct from a status change | ⚠️ Gap | Only status-transition exists today; no distinct refund/reversal action |
+
+### Customers Capability Domain
+
+| Capability | Status | Mechanism |
+|---|---|---|
+| View customer list | ⚠️ Real code exists, but **not live** | `app/api/v1/admin/customers.py` defines full CRUD, but is never `include_router`'d in `app/api/v1/admin/__init__.py` — confirmed by reading that file's router list directly; this endpoint is unreachable today |
+| Edit / delete a customer | ⚠️ Same as above | same file, same unmounted status |
+
+**Side finding, flagged per this project's evidence discipline, not fixed here**: even setting the
+unmounted status aside, `customers.py`'s own endpoints take `client_id` as a **query parameter**
+with no `get_current_tenant`/`get_current_admin_user`/`require_service` dependency anywhere in the
+file — unlike every other admin route this investigation read. If this file is ever wired back in,
+it needs the same JWT-tenant-resolution and role/service gating every other admin route already
+follows (`rules/backend/api-rules.md`'s mandatory dependency chain), not a client-supplied
+`client_id` — a real, code-level finding, not a hypothetical risk, and explicitly not something
+this design-only document fixes.
+
+---
+
+## 15. Capability Matrix — the golden reference
+
+One table, all domains, answering exactly the question Salman posed: not "does this feature exist"
+but "**who is allowed to invoke it**." The AI column is populated now, before any AI work begins,
+precisely so that when a future assistant is added it inherits this boundary automatically instead
+of needing its permissions re-litigated capability-by-capability.
+
+**Legend**: ✅ allowed today · 🔜 intended for Client/AI once the Gap above is closed (still Content
+layer, just not built) · ❌ deliberately excluded, Platform/Template-owned, not a roadmap item for
+Client or AI regardless of future work. **Developer is omitted as its own column** — a developer
+has code-level access to everything by construction, so marking it ✅ on every row would add no
+information; the signal this matrix exists to carry is entirely in the Client/AI columns, and
+those two columns are identical on every row below **by design** (§11's rule: the AI always
+operates inside the Client's own ceiling, never above it).
+
+| Capability | Client | AI |
+|---|---|---|
+| Create / Edit / Delete Product | ✅ | ✅ |
+| Duplicate Product | 🔜 | 🔜 |
+| Reorder Products / Categories | 🔜 | 🔜 |
+| Archive / Publish Product | ✅ | ✅ |
+| Create / Rename / Delete Category | ✅ | ✅ |
+| Upload images/video (contextual) | ✅ | ✅ |
+| Browse/reuse a shared Media Library | 🔜 | 🔜 |
+| Change primary color / font (curated) | ✅ | ✅ |
+| Reorder / show-hide page sections | ✅ | ✅ |
+| **Create a new section type or layout** | ❌ | ❌ |
+| **Change Checkout page layout** | ❌ | ❌ |
+| Edit Hero/About/Contact copy | ✅ | ✅ |
+| Edit SEO metadata | 🔜 | 🔜 |
+| View / update order status | ✅ | ✅ |
+| Export orders | 🔜 | 🔜 |
+| View / edit customer info | 🔜 (blocked on §14's unmounted-route finding) | 🔜 |
+| **Activate/deactivate a paid module (`client_services`)** | ❌ | ❌ |
+| **Anything Platform-layer** (routing, checkout logic, WhatsApp integration, DB structure) | ❌ | ❌ |
+
+This table is the artifact Salman asked for explicitly as a "golden reference": the day a Content
+OS assistant is designed, its permission scope is "every ✅ row above, exactly, no more" — nothing
+about AI trust needs to be re-decided at that point, only which ✅ rows to build a conversational
+front-end for first.
+
+---
+
+## 16. Next Step — the Client Journey Audit (Phase 3, gated)
+
+Salman's explicit direction: **not yet**. The Client Journey Audit — reviewing the store owner's
+own onboarding-to-first-published-product journey, mirroring the role the Store Experience Review
+played for the shopper's journey
+(`.claudedocs/reviews/BEIT_AL_FAKHAR_STORE_EXPERIENCE_REVIEW.md`) — is real and still the right
+Phase 3, but is explicitly **blocked on §14/§15 being written and reviewed first**. Starting the
+audit before the capability domains were named would have produced a list of "this doesn't exist
+yet," not a real audit of a defined product — exactly the risk Salman flagged.
+
+**Scope, unchanged from the first draft, to be executed once Phase 2 is accepted**:
 
 ```
 Create the store account → choose a Template → upload the logo → set brand colors →
@@ -384,31 +545,32 @@ create the first Category → create the first Product → upload its photos →
 preview the live site → Publish
 ```
 
-**Success bar, stated as a concrete, falsifiable number, not a vague "should feel easy"**: a
-non-technical person should be able to complete this entire journey in **15-20 minutes**. If they
-can, this is a real SaaS product a client runs themselves. If they can't, no amount of individual
-feature polish changes that verdict — this number is the standard every future Content OS addition
-should be measured against, the same way the Dashboard First Principle (§3) measures every single
-feature.
+Each step now maps to a named capability from §14 (e.g. "create the first Product" = the Catalog
+Capability Domain's `Create Product` row, already ✅ real) — so the audit, once run, will measure a
+real, bounded product against a real, bounded contract, not a moving target.
 
-**Status of this audit**: not yet conducted. This document recommends it as the immediate next
-step, in the same real-CDP-walkthrough style already used for the Store Experience Review, but
-does not execute it here — creating a real test tenant/account touches live registration flow and
-real data, which is a deliberate action to take with explicit go-ahead, not a silent side-effect of
-an architecture-planning document.
+**Success bar, unchanged**: a non-technical person completing this journey in **15-20 minutes** is
+the standard every future Content OS addition is measured against, same as the Dashboard First
+Principle (§3) measures every individual feature.
+
+**Status**: not yet conducted, and explicitly not started in this revision — gated on Phase 2's
+review, per Salman's direction.
 
 ---
 
-## 14. What this plan deliberately does not do
+## 17. What this plan deliberately does not do
 
-- No new API endpoints designed (the `CatalogItem`/`CatalogCategory` reorder gap, the Live Preview
-  draft/publish mechanism, and the future AI action-vocabulary are all named, not designed).
-- No new Prisma models or migrations proposed — every Content item in §5 maps to a field that
-  already exists, except the SEO gap explicitly marked as such.
+- No new API endpoints designed (the `CatalogItem`/`CatalogCategory` reorder gap, the Media
+  Library, the Live Preview draft/publish mechanism, and the future AI action-vocabulary are all
+  named, not designed).
+- No new Prisma models or migrations proposed — every Content item in §5/§14 maps to a field that
+  already exists, except the Gaps explicitly marked as such.
 - No UI components, wireframes, or visual design.
 - No decision on unifying `GenericAdminDashboard.jsx` and `SmarAdminDashboard.jsx` into one
   codebase — that is a real Implementation Contract's job, informed by this plan's boundaries.
 - No resolution of the `client_services`-vs-role tab-gating conflict named in §12.
-- No cleanup of the orphaned `PageBuilderTab.jsx` — flagged for a separate repository-hygiene pass.
-- No Client Journey Audit conducted yet — recommended in §13 as the next real step, not performed
-  in this document.
+- No cleanup of the orphaned `PageBuilderTab.jsx`, and no fix to `customers.py`'s unmounted status
+  or its missing tenant-auth dependency (§14) — both flagged, neither fixed here; both are code
+  changes outside this document's declared scope.
+- No Client Journey Audit conducted — explicitly deferred to Phase 3 (§16), gated on this
+  revision's §14/§15 being reviewed first, per Salman's direction.
