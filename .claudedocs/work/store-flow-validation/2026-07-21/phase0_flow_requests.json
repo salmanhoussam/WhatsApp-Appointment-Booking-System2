@@ -1,0 +1,32 @@
+{
+  "7306.116": {
+    "url": "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config",
+    "method": "GET",
+    "postData": null,
+    "status": "HTTP 200"
+  },
+  "7306.117": {
+    "url": "http://127.0.0.1:8000/api/v1/public/store/categories?client_slug=beit-al-fakhar",
+    "method": "GET",
+    "postData": null,
+    "status": "HTTP 200"
+  },
+  "7306.118": {
+    "url": "http://127.0.0.1:8000/api/v1/public/store/products?client_slug=beit-al-fakhar&category_id=641fb6cb-ee16-43cd-9ccc-f4b750f39011",
+    "method": "GET",
+    "postData": null,
+    "status": "HTTP 200"
+  },
+  "7306.215": {
+    "url": "http://127.0.0.1:8000/api/v1/public/beit-al-fakhar/config",
+    "method": "GET",
+    "postData": null,
+    "status": "HTTP 200"
+  },
+  "7A989800AB6C39325C7E77F611148C08": {
+    "url": "http://127.0.0.1:8000/api/v1/public/store/cart?client_slug=beit-al-fakhar",
+    "method": "OPTIONS",
+    "postData": null,
+    "status": "HTTP 200"
+  }
+}
