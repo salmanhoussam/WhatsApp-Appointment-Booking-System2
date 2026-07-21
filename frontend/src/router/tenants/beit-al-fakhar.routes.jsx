@@ -8,7 +8,7 @@
  *   /beit-al-fakhar/home        → HomePage (custom cinematic homepage — hero video, categories, gallery)
  *   /beit-al-fakhar/store       → CatalogPage (generic — store module, real categories/products)
  *   /beit-al-fakhar/store/:itemId → ProductPage (tenant-specific — Premium Product Experience)
- *   /beit-al-fakhar/cart        → CartPage   (generic)
+ *   /beit-al-fakhar/cart        → CheckoutPage (tenant-specific — Showroom Checkout Experience)
  *   /beit-al-fakhar/admin       → GenericAdminDashboard (JWT required — owner adds products here)
  */
 
@@ -21,7 +21,7 @@ import { TenantConfigProvider } from '../../context/TenantConfigContext';
 const HomePage             = lazy(() => import('../../pages/beit-al-fakhar/normal/HomePage'));
 const CatalogPage          = lazy(() => import('../../pages/generic/normal/CatalogPage'));
 const ProductPage          = lazy(() => import('../../pages/beit-al-fakhar/product/ProductPage'));
-const CartPage             = lazy(() => import('../../pages/generic/normal/CartPage'));
+const CheckoutPage         = lazy(() => import('../../pages/beit-al-fakhar/checkout/CheckoutPage'));
 const GenericAdminDashboard = lazy(() => import('../../pages/generic-admin/GenericAdminDashboard'));
 
 // ── Fallback ──────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export default function BeitAlFakharRoutes() {
           <Lazy component={CatalogPage} productLinkBase={(item) => `/beit-al-fakhar/store/${item.id}`} />
         } />
         <Route path="store/:itemId" element={<Lazy component={ProductPage} />} />
-        <Route path="cart"  element={<Lazy component={CartPage} />} />
+        <Route path="cart"  element={<Lazy component={CheckoutPage} />} />
 
         <Route path="admin" element={
           <ProtectedRoute>
