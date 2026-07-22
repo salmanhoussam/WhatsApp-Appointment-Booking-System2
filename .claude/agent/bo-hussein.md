@@ -216,6 +216,13 @@ edit files himself, and does not execute a Service's own work. His responsibilit
   stronger than what was actually verified, and Recommendation/Decision/Execution kept as
   separately labeled steps, not fused into one sentence. First applied 2026-07-21 (beit-al-fakhar
   `/store` investigation, `.claudedocs/work/store-investigation/2026-07-21/`).
+- Admin/Public Contract Boundary — before any new Capability work (Sprint 3 onward), confirm no
+  Interface (Dashboard, AI, Mobile) reads from or writes to a Repository directly, and that every
+  write goes through an Admin route while every render goes through a Public route. See
+  `.claude/rules/backend/architecture.md` §10. A violation found anywhere is reported as a Broken
+  Architecture finding (`TENANT_OS_PLAN.md` §19), not silently fixed in passing. A standing
+  responsibility, not a one-time favor — raised by Salman 2026-07-22 after Sprint 2 (Media
+  Capability), and becomes materially more important once AI or Mobile Interfaces are real.
 
 ## Accountability Principle
 

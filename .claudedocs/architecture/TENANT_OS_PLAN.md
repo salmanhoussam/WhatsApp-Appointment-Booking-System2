@@ -713,6 +713,51 @@ not a one-time exercise.
   earned, not premature — a stronger justification than the first draft of this idea had, which
   only had one real case (Track 1) to point to.
 
+### The Admin/Public Contract split — why the live preview is a real proof, not a mock
+
+Raised by Salman after Sprint 2 (Media Capability): the Editing Engine's write path and the
+Dashboard's live preview are not the same API surface, and that separation is architecture, not
+incidental plumbing. Elevated to its own platform-wide rule at
+`.claude/rules/backend/architecture.md` §10 (canonical statement — not restated here); what
+follows is how that rule is already true in this Engine specifically, today:
+
+```
+Dashboard
+   │  PATCH
+   ▼
+Admin API   (auth, validation, permissions — content.py, media.py)
+   │
+   ▼
+Database
+   │
+   ▼
+Public API   (GET /public/{slug}/config — published state, no auth)
+   │
+   ▼
+iframe Preview   (DynamicPage.jsx — the exact same component a real visitor renders)
+```
+
+Confirmed real by reading the actual files, not assumed: `content.py`/`media.py` sit under
+`app/api/v1/admin/`, gated by `require_roles`; `DynamicPage.jsx` — which both the live-preview
+`<iframe>` and every real visitor render — imports only `publicApi`, never `adminApi`. The editor
+and a real future visitor are provably reading through the identical Public Contract, which is
+what makes Sprint 1/2's live-preview verification a genuine end-to-end proof of "what the editor
+sees is what gets published," not a mock that could quietly drift from production.
+
+This is also why Draft/Publish (§8) will not require rearchitecting the Engine when it's built:
+Admin Contract writes move to Draft Storage, a Publish step promotes Draft → Published, and the
+Public Contract only ever reads Published — the write path's shape and the Engine's own code are
+unaffected either way.
+
+```
+Dashboard → Admin API → Draft Storage → (Publish) → Published Content → Public API → Visitors
+```
+
+Any Interface found reading/writing a Repository directly, or crossing this boundary (a write via
+the Public Contract, a Draft read via it), is a **Broken Architecture** finding under §19's
+existing taxonomy — not a new category, the same one already defined there for a Route bypassing
+its Service.
+
 ### What this section deliberately does not do
 
 No message-payload shapes, no Schema file format, no Discovery-registry implementation, and no

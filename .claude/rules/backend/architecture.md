@@ -116,3 +116,44 @@ entirely, even when each individual file "looks correct" in isolation.
 enforced today (its Single Source of Truth Matrix and classified Architecture Integrity Findings)
 — that document does not own this rule, it demonstrates applying it. Any future domain plan should
 link back here rather than restate the principle itself.
+
+## 10. Every Capability Exposes Two Contracts — Admin (Write) and Public (Read)
+
+Platform-wide principle, raised by Salman while reviewing the Tenant OS Editing Engine's real
+write path (Sprint 1/2, Content and Media Capabilities) — already true in the current codebase
+(`app/api/v1/public/`, `app/api/v1/admin/` have been separate directories since Section 1's Folder
+Structure), made explicit here as its own rule so it stays true *on purpose* rather than by
+accident once more Capabilities and Interfaces (AI, Mobile) are added:
+
+> **Admin Contract** — mutable, authenticated, operation-based: validation, permissions, audit,
+> draft/workflow. Consumed only by trusted write-capable Interfaces (the Dashboard today; a future
+> AI action or Mobile write path tomorrow).
+> **Public Contract** — read-only, rendering-optimized: published content only, never drafts, a
+> stable shape any tenant-facing renderer can depend on, future caching. Consumed by every
+> tenant-facing Interface, including a Dashboard's own live preview.
+
+Concretely, in the Tenant OS Editing Engine (`TENANT_OS_PLAN.md` §14) as already built: the
+Dashboard's write path is `Dashboard → PATCH /api/v1/admin/{capability}/... → Service →
+Repository → DB`; the live preview `<iframe>` (and every real visitor) reads that same DB state
+back through a completely separate route, `GET /api/v1/public/{slug}/config` — never the Admin
+one. Confirmed real, not aspirational: `DynamicPage.jsx` (the component both the live preview and
+every real visitor render) imports only `publicApi`, never `adminApi`. This is what makes the live
+preview a genuine end-to-end proof rather than a mock — the editor and a real future visitor read
+through the identical Public Contract, so what the editor sees during editing is what a visitor
+will actually get.
+
+No Interface — Dashboard, a future AI action, a future Mobile client — may read from or write to a
+Repository directly, or cross the boundary (writing through the Public Contract, or reading
+Draft/unpublished state through it). Every write goes through an Admin route; every render goes
+through a Public route. A violation found anywhere is a **Broken Architecture** finding under
+`TENANT_OS_PLAN.md` §19's existing taxonomy — not a new category; the same one already defined
+there for a Route bypassing its Service, applied to this specific boundary.
+
+When Draft/Publish (`TENANT_OS_PLAN.md` §8) is built, this split is exactly what makes it a clean
+addition rather than a rearchitecture: Admin Contract writes go to Draft Storage, a Publish step
+promotes Draft → Published, and the Public Contract only ever reads Published state — the Editing
+Engine itself does not change.
+
+`.claudedocs/architecture/TENANT_OS_PLAN.md` §14 is where this split is being actively exercised
+today (Content and Media Capabilities' real Admin routes vs. the Public config endpoint the live
+preview reads) — that document does not own this rule, it demonstrates applying it.
