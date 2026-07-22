@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-07-21
+# Last updated: 2026-07-22
 
 ## Completed Phases
 
@@ -98,6 +98,30 @@
 
 ## 🟠 In Progress / Carry Forward
 
+- [x] **Tenant OS Editing Engine — Sprint 1 (Content Capability) + Sprint 2 (Media Capability)** —
+  `hero.title`/`story.heading` (`UpdateField`) and `hero.bg_image` (`ReplaceMedia`) all real,
+  verified end-to-end via CDP; `CanvasPageEditor.jsx`/`PageBuilderTab.jsx` deleted once proven. See
+  `.claudedocs/architecture/TENANT_OS_PLAN.md` §14, `.claudedocs/sessions/2026-07-22.md` — ✅ Done
+  2026-07-22
+- [ ] **Site Configuration Capability (Sprint 3), Phase 2 + Phase 3** — Phase 0 (real
+  re-investigation) + Phase 1 (Ownership Matrix + Contract) done 2026-07-22
+  (`.claudedocs/work/tenant-os-sprint3-phase0/2026-07-22/PHASE0_INVESTIGATION.md`,
+  `TENANT_OS_PLAN.md` §13). Phase 2 must fix `client_service.py` (extend its `ClientUpdate`
+  schema — doesn't cover Site Config fields today) **and** `settings.py` **and** `upload.py`'s
+  `page_hero_video` bypass together (2 independent writers found, not 1) before Phase 3's Engine
+  integration for Brand/Contact/Currency/Theme. Three named Hero boundary-debt findings
+  (`config.hero.*` legacy duplicate, dead `Client.hero_video_url` pipeline, phantom
+  `config.hero_image_url` reference) carry forward, not resolved yet.
+- [ ] **Architecture Documentation System — Implementation Contract (Migration Manifest)** —
+  `ADR-0003` committed 2026-07-22 (`.claudedocs/adr/ADR-0003.md`), adopting a 6-layer docs system
+  (Entry Point/Principles/ADR/Capability Contracts/Reviews/Roadmap) to replace
+  `TENANT_OS_PLAN.md`'s 1,432-line single-file structure. Salman's explicit call: write the
+  Implementation Contract next session with a clear head, as a phased Migration Manifest (see
+  `.claude/plans/we-moved-on-new-hazy-barto.md`, memory `feedback_migration_manifest_structure.md`)
+  — zero files moved yet.
+- [ ] **`ReplaceMedia` Processing Pipeline for beit-al-fakhar's frame-sequence Hero** — named Gap,
+  `TENANT_OS_PLAN.md` §14. Frame extraction is still manual `ffmpeg` + hand-edited
+  `walkthroughAssets.js`; no automation connects a new video upload to regenerated frames.
 - [ ] **Restaurant template — visual confirmation in an actual browser** (`localhost:5173/demo/pilot-test-20260720`) — all 8 sections now resolve to real components and the CTA link is wired (verified via `GET /config`, matches the same "verified via API, never visually confirmed" gap already logged for Arizona/Caracas above); no screenshot tool available in this environment
 - [ ] **Restaurant template — reference-quality sign-off** — once visually confirmed, `pilot-test-20260720` becomes the documented reference for `food-restaurant`/`module_key: restaurant`; only then does Store (step 2) start, per `.claudedocs/architecture/TEMPLATE_ROADMAP_VISION.md`
 - [ ] **Store template** (step 2 of the roadmap) — not started, queued behind Restaurant sign-off
