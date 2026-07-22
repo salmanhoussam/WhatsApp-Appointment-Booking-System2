@@ -7,6 +7,7 @@ import SettingsTab       from './tabs/SettingsTab'
 import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
+import { contentSchema }  from '../../tenant-os/schemas/content'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icons
@@ -255,34 +256,18 @@ export default function GenericAdminDashboard() {
   }, [previewForm])
 
   // ── Tenant OS Editing Engine — receive field clicks from the real live iframe ─
-  // Sprint 1 shipped exactly one field (content.hero.title) via a fully hardcoded handler.
-  // Adding a second field (content.story.heading) to test whether the Engine itself
-  // (EditableRegion, Discovery, the click-capture effect, this postMessage bridge) needed to
-  // change — it didn't. The only real duplication was inside this one handler function, so
-  // it's generalized into a small local field-config map, not a Dispatcher service: still one
-  // file, still no registry module, still nothing built ahead of this second real case
-  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7). A third field would be the real test of
-  // whether even this small map still holds up unchanged.
-  const CONTENT_FIELDS = {
-    'hero.title': {
-      sectionType: 'hero',
-      dataField:   'title_ar',
-      apiPath:     '/content/hero-title',
-      promptLabel: 'عنوان الهيرو (Content Capability — hero.title):',
-    },
-    'story.heading': {
-      sectionType: 'story',
-      dataField:   'heading_ar',
-      apiPath:     '/content/story-heading',
-      promptLabel: 'عنوان قسم القصة (Content Capability — story.heading):',
-    },
-  }
-
+  // Sprint 1 shipped one field (content.hero.title); a second (content.story.heading) proved
+  // the Engine itself (EditableRegion, Discovery, the click-capture effect, this postMessage
+  // bridge) didn't need to change. The one real duplication that surfaced was this handler
+  // reading its own local field-config map that duplicated contentSchema's per-key entries —
+  // per CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md, merged: this handler now reads directly from
+  // contentSchema (§14's Schema), not a second, parallel object. Still no Dispatcher service,
+  // still nothing built ahead of what's proven (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
   useEffect(() => {
     const handler = async (e) => {
       if (e.data?.type !== 'TENANT_OS_FIELD_CLICK') return
       if (e.data.capability !== 'content') return
-      const field = CONTENT_FIELDS[e.data.key]
+      const field = contentSchema[e.data.key]
       if (!field) return
 
       const existingContent = settings?.config?.content ?? {}

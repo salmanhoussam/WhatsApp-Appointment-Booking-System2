@@ -9,8 +9,12 @@ update_client (whose ClientUpdate schema only covers name/slug/phone/email/passw
 was never actually usable for Content's page-copy fields, so this is genuinely new Implementation-
 stage work, not a rerouting of an existing path).
 
-Sprint 1 scope only: the Hero section's title field. Other Content fields (About/Story copy, SEO)
-are real per TENANT_OS_PLAN.md S13 but not touched here.
+Two real fields today: the Hero section's title, the Story section's heading. Both followed the
+identical read-merge-write shape -- exactly two independent instances of the same behavior, which
+is the Abstraction Rule's own stated bar for extraction (per CONTENT_CAPABILITY_ARCHITECTURE_
+REVIEW.md). Extracted into _get_section_field/_update_section_field below; the named per-field
+functions are now thin wrappers, kept because content.py's routes are deliberately NOT merged into
+one generic endpoint yet -- that's the Operation-execution Dispatcher question, still deferred.
 """
 
 from typing import Optional
@@ -20,17 +24,25 @@ from prisma import Json
 from app.repositories import admin_client_repo as _client_repo
 
 
-async def update_hero_title(
-    client_id: str,
-    title_ar: Optional[str] = None,
-    title_en: Optional[str] = None,
-):
-    """
-    Update the Hero section's title within Client.config.content.sections[].
+async def _get_section_field(client_id: str, section_type: str, field: str):
+    """Real, shared read: find a section by type, return one of its data fields."""
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+    section = next((s for s in sections if s.get("type") == section_type), None)
+    if section is None:
+        return None
+    return (section.get("data") or {}).get(field)
 
-    Reads the current config, patches only the hero section's title fields, writes the whole
+
+async def _update_section_field(client_id: str, section_type: str, **fields):
+    """
+    Real, shared write: find a section by type, patch the given data fields, write the whole
     config back -- matches the same read-merge-write shape scripts/seed_page_content.py already
-    uses for this same field.
+    uses. `fields` are only applied when not None (partial update).
     """
     client = await _client_repo.find_client_by_id(client_id)
     if not client:
@@ -40,16 +52,15 @@ async def update_hero_title(
     content = dict(config.get("content") or {})
     sections = list(content.get("sections") or [])
 
-    hero_section = next((s for s in sections if s.get("type") == "hero"), None)
-    if hero_section is None:
-        raise ValueError("This tenant's page has no hero section to update")
+    section = next((s for s in sections if s.get("type") == section_type), None)
+    if section is None:
+        raise ValueError(f"This tenant's page has no {section_type} section to update")
 
-    data = dict(hero_section.get("data") or {})
-    if title_ar is not None:
-        data["title_ar"] = title_ar
-    if title_en is not None:
-        data["title_en"] = title_en
-    hero_section["data"] = data
+    data = dict(section.get("data") or {})
+    for key, value in fields.items():
+        if value is not None:
+            data[key] = value
+    section["data"] = data
 
     content["sections"] = sections
     config["content"] = content
@@ -57,18 +68,17 @@ async def update_hero_title(
     return await _client_repo.update_client(client_id, {"config": Json(config)})
 
 
+async def update_hero_title(
+    client_id: str,
+    title_ar: Optional[str] = None,
+    title_en: Optional[str] = None,
+):
+    return await _update_section_field(client_id, "hero", title_ar=title_ar, title_en=title_en)
+
+
 async def get_hero_title(client_id: str):
     """Read-side helper for Discovery/verification -- not itself a write path."""
-    client = await _client_repo.find_client_by_id(client_id)
-    if not client:
-        raise ValueError("Client not found")
-    config = dict(getattr(client, "config", None) or {})
-    content = dict(config.get("content") or {})
-    sections = list(content.get("sections") or [])
-    hero_section = next((s for s in sections if s.get("type") == "hero"), None)
-    if hero_section is None:
-        return None
-    return (hero_section.get("data") or {}).get("title_ar")
+    return await _get_section_field(client_id, "hero", "title_ar")
 
 
 async def update_story_heading(
@@ -76,46 +86,8 @@ async def update_story_heading(
     heading_ar: Optional[str] = None,
     heading_en: Optional[str] = None,
 ):
-    """
-    Second real field, Content Capability -- proves the Engine generalizes to a second
-    Capability sub-field (and a second real section component, StorySection.jsx) without
-    changing EditableRegion, Discovery, or the click-capture/live-preview plumbing at all.
-    Same read-merge-write shape as update_hero_title -- the shape repeats, confirming it's
-    real, not a one-off.
-    """
-    client = await _client_repo.find_client_by_id(client_id)
-    if not client:
-        raise ValueError("Client not found")
-
-    config = dict(getattr(client, "config", None) or {})
-    content = dict(config.get("content") or {})
-    sections = list(content.get("sections") or [])
-
-    story_section = next((s for s in sections if s.get("type") == "story"), None)
-    if story_section is None:
-        raise ValueError("This tenant's page has no story section to update")
-
-    data = dict(story_section.get("data") or {})
-    if heading_ar is not None:
-        data["heading_ar"] = heading_ar
-    if heading_en is not None:
-        data["heading_en"] = heading_en
-    story_section["data"] = data
-
-    content["sections"] = sections
-    config["content"] = content
-
-    return await _client_repo.update_client(client_id, {"config": Json(config)})
+    return await _update_section_field(client_id, "story", heading_ar=heading_ar, heading_en=heading_en)
 
 
 async def get_story_heading(client_id: str):
-    client = await _client_repo.find_client_by_id(client_id)
-    if not client:
-        raise ValueError("Client not found")
-    config = dict(getattr(client, "config", None) or {})
-    content = dict(config.get("content") or {})
-    sections = list(content.get("sections") or [])
-    story_section = next((s for s in sections if s.get("type") == "story"), None)
-    if story_section is None:
-        return None
-    return (story_section.get("data") or {}).get("heading_ar")
+    return await _get_section_field(client_id, "story", "heading_ar")

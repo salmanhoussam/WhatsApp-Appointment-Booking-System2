@@ -1,10 +1,12 @@
 """
-app/api/v1/admin/content.py — Content Capability, Sprint 1 scope only (Hero Title).
+app/api/v1/admin/content.py — Content Capability routes (hero.title, story.heading).
 
-Tenant OS: this route is the one real call site for the "UpdateField" Operation on
-content.hero.title -- a direct call into content_service.py, not a generic Dispatcher
-(TENANT_OS_IMPLEMENTATION_REVIEW.md S1a/Q7: a Dispatcher abstraction is deferred until a second
-real Capability/Operation proves the routing shape actually repeats).
+Tenant OS: each route is a direct call site for one "UpdateField" Operation -- not a generic
+Dispatcher endpoint (TENANT_OS_IMPLEMENTATION_REVIEW.md S1a/Q7: a Dispatcher abstraction is
+deferred until a second real Capability/Operation proves the routing shape actually repeats).
+Deliberately not merged into one generic route either, per
+CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md -- that's the same Dispatcher question, not a separate
+one, and stays deferred with it.
 """
 
 import logging
