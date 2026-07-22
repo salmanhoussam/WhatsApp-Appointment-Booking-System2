@@ -531,6 +531,7 @@ Content layer (§4) that has no mechanism yet; it is not a suggestion to build i
 | Reorder unit gallery photos | ✅ Real (booking module only) | `PUT /gallery/{unit_id}/reorder` |
 | Delete a unit gallery photo | ✅ Real | `DELETE /gallery/images/{id}` |
 | Browse/reuse previously uploaded media across contexts (a real Media Library) | ⚠️ Gap | No client-wide "list my media" endpoint exists — every upload is bound to one context, nothing is browsable/reusable across contexts today |
+| Replace beit-al-fakhar's Hero video (frame-sequence Hero) | ⚠️ Gap, distinct from Sprint 2's `hero.bg_image` | See §14's "`ReplaceMedia` may need a Processing Pipeline" — frames are extracted offline by hand today (`ffmpeg`, then hardcoded into `walkthroughAssets.js`); a real `ReplaceMedia` for this Hero cannot reuse Sprint 2's simple file→URL shape without silently leaving stale frames on the page |
 
 ### Site Configuration Capability (broader than Theme) — Ownership Matrix (Sprint 3, Phase 1)
 
@@ -801,6 +802,51 @@ not a one-time exercise.
   Engine machinery serving a data-driven page and a hand-built page proves the abstraction is
   earned, not premature — a stronger justification than the first draft of this idea had, which
   only had one real case (Track 1) to point to.
+
+### Known Requirement — `ReplaceMedia` may need a Processing Pipeline, not just a URL swap
+
+Raised by Salman while reviewing Sprint 3's Phase 1, prompted by beit-al-fakhar's own real Hero —
+confirmed exactly as he described, not assumed: beit-al-fakhar's Hero is not a `<video>` tag.
+`frontend/src/pages/beit-al-fakhar/sections/hero/` (the reference implementation for the
+`frame-sequence-canvas` skill, `rules/frontend/animations.md` §5) scroll-scrubs real, pre-extracted
+video frames painted onto a `<canvas>`. The frame set is prepared entirely **offline and by
+hand** — the skill's own words: *"The frame sequence is prepared once, offline, from a real source
+video"* via a documented `ffmpeg` recipe, uploaded manually, with the exact frame count and base
+URL then **hardcoded** into `walkthroughAssets.js` (`FRAME_COUNT = 71`, a literal Supabase URL,
+both edited directly in source by whoever ran the extraction on 2026-07-19). There is no field, no
+Service, no endpoint, no automation connecting "a new video was uploaded" to "the frames get
+regenerated" — today that connection is a developer re-running the `ffmpeg` recipe and hand-editing
+this file. If a future `ReplaceMedia` Operation on this Hero only swapped a stored URL (Sprint 2's
+`hero.bg_image` shape), the page would keep silently rendering the **old** 71 frames forever — a
+real, predictable functional bug, not a hypothetical one.
+
+**The generalized principle, stated now so it isn't rediscovered mid-Sprint**: `ReplaceMedia` is
+not always `file → URL`. For some fields it is `file → Processing Pipeline → Derived Assets →
+Published Result` — upload, then some transformation, then the actual thing a page renders is the
+*derived* asset, not the uploaded file itself. The Interface's job stays exactly what §14 already
+established: say "replace the hero video." Whether that requires a pipeline afterward, and what
+that pipeline does, is entirely the owning Capability's decision, invisible to every Interface —
+the same Capability → Operation boundary this whole section exists to protect, now shown to apply
+to an Operation's *own* internal complexity, not just which Interface calls it.
+
+Salman's own worked examples, recorded as the standing frame for future Media-adjacent work (none
+built now — Reserved/Gap, per §15/§20, until a real case needs it):
+
+| Asset | Pipeline after Upload? |
+|---|---|
+| Logo | Upload only |
+| Product photo | Upload only |
+| Hero video (frame-sequence Hero) | Upload **+ frame extraction** (today: manual `ffmpeg`, unautomated) |
+| Gallery images (future) | Upload **+ thumbnail generation** |
+| PDF/Catalog (future) | Upload **+ preview generation** |
+
+**Not built now — a named Gap, not a Sprint 3 deliverable**: no Processing Pipeline abstraction, no
+job queue, no automated frame-extraction trigger. Sprint 2's real `ReplaceMedia` (`hero.bg_image`)
+remains exactly what it is — a direct file→URL swap for the *generic* `HeroSection.jsx` path — and
+is explicitly **not** the same mechanism as beit-al-fakhar's bespoke frame-sequence Hero, which has
+no Editing Engine integration of any kind today. Wiring beit-al-fakhar's Hero into the Engine
+later must account for this Known Requirement from the start, rather than copying Sprint 2's
+simpler shape and silently reintroducing the stale-frames bug this section exists to prevent.
 
 ### The Admin/Public Contract split — why the live preview is a real proof, not a mock
 
