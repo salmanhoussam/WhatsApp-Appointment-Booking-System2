@@ -526,40 +526,129 @@ Content layer (§4) that has no mechanism yet; it is not a suggestion to build i
 
 | Sub-capability | Status | Mechanism |
 |---|---|---|
-| Upload image/video into a specific context (hero, logo, product, unit gallery) | ✅ Real | `upload.py`'s `FOLDER_MAP`/`IMAGE_TYPE_MAP`, `useImageUpload.js` |
+| Upload a file into a specific storage context (hero, logo, product, unit gallery) | ✅ Real | `upload.py`'s `FOLDER_MAP`/`IMAGE_TYPE_MAP`, `useImageUpload.js` — the file transfer itself always succeeds |
+| Persist the uploaded URL somewhere queryable | ⚠️ **Per-context, not blanket** — corrected 2026-07-22 (Phase 0) | Real for `page_hero_video` (writes `Client.hero_video_url` directly, bypassing any Service — itself a Broken-Architecture-adjacent finding, §19) and for `catalog_item`/`unit_cover`/`unit_gallery` (via `GalleryImage`/catalog rows). **Not real for `page_logo`, `page_hero`, `page_story`, `page_demo`** — confirmed by reading `upload.py`'s full route body: none of those contexts match a persistence branch; the call falls through to `return {"url": ..., "image_id": None}` and the URL is never saved anywhere unless a caller separately PATCHes it (which Sprint 2 now does for `page_hero` via `/media/hero-image` — `page_logo` has no equivalent route yet, see §13's Site Configuration Ownership Matrix) |
 | Reorder unit gallery photos | ✅ Real (booking module only) | `PUT /gallery/{unit_id}/reorder` |
 | Delete a unit gallery photo | ✅ Real | `DELETE /gallery/images/{id}` |
 | Browse/reuse previously uploaded media across contexts (a real Media Library) | ⚠️ Gap | No client-wide "list my media" endpoint exists — every upload is bound to one context, nothing is browsable/reusable across contexts today |
 
-### Site Configuration Capability (broader than Theme)
+### Site Configuration Capability (broader than Theme) — Ownership Matrix (Sprint 3, Phase 1)
 
-Salman's explicit addition: not Theme (§10, narrowly visual), but everything about how the
-tenant's business itself is configured.
+Salman's explicit addition, twice now: first (Phase 1's original pass) that Site Configuration is
+not Theme (§10, narrowly visual) but everything about how the tenant's business itself is
+configured; second, after Sprint 3's Phase 0 re-investigation
+(`.claudedocs/work/tenant-os-sprint3-phase0/2026-07-22/PHASE0_INVESTIGATION.md`), that the Contract
+must be written from **Ownership first, fields second** — Phase 0 found the real risk isn't the
+API shape, it's that one concept ("Hero") is currently split across more than one Capability's
+storage. His words: *"أكبر مشكلة ليست الـ API. بل أن مفهومًا واحدًا ('Hero') موزع على
+Capabilityين... إذا لم نحل هذا أولًا، فسنبني Contract فوق حدود غير مستقرة."*
 
-| Sub-capability | Status | Mechanism |
+**Ownership Matrix** — every concept touching `Client`/`config` today, assigned to exactly one
+Capability:
+
+| Concept | Capability | Why |
 |---|---|---|
-| Brand name | ✅ Real | `Client.name_ar/name_en` |
-| Logo | ✅ Real | `page_logo` upload context |
-| WhatsApp number | ✅ Real | `Client.whatsapp_number` |
-| Email | ✅ Real | `Client.email` |
-| Social links | ⚠️ Real but narrow | `Client.instagram_url`, `maps_url` only — not a generic social-links list |
-| Currency | ✅ Real | `Client.currency` |
-| Business hours | ⚠️ Real where the Template includes it | The `hours` section type exists in `page_templates` (confirmed for booking's template; presence in store/restaurant templates not independently verified in this pass) |
-| Languages supported | ⚠️ Gap | No real field found |
-| Custom domain | ⚠️ Gap | No real field found — tenants are subdomain/slug-routed today |
-| Timezone | ⚠️ Gap | No real field found |
-| Tax settings | ⚠️ Gap | No real field found |
-| Delivery zones/fees | ⚠️ Gap, already on the roadmap | `service-system.md` already lists `delivery_zones` as a 📋 Planned serviceKey — this Capability's Gap and that Planned service are the same future work, not two separate ideas |
-| SEO metadata | ⚠️ Gap | Same Gap already named under the Content Capability below — not duplicated, just reachable from both |
-| Analytics | ⚠️ Gap, already on the roadmap | `service-system.md` already lists `analytics` as a 📋 Planned serviceKey — same cross-reference as Delivery |
-| Integrations (payment gateways, WhatsApp Business API, etc.) | ⚠️ Gap | No real mechanism found; generic placeholder for future work, not a specific commitment |
+| Brand (`name_ar`, `name_en`) | Site Configuration | Identity metadata, not editorial text |
+| Contact (`whatsapp_number`, `email`, `instagram_url`, `maps_url`) | Site Configuration | Business facts |
+| Currency | Site Configuration | Business fact |
+| Theme Tokens (`primary_color`, `font`, `catalog_layout`, `page_type`/`template_key`) | Site Configuration | Display configuration — the "Theme" slice §20 already named as narrower than Site Configuration |
+| Logo | **Media**, not Site Configuration | Same reasoning as Hero Image below — it is an image needing a `ReplaceMedia` Operation, not configuration data. Site Configuration may *reference* `logo_url` for rendering but does not own writing it. **Judgment call, not explicitly given by Salman** — his own example list didn't cover Logo; flagged here for confirmation rather than assumed, precisely because Phase 0 found its current status ("✅ Real") was itself wrong (see correction below) |
+| Hero Copy (title/subtitle/CTA text) | **Content**, not Site Configuration | Editorial text — regardless of where it is stored today. Salman's explicit new rule: *"Site Configuration لا يملك أي نصوص تحريرية. أي شيء يمثل Content يبقى داخل Content Capability، حتى لو كان موجودًا تاريخيًا داخل `config.hero`."* |
+| Story Copy | Content | Editorial text |
+| Hero Image/Video (`bg_image_url`, matched for video by file extension) | Media | `ReplaceMedia` Operation — Sprint 2's real, proven mechanism |
+
+**Correction to this table's prior text, made honest by Phase 0's more rigorous evidence**: Logo
+was previously listed "✅ Real" here, evidenced only by `upload.py`'s `page_logo` `FOLDER_MAP` entry
+existing. Phase 0 read the route's full body: `page_logo` matches none of its `if`/`elif` branches
+that persist a URL anywhere (only `page_hero_video` does) — the file uploads correctly, the
+resulting URL is never saved. No `logo_url` field exists on `Client`; no frontend code references
+`logo_url`/`logoUrl` anywhere (confirmed by grep). Logo is a **complete Gap**, not partial —
+upload-storage plumbing exists, nothing else does.
+
+#### Known Boundary Debt (Phase 0 findings — named, not resolved, not silently inherited)
+
+Three real, independently-confirmed instances of the same "Hero" concept fragmenting across
+storage locations, each a different failure shape — not one bug repeated three times:
+
+1. **Hero Copy — a live duplicate.** `config.hero.title_ar/subtitle_ar/cta_ar` (legacy, written
+   only via `SettingsTab.jsx`'s own hero-text fields, read only by `ConfigurableHero.jsx:55` for
+   the `page_type: "showcase"` + `sections: []` fallback) is a second, fully independent "Hero
+   Title" storage location, unrelated to Sprint 1's real Content Capability field
+   (`config.content.sections[type=hero].data.title_ar`, edited via `/content/hero-title`, rendered
+   by `HeroSection.jsx` through `DynamicPage.jsx`'s real `SECTION_MAP`). Both are live and
+   consumed today, depending on which rendering path a given tenant uses.
+2. **Hero Video — a dead pipeline.** `Client.hero_video_url` (root column) has two real Admin
+   write paths (`PATCH /settings` via `SettingsTab.jsx`'s form; `POST /upload/` with
+   `context=page_hero_video` via `upload.py`'s direct bypass write) but its only real frontend
+   *read* consumer, `frontend/src/design-system/organisms/TenantHero.jsx`, has **zero importers
+   anywhere in the codebase** (confirmed by grep) — nothing ever renders it. Unlike Hero Copy, this
+   isn't two live competing writers; it's a fully-wired write path with no live reader at the end
+   of it. Sprint 2's real Media Capability already covers the *conceptually* equivalent slot
+   (`content.sections[hero].data.bg_image_url`, which already matches video file extensions in
+   `HeroSection.jsx`) — `Client.hero_video_url` is redundant with it, not complementary.
+3. **Hero Cover Image — a phantom reference.** `ConfigurableHero.jsx` (lines 59, 152) reads
+   `config?.hero_image_url || config?.cover_url` — **neither field exists anywhere in
+   `prisma/schema.prisma`**, confirmed by grep. For any tenant rendering through this fallback
+   path, the hero cover image has never actually worked; this is a latent bug, not a duplication.
+
+None of these three are fixed in Phase 1 — named here so Phase 2/3 inherit them as explicit,
+evidenced decisions to make (migrate `config.hero.*` into `content.sections`? delete
+`TenantHero.jsx` and both its write paths since nothing renders it? wire a real field for
+`ConfigurableHero.jsx`'s cover image, or retire that fallback path entirely?), not silently
+rediscovered later.
+
+#### Site Configuration — Capability Contract (Phase 1, Sprint 3)
+
+Only the concepts the Ownership Matrix above actually assigns to Site Configuration. Each row:
+Source of Truth (today's real storage), Admin Contract (write), Public Contract (read), Operation.
+
+| Field | Source of Truth | Admin Contract | Public Contract | Operation |
+|---|---|---|---|---|
+| Brand name (ar/en) | `Client.name_ar`, `Client.name_en` | `PATCH /admin/site-config/brand` (new — Phase 2) | `GET /public/{slug}/config` → `name_ar`/`name_en` (already real, unchanged) | `UpdateField` |
+| WhatsApp number | `Client.whatsapp_number` | `PATCH /admin/site-config/contact` (new — Phase 2) | `GET /public/{slug}/config` → `whatsapp_number` (already real) | `UpdateField` |
+| Email | `Client.email` | `PATCH /admin/site-config/contact` (new — Phase 2) | **Gap, confirmed by Phase 0** — not exposed today; stays un-exposed unless a real reason to make it public surfaces | `UpdateField` |
+| Instagram / Maps URL | `Client.instagram_url`, `Client.maps_url` | `PATCH /admin/site-config/contact` (new — Phase 2) | `GET /public/{slug}/config` → same keys (already real) | `UpdateField` |
+| Currency | `Client.currency` | `PATCH /admin/site-config/business` (new — Phase 2) | `GET /public/{slug}/config` → `currency` (already real) | `UpdateField` |
+| Primary color / font / catalog layout / page type | `Client.primary_color`, `config.font`, `config.catalog_layout`, `Client.pageType`/`templateKey` | `PATCH /admin/site-config/theme` (new — Phase 2) | `GET /public/{slug}/config` → same keys (already real) | `UpdateField` |
+
+**Source of Truth for the Service layer itself (not yet built — Phase 2's job)**: per Salman's
+explicit decision this Sprint — *"لن أحاول 'إعادة توصيل' `settings.py` بهذا الـ Service. بل سأتعامل
+مع `client_service.py` نفسه كجزء من Sprint 3"* — the target Service is `client_service.py` itself,
+**extended** (its `ClientUpdate` schema currently only covers `name`/`slug`/`phone`/`email`/
+`isActive`/`password` — Phase 0 confirmed it cannot carry `primary_color`/`config`/
+`whatsapp_number` etc. as-is) and **fixed** to call `admin_client_repo` instead of `prisma_client`
+directly, not a fresh Service written from scratch. Route names above (`/site-config/brand` etc.)
+are illustrative groupings for Phase 2 to size, not a final API surface commitment.
+
+**Why this Contract is deliberately narrower than the table that used to sit here**: Business
+hours, Languages, Custom domain, Timezone, Tax settings, Delivery zones/fees, SEO metadata,
+Analytics, and Integrations remain real Gaps (unchanged from the prior pass — no new evidence
+found or claimed for any of them this Sprint) and are not part of Phase 1's Contract; they stay
+named as future work, not re-scored here.
+
+**Reframing Sprint 3's actual target, per Salman's own correction**: this is not "wire `settings.py`
+into the Editing Engine." It is establishing **one canonical write path per field** — the same
+`upload.py` finding that surfaced a second bypass writer for `hero_video_url` is itself evidence
+that the real problem was never one Route; it's that Site-Configuration-owned fields have had more
+than one Writer. Phase 2 must fix `settings.py` **and** `upload.py`'s `page_hero_video` branch
+together, not `settings.py` alone — anything less leaves a second, uncoordinated writer standing.
 
 ### Content Capability (page copy, distinct from Catalog's product data)
 
+**Corrected 2026-07-22, Phase 0 re-investigation** — this table previously overstated what Sprint 1
+actually built. Only `hero.title` and `story.heading` are real, Engine-editable fields
+(`content_service.py`, verified end-to-end via CDP). Subtitle/CTA text and About/Why-Us/
+Testimonials copy exist as real data in `config.content.sections[].data` and do render (via
+`HeroSection.jsx`/`StorySection.jsx`/`TestimonialsSection.jsx`), but have **no Admin route and no
+`EditableRegion`** yet — "the data field exists and renders" and "is editable through the Engine"
+are different claims, and the prior text conflated them.
+
 | Sub-capability | Status | Mechanism |
 |---|---|---|
-| Edit Hero headline/subtitle/CTA text | ✅ Real | `config.content` hero section |
-| Edit About/Story/Why-Us copy | ✅ Real | `config.content` story/testimonials sections |
+| Edit Hero title | ✅ Real, Engine-editable | `content_service.py` → `/content/hero-title`, Sprint 1 |
+| Edit Story heading | ✅ Real, Engine-editable | `content_service.py` → `/content/story-heading`, Sprint 1 |
+| Edit Hero subtitle/CTA text | ⚠️ Data exists, not yet Engine-editable | Renders from `config.content.sections[hero].data.subtitle_ar`/`cta_text_ar`; no Admin route, no `EditableRegion` |
+| Edit About/Why-Us/Testimonials copy | ⚠️ Data exists, not yet Engine-editable | Renders from their respective `config.content.sections[].data`; no Admin route, no `EditableRegion` |
 | Edit SEO metadata (title/description) | ⚠️ Gap | No real field found (§6) |
 
 ### Orders Capability
