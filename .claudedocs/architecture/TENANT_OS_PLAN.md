@@ -5,18 +5,29 @@ architecture plan, per `.claude/rules/documentation-policy.md`. Follows the Serv
 Constitution's "real project state is the source of truth" principle throughout: every claim
 below about what exists was verified by reading the real files, not assumed.
 
-**Revision note (this pass)**: Salman's closing observation was that Architecture is now
-sufficiently covered, but **Product Governance** — deciding whether a new idea deserves to become
-a Capability at all, before any Architecture applies to it — was still missing. Adds §12,
-**Capability Proposal**, a five-question gate every future Capability must answer before a
-Contract is even written (deliberately not a fourth branch of §5's anatomy — it's the admission
-process that precedes the anatomy, not part of it). Adds §21, a **Capability Health Dashboard** —
-a single-glance, progress-bar-style view for the team itself, built from the detailed derivations
-already in §14/§19/§20 rather than replacing them. Also records two things Salman raised without
-asking for immediate action: a future rename once this document is formally adopted (§22, Phase
-2.5), since "Plan" undersells what this has become; and the three documents Salman now considers
-this project's architectural backbone (§1) — the Service Execution Constitution, the Backend
-Architecture Rules, and this document.
+**Revision note (this pass)**: a real investigation of the dashboard's two "page editor" tabs
+(written up separately as `LIVE_PAGE_EDITOR_PLAN.md`) found both render a hand-built mockup
+canvas — a live Duplicate Architecture violation of §8's Live Preview principle, confirmed by
+reading the code, not assumed. Salman's review of that plan made the deeper point: the fix is not
+"a better Page Editor" — it's a real architectural layer, the **Editing Engine** (new §15), that
+sits between Capability Contracts and every Interface (Dashboard, AI, Mobile, API, eventually
+Voice), so that adding a new Capability later never means touching each Interface's code
+separately. Per Salman's explicit instruction, that standalone plan is now **merged into this
+document rather than left independent** — `LIVE_PAGE_EDITOR_PLAN.md` is removed; its real findings
+live in §15 below. §5, §8, §9, and §12 are updated to reference the Editing Engine where they
+previously left "how an Interface actually reaches a Capability" implicit.
+
+**Earlier revision note**: Salman's closing observation was that Architecture is now sufficiently
+covered, but **Product Governance** — deciding whether a new idea deserves to become a Capability
+at all, before any Architecture applies to it — was still missing. Adds §12, **Capability
+Proposal**, a five-question gate every future Capability must answer before a Contract is even
+written (deliberately not a fourth branch of §5's anatomy — it's the admission process that
+precedes the anatomy, not part of it). Adds a **Capability Health Dashboard** — a single-glance,
+progress-bar-style view for the team itself, built from detailed derivations rather than replacing
+them. Also records two things Salman raised without asking for immediate action: a future rename
+once this document is formally adopted (Phase 2.5), since "Plan" undersells what this has become;
+and the three documents Salman now considers this project's architectural backbone (§1) — the
+Service Execution Constitution, the Backend Architecture Rules, and this document.
 
 ---
 
@@ -115,7 +126,7 @@ Five standing principles every future Content/Template/Platform decision gets me
    since it applies equally to Booking, Restaurant, Store/Catalog, AI, and any future Plugin, not
    just to the Tenant OS's own scope. Its canonical home is now
    `.claude/rules/backend/architecture.md` §9 — restated here only for local context; if the two
-   ever seem to disagree, the rule file wins. §15's Single Source of Truth Matrix and §18's
+   ever seem to disagree, the rule file wins. §16's Single Source of Truth Matrix and §19's
    Architecture Integrity Findings are this document's own act of *applying* that platform-wide
    rule to the Tenant OS's specific Capabilities — not a second copy of the rule itself.
 
@@ -184,7 +195,7 @@ Tenant OS
   │
   ├── Capability
   │      ├── Contract        (§13 — what the capability can do)
-  │      ├── Service          (the one canonical write path, §15)
+  │      ├── Service          (the one canonical write path, §16)
   │      ├── Repository       (Prisma queries only, no logic)
   │      └── Database         (the real Prisma model — the actual source of truth)
   │      [ one branch per domain: Catalog, Category, Media, Site Configuration,
@@ -200,11 +211,11 @@ Tenant OS
   │                         data) — not built, a real Gap, not designed here
   │
   └── Governance
-         ├── Permissions    — who may invoke a Capability (§16's Capability Matrix)
+         ├── Permissions    — who may invoke a Capability (§17's Capability Matrix)
          ├── Draft/Publish  — staged edits before going live (§8's Live Preview)
-         ├── Audit          — who changed what, when (real Gap, §17)
-         ├── Versioning     — content history / undo (real Gap, §17)
-         └── Activity       — a human-readable feed of recent changes (real Gap, §17)
+         ├── Audit          — who changed what, when (real Gap, §18)
+         ├── Versioning     — content history / undo (real Gap, §18)
+         └── Activity       — a human-readable feed of recent changes (real Gap, §18)
 ```
 
 **One admission gate sits above this whole anatomy, not inside it**: §12's Capability Proposal
@@ -212,15 +223,21 @@ decides whether an idea is even allowed to become a Capability with a Contract i
 It is Product Governance, not Architecture — a different question than anything this anatomy
 describes, which is why it isn't drawn as a fourth branch above.
 
+**One connective mechanism sits between Capability and Interface, not inside either**: §15's
+**Editing Engine** is how an Interface actually reaches a Capability's editable fields —
+Capability → Operation → Schema → Renderer, never Interface → hardcoded per-field UI logic. It is
+not drawn as a fourth branch either; it is the literal implementation of the arrow between
+Capability and Interface that this diagram already implies but previously left unspecified.
+
 **Why the Capability/Interface/Governance split matters, concretely**: Draft/Publish, Audit,
 Versioning, and Activity are not properties of any one Capability. Catalog does not get its own
 separate audit log; Content does not get its own separate draft/publish mechanism. These are
 cross-cutting concerns, built **once** at the Governance layer, and every Capability inherits them
-automatically. §17 is where this is made concrete.
+automatically. §18 is where this is made concrete.
 
 **What this means for the rest of the document**: every section from here on is one of four
-things — the Product Governance gate (§12), Capability content (§6, §13, §14, §15), Interface
-content (§7, §11), or Governance content (§8, §16, §17). None of them is "the top level" of
+things — the Product Governance gate (§12), Capability content (§6, §13, §15, §16), Interface
+content (§7, §11), or Governance content (§8, §17, §18). None of them is "the top level" of
 anything except the gate, which precedes all three anatomy branches by design.
 
 ---
@@ -297,15 +314,18 @@ Concretely, the difference this framing demands:
   changes. Drop a video in, it plays. Every action is direct manipulation of the thing itself, not
   a proxy form describing it.
 
-This project already has the real building blocks this identity needs (§1): `CanvasPageEditor.jsx`
-already edits page sections in place rather than through a distant form; the shared upload flow
+This project already has real building blocks this identity needs (§1): the shared upload flow
 (`upload.py`, `useImageUpload.js`) already collapses upload into a single drop-target interaction.
-The correction going forward is to make **inline-in-context editing the default posture for every
-Content item**, not an occasional nicety — reserving a traditional form field only for the rare
-Content item with no visual home at all (e.g., a payment-method toggle). Where §6's "gap" items
-(reorder for `CatalogItem`/`CatalogCategory`) get closed by a future Implementation Contract, they
-should be closed in this same direct-manipulation spirit (drag the card, not "edit sort_order in a
-number field"), continuing the real pattern `GalleryImage`'s reorder endpoint already proves works.
+`CanvasPageEditor.jsx`, however, does **not** — a real investigation (§15) found its "canvas" is a
+separate, hand-rolled mockup that never renders the real page, exactly the anti-pattern this
+section and §8 both warn against. §15's Editing Engine is the real fix: inline-in-context editing
+becomes the default posture for every Content item not because each Interface hand-builds it, but
+because the Editing Engine's Discovery mechanism makes every editable field clickable-in-place
+automatically, on the real rendered page, for any Interface that chooses to surface it that way.
+Where §6's "gap" items (reorder for `CatalogItem`/`CatalogCategory`) get closed by a future
+Implementation Contract, they should be closed in this same direct-manipulation spirit (drag the
+card, not "edit sort_order in a number field"), continuing the real pattern `GalleryImage`'s
+reorder endpoint already proves works.
 
 ---
 
@@ -328,6 +348,21 @@ public page reads, until the tenant hits Save/Publish) — not two different ren
 Whether that staging is a `draft_config` column, a separate `is_published` flag, or something else
 is deliberately **not decided here** — it's real schema work for a future Implementation Contract,
 gated by whichever Capability needs Live Preview first proving the shape (Abstraction Rule).
+
+**A real, working precedent for this exact principle was found in §15's investigation, on a tab
+this document had not previously examined**: the Settings tab already renders a real
+`<iframe src="/demo/{slug}">` — the actual production page, live, inside the dashboard — with a
+working `postMessage` bridge that pushes edited field values into it instantly, no save/reload
+required (`GenericAdminDashboard.jsx:260-269`, `DynamicPage.jsx:216-233`). It only carries 3
+primitive fields today (accent color, hero type, catalog layout), but the plumbing itself is
+exactly this section's principle, already real, not proposed. §15's Editing Engine generalizes
+this real foundation to every Capability's editable fields, rather than inventing a second
+mechanism beside it. By contrast, `CanvasPageEditor.jsx` and the orphaned `PageBuilderTab.jsx` —
+the dashboard's actual "page editor" tabs — do the opposite of this principle: both render a
+separate, hand-built mockup canvas that imports zero real components (`CanvasPageEditor.jsx:
+1002-1224`, confirmed importing nothing from `components/dynamic-sections/`) — a live Duplicate
+Architecture finding (§20) this document's own principle would have caught, had this investigation
+happened sooner.
 
 ---
 
@@ -384,13 +419,21 @@ the architectural placeholder this plan leaves:
   Draft/Publish mechanism (§8) — the tenant still reviews in Live Preview and hits Save before
   anything goes live. This isn't a new concept invented for AI; it's the same staging mechanism §8
   already requires for humans, reused.
-- Its permission ceiling is not a new decision — it's §16's Capability Matrix (Governance:
+- Its permission ceiling is not a new decision — it's §17's Capability Matrix (Governance:
   Permissions), read directly: the AI may invoke exactly the Capabilities marked ✅ for AI there,
   no more, no negotiation per feature.
 - Concretely reserved, not designed: a chat-style Interface surface, and a narrow, explicit
   action-vocabulary the assistant is allowed to call (the same vocabulary every other Interface
   already exposes — nothing more). No model choice, no prompt design, no new endpoint is decided
   here.
+- **That "action-vocabulary" is not a separate thing to design for AI specifically — it is §15's
+  Editing Engine, read directly.** The set of Operations the Editing Engine's Discovery mechanism
+  exposes for a given page (§15) *is* the AI's action-vocabulary, verbatim — an AI reads the same
+  Schema a human's Dashboard renders as a form, and calls the same Operation-execution endpoint a
+  click resolves to. This is what makes the earlier bullet ("never a separate privileged codepath")
+  concrete rather than aspirational: there is no second implementation for AI to drift from,
+  because there is only one Operation per field, discovered the same way regardless of which
+  Interface is asking.
 
 ---
 
@@ -414,7 +457,7 @@ written**:
    ever call it, it is probably not a Capability at all — more likely Interface-specific UI logic
    that doesn't need its own Contract/Service/Repository chain.
 4. **What is the Source of Truth?** If this cannot be named clearly, implementation does not start
-   — this is §15's Single Source of Truth Matrix's own admission requirement, applied at proposal
+   — this is §16's Single Source of Truth Matrix's own admission requirement, applied at proposal
    time rather than discovered after the fact.
 5. **How will the client — not the developer — measure whether it succeeded?** A technical
    definition of done is not sufficient on its own.
@@ -430,11 +473,11 @@ something**:
 | Problem, for whom? | Tenants need to list distinct sellable items with prices and photos, for their own customers to browse and order |
 | New or extension? | Was genuinely new (the Phase 54 unification that replaced separate Menu/Store models) |
 | More than one Interface? | Yes — Dashboard is real today; AI and a tenant-authoring API are named, reserved future consumers (§11, §5) |
-| Source of Truth? | `CatalogItem`/`CatalogCategory` — unambiguous (§15) |
+| Source of Truth? | `CatalogItem`/`CatalogCategory` — unambiguous (§16) |
 | Client's own success measure? | "I can list a real product, and a real customer can find and buy it" — non-technical, checkable |
 
 Catalog passes cleanly — a real confirmation the gate isn't purely theoretical. This is the
-concrete content of §14's Lifecycle "Idea" stage: an Idea only becomes eligible to move to
+concrete content of §15's Lifecycle "Idea" stage: an Idea only becomes eligible to move to
 "Contract" once these five questions are answered, for every future Capability, not only this
 worked example.
 
@@ -536,12 +579,152 @@ tenant's business itself is configured.
 | View customer list | ⚠️ Real code exists, but **not live** | `app/api/v1/admin/customers.py` defines full CRUD, but is never `include_router`'d in `app/api/v1/admin/__init__.py` — confirmed by reading that file's router list directly; this endpoint is unreachable today |
 | Edit / delete a customer | ⚠️ Same as above | same file, same unmounted status |
 
-See §18 for why this Capability's gap is treated as a formally-classified Architecture Integrity
+See §19 for why this Capability's gap is treated as a formally-classified Architecture Integrity
 Finding, not an ordinary Gap.
 
 ---
 
-## 14. Capability Lifecycle
+## 14. Editing Engine — Capability → Operation → Schema → Renderer
+
+### Why this section exists
+
+A real investigation of the dashboard's two "page editor" tabs (originally written up as its own
+document, `LIVE_PAGE_EDITOR_PLAN.md`, now merged here per Salman's explicit direction) found both
+render a hand-built mockup: `CanvasPageEditor.jsx`'s center canvas (`CanvasPageEditor.jsx:
+1002-1224`) and the orphaned `PageBuilderTab.jsx`'s equivalent both import **zero** components from
+`components/dynamic-sections/` — confirmed by their full import lists. Two section types
+(`featured_items`, `categories_grid`) render nothing but placeholder text, forever, regardless of
+real data. The real production page (`DynamicPage.jsx` → `SECTION_MAP` → 10 real components under
+`components/dynamic-sections/`) is a completely separate, richer, working system these editors
+never touch — a live Duplicate Architecture finding (§19) and a direct violation of §8's own Live
+Preview principle, written before this investigation happened.
+
+Salman's review of the first fix proposed for this (an iframe + click-to-select, still tied to one
+specific UI mechanism) made the deeper point: **the fix is not a better Page Editor — it's a real
+architectural layer.** Today there is a Dashboard. Tomorrow there will be an AI Assistant, a Mobile
+app, a Public API, possibly Voice. All of them must reach the exact same editable data through the
+exact same mechanism, or each new Interface will reinvent its own — exactly the coupling Design
+Principle 5 (§3) and the Single Source of Truth Matrix (§16) already exist to prevent, now applied
+to the *editing* side of Capabilities, not just their storage.
+
+### The core correction: Capability → Operation → UI, never the reverse
+
+Today's real interaction in `CanvasPageEditor.jsx` is `Click Section → Open HeroEditor` — a direct
+UI-to-UI mapping, with business logic about what fields a Hero has living inside `HeroEditor.jsx`
+itself. This looks reasonable until a second Interface arrives: when an AI Assistant is told "غيّر
+عنوان الهيرو" (change the hero title), there is no click, and `HeroEditor.jsx`'s logic is
+unreachable from that instruction. The direction must be reversed. Every future feature decision
+here starts from the Capability side, never the page side:
+
+```
+Capability  →  Operation  →  Schema  →  Renderer
+```
+
+- **Operation** — a small, fixed vocabulary of generic action *types*, not one bespoke action per
+  field: `UpdateField` (text/richtext/number/boolean), `ReplaceMedia` (image/video), `ReorderList`,
+  `ToggleVisibility`. An Operation is always addressed by `{capability, key}` —
+  e.g. `{capability: "content", key: "hero.title", operation: "UpdateField", value: "..."}` — never
+  by a page name or a component name. This is the literal content of Salman's
+  `<EditableRegion capability="content" key="hero.title" />` example (below).
+- **Schema** — each Capability (§13) declares, once, which keys exist and which Operation types
+  apply to each (a text field takes `UpdateField`; an image takes `ReplaceMedia`; a list takes
+  `ReorderList` and `ToggleVisibility` per item). This Schema is what a generic form-renderer draws
+  from — **not** a bespoke `HeroEditor.jsx`/`OffersEditor.jsx` per section type, which is exactly
+  what today's two fake canvases both do, and exactly what would need to be re-duplicated for
+  Mobile and re-parsed for AI if it stayed that way.
+- **Renderer** — each Interface is *only* a renderer of, or caller into, the same Schema and
+  Operations — never an owner of business logic about what fields exist. The Dashboard draws the
+  Schema as inline-editable regions on the real rendered page. The AI reads the same Schema to know
+  what an instruction like "change the hero title" needs as input, then calls the identical
+  Operation-execution endpoint a click would have called. The API exposes Operation execution
+  directly. A future Mobile app renders the same Schema natively. None of them contain field-level
+  business logic; all of it lives once, in the Capability's Schema.
+
+**The Editing Engine's own execution must still obey §16's Single Source of Truth rule.** It is a
+dispatcher, not a second writer: given `{capability, key, operation, value}`, it resolves which
+Capability owns that key and calls **that Capability's one existing canonical Service** — the same
+`catalog_service.py`, the same (once §19's Broken-Architecture finding for Site Configuration is
+closed) real `client_service.py` — never a parallel write path of its own. If the Editing Engine
+ever wrote directly to a Repository or DB, it would itself become an eighth Duplicate Architecture
+finding, exactly the failure this whole document exists to prevent.
+
+### Discoverability: nobody should have to know where "Hero Title" lives
+
+`Page → Regions → Fields → Operations` — any editable page, whether section-driven
+(`DynamicPage.jsx`) or bespoke (beit-al-fakhar's hand-built `HomePage.jsx`), exposes this same tree
+to any Interface that asks. A developer marks a real piece of a page once, declaratively:
+
+```jsx
+<EditableRegion capability="content" key="hero.title">
+  {children}
+</EditableRegion>
+```
+
+This is a **Contract**, not merely a clickable wrapper: for a real visitor it renders its children
+inertly, zero behavior change. For any editing context, it registers `{capability: "content", key:
+"hero.title"}` into a Discovery registry — the same registration a Dashboard, an AI planning step,
+or a Mobile client all read to build the exact same "what can I edit here" tree, without any of
+them needing a developer to have separately told them where a Hero Title physically lives. This
+directly answers Salman's own worry about repeating the fake-canvas mistake in a new guise: an
+`EditableRegion` never contains a form, a modal, or field-specific rendering logic — those are the
+Renderer's job, driven entirely by the Capability's Schema.
+
+### The concrete test: adding Testimonials or FAQs tomorrow
+
+Salman's own proposed test for whether this is real architecture or still coupled: *if a new
+Capability is added tomorrow, how many files change?* Worked through honestly for a hypothetical
+**Testimonials** Capability:
+
+1. **Define its Contract/Schema** (§13-style — one real definition: which keys exist, e.g.
+   `items[].quote`, `items[].author`; which Operation types apply to each).
+2. **Mark up wherever testimonials already render** — `TestimonialsSection.jsx`, the real,
+   already-existing component — with `EditableRegion` contracts around its real fields. No new
+   editor form file is written.
+3. **Its data still needs exactly one real canonical Service**, per §16's rule — the same
+   requirement every Capability already has regardless of the Editing Engine's existence, not new
+   work created by it.
+
+That's it. The Dashboard's generic Schema-renderer, the AI's Schema-reader, the API's Operation
+endpoint, and a future Mobile renderer all pick up Testimonials automatically — **zero** of them
+need new Testimonials-specific code. If a real future Capability instead required touching four or
+five separate places (a new Dashboard form, new AI intent-handling code, a new API route, a new
+Mobile screen), that would be direct, measurable evidence the Editing Engine has not actually
+decoupled Interfaces from Capabilities — this test is the standing way to check that going forward,
+not a one-time exercise.
+
+### Applying it to the two real tracks already identified
+
+- **Section-driven tenants (footlab, caracas, olivello)**: `DynamicPage.jsx`'s real `SECTION_MAP`
+  components (`HeroSection.jsx` and its 9 siblings) get `EditableRegion` contracts added around
+  their real fields. The Dashboard's chosen visual style for surfacing them — reusing the Settings
+  tab's already-real `<iframe>` + `postMessage` foundation (§8), extended to carry full Schema-
+  driven content instead of 3 primitive fields, plus one new message type so a click inside the
+  iframe reports the clicked `{capability, key}` back to the parent — is one Interface's rendering
+  choice, not the Editing Engine's design. `CanvasPageEditor.jsx`'s per-section-type editor forms
+  (`HeroEditor`, `OffersEditor`, etc.) are retired in favor of one generic Schema-driven form
+  renderer; both fake canvases are deleted entirely, including the orphaned `PageBuilderTab.jsx`
+  (its one worth-keeping idea, real `@dnd-kit` drag-reorder, is folded into the `ReorderList`
+  Operation's Dashboard renderer).
+- **Bespoke tenants (beit-al-fakhar)**: the exact same `EditableRegion` Contract, the exact same
+  Discovery tree, the exact same Operation-execution endpoint — placed directly around real Content
+  in hand-built JSX (`HomePage.jsx`'s hero headline first) rather than around a `SECTION_MAP` entry.
+  **This is the second independent real case the Abstraction Rule asks for**: the same Editing
+  Engine machinery serving a data-driven page and a hand-built page proves the abstraction is
+  earned, not premature — a stronger justification than the first draft of this idea had, which
+  only had one real case (Track 1) to point to.
+
+### What this section deliberately does not do
+
+No message-payload shapes, no Schema file format, no Discovery-registry implementation, and no
+decision on how `EditableRegion` technically registers itself (React Context, a build-time static
+scan, a runtime call) are specified here — all real Implementation Contract work for whichever
+Capability builds this first. `LIVE_PAGE_EDITOR_PLAN.md`, the standalone document this section
+supersedes, has been removed; its confirmed investigation findings are preserved above and in §8,
+§19.
+
+---
+
+## 15. Capability Lifecycle
 
 Every Capability — the seven above, or any future one that passes §12's Proposal gate — moves
 through the same sequence, never invented per case:
@@ -552,11 +735,12 @@ Idea → Contract → Implementation → Interface → Governance → AI Access 
 
 - **Idea** — has passed §12's Capability Proposal gate; the five questions are answered.
 - **Contract** — its sub-capabilities are listed, real vs Gap, per §13's format.
-- **Implementation** — a single canonical Service owns its writes (§15) — clean, not merely present.
-- **Interface** — at least one Interface (typically Dashboard) can invoke it end-to-end.
-- **Governance** — Permissions, Draft/Publish, and ideally Audit/Activity are wired in (§17).
+- **Implementation** — a single canonical Service owns its writes (§16) — clean, not merely present.
+- **Interface** — at least one Interface (typically Dashboard) can invoke it end-to-end, through
+  the Editing Engine (§14) — never through Interface-specific field logic of its own.
+- **Governance** — Permissions, Draft/Publish, and ideally Audit/Activity are wired in (§18).
 - **AI Access** — the Capability is reachable from the AI Interface, within the Client's own
-  permission ceiling (§16).
+  permission ceiling (§17).
 - **Review** — a real, deliberate check that the Capability behaves as intended — not implied by
   the earlier stages being done, a distinct closing step.
 
@@ -566,20 +750,20 @@ Idea → Contract → Implementation → Interface → Governance → AI Access 
 |---|---|
 | Idea | ✅ (§12 confirms it passes the Proposal gate) |
 | Contract | ✅ (§13) |
-| Implementation | ⚠️ Reached, but not clean — `catalog_service.py` is a real, correct single path, but `store.py`/`restaurant.py` independently write the same tables (§18's Duplicate Architecture finding) |
+| Implementation | ⚠️ Reached, but not clean — `catalog_service.py` is a real, correct single path, but `store.py`/`restaurant.py` independently write the same tables (§19's Duplicate Architecture finding) |
 | Interface | ⚠️ Partial — Dashboard ✅ real; Mobile ❌; tenant-authoring API ❌ |
-| Governance | ⚠️ Partial — Permissions ✅ (§16); Draft/Publish ⚠️ provisional only (§8); Audit ❌; Activity ❌ |
+| Governance | ⚠️ Partial — Permissions ✅ (§17); Draft/Publish ⚠️ provisional only (§8); Audit ❌; Activity ❌ |
 | AI Access | ❌ Not built |
 | Review | ❌ No formal Capability-level review has been conducted |
 
 **The honest conclusion this table forces**: even Catalog — the most built Capability in the
-project — is roughly a third of the way through this pipeline. Every other Capability in §19's
+project — is roughly a third of the way through this pipeline. Every other Capability in §20's
 Maturity table is earlier still. This is the entire point of naming the Lifecycle explicitly: it
 replaces a vague "is Catalog done?" with a specific, checkable answer.
 
 ---
 
-## 15. Single Source of Truth Matrix — the most important table in this plan
+## 16. Single Source of Truth Matrix — the most important table in this plan
 
 This table is this document's own applied instance of the platform-wide principle now owned by
 `.claude/rules/backend/architecture.md` §9 (§3, Principle 5) — not a second copy of that rule.
@@ -590,14 +774,14 @@ through that Capability's one canonical path.
 
 | Capability | Source of Truth (model) | Intended single write path | Current reality |
 |---|---|---|---|
-| Products | `CatalogItem` | `catalog_service.py` | ⚠️ **Violated today** — §18, Duplicate Architecture |
-| Categories | `CatalogCategory` | `catalog_service.py` | ⚠️ **Violated today** — §18, Duplicate Architecture |
-| Units (Booking) | `Unit` | `unit_service.py` (exists) | ⚠️ **Violated today** — §18, Broken Architecture |
-| Site Configuration / Theme / Home Sections | `Client.config` (Json) | `client_service.py` (exists) | ⚠️ **Violated today** — §18, Broken Architecture |
-| Orders (Store/Restaurant) | `StoreOrder` / restaurant order model | No dedicated service exists | ⚠️ §18, Missing Architecture |
-| Customers | `Customer` | `customer_service.py` (exists, correctly used) | ⚠️ Route unreachable — §18, Missing Architecture |
-| Gallery / Media | `GalleryImage` | No dedicated service exists | ⚠️ §18, Missing Architecture |
-| Team / Staff | `User` | No dedicated service exists | ⚠️ §18, Missing Architecture |
+| Products | `CatalogItem` | `catalog_service.py` | ⚠️ **Violated today** — §19, Duplicate Architecture |
+| Categories | `CatalogCategory` | `catalog_service.py` | ⚠️ **Violated today** — §19, Duplicate Architecture |
+| Units (Booking) | `Unit` | `unit_service.py` (exists) | ⚠️ **Violated today** — §19, Broken Architecture |
+| Site Configuration / Theme / Home Sections | `Client.config` (Json) | `client_service.py` (exists) | ⚠️ **Violated today** — §19, Broken Architecture |
+| Orders (Store/Restaurant) | `StoreOrder` / restaurant order model | No dedicated service exists | ⚠️ §19, Missing Architecture |
+| Customers | `Customer` | `customer_service.py` (exists, correctly used) | ⚠️ Route unreachable — §19, Missing Architecture |
+| Gallery / Media | `GalleryImage` | No dedicated service exists | ⚠️ §19, Missing Architecture |
+| Team / Staff | `User` | No dedicated service exists | ⚠️ §19, Missing Architecture |
 
 **Reading this table honestly, not optimistically**: almost no admin-side Capability has a clean
 single write path *today*. `catalog.py` is the one file in this entire codebase that does it
@@ -606,12 +790,12 @@ without this fixed first, an AI assistant, a Mobile app, or an Import Tool arriv
 would each face the same choice `store.py` and `restaurant.py` already made once — reimplement the
 write logic directly against a repository — and each would make it independently, compounding the
 exact problem this matrix exists to prevent. Closing this is real Implementation Contract work,
-not performed in this document; §18 classifies each violation formally so none of it is lost among
+not performed in this document; §19 classifies each violation formally so none of it is lost among
 smaller notes.
 
 ---
 
-## 16. Capability Matrix — Governance: Permissions
+## 17. Capability Matrix — Governance: Permissions
 
 One table, all Capabilities, answering exactly the question Salman posed: not "does this feature
 exist" but "**who is allowed to invoke it**." Per §5's anatomy, this table *is* the Permissions
@@ -646,7 +830,7 @@ operates inside the Client's own ceiling, never above it).
 | Edit SEO metadata | 🔜 | 🔜 |
 | View / update order status | ✅ | ✅ |
 | Export orders | 🔜 | 🔜 |
-| View / edit customer info | 🔜 (blocked on §18's Customers finding) | 🔜 |
+| View / edit customer info | 🔜 (blocked on §19's Customers finding) | 🔜 |
 | **Activate/deactivate a paid module (`client_services`)** | ❌ | ❌ |
 | **Anything Platform-layer** (routing, checkout logic, WhatsApp integration, DB structure) | ❌ | ❌ |
 
@@ -657,14 +841,14 @@ front-end for first.
 
 ---
 
-## 17. Governance Layer — Permissions, Draft/Publish, Audit, Versioning, Activity
+## 18. Governance Layer — Permissions, Draft/Publish, Audit, Versioning, Activity
 
 Per §5's anatomy, Governance is the third sibling alongside Capability and Interface —
 cross-cutting concerns built **once** and inherited by every Capability, never re-implemented per
 domain. Two of its five pieces already have real content elsewhere in this plan; three are named
 here for the first time as real Gaps.
 
-- **Permissions** — already designed: §16's Capability Matrix, read directly. Not repeated here.
+- **Permissions** — already designed: §17's Capability Matrix, read directly. Not repeated here.
 - **Draft/Publish** — already designed: §8's Live Preview mechanism. Not repeated here.
 - **Audit** (who changed what, when) — ⚠️ **Gap, but with a real, structurally-suitable start**:
   `SecurityAuditLog` (`prisma/schema.prisma`) already exists with exactly the right shape for this
@@ -684,13 +868,13 @@ here for the first time as real Gaps.
 **Why this section exists as its own thing, not folded into §13's Capability Contracts**: none of
 these five concerns belongs to Catalog, or Orders, or any single Capability. A Draft/Publish
 mechanism built inside the Catalog Capability and a separate one built inside the Content Capability
-would themselves become a Duplicate Architecture finding (§18) the moment a second Capability
+would themselves become a Duplicate Architecture finding (§19) the moment a second Capability
 needed it — exactly the mistake naming Governance as its own branch is meant to prevent before it
 happens once, let alone twice.
 
 ---
 
-## 18. Architecture Integrity Findings
+## 19. Architecture Integrity Findings
 
 Salman's explicit instruction: code that exists but isn't wired into the system, or that routes
 around tenant boundaries, is **not** ordinary technical debt to note in passing — it's an
@@ -767,19 +951,19 @@ classified — left for a future Implementation Contract to resolve, one categor
 
 ---
 
-## 19. Capability Maturity
+## 20. Capability Maturity
 
-Salman's addition: not every Capability is at the same stage of §14's Lifecycle, and saying "X
+Salman's addition: not every Capability is at the same stage of §15's Lifecycle, and saying "X
 exists" without a maturity label is misleading — this is exactly what prevents a sentence like
 "Customers is done" from hiding the fact that its route isn't even mounted.
 
-**The five stages, defined against §14's Lifecycle**:
+**The five stages, defined against §15's Lifecycle**:
 
 - **Reserved** — an Idea only; no real code yet.
 - **Experimental** — real code exists, but is unreliable, unreachable, unguarded, or usable within
   only one module rather than as a general Capability.
 - **Developing** — Contract and at least one working Interface exist, but Implementation carries a
-  known Architecture Integrity Finding (§18) and/or Governance is largely absent.
+  known Architecture Integrity Finding (§19) and/or Governance is largely absent.
 - **Stable** — Implementation is clean (no open Integrity Finding) and at least one Interface works
   correctly; Governance and AI Access are still incomplete.
 - **Mature** — Contract, clean Implementation, Interface, and Governance are all real; only AI
@@ -789,12 +973,12 @@ exists" without a maturity label is misleading — this is exactly what prevents
 
 | Capability | Stage | Why |
 |---|---|---|
-| Catalog | Developing | Contract + Dashboard real; Implementation carries the live Duplicate-Architecture finding (§18) |
+| Catalog | Developing | Contract + Dashboard real; Implementation carries the live Duplicate-Architecture finding (§19) |
 | Category | Developing | Shares `catalog_service.py` and the same Duplicate finding as Catalog |
-| Site Configuration | Developing | Contract + partial Dashboard real; Implementation carries the live Broken-Architecture finding (§18) |
+| Site Configuration | Developing | Contract + partial Dashboard real; Implementation carries the live Broken-Architecture finding (§19) |
 | Content | Developing | Rides the same `Client.config` mechanism and finding as Site Configuration |
 | Theme | Developing | A narrower slice of Site Configuration (§10), same underlying finding |
-| Orders | Developing | Dashboard works in production today; Implementation is Missing Architecture (§18) |
+| Orders | Developing | Dashboard works in production today; Implementation is Missing Architecture (§19) |
 | Media | Experimental | Only real within Booking's unit-gallery context; no cross-module capability; Implementation is Missing Architecture |
 | Customers | Experimental | Service correctly built, but its route is unmounted and unguarded — unreachable end-to-end |
 | Team / Staff | Experimental, pre-Contract | Real, working code exists (`team.py`) but was never elevated to its own §13 Contract, and never passed §12's Proposal gate — skipped straight past Idea/Contract; Implementation is Missing Architecture |
@@ -806,7 +990,7 @@ matters the moment more than one person is touching this code.
 
 ---
 
-## 20. Capability Acceptance Criteria
+## 21. Capability Acceptance Criteria
 
 Salman's addition, and the piece he considers most important: not "when is the code finished," but
 **when is a Capability actually considered complete.**
@@ -830,9 +1014,9 @@ considerably more precise.
 | AI | ❌ Not built (§11) | 0 |
 | API (tenant-authoring) | ❌ Not built (§5) — distinct from the existing shopper-facing public API | 0 |
 | Validation | ✅ Likely — Pydantic input validation is this project's mandatory convention (`rules/backend/api-rules.md`) and `catalog.py` is the one route file already confirmed clean; not independently re-verified field-by-field in this pass | 1 |
-| Audit | ❌ Gap (§17) | 0 |
-| Activity | ❌ Gap (§17) | 0 |
-| Permissions | ✅ Real rows exist in the Capability Matrix (§16) | 1 |
+| Audit | ❌ Gap (§18) | 0 |
+| Activity | ❌ Gap (§18) | 0 |
+| Permissions | ✅ Real rows exist in the Capability Matrix (§17) | 1 |
 | Draft/Publish (applicable here) | ⚠️ Provisional only — Publish today ≈ `isActive`, not the staged mechanism §8 describes | 0.5 |
 | Documentation | ✅ Real — `catalog-contract.md`, `service-system.md`'s table entry, this plan's own §13 contract | 1 |
 
@@ -840,20 +1024,20 @@ considerably more precise.
 
 This is a real, computed number, not an illustrative one — included specifically because it's
 honest: even the single most built-out Capability in this project is roughly halfway to complete by
-this standard. Every other Capability in §19's Maturity table would score lower still. This is the
+this standard. Every other Capability in §20's Maturity table would score lower still. This is the
 entire value of naming Acceptance Criteria explicitly: it replaces a feeling ("Catalog seems done")
 with an auditable number anyone can recompute.
 
 ---
 
-## 21. Capability Health Dashboard — team-facing view
+## 22. Capability Health Dashboard — team-facing view
 
-Salman's addition: turn §20's number into a progress bar, and pair it with §14's per-stage
+Salman's addition: turn §21's number into a progress bar, and pair it with §15's per-stage
 readout — together, a single-glance status view the team itself can use, rather than a sentence in
-a report. This section is a **summary view built from §14/§18/§19/§20's detailed derivations
+a report. This section is a **summary view built from §15/§19/§20/§21's detailed derivations
 above** — it does not re-derive anything independently.
 
-**Catalog** — the only Capability scored at full, per-criterion rigor (§20):
+**Catalog** — the only Capability scored at full, per-criterion rigor (§21):
 
 ```
 Catalog
@@ -868,28 +1052,28 @@ Review          ❌
 ```
 
 **Every other real Capability** — approximate order-of-magnitude bars only, derived from their
-already-established Architecture Integrity Findings (§18) and Maturity stage (§19), **not
+already-established Architecture Integrity Findings (§19) and Maturity stage (§20), **not
 independently re-scored criterion-by-criterion the way Catalog was** — flagged here explicitly so
 this reads as honestly approximate, not false precision:
 
 ```
-Category              █████░░░░░ ~50%   (same profile as Catalog, §19)
-Site Configuration     ████░░░░░░ ~44%   (Developing — Broken Architecture, §18)
+Category              █████░░░░░ ~50%   (same profile as Catalog, §20)
+Site Configuration     ████░░░░░░ ~44%   (Developing — Broken Architecture, §19)
 Content                ████░░░░░░ ~44%   (rides Site Configuration's mechanism)
 Theme                  ████░░░░░░ ~44%   (narrower slice of Site Configuration)
-Orders                 ███░░░░░░░ ~38%   (Developing — Missing Architecture, §18)
+Orders                 ███░░░░░░░ ~38%   (Developing — Missing Architecture, §19)
 Media                  ███░░░░░░░ ~38%   (Experimental — single-module only)
-Team / Staff           ██░░░░░░░░ ~25%   (Experimental, pre-Contract, §19)
-Customers              █░░░░░░░░░ ~13%   (Experimental — unreachable route, §18)
+Team / Staff           ██░░░░░░░░ ~25%   (Experimental, pre-Contract, §20)
+Customers              █░░░░░░░░░ ~13%   (Experimental — unreachable route, §19)
 ```
 
-**A future Implementation Contract that wants exact figures for these** would repeat §20's
+**A future Implementation Contract that wants exact figures for these** would repeat §21's
 per-criterion table for each — a reasonable, bounded piece of future work, not performed here to
 avoid presenting invented precision for Capabilities this pass didn't score at that depth.
 
 ---
 
-## 22. Rollout Phases
+## 23. Rollout Phases
 
 Salman's sequencing, including his closing review verdict on when the Client Journey Audit
 actually belongs in this sequence:
@@ -898,10 +1082,10 @@ actually belongs in this sequence:
   Dashboard First Principle and constitution reference (§3), the Content Ownership Matrix (§6),
   the Theme boundaries (§10).
 - **Phase 2 — Write the contract.** ✅ Done: the Capability Proposal gate (§12), Capability
-  Contracts (§13), the Capability Lifecycle (§14), the Single Source of Truth Matrix (§15), the
-  Capability Matrix (§16), the Governance Layer (§17), the classified Architecture Integrity
-  Findings (§18), Capability Maturity (§19), Capability Acceptance Criteria (§20), and the
-  Capability Health Dashboard (§21).
+  Contracts (§13), the Editing Engine (§14), the Capability Lifecycle (§15), the Single Source of
+  Truth Matrix (§16), the Capability Matrix (§17), the Governance Layer (§18), the classified
+  Architecture Integrity Findings (§19), Capability Maturity (§20), Capability Acceptance Criteria
+  (§21), and the Capability Health Dashboard (§22).
 - **Phase 2.5 — Adopt as Reference Architecture.** Salman's explicit closing verdict: reviewing
   this document is not the same as implementing anything, and once accepted, this document itself
   becomes the standing reference every future Capability is built against and reviewed against —
@@ -912,16 +1096,16 @@ actually belongs in this sequence:
   ARCHITECTURE.md` or `TENANT_OS_REFERENCE_ARCHITECTURE.md` as candidates. Recorded here as an
   intention tied to adoption, not executed in this revision.
 - **Phase 3 — Build the first group of Capabilities against this reference.** Real implementation
-  work: closing §18's Broken/Missing/Duplicate findings, moving at least one Capability
-  meaningfully forward on §14's Lifecycle and §19/§20's Maturity/Acceptance scales. Outside this
+  work: closing §19's Broken/Missing/Duplicate findings, moving at least one Capability
+  meaningfully forward on §15's Lifecycle and §20/§21's Maturity/Acceptance scales. Outside this
   document's scope — a future Implementation Contract's job.
 - **Phase 4 — Client Journey Audit.** Deferred until **after** Phase 3 produces real, working
-  Capabilities, not immediately after this document is reviewed (§23). Measures the real owner
+  Capabilities, not immediately after this document is reviewed (§24). Measures the real owner
   experience against a genuinely built product, not a freshly-written contract.
 
 ---
 
-## 23. Next Step — the Client Journey Audit (Phase 4, gated on real implementation)
+## 24. Next Step — the Client Journey Audit (Phase 4, gated on real implementation)
 
 Salman's explicit direction, sharpened by his closing verdict: the Client Journey Audit — the
 store owner's own onboarding-to-first-published-product journey, mirroring the role the Store
@@ -949,7 +1133,7 @@ create the first Category → create the first Product → upload its photos →
 preview the live site → Publish
 ```
 
-Each step maps to a named Capability from §13, scored against §19's Maturity and §20's Acceptance
+Each step maps to a named Capability from §13, scored against §20's Maturity and §21's Acceptance
 Criteria — so the audit measures a real, bounded, *already-built* product against a real, bounded
 contract, not a moving target or a document that was only just approved.
 
@@ -963,7 +1147,7 @@ Phase 3, per Salman's direction.
 
 ---
 
-## 24. Architecture Boundaries — Generic / Tenant-specific / Plugin / Never
+## 25. Architecture Boundaries — Generic / Tenant-specific / Plugin / Never
 
 This table answers a different question than §4's three layers — §4 is about *who owns* a given
 piece of content or design; this table is about *where the code that renders it lives*. The two
@@ -987,24 +1171,27 @@ be scoped per-service too, but this is a judgment call for that future contract,
 
 ---
 
-## 25. What this plan deliberately does not do
+## 26. What this plan deliberately does not do
 
 - No new API endpoints designed (the `CatalogItem`/`CatalogCategory` reorder gap, the Media
   Library, the Live Preview draft/publish mechanism, and the future AI action-vocabulary are all
   named, not designed).
 - No new Prisma models or migrations proposed — every Content item in §6/§13 maps to a field that
   already exists, except the Gaps explicitly marked as such (Audit's extension of
-  `SecurityAuditLog`, §17, is named as an option, not decided).
+  `SecurityAuditLog`, §18, is named as an option, not decided).
 - No UI components, wireframes, or visual design.
 - No decision on unifying `GenericAdminDashboard.jsx` and `SmarAdminDashboard.jsx` into one
   codebase — that is a real Implementation Contract's job, informed by this plan's boundaries.
-- No resolution of the `client_services`-vs-role tab-gating conflict named in §24.
-- No fix to any of §18's seven classified Architecture Integrity Findings — all seven are named,
+- No resolution of the `client_services`-vs-role tab-gating conflict named in §25.
+- No fix to any of §19's seven classified Architecture Integrity Findings — all seven are named,
   evidenced, and categorized, none are fixed here; all are code changes outside this document's
   declared scope.
 - No formal adoption of this document as Reference Architecture, and no rename — both are Phase
-  2.5 (§22), a decision for Salman to make, not something this document can grant itself.
-- No independent per-criterion Acceptance scoring for any Capability besides Catalog (§21) —
+  2.5 (§23), a decision for Salman to make, not something this document can grant itself.
+- No independent per-criterion Acceptance scoring for any Capability besides Catalog (§22) —
   approximate bars only, explicitly flagged as such.
-- No Client Journey Audit conducted — explicitly deferred to Phase 4 (§23), gated on Phase 2.5's
+- No Editing Engine implementation (§14) — no Schema file format, no Discovery-registry mechanism,
+  no `EditableRegion` registration technique, no message-payload shapes for the Dashboard's
+  Interface-specific rendering choice. Named as the correct layer, not built.
+- No Client Journey Audit conducted — explicitly deferred to Phase 4 (§24), gated on Phase 2.5's
   adoption and Phase 3's real implementation, per Salman's direction.
