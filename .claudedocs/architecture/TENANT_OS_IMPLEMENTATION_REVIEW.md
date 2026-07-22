@@ -63,10 +63,47 @@ mechanism, not a Content mechanism), but it is a real planning gap: nothing in t
 what happens when Sprint 1 needs to save a real edit *before* Draft/Publish exists. See Sprint 1
 Plan below for the explicit decision this review makes about that gap.
 
-**Nothing in these four findings blocks Sprint 1 outright** — Finding 1 must be resolved as
-Sprint 1's own first step (cheap: it's a naming/ownership decision, not new code); Findings 2 and 4
-are named risks/scope decisions Sprint 1 works around explicitly (see below), not defects that
-need fixing first.
+**Nothing in these four findings blocked Sprint 1 outright** — Finding 1 needed a real decision
+before Sprint 1 could start (see below, now resolved); Findings 2 and 4 are named risks/scope
+decisions Sprint 1 works around explicitly (see below), not defects that need fixing first.
+
+---
+
+## 1a. Decisions Ratified
+
+Salman's response to this review, recorded here as the actual decisions Sprint 1 builds against —
+not restated in `TENANT_OS_PLAN.md` itself, per his direction that this review stands as the
+implementation-ready record.
+
+- **Finding 1 (Content / Site Configuration / Theme) — resolved: keep them three separate
+  Capabilities**, even though they currently share one Service/Model. Salman's own reasoning,
+  recorded verbatim in spirit: *Capability* (what the client can do) and *Persistence* (where the
+  data is stored) are two different axes that this review's original finding conflated — Catalog
+  and Orders might both write to PostgreSQL without that making them one Capability; the same logic
+  applies here. Storage mechanism changes over time; a Capability is part of the product and
+  shouldn't be redrawn just because today's storage happens to be shared. Content owns `hero.title`
+  regardless of which Service currently backs it.
+- **Finding 2 (Booking has no Contracts) — confirmed as a real gap**, not a Sprint 1 blocker, but a
+  genuine break of "every Capability begins with a Contract" — a principle this project has now
+  adopted. Left as a recorded gap; not fixed as part of Sprint 1's Content-only scope.
+- **Finding 3 (`EditableRegion` is not a pure Contract) — resolved in favor of this review's
+  proposed correction**: `EditableRegion` will not know whether a Dashboard exists at all. It only
+  declares `{capability, key, schema}` and withdraws. Overlay, Highlight, Selection, Hover,
+  Inspector — all of it belongs to the Editing Engine's Interface-side rendering, never to
+  `EditableRegion` itself. This is what keeps `EditableRegion` valid for any future Interface.
+- **Finding 4 (Draft/Publish deferred) — confirmed correct**, with Salman's own reasoning: Sprint 1
+  is still proving the Editing Engine itself works; there is no reason to add a Versioning-adjacent
+  layer before a real editor exists to version.
+- **Q7 (Dispatcher) — corrected**: see the update to Q7 and Sprint 1 Plan item 4 below. Salman's
+  distinction: if "Dispatcher" means a thin `Operation → Capability → Service` routing layer, it is
+  not something Sprint 1 builds as its own component — it will simply appear as a direct function
+  call. If it grew into a named "Dispatcher Framework" starting in Sprint 1, that would be exactly
+  the premature abstraction this whole review exists to prevent.
+
+Salman's closing verdict: this review is treated as an **implementation-ready document** —
+`TENANT_OS_PLAN.md` itself needs no further edits at this stage. The next step is executing
+Sprint 1 on the Content Capability (Hero Title only), then using it as the first real proof the
+Tenant OS is alive before extending to any other Capability.
 
 ---
 
@@ -216,30 +253,45 @@ which is what Salman's own question was checking for.
 
 ## 7. Does the Editing Engine need a Dispatcher / Registry / Capability Manager / Schema Registry / Operations Registry?
 
-Reviewed against what Sprint 1 (one Capability, one field) actually requires — **two of these are
-real and needed now; the other three would be premature**:
+Reviewed against what Sprint 1 (one Capability, one field) actually requires.
 
-- **Operation Dispatcher — needed.** Real, required by the graph above: something has to resolve
-  `{capability, key, operation, value}` to the right Capability's Service call. This is the one
-  piece of new runtime logic Sprint 1 cannot avoid building.
-- **Discovery registry — needed.** Real, required to walk `EditableRegion` markup into the
-  Page/Region/Field/Operations tree Q5 describes.
+**Correction, per Salman's review of this review**: the first draft of this answer said "Operation
+Dispatcher — needed" alongside Discovery, as if the two were equally real components to build.
+Salman correctly separated them — Discovery is a real mechanism worth naming and building now;
+"Dispatcher" is not, unless it is defined narrowly first. If "Dispatcher" means a routing layer
+(`Operation → Capability → Service`), that is not something Sprint 1 *builds* as its own named
+component at all — with exactly one Capability and one Operation type, it is nothing more than the
+one route handler directly calling the one Service function. Naming that a "Dispatcher" and
+building it as a distinct abstraction in Sprint 1 would be the same premature-abstraction mistake
+already correctly avoided for Schema Registry/Capability Manager/Operations Registry below — it
+just wasn't caught the first time this section was written.
+
+- **Discovery — needed, build for real.** Required to walk `EditableRegion` markup into the
+  Page/Region/Field/Operations tree Q5 describes. Nothing else provides this.
+- **"Dispatcher" — not a Sprint 1 component.** What Sprint 1 needs is a direct function call inside
+  the one real Operation-execution route handler, straight to Content's one canonical Service — no
+  routing table, no registry, no named abstraction. A real, nameable Dispatcher (a genuine
+  `{capability} → {service}` lookup mechanism) is earned the moment a **second** real Capability and
+  Operation exist and the same routing shape is proven to repeat — not assumed in Sprint 1 to save
+  a rewrite later.
 - **A separate "Schema Registry" service — not needed yet.** A Capability's Schema can be a plain,
-  static exported definition per Capability module, read directly by the Dispatcher and Discovery.
+  static exported definition per Capability module, read directly wherever it's needed.
   Standing up a dedicated registry *service* for something one real Capability currently needs
   would be exactly the premature abstraction the project's own Abstraction Rule (`rules/team-
   roles.md`) warns against — earned only once a second real Capability proves the same shape is
   actually reused, not assumed in advance.
 - **A separate "Capability Manager" — not needed yet**, for the same reason. Its job (knowing which
-  Capabilities exist, which Service each owns) is exactly what the Dispatcher's own internal lookup
-  table already does for one Capability; splitting it into its own component now would be
-  architecture built ahead of a second real case that would justify it.
+  Capabilities exist, which Service each owns) is exactly what one plain conditional does for a
+  single Capability; splitting it into its own component now would be architecture built ahead of a
+  second real case that would justify it.
 - **A separate "Operations Registry"** — not needed as a distinct thing from the fixed, small
   Operation-type vocabulary (`UpdateField`, `ReplaceMedia`, `ReorderList`, `ToggleVisibility`)
   §14 already names. These are a closed, small set, not a growing collection that needs its own
   registry to manage.
 
-**Net answer**: build the Dispatcher and Discovery for real; do not build the other three now.
+**Net answer, corrected**: build Discovery for real. Do not build a Dispatcher, a Schema Registry, a
+Capability Manager, or an Operations Registry in Sprint 1 — a direct function call stands in for
+"dispatch" until a second real Capability proves the routing shape actually needs its own name.
 
 ---
 
@@ -248,15 +300,16 @@ real and needed now; the other three would be premature**:
 Scope, narrow and explicit about what it excludes:
 
 **In scope**:
-1. Resolve Finding 1 (Content vs. Site Configuration vs. Theme boundary) — a naming/ownership
-   decision, not code; blocks nothing once decided.
+1. ~~Resolve Finding 1~~ — done (§1a): Content, Site Configuration, and Theme stay three separate
+   Capabilities regardless of shared storage. Content owns `hero.title`.
 2. Fix Content/Site Configuration's Broken-Architecture finding: reroute `settings.py` to call
    `client_service.py`; fix `client_service.py`'s own internal Prisma-direct-call defect. This is
    real Implementation-stage work per §15's Lifecycle — not scope creep, the necessary precondition
    for a genuinely clean canonical Service to dispatch to.
 3. Define Content's real Schema for exactly one field: Hero Title.
-4. Build the Operation Dispatcher, scoped to the one Operation type Hero Title needs
-   (`UpdateField`) and the one Capability (Content).
+4. Wire the one Operation type Hero Title needs (`UpdateField`) as a direct function call from the
+   route handler to Content's one canonical Service — no separate "Dispatcher" component, per the
+   correction in Q7.
 5. Add one real `EditableRegion` contract around `HeroSection.jsx`'s real title field.
 6. Build Discovery, scoped to walking exactly this one registration.
 7. Build the Dashboard's Schema-Renderer for exactly this one field — inline-editable on the real
