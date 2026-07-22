@@ -232,6 +232,29 @@ export default function DynamicPage() {
     return () => window.removeEventListener('message', handler)
   }, [serverConfig])
 
+  // ── Tenant OS Editing Engine — click-capture, iframe context only ────────────
+  // Sprint 1 scope (TENANT_OS_PLAN.md §14; TENANT_OS_IMPLEMENTATION_REVIEW.md):
+  // EditableRegion (frontend/src/tenant-os/EditableRegion.jsx) marks real fields with
+  // data-capability/data-field-key attributes and nothing else — it has no knowledge of
+  // any Interface. This is the Editing Engine's own Interface-side behavior: only active
+  // inside an iframe (never for a real visitor, who is never framed), it listens for
+  // clicks on those data-attributes and reports {capability, key} up to the parent
+  // Dashboard, which owns the actual authenticated Operation call and the editing UI.
+  useEffect(() => {
+    if (window.self === window.top) return // real visitor — never active
+    const onClick = (e) => {
+      const el = e.target.closest('[data-capability][data-field-key]')
+      if (!el) return
+      window.parent.postMessage({
+        type:       'TENANT_OS_FIELD_CLICK',
+        capability: el.dataset.capability,
+        key:        el.dataset.fieldKey,
+      }, '*')
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [])
+
   // ── Early exits ──────────────────────────────────────────────────────────────
   if (loading)       return <LoadingScreen />
   if (!tenantConfig) return <NotFoundScreen slug={slug} />

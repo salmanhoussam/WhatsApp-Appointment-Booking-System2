@@ -268,6 +268,47 @@ export default function GenericAdminDashboard() {
     }, '*')
   }, [previewForm])
 
+  // ── Tenant OS Editing Engine — receive field clicks from the real live iframe ─
+  // Sprint 1 scope: exactly one Capability, one field (content.hero.title). This is a
+  // direct, explicit handler, not a generic Dispatcher — a real routing abstraction is
+  // earned once a second real Capability/Operation proves the shape repeats
+  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
+  useEffect(() => {
+    const handler = async (e) => {
+      if (e.data?.type !== 'TENANT_OS_FIELD_CLICK') return
+      if (e.data.capability !== 'content' || e.data.key !== 'hero.title') return
+
+      const currentTitle = settings?.config?.content?.sections
+        ?.find(s => s.type === 'hero')?.data?.title_ar ?? ''
+      const newTitle = window.prompt('عنوان الهيرو (Content Capability — hero.title):', currentTitle)
+      if (newTitle === null || newTitle === currentTitle) return
+
+      try {
+        await adminApi.patch('/content/hero-title', { title_ar: newTitle })
+
+        // Reconstruct the updated sections array from what we already have in `settings`,
+        // and push it into the real live iframe the same way PREVIEW_UPDATE already does
+        // for the 3 primitive Settings fields — same real mechanism, more content.
+        const existingContent = settings?.config?.content ?? {}
+        const updatedSections = (existingContent.sections ?? []).map(s =>
+          s.type === 'hero' ? { ...s, data: { ...s.data, title_ar: newTitle } } : s
+        )
+        const updatedConfig = { ...(settings?.config ?? {}), content: { ...existingContent, sections: updatedSections } }
+
+        setSettings(prev => ({ ...prev, config: updatedConfig }))
+        // DynamicPage.jsx's PREVIEW_UPDATE handler does `Object.assign(patch, e.data.config)` —
+        // e.data.config's own keys land directly on tenantConfig's top level, not nested under
+        // tenantConfig.config. To patch tenantConfig.config.content, e.data.config itself must be
+        // `{ config: updatedConfig }`, not `updatedConfig` directly.
+        iframeRef.current?.contentWindow?.postMessage({ type: 'PREVIEW_UPDATE', config: { config: updatedConfig } }, '*')
+      } catch (err) {
+        window.alert('تعذّر حفظ التعديل — حاول مجدداً.')
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [settings])
+
   // ── Derived values ──────────────────────────────────────────────────────────
   const color           = settings?.primary_color  ?? '#6366f1'
   const tenantName      = settings?.name_ar        ?? 'لوحة التحكم'

@@ -3,6 +3,8 @@
  * data: { title_ar, subtitle_ar, cta_text_ar, bg_image_url, bg_type }
  */
 import { motion } from 'framer-motion'
+import EditableRegion from '../../tenant-os/EditableRegion'
+import { contentSchema } from '../../tenant-os/schemas/content'
 
 const S_TITLE  = { type: 'spring', stiffness: 80,  damping: 18, mass: 1.2 }
 const S_BODY   = { type: 'spring', stiffness: 70,  damping: 18, mass: 1.2, delay: 0.12 }
@@ -70,23 +72,25 @@ export default function HeroSection({ data, accent }) {
         padding: '100px 32px 80px',
         maxWidth: 800, margin: '0 auto',
       }}>
-        <motion.h1
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={S_TITLE}
-          style={{
-            margin: '0 0 20px',
-            fontSize: 'clamp(32px, 6vw, 68px)',
-            fontWeight: 900,
-            color: '#fff',
-            lineHeight: 1.15,
-            letterSpacing: '-0.02em',
-            fontFamily: "'Cairo', 'Segoe UI', sans-serif",
-            textShadow: '0 2px 20px rgba(0,0,0,0.4)',
-          }}
-        >
-          {data.title_ar || 'مرحباً بكم'}
-        </motion.h1>
+        <EditableRegion capability="content" fieldKey="hero.title" schema={contentSchema['hero.title']}>
+          <motion.h1
+            initial={{ opacity: 0, y: 32 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={S_TITLE}
+            style={{
+              margin: '0 0 20px',
+              fontSize: 'clamp(32px, 6vw, 68px)',
+              fontWeight: 900,
+              color: '#fff',
+              lineHeight: 1.15,
+              letterSpacing: '-0.02em',
+              fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+              textShadow: '0 2px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            {data.title_ar || 'مرحباً بكم'}
+          </motion.h1>
+        </EditableRegion>
 
         {data.subtitle_ar && (
           <motion.p
