@@ -941,13 +941,20 @@ and `restaurant.py` **independently perform the exact same CRUD on the exact sam
 different patterns, one shared pair of tables — Salman's own example of this category, confirmed
 real in this codebase, not hypothetical.
 
-**Finding — `PageBuilderTab.jsx` vs `CanvasPageEditor.jsx`.** `frontend/src/pages/generic-admin/
-tabs/PageBuilderTab.jsx` (~1300 lines) is a near-duplicate implementation of the same
-page/section-editing capability `CanvasPageEditor.jsx` provides — never imported anywhere, an
-abandoned parallel implementation rather than the canonical one.
+**Finding — `PageBuilderTab.jsx` vs `CanvasPageEditor.jsx` — ✅ RESOLVED (2026-07-22).** Both files
+deleted, along with the "محرر الصفحة" nav tab that mounted `CanvasPageEditor`, once Sprint 1
+(`.claudedocs/work/tenant-os-sprint1/2026-07-22/`) proved the real replacement — the Editing
+Engine (§14) editing the real rendered page through `EditableRegion` + Discovery + the Settings
+tab's already-real iframe/`postMessage` bridge — across **two independent real fields**
+(`content.hero.title`, `content.story.heading`), on two different real section components
+(`HeroSection.jsx`, `StorySection.jsx`), with zero changes to `EditableRegion.jsx`, `discovery.js`,
+or the click-capture/live-preview plumbing between the two. Per Salman's own words: *"في Sprint 1
+كنت سأرفض [الحذف]. أما الآن... البديل لم يعد Prototype. بل أصبح المسار الحقيقي."* Real, verified
+via CDP that the Dashboard's remaining tabs and console are clean after deletion — not just
+assumed safe.
 
-**None of these seven findings are fixed in this document.** Each is named, evidenced, and
-classified — left for a future Implementation Contract to resolve, one category at a time.
+**Six of these seven findings remain unfixed in this document** — each still named, evidenced, and
+classified, left for a future Implementation Contract to resolve, one category at a time.
 
 ---
 
@@ -976,7 +983,7 @@ exists" without a maturity label is misleading — this is exactly what prevents
 | Catalog | Developing | Contract + Dashboard real; Implementation carries the live Duplicate-Architecture finding (§19) |
 | Category | Developing | Shares `catalog_service.py` and the same Duplicate finding as Catalog |
 | Site Configuration | Developing | Contract + partial Dashboard real; Implementation carries the live Broken-Architecture finding (§19) |
-| Content | Developing | Rides the same `Client.config` mechanism and finding as Site Configuration |
+| Content | **Stable** (2026-07-22, up from Developing) | Its own clean `content_service.py` (no shared Broken-Architecture finding with Site Configuration anymore — separated per §1a's ratified decision), a real Dashboard Interface proven across 2 independent fields/components (Sprint 1 evidence, `.claudedocs/work/tenant-os-sprint1/2026-07-22/`). Governance (Draft/Publish, Audit) and AI Access still incomplete, per §20's own definition of Stable |
 | Theme | Developing | A narrower slice of Site Configuration (§10), same underlying finding |
 | Orders | Developing | Dashboard works in production today; Implementation is Missing Architecture (§19) |
 | Media | Experimental | Only real within Booking's unit-gallery context; no cross-module capability; Implementation is Missing Architecture |
@@ -1036,6 +1043,28 @@ Salman's addition: turn §21's number into a progress bar, and pair it with §15
 readout — together, a single-glance status view the team itself can use, rather than a sentence in
 a report. This section is a **summary view built from §15/§19/§20/§21's detailed derivations
 above** — it does not re-derive anything independently.
+
+**Editing Engine Gate — ratified 2026-07-22, per Sprint 1's real evidence
+(`.claudedocs/work/tenant-os-sprint1/2026-07-22/`)**, in Salman's own words:
+
+```
+Editing Engine Status: PROVEN (2 independent production paths)
+
+Engine Core:               ✅ Stable
+Discovery:                 ✅ Stable
+EditableRegion Contract:   ✅ Stable
+Live Preview:              ✅ Stable
+Content Capability:        ✅ Proven
+
+Next architectural watchpoint: when CONTENT_FIELDS (the small local field-config
+map in GenericAdminDashboard.jsx, §14) becomes difficult to maintain — not before —
+introduce a Schema Registry. Not a prediction; an objective trigger to watch for.
+```
+
+This is the real gate that authorized deleting `CanvasPageEditor.jsx`/`PageBuilderTab.jsx` (§19) —
+before Sprint 1's second field, this would have been refused; after two independent real cases
+proved the Engine itself doesn't change per field, the replacement stopped being a prototype and
+became the real path.
 
 **Catalog** — the only Capability scored at full, per-criterion rigor (§21):
 
