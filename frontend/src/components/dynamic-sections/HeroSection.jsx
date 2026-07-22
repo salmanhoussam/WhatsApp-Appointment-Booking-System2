@@ -5,6 +5,7 @@
 import { motion } from 'framer-motion'
 import EditableRegion from '../../tenant-os/EditableRegion'
 import { contentSchema } from '../../tenant-os/schemas/content'
+import { mediaSchema } from '../../tenant-os/schemas/media'
 
 const S_TITLE  = { type: 'spring', stiffness: 80,  damping: 18, mass: 1.2 }
 const S_BODY   = { type: 'spring', stiffness: 70,  damping: 18, mass: 1.2, delay: 0.12 }
@@ -30,25 +31,27 @@ export default function HeroSection({ data, accent }) {
     }}>
 
       {/* Background */}
-      {isVideo ? (
-        <video
-          src={data.bg_image_url}
-          autoPlay muted loop playsInline
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : hasBg ? (
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: `url(${data.bg_image_url})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
-        }} />
-      ) : (
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `radial-gradient(ellipse at 60% 40%, ${accent}28 0%, transparent 70%),
-                       linear-gradient(160deg, oklch(0.13 0.03 280) 0%, oklch(0.08 0.01 260) 100%)`,
-        }} />
-      )}
+      <EditableRegion capability="media" fieldKey="hero.bg_image" schema={mediaSchema['hero.bg_image']}>
+        {isVideo ? (
+          <video
+            src={data.bg_image_url}
+            autoPlay muted loop playsInline
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : hasBg ? (
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: `url(${data.bg_image_url})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          }} />
+        ) : (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: `radial-gradient(ellipse at 60% 40%, ${accent}28 0%, transparent 70%),
+                         linear-gradient(160deg, oklch(0.13 0.03 280) 0%, oklch(0.08 0.01 260) 100%)`,
+          }} />
+        )}
+      </EditableRegion>
 
       {/* Overlay — stronger on bg-media, subtle on color-only */}
       <div style={{

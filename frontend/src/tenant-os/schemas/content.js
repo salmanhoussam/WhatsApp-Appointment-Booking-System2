@@ -21,6 +21,7 @@ export const contentSchema = {
     operations: ['UpdateField'],
     sectionType: 'hero',
     dataField:   'title_ar',
+    apiField:    'title_ar', // content.py's PATCH body key -- happens to match dataField here
     apiPath:     '/content/hero-title',
     promptLabel: 'عنوان الهيرو (Content Capability — hero.title):',
   },
@@ -30,6 +31,7 @@ export const contentSchema = {
     operations: ['UpdateField'],
     sectionType: 'story',
     dataField:   'heading_ar',
+    apiField:    'heading_ar', // content.py's PATCH body key -- happens to match dataField here
     apiPath:     '/content/story-heading',
     promptLabel: 'عنوان قسم القصة (Content Capability — story.heading):',
   },

@@ -911,7 +911,11 @@ write routes (`units.py`) bypass it entirely, importing `UnitRepository`/`Bookin
 
 **Finding — Gallery/Media (`gallery.py`).** No service exists for `GalleryImage` CRUD/reorder at
 all; `storage_service.py` handles only upload/storage mechanics, not the CRUD logic, which lives
-directly in `gallery.py`'s route handlers via `gallery_repo`.
+directly in `gallery.py`'s route handlers via `gallery_repo`. **Still open as of Sprint 2
+(2026-07-22)** — Sprint 2 built `media_service.py` for one narrow, different path
+(`hero.bg_image` via the Editing Engine's `ReplaceMedia` Operation, going through
+`content_sections_repo.py`, not `gallery_repo`) — it does not touch, and does not close, this
+finding. Booking's unit-gallery CRUD/reorder still has no Service layer.
 
 **Finding — Team/Staff (`team.py`).** No service file exists for `User`/team management at all
 (confirmed against the full `app/services/` listing); `team.py` calls `user_repo` directly.
@@ -986,7 +990,7 @@ exists" without a maturity label is misleading — this is exactly what prevents
 | Content | **Stable** (2026-07-22, up from Developing) | Its own clean `content_service.py` (no shared Broken-Architecture finding with Site Configuration anymore — separated per §1a's ratified decision), a real Dashboard Interface proven across 2 independent fields/components (Sprint 1 evidence, `.claudedocs/work/tenant-os-sprint1/2026-07-22/`). Governance (Draft/Publish, Audit) and AI Access still incomplete, per §20's own definition of Stable |
 | Theme | Developing | A narrower slice of Site Configuration (§10), same underlying finding |
 | Orders | Developing | Dashboard works in production today; Implementation is Missing Architecture (§19) |
-| Media | Experimental | Only real within Booking's unit-gallery context; no cross-module capability; Implementation is Missing Architecture |
+| Media | Experimental (2026-07-22: one new real Interface path added, still Experimental overall) | Booking's unit-gallery context remains Missing Architecture (§19) unchanged. Separately, `hero.bg_image` now has a real, clean, verified end-to-end path through the Editing Engine (`media_service.py` → `content_sections_repo.py`, Sprint 2 evidence: `.claudedocs/work/tenant-os-sprint2/2026-07-22/`) — but it is one field on one section type, not a general cross-module Media Capability (no Media Library, no browse/reuse). Stays Experimental until the broader Contract (§13) is actually built, not just one Operation type proven |
 | Customers | Experimental | Service correctly built, but its route is unmounted and unguarded — unreachable end-to-end |
 | Team / Staff | Experimental, pre-Contract | Real, working code exists (`team.py`) but was never elevated to its own §13 Contract, and never passed §12's Proposal gate — skipped straight past Idea/Contract; Implementation is Missing Architecture |
 | AI | Reserved | Not built — an Interface sibling (§11), not a Capability |
@@ -1065,6 +1069,28 @@ This is the real gate that authorized deleting `CanvasPageEditor.jsx`/`PageBuild
 before Sprint 1's second field, this would have been refused; after two independent real cases
 proved the Engine itself doesn't change per field, the replacement stopped being a prototype and
 became the real path.
+
+**Sprint 2 update — Operation-type generalization, verified 2026-07-22
+(`.claudedocs/work/tenant-os-sprint2/2026-07-22/SPRINT2_EVIDENCE.md`)**:
+
+```
+Editing Engine Status: PROVEN across 2 Capabilities AND 2 Operation types
+
+Engine Core:               ✅ Stable  (zero changes for ReplaceMedia, same as the 2nd field)
+Discovery:                 ✅ Stable  (unchanged, still unwired — see §14's own note)
+EditableRegion Contract:   ✅ Stable  (zero changes for the image/file case)
+Live Preview:              ✅ Stable  (same PREVIEW_UPDATE bridge re-renders a new image URL)
+Content Capability:        ✅ Proven  (Sprint 1)
+Media Capability:          ⚠️ Partial (one field, hero.bg_image, proven — NOT the full
+                                       Media Contract; Booking's unit-gallery Missing
+                                       Architecture finding, §19, is untouched)
+
+Real bug found this sprint: schema entries conflated dataField (the section.data key)
+with the API's own body key. Content's two fields happened to share the same name for
+both, hiding the gap; Media's route didn't, and exposed it as a real 422. Fixed by
+adding an explicit apiField to every schema entry — the correct general shape going
+forward, not a one-off patch.
+```
 
 **Catalog** — the only Capability scored at full, per-criterion rigor (§21):
 

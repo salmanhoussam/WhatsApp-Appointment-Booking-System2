@@ -8,6 +8,8 @@ import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
 import { contentSchema }  from '../../tenant-os/schemas/content'
+import { mediaSchema }    from '../../tenant-os/schemas/media'
+import useImageUpload     from '../../hooks/useImageUpload'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icons
@@ -218,6 +220,8 @@ export default function GenericAdminDashboard() {
   const [isMobile,     setIsMobile]     = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [previewForm,  setPreviewForm]  = useState(null)
   const iframeRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const { upload: uploadImage } = useImageUpload()
 
   // ── Public config — for active_services (admin/settings doesn't return it) ──
   const { config } = useTenantConfig()
@@ -256,50 +260,81 @@ export default function GenericAdminDashboard() {
   }, [previewForm])
 
   // ── Tenant OS Editing Engine — receive field clicks from the real live iframe ─
-  // Sprint 1 shipped one field (content.hero.title); a second (content.story.heading) proved
-  // the Engine itself (EditableRegion, Discovery, the click-capture effect, this postMessage
-  // bridge) didn't need to change. The one real duplication that surfaced was this handler
-  // reading its own local field-config map that duplicated contentSchema's per-key entries —
-  // per CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md, merged: this handler now reads directly from
-  // contentSchema (§14's Schema), not a second, parallel object. Still no Dispatcher service,
-  // still nothing built ahead of what's proven (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
+  // Sprint 1 (Content, UpdateField) proved two independent fields worked through this bridge
+  // unchanged. Sprint 2 adds Media's ReplaceMedia Operation (a real image upload, not a text
+  // prompt) on the exact same bridge — EditableRegion, Discovery, and the click-capture effect
+  // in DynamicPage.jsx needed zero changes for either the second Capability or the second
+  // Operation type; only this handler's per-type interaction (prompt vs file picker) differs.
+  //
+  // Field lookup is a small local capability->schema map, not a Dispatcher service — still
+  // nothing built ahead of what two real Capabilities have actually proven
+  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
+  const SCHEMAS_BY_CAPABILITY = { content: contentSchema, media: mediaSchema }
+  const pendingImageFieldRef = useRef(null)
+
+  // Shared by both interaction types: patch the field's value into `settings`, and push it into
+  // the real live iframe the same way PREVIEW_UPDATE already does for the 3 primitive Settings
+  // fields — same real mechanism, more content.
+  const saveFieldValue = useCallback(async (field, newValue) => {
+    const existingContent = settings?.config?.content ?? {}
+    try {
+      await adminApi.patch(field.apiPath, { [field.apiField]: newValue })
+
+      const updatedSections = (existingContent.sections ?? []).map(s =>
+        s.type === field.sectionType ? { ...s, data: { ...s.data, [field.dataField]: newValue } } : s
+      )
+      const updatedConfig = { ...(settings?.config ?? {}), content: { ...existingContent, sections: updatedSections } }
+
+      setSettings(prev => ({ ...prev, config: updatedConfig }))
+      // DynamicPage.jsx's PREVIEW_UPDATE handler does `Object.assign(patch, e.data.config)` —
+      // e.data.config's own keys land directly on tenantConfig's top level, not nested under
+      // tenantConfig.config. To patch tenantConfig.config.content, e.data.config itself must be
+      // `{ config: updatedConfig }`, not `updatedConfig` directly.
+      iframeRef.current?.contentWindow?.postMessage({ type: 'PREVIEW_UPDATE', config: { config: updatedConfig } }, '*')
+    } catch (err) {
+      window.alert('تعذّر حفظ التعديل — حاول مجدداً.')
+    }
+  }, [settings])
+
   useEffect(() => {
     const handler = async (e) => {
       if (e.data?.type !== 'TENANT_OS_FIELD_CLICK') return
-      if (e.data.capability !== 'content') return
-      const field = contentSchema[e.data.key]
+      const schema = SCHEMAS_BY_CAPABILITY[e.data.capability]
+      const field = schema?.[e.data.key]
       if (!field) return
 
+      if (field.type === 'image') {
+        // ReplaceMedia — trigger the real file picker; the actual upload + save happens in
+        // handleImageFileSelected once a real file is chosen.
+        pendingImageFieldRef.current = field
+        fileInputRef.current?.click()
+        return
+      }
+
+      // UpdateField (text) — unchanged from Sprint 1.
       const existingContent = settings?.config?.content ?? {}
       const currentValue = existingContent.sections
         ?.find(s => s.type === field.sectionType)?.data?.[field.dataField] ?? ''
       const newValue = window.prompt(field.promptLabel, currentValue)
       if (newValue === null || newValue === currentValue) return
-
-      try {
-        await adminApi.patch(field.apiPath, { [field.dataField]: newValue })
-
-        // Reconstruct the updated sections array from what we already have in `settings`,
-        // and push it into the real live iframe the same way PREVIEW_UPDATE already does
-        // for the 3 primitive Settings fields — same real mechanism, more content.
-        const updatedSections = (existingContent.sections ?? []).map(s =>
-          s.type === field.sectionType ? { ...s, data: { ...s.data, [field.dataField]: newValue } } : s
-        )
-        const updatedConfig = { ...(settings?.config ?? {}), content: { ...existingContent, sections: updatedSections } }
-
-        setSettings(prev => ({ ...prev, config: updatedConfig }))
-        // DynamicPage.jsx's PREVIEW_UPDATE handler does `Object.assign(patch, e.data.config)` —
-        // e.data.config's own keys land directly on tenantConfig's top level, not nested under
-        // tenantConfig.config. To patch tenantConfig.config.content, e.data.config itself must be
-        // `{ config: updatedConfig }`, not `updatedConfig` directly.
-        iframeRef.current?.contentWindow?.postMessage({ type: 'PREVIEW_UPDATE', config: { config: updatedConfig } }, '*')
-      } catch (err) {
-        window.alert('تعذّر حفظ التعديل — حاول مجدداً.')
-      }
+      await saveFieldValue(field, newValue)
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [settings])
+  }, [settings, saveFieldValue])
+
+  const handleImageFileSelected = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file next time
+    const field = pendingImageFieldRef.current
+    if (!file || !field) return
+    try {
+      const { url } = await uploadImage(file, { context: field.uploadContext })
+      await saveFieldValue(field, url)
+    } catch (err) {
+      window.alert('تعذّر رفع الصورة — حاول مجدداً.')
+    }
+  }, [uploadImage, saveFieldValue])
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const color           = settings?.primary_color  ?? '#6366f1'
@@ -351,6 +386,16 @@ export default function GenericAdminDashboard() {
       background: '#0d0d14', color: '#fff',
       fontFamily: "'Cairo', 'Segoe UI', sans-serif",
     }}>
+
+      {/* Tenant OS Editing Engine — hidden real file input backing the ReplaceMedia Operation.
+          Triggered programmatically from the TENANT_OS_FIELD_CLICK handler above; never shown. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageFileSelected}
+        style={{ display: 'none' }}
+      />
 
       {/* ════════════════════════════════════════════════════════════════
           DESKTOP SIDEBAR
