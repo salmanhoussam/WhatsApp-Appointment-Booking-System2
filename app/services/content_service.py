@@ -69,3 +69,53 @@ async def get_hero_title(client_id: str):
     if hero_section is None:
         return None
     return (hero_section.get("data") or {}).get("title_ar")
+
+
+async def update_story_heading(
+    client_id: str,
+    heading_ar: Optional[str] = None,
+    heading_en: Optional[str] = None,
+):
+    """
+    Second real field, Content Capability -- proves the Engine generalizes to a second
+    Capability sub-field (and a second real section component, StorySection.jsx) without
+    changing EditableRegion, Discovery, or the click-capture/live-preview plumbing at all.
+    Same read-merge-write shape as update_hero_title -- the shape repeats, confirming it's
+    real, not a one-off.
+    """
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+
+    story_section = next((s for s in sections if s.get("type") == "story"), None)
+    if story_section is None:
+        raise ValueError("This tenant's page has no story section to update")
+
+    data = dict(story_section.get("data") or {})
+    if heading_ar is not None:
+        data["heading_ar"] = heading_ar
+    if heading_en is not None:
+        data["heading_en"] = heading_en
+    story_section["data"] = data
+
+    content["sections"] = sections
+    config["content"] = content
+
+    return await _client_repo.update_client(client_id, {"config": Json(config)})
+
+
+async def get_story_heading(client_id: str):
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+    story_section = next((s for s in sections if s.get("type") == "story"), None)
+    if story_section is None:
+        return None
+    return (story_section.get("data") or {}).get("heading_ar")

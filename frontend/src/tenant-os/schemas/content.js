@@ -13,4 +13,9 @@ export const contentSchema = {
     label_ar: 'عنوان الهيرو',
     operations: ['UpdateField'],
   },
+  'story.heading': {
+    type: 'text',
+    label_ar: 'عنوان قسم القصة',
+    operations: ['UpdateField'],
+  },
 }

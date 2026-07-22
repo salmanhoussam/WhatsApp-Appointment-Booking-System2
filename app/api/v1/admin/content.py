@@ -25,6 +25,11 @@ class HeroTitleUpdate(BaseModel):
     title_en: Optional[str] = None
 
 
+class StoryHeadingUpdate(BaseModel):
+    heading_ar: Optional[str] = None
+    heading_en: Optional[str] = None
+
+
 @router.get("/hero-title")
 async def get_hero_title(
     tenant: dict = Depends(get_current_tenant),
@@ -57,4 +62,38 @@ async def update_hero_title(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"🔥 DB error updating hero title for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.get("/story-heading")
+async def get_story_heading(
+    tenant: dict = Depends(get_current_tenant),
+):
+    try:
+        heading_ar = await content_service.get_story_heading(tenant["id"])
+        return {"success": True, "data": {"heading_ar": heading_ar}}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/story-heading")
+async def update_story_heading(
+    body: StoryHeadingUpdate,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """Second real Operation -- proves the same UpdateField shape repeats for a second field."""
+    if body.heading_ar is None and body.heading_en is None:
+        raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+    try:
+        await content_service.update_story_heading(
+            tenant["id"], heading_ar=body.heading_ar, heading_en=body.heading_en
+        )
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: story heading updated for tenant '%s'", tenant["slug"])
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error updating story heading for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")

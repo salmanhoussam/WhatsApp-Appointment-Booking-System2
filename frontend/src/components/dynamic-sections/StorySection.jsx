@@ -5,6 +5,8 @@
 import { motion } from 'framer-motion'
 import { useInView } from 'framer-motion'
 import { useRef } from 'react'
+import EditableRegion from '../../tenant-os/EditableRegion'
+import { contentSchema } from '../../tenant-os/schemas/content'
 
 function StatCard({ num, label, accent, delay }) {
   const ref = useRef(null)
@@ -58,21 +60,23 @@ export default function StorySection({ data, accent }) {
       {/* Thin accent line */}
       <div style={{ width: 36, height: 3, background: accent, borderRadius: 2, marginBottom: 20 }} />
 
-      <motion.h2
-        initial={{ opacity: 0, y: 20 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
-        transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-        style={{
-          margin: '0 0 16px',
-          fontSize: 'clamp(22px, 3.5vw, 36px)',
-          fontWeight: 800,
-          color: '#f0f0f5',
-          letterSpacing: '-0.01em',
-          fontFamily: "'Cairo', sans-serif",
-        }}
-      >
-        {data.heading_ar || 'قصتنا'}
-      </motion.h2>
+      <EditableRegion capability="content" fieldKey="story.heading" schema={contentSchema['story.heading']}>
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+          style={{
+            margin: '0 0 16px',
+            fontSize: 'clamp(22px, 3.5vw, 36px)',
+            fontWeight: 800,
+            color: '#f0f0f5',
+            letterSpacing: '-0.01em',
+            fontFamily: "'Cairo', sans-serif",
+          }}
+        >
+          {data.heading_ar || 'قصتنا'}
+        </motion.h2>
+      </EditableRegion>
 
       {data.body_ar && (
         <motion.p

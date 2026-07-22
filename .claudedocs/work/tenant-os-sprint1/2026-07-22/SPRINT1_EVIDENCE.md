@@ -103,6 +103,43 @@ Real sequence, captured via headless Chrome + raw CDP (no Playwright/Puppeteer):
    Capability was built, what "done" means for it this sprint, and why AI/Mobile/Draft-Publish/
    Versioning aren't part of it yet (§8's explicit exclusions — none were started).
 
+## Second field — proving the Engine generalizes, not just works once
+
+Per Salman's explicit direction after reviewing the first result: don't move on to a third field
+inside the same section (Hero subtitle/CTA) — prove the Engine holds for a **second real
+component**, `StorySection.jsx`, before trusting the design at all. Added `content.story.heading`:
+
+- `content_service.py`: `update_story_heading`/`get_story_heading` — same read-merge-write shape
+  as `update_hero_title`, confirming the shape repeats rather than being a one-off.
+- `content.py`: `GET`/`PATCH /content/story-heading` — same pattern, a new route file entry, not a
+  new mechanism.
+- `contentSchema`: one new entry, `story.heading`.
+- `StorySection.jsx`: wrapped its real `heading_ar` in `EditableRegion` — **zero changes** to
+  `EditableRegion.jsx`, `discovery.js`, `DynamicPage.jsx`'s click-capture effect, or the
+  `TENANT_OS_FIELD_CLICK` message contract itself.
+- `GenericAdminDashboard.jsx`: the **one real place that needed to change** — its handler was
+  hardcoded to `content`/`hero.title` only. Generalized into a small local `CONTENT_FIELDS` map
+  (`sectionType`/`dataField`/`apiPath`/`promptLabel` per key) so the handler function itself
+  doesn't duplicate — still one file, still no Dispatcher service, still nothing built ahead of
+  this second real case (per §1a/Q7). A third field is the real test of whether even this small
+  map still holds up unchanged.
+
+`pilot-test-20260720` had no real `story` section yet — added one directly via the DB with real
+placeholder copy, a legitimate test-fixture addition (the tenant's own name is literally "Service
+Contract Validation" / "اختبار الطيار الأول"), not fabricated application behavior.
+
+**Verified identically to the first field**: real click on the real rendered `StorySection.jsx`
+heading → real dialog → real `PATCH /content/story-heading` (200 OK) → live re-render in the
+iframe within ~4.5s, no reload → confirmed via direct DB read and the real public `/config`
+endpoint. Also confirmed the Hero title from the first test remained untouched by this second
+edit — the two fields write to independent sections, no cross-contamination.
+
+**The honest signal this second field produced**: adding it required one new backend function,
+one new route, one Schema entry, one `EditableRegion` wrap, and one small config-map entry in the
+Dashboard handler — no change to the Engine's actual mechanics (Contract declaration, Discovery,
+click-capture, the live-preview bridge). That's the real evidence the design generalizes rather
+than having only worked once.
+
 ## Explicitly not done
 
 `CanvasPageEditor.jsx`/`PageBuilderTab.jsx` deletion — deferred, per the plan, until the new path

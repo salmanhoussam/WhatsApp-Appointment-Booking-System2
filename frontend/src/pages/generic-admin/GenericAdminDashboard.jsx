@@ -269,29 +269,50 @@ export default function GenericAdminDashboard() {
   }, [previewForm])
 
   // ── Tenant OS Editing Engine — receive field clicks from the real live iframe ─
-  // Sprint 1 scope: exactly one Capability, one field (content.hero.title). This is a
-  // direct, explicit handler, not a generic Dispatcher — a real routing abstraction is
-  // earned once a second real Capability/Operation proves the shape repeats
-  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
+  // Sprint 1 shipped exactly one field (content.hero.title) via a fully hardcoded handler.
+  // Adding a second field (content.story.heading) to test whether the Engine itself
+  // (EditableRegion, Discovery, the click-capture effect, this postMessage bridge) needed to
+  // change — it didn't. The only real duplication was inside this one handler function, so
+  // it's generalized into a small local field-config map, not a Dispatcher service: still one
+  // file, still no registry module, still nothing built ahead of this second real case
+  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7). A third field would be the real test of
+  // whether even this small map still holds up unchanged.
+  const CONTENT_FIELDS = {
+    'hero.title': {
+      sectionType: 'hero',
+      dataField:   'title_ar',
+      apiPath:     '/content/hero-title',
+      promptLabel: 'عنوان الهيرو (Content Capability — hero.title):',
+    },
+    'story.heading': {
+      sectionType: 'story',
+      dataField:   'heading_ar',
+      apiPath:     '/content/story-heading',
+      promptLabel: 'عنوان قسم القصة (Content Capability — story.heading):',
+    },
+  }
+
   useEffect(() => {
     const handler = async (e) => {
       if (e.data?.type !== 'TENANT_OS_FIELD_CLICK') return
-      if (e.data.capability !== 'content' || e.data.key !== 'hero.title') return
+      if (e.data.capability !== 'content') return
+      const field = CONTENT_FIELDS[e.data.key]
+      if (!field) return
 
-      const currentTitle = settings?.config?.content?.sections
-        ?.find(s => s.type === 'hero')?.data?.title_ar ?? ''
-      const newTitle = window.prompt('عنوان الهيرو (Content Capability — hero.title):', currentTitle)
-      if (newTitle === null || newTitle === currentTitle) return
+      const existingContent = settings?.config?.content ?? {}
+      const currentValue = existingContent.sections
+        ?.find(s => s.type === field.sectionType)?.data?.[field.dataField] ?? ''
+      const newValue = window.prompt(field.promptLabel, currentValue)
+      if (newValue === null || newValue === currentValue) return
 
       try {
-        await adminApi.patch('/content/hero-title', { title_ar: newTitle })
+        await adminApi.patch(field.apiPath, { [field.dataField]: newValue })
 
         // Reconstruct the updated sections array from what we already have in `settings`,
         // and push it into the real live iframe the same way PREVIEW_UPDATE already does
         // for the 3 primitive Settings fields — same real mechanism, more content.
-        const existingContent = settings?.config?.content ?? {}
         const updatedSections = (existingContent.sections ?? []).map(s =>
-          s.type === 'hero' ? { ...s, data: { ...s.data, title_ar: newTitle } } : s
+          s.type === field.sectionType ? { ...s, data: { ...s.data, [field.dataField]: newValue } } : s
         )
         const updatedConfig = { ...(settings?.config ?? {}), content: { ...existingContent, sections: updatedSections } }
 
