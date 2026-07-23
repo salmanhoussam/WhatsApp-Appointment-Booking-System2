@@ -103,3 +103,11 @@ general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, + 
 prisma/schema.prisma edit  → append to .claudedocs/architecture/database_report.md
 "deploy" / "ارفع"          → run /audit --pre-deploy
 "what's left?" / "شو باقي" → print inline roadmap status
+context compacted (auto OR manual /compact) → BEFORE continuing any other work, write the
+  received compact summary verbatim (lightly reformatted, all 8 summary sections kept) into
+  today's .claudedocs/sessions/YYYY-MM-DD.md under a "## Compact Summary" heading (create the
+  file from the usual session template first if it doesn't exist yet for today). This is a
+  standing rule (established 2026-07-23, Salman's explicit instruction) — a compact must never
+  silently drop session history that only lived in ephemeral context; the session log is its
+  permanent home. Do this silently, without asking, every single time a compact summary appears
+  at the start of a turn.
