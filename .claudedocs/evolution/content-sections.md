@@ -51,3 +51,70 @@ from memory.
 
 No — exactly one real case (`hr`) exists. Revisit this file the next time any tenant build
 considers a similar video-led or narrative-flow section.
+
+---
+
+## 2026-07-24
+
+### Context
+
+The very next day, Salman reviewed `video_story`'s output for `hr` and pushed it further: a simple
+looping video (even framed as "narrative") still wasn't the real ask. He wanted the video to
+literally *lead the page* — a scroll-driven frame-sequence canvas (real footage, no `<video>`
+scrubbing) with "chapters" that fade overlay UI in/out as the user scrolls through it, reusing
+beit-al-fakhar's existing frame-engine as a rendering layer. Built as a new section type,
+`story_experience` — see `.claudedocs/reviews/rk-barbar-verification.md` for the full build record.
+
+### Discovery
+
+This is **not** the same idea repeating in a second tenant type (which would trigger the promotion
+criteria below) — it's the *same* tenant (`hr`) and the *same* underlying content (Video 1) getting
+a second, more ambitious iteration one day later. Real, useful signal came out of it anyway:
+
+1. **The rendering engine really was shareable, not just theoretically.** `useFrameSequence.js` and
+   `FrameSequenceCanvas.jsx` (beit-al-fakhar's) were extracted to
+   `frontend/src/components/frame-sequence/` and reused as-is (zero logic changes) for `hr`'s
+   `story_experience` — confirmed real via a beit-al-fakhar regression check (real headless-Chrome
+   screenshot, zero console errors) after the move. This is the Abstraction Rule's "share what's
+   proven identical" carve-out actually paying off, not just cited as theory.
+2. **`video_story` and `story_experience` are now two distinct, coexisting section types on the
+   same tenant** — `hr`'s Video 2 stayed a plain `video_story` block (explicitly not touched, no
+   urgency); Video 1 became `story_experience`. This is a real signal that "a video section" isn't
+   one shape — plain sequential display and scroll-driven narrative are genuinely different jobs,
+   correctly modeled as two different `SectionType`s rather than one type trying to serve both.
+3. **A real tuning finding, not a defect**: with `scroll_range_vh: 320` and a real device viewport
+   noticeably shorter than the section's scroll height, the CSS `sticky` pin releases before
+   `useScroll`'s progress reaches 1.0 (the last chapter, `booking`, can appear mid-unpin rather than
+   fully pinned-centered — confirmed via real screenshot at progress≈0.9). This is inherent to the
+   already-proven tall-container-plus-sticky-child pattern (beit-al-fakhar has the exact same
+   property), not something `story_experience` introduced. Chapter boundaries and
+   `scroll_range_vh` are tuning parameters meant to be eyeballed against real footage and a real
+   device, same as beit-al-fakhar's own `contentFadeEnd`/`handoffStart` constants were — flagged
+   here so a future session doesn't have to rediscover it.
+
+### Current Understanding
+
+`story_experience` is exactly one Section, used by exactly one tenant (`hr`), same as
+`video_story`'s own status a day ago. The reusable PART (frame-sequence rendering engine) has
+already proven itself across 2 real tenants (`beit-al-fakhar`, `hr`) and is genuinely shared code
+today — but the Chapters/Overlay-Blocks *pattern* (the declarative chapter-timing system) still has
+exactly one real implementation. These are tracked separately on purpose: the rendering engine's
+sharing is already a settled fact, not a future promotion question; the Chapters pattern's
+promotion still waits on a second tenant *type*, per Salman's own explicit instruction not to
+generalize yet ("الهدف في هذه المرحلة ليس التعميم").
+
+### Open Questions — promotion criteria for the Chapters/Overlay-Blocks pattern (unchanged bar)
+
+Same threshold as `video_story`'s entry above, now applied to `story_experience`'s chapters system
+specifically: if a *different* tenant type (restaurant, real estate, car showroom, furniture store —
+Salman's own examples) independently needs "a video that leads the story with scroll-timed overlay
+content," that's the second real case this needs before the Chapters/Overlay-Blocks shape
+(Background/Timeline/Chapters/Overlay Blocks, Salman's own sketch) gets extracted into a real
+Capability/Pattern with its own ADR. One tenant reusing it twice for two different videos (as `hr`
+just did) does not count — it has to be a second, independently-motivated tenant type.
+
+### Promoted?
+
+No — the rendering engine is confirmed shared (2 real cases); the Chapters/Overlay-Blocks pattern
+itself still has exactly one real case (`hr`). Revisit this file the next time any tenant build
+considers a similar scroll-driven, chapter-overlay narrative.

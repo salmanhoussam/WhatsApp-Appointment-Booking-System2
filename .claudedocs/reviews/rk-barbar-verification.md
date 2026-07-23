@@ -1,5 +1,10 @@
 # RK Barber Shop — Tenant Verification
 
+> **2026-07-24 follow-up**: Video 1's `video_story` section was rebuilt into a scroll-driven
+> "Story Experience" (`story_experience` section type) the day after this review closed. Per this
+> project's Review immutability rule, that work has its own new document, not an edit to this
+> closed one: see `.claudedocs/reviews/rk-barbar-story-experience-verification.md`.
+
 Copied from `tenant-verification-template.md`, this project's first real use. Real business name
 found via investigation (below), not asked — confirmed **"RK Barber Shop"** (English) from the
 logo watermark embedded in one of the tenant's own uploaded videos.
