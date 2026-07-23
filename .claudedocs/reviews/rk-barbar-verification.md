@@ -5,8 +5,9 @@ found via investigation (below), not asked — confirmed **"RK Barber Shop"** (E
 logo watermark embedded in one of the tenant's own uploaded videos.
 
 **Tenant:** slug `hr` (confirmed by Salman) — **WhatsApp:** `96176985477` (confirmed) —
-**Date:** 2026-07-23 — **Status:** Phase 0 (Tenant Discovery) complete. Phase 0.5 (Architecture
-Decision) next, below — no code/DB changes yet.
+**Date:** 2026-07-23 — **Status:** Onboarding steps 1-3 of Salman's 5-step order complete with real
+evidence (Client/User/Services/Settings/PageContent/PublicPage/Dashboard all verified). Steps 4
+(wire Hero to Video 3) and 5 (build "Our Shop" section for Videos 1 & 2) not started.
 
 ## 0. Phase 0 — Tenant Discovery (real investigation, per Salman's explicit instruction)
 
@@ -103,8 +104,44 @@ technically reachable," but "how long did it actually take, for real, during thi
 
 ## 4. Confirmed Findings
 
-Real, evidenced things this build proved or disproved about the architecture — grounded in what
-actually happened, not what should have happened.
+**Onboarding was first wrongly reported "succeeded" after only Client+User creation** —
+`register_new_tenant()` covers Step 1 of `tenant-onboarding.md`'s own checklist only. This directly
+led to adding the Completion Gate to that rule file (2026-07-23) so file-completion is never
+conflated with onboarding-completion again.
+
+**Two real, previously-latent bugs found while actually verifying the page renders** (not from
+trusting `seed_page_content.py`'s success message alone):
+
+1. `booking.json`'s own `location` section template shipped `"tags": ""` (a string) against
+   `LocationSection.jsx`'s own documented contract (`tags: string[]`) — crashed the entire public
+   page with a real `TypeError: (data.tags ?? []).filter is not a function`. Confirmed via a real
+   headless-Chrome console capture, not guessed from behavior. `smar` (the only other real
+   `booking_showcase`-shaped tenant) never exercises this section, so the bug was never caught
+   before. Fixed in the template and this tenant's own copy (`"tags": []`).
+2. `GenericAdminDashboard.jsx`'s Reservations tab gates on a service key literally named
+   `"reservations"` — separate from `"booking"`, and **absent from `service-system.md`'s own Valid
+   Service Keys table**. Seeding only `booking`/`catalog`/`whatsapp_ordering` left the Reservations
+   tab and its backend route (`require_service("reservations")`) silently unreachable despite
+   Booking being fully active. Confirmed real via `pilot-test-20260720`'s own active services
+   (which does include `reservations`) as the reference case. Fixed: added to the `barbershop`
+   preset, documented in `service-system.md`, activated for the already-created `hr` tenant.
+
+**Real end-to-end verification performed, matching the new Completion Gate exactly:**
+- `client.config.content.sections`: 8 real sections, confirmed via direct DB read (not the seed
+  script's own "Success" message).
+- Public page (`localhost:5173/hr`): real screenshot, Hero renders "RK Barber Shop" + real
+  subtitle/CTA, no "الصفحة قيد الإعداد" text present, confirmed via `document.body.innerText`.
+- Login: real `POST /auth/users/login` with the Development Tenant credentials → real 200 + JWT,
+  correct `role: TENANT_ADMIN`, correct `slug: hr`.
+- Dashboard (`localhost:5173/hr/dashboard`): real screenshot, sidebar shows نظرة عامة/الطلبات/
+  الحجوزات/الكتالوج/الإعدادات — Reservations tab present only after fixing Finding #2 above.
+
+**Environment concern raised by Salman, closed with evidence, not assumed**: `DATABASE_URL` in
+`.env` points to `postgres.wefjghagwpkotrrdiqyi` — the exact same Supabase project used for every
+other real DB check this whole session. `FRONTEND_URL` is unset; the `salmansaas.com` value seen in
+`register_new_tenant()`'s return payload is only that env var's hardcoded fallback string for the
+*returned* `dashboard_url` field, unrelated to which database the write went to. No environment
+mixing occurred.
 
 ## 5. Side Findings
 
@@ -113,13 +150,16 @@ collision, tech debt) — named as side findings explicitly, not folded into the
 
 ## 6. Unknowns
 
-- **Arabic business name** — the video's logo watermark only confirms the English name ("RK Barber
-  Shop"); no Arabic name found in any real artifact. Not guessed.
+- **Arabic business name** — still the only genuinely unresolvable-by-investigation fact. The
+  video's logo watermark only confirms the English name ("RK Barber Shop"). Placeholder in use
+  (`name_ar = name_en`, per Salman's explicit instruction) until the real client provides one —
+  logged as Temporary Business Data in `Client.notes`, editable via the Dashboard.
 - Real service list + prices — per Salman, the owner adds these via the Dashboard directly; no
-  real data seeded now beyond a minimal empty/starter catalog structure.
+  real data seeded now beyond the empty starter catalog structure.
 
-(The 3 open Decisions Required — Videos 1&2's fate, service-seeding mechanism, calendar timing —
-are tracked in §0, not repeated here; those are decisions pending Phase 0.5, not unresolved facts.)
+(Videos 1 & 2's fate and the reservations-calendar decision are resolved in §0's Phase 0.5;
+service-seeding is resolved in §4 above — the `barbershop` preset. Nothing tracked here is still
+open except the Arabic name.)
 
 ## 7. Verdict — Does the Architecture Need to Change?
 
