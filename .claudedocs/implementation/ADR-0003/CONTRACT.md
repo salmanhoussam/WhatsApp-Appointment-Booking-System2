@@ -73,6 +73,13 @@ point at which the whole migration can still be cancelled or re-scoped for free,
 creates the first real file. **Confirmed reached 2026-07-23**, per Salman's review of this Contract
 (9.5/10, one correction applied above, no further changes requested).
 
+**Extension added at Phase 0→1 handoff**: every Phase below now also carries a **Navigation
+Check** — not a technical test, a usability test of the architecture itself. Salman's framing: the
+goal of ADR-0003 was never "reorganize folders," it was reducing cognitive load; a phase whose
+files land exactly where the Contract says but still takes 3 minutes to search through hasn't
+actually succeeded. Each Navigation Check asks one concrete "can a real question be answered
+quickly here" test, specific to what that phase actually changes.
+
 ### Phase 1 — Create Architecture Skeleton
 
 **Preconditions:** None — this phase only creates new, empty structure.
@@ -92,6 +99,10 @@ reviews/tenant-verification-template.md  (new — general template, first real u
 - ✓ No existing file moved, renamed, or edited
 - ✓ `tenant-verification-template.md` has a real, fillable structure (not a placeholder stub)
 
+**Navigation Check:** Open only `architecture/README.md` — within 30 seconds, can you say what
+`principles/`, `capabilities/`, `adr/TOS-*`, and `reviews/` are each for, without opening any of
+them? (Tests the skeleton's own self-explanatoriness, not content that doesn't exist yet.)
+
 ### Phase 2 — Reviews Consolidation
 
 **Preconditions:** Phase 1 committed.
@@ -109,6 +120,10 @@ inside other historical docs (sessions/work), left as-is by design.
 - ✓ 3 files moved with history preserved
 - ✓ Content byte-identical except filename (no rewriting during the move itself)
 - ✓ No other file's functional behavior changes
+
+**Navigation Check:** Given only "find the review of the Content Capability's architecture" as a
+task, does exactly one obviously-named file in `reviews/` answer it — without needing to know the
+old `CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md` name first?
 
 ### Phase 3 — Tenant OS ADRs
 
@@ -128,6 +143,11 @@ every real decision/rationale preserved, nothing silently dropped. `wc -l` each 
 - ✓ 3 ADRs created, `TOS-` prefix, in the existing `adr/` folder alongside `ADR-0001/2/3`
 - ✓ Every Decision Driver/Option/Consequence traceable back to the original section
 - ✓ `TENANT_OS_PLAN.md` itself untouched (still the fallback reference until Phase 7)
+
+**Navigation Check:** Given "why does the Editing Engine work as Capability→Operation→Schema→
+Renderer instead of a click-to-edit UI" as a real question, can you find `TOS-002` inside `adr/` in
+under 30 seconds, and immediately tell it apart from `ADR-0001/2/3` by the prefix alone (no need to
+open any file to know it's a different kind of decision)?
 
 ### Phase 4 — Principles
 
@@ -152,6 +172,10 @@ Principles" section listing each, plus a "Platform Principles" section pointing 
 - ✓ No principle duplicates content already in `.claude/rules/`
 - ✓ Each file answers "what is permanently true," not "what's true this Sprint"
 - ✓ `INDEX.md`'s two-section split is real and correct
+
+**Navigation Check:** Pick any one principle mentioned informally in conversation (e.g. "Single
+Source of Truth," "Dashboard-First") — does `INDEX.md` alone tell you, without opening a second
+file to check, whether it lives in `.claude/rules/` or `architecture/principles/`?
 
 ### Phase 5 — Capability Files (the largest phase)
 
@@ -181,6 +205,12 @@ Site Configuration's file specifically checked against
 - ✓ No Capability's real finding/maturity data lost in the split
 - ✓ `INDEX.md`'s Capability rollup table added, one row per Capability, linking here
 
+**Navigation Check (the real test — Site Configuration is today's active Sprint):** Open only
+`capabilities/site-configuration.md` — does it alone contain the Ownership Matrix, the 3 Known
+Boundary Debt findings, and the current Contract, with zero need to cross-reference the retired
+`TENANT_OS_PLAN.md` for anything real? If a genuine "where does X live" question still requires
+opening the old file, this phase isn't actually done yet, regardless of what got copied.
+
 ### Phase 6 — `TENANT_OS.md` + Finalize `INDEX.md`/`README.md`
 
 **Preconditions:** Phases 3–5 committed (everything they'd link to now exists).
@@ -197,6 +227,11 @@ a real file (no broken links — checked by actually following each one).
 - ✓ `TENANT_OS.md` under 200 lines
 - ✓ `INDEX.md` has both a Decision table and a Capability rollup table, complete
 - ✓ A reader following only `README.md` → `INDEX.md` can find any real fact in ≤2 links
+
+**Navigation Check:** Actually time it — starting from `README.md` with no prior context, how long
+to find (a) Site Configuration's Ownership Matrix, (b) why the Editing Engine works the way it
+does, (c) the Abstraction Rule's real location? Each should be well under a minute, not "technically
+reachable eventually."
 
 ### Phase 7 — Retire `TENANT_OS_PLAN.md`
 
@@ -217,6 +252,11 @@ duplicated as a live (non-historical) copy.
 - ✓ File archived, not deleted, with a clear superseded-by pointer
 - ✓ The content-completeness diff check passes
 - ✓ `git log --follow` on the archived path still shows full history
+
+**Navigation Check:** Browse `architecture/` after this phase — is there exactly one obvious
+"source of truth" for Tenant OS (`TENANT_OS.md` + its links), with zero competing candidate that
+looks equally authoritative? (Before this phase, both the old plan and the new structure existed
+side by side — a real source of confusion this check specifically closes.)
 
 ### Phase 8 — Fix External References
 
@@ -245,6 +285,10 @@ accepted historical files above.
 - ✓ All 11 live references fixed
 - ✓ Historical files' stale references confirmed intentional, not missed
 - ✓ `documentation-policy.md` now correctly describes the real folder structure
+
+**Navigation Check:** Actually click/follow the rewritten reference in `bo-hussein.md` and in
+`CLAUDE.md` — does each land exactly on the intended new file/section on the first try, with no
+detour through a stale path or a guess about where the content moved to?
 
 ## 4. Content-Completeness Verification (gates Phase 7)
 
