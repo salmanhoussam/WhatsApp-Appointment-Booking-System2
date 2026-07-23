@@ -5,58 +5,57 @@ found via investigation (below), not asked — confirmed **"RK Barber Shop"** (E
 logo watermark embedded in one of the tenant's own uploaded videos.
 
 **Tenant:** slug `hr` (confirmed by Salman) — **WhatsApp:** `96176985477` (confirmed) —
-**Date:** 2026-07-23 — **Status:** Phase 0 (Tenant Discovery) in progress, no code/DB changes yet.
+**Date:** 2026-07-23 — **Status:** Phase 0 (Tenant Discovery) complete. Phase 0.5 (Architecture
+Decision) next, below — no code/DB changes yet.
 
 ## 0. Phase 0 — Tenant Discovery (real investigation, per Salman's explicit instruction)
 
-**The 3 videos — classified by actually downloading and extracting real frames, not guessed from
-filenames**, per `curl` from the real Supabase `properties/RK Barbar/` folder:
+**Correction to this section's own first draft**: an earlier version of this section stated
+decisions ("build tenant-specific," "seed services explicitly") as if they were investigation
+outcomes. Salman's catch: *"هيدا قرار معماري، وليس نتيجة تحقيق... التحقيق لازم ينتهي عند [الحقائق]،
+وبعدين يتوقف."* Investigation stops at facts; deciding what to do about them is a separate step
+(Phase 0.5, below). Rewritten to keep that seam visible.
 
-| File | Real specs | Content (from actual extracted frames) | Role |
-|---|---|---|---|
-| `WhatsApp Video 2026-07-22 at 02.01.14.mp4` | 24.2s, 464×832, 5.07MB | Hand opening the shop's glass entrance door, then panning across product shelves (hair sprays, gels, branded caps) and a styling station — casual phone-shot, no logo | **Shop/Storefront Intro** |
-| `WhatsApp Video 2026-07-22 at 02.01.24.mp4` | 13.1s, 464×832, 2.65MB | Close-up panning across product shelves — "Elegance" brand sprays/gels, a photo of the barber on the shelf, the barber-pole light fixture | **Products Close-up** |
-| `WhatsApp Video 2026-07-22 at 02.01.45.mp4` | 18.1s, 576×1024 (higher-res), 3.78MB | Wide cinematic shots of the full shop interior — multiple premium leather barber chairs, arched mirror decor, ceiling lighting, barber pole — **carries a real "RK Barber Shop" logo watermark** (crown icon) throughout | **Premium Shop Showcase — confirms the real business name** |
+### Confirmed
 
-Matches Salman's own predicted classification almost exactly, refined by real evidence: video 3 is
-better described as a *premium full-shop* showcase (not specifically "products") — the thing that
-actually distinguishes it is production quality + the embedded logo, confirmed by frame content, not
-assumed from file size alone.
+- RK Barber Shop identified (real business name, found via the logo watermark in one of its own
+  uploaded videos — not asked for).
+- 3 real videos uploaded to `properties/RK Barbar/` (downloaded and frame-extracted directly, not
+  guessed from filenames):
+  - Video 1 (24.2s, 464×832): shop entrance + interior/product-shelf pan, casual phone-shot.
+  - Video 2 (13.1s, 464×832): close-up product-shelf pan (Elegance-brand sprays/gels).
+  - Video 3 (18.1s, 576×1024, higher-res): wide cinematic full-shop interior shots, carries the
+    real "RK Barber Shop" logo watermark throughout.
+- Video 3 fits the existing Hero mechanism exactly (Sprint 2's `ReplaceMedia`/`hero.bg_image` — one
+  video, autoplay background) — confirmed by reading `HeroSection.jsx`'s real `isVideo` handling.
+- `GallerySection.jsx`'s real data shape is `{ heading_ar, images: [{url, caption_ar}] }` — images
+  only, confirmed by reading the component directly, zero `video`/`mp4`/`isVideo` reference found.
+- No existing section or Capability in this codebase handles more than one video, or non-Hero
+  video, today. This is the first real case that needs it.
+- Booking (`app/api/v1/admin/reservations.py`) and Catalog (`catalog.py`/`catalog_service.py`) both
+  work independently and are both real, usable modules.
+- `SERVICE_TYPE_MAP` (`app/core/services.py`) has no preset combining `booking` + `catalog` — every
+  existing `service_type` seeds one or the other, never both.
+- `ReservationsTab.jsx` (552 lines, read directly) is a table/list view with status badges
+  (`pending`/`confirmed`/`arrived`/`cancelled`/`no_show`) and pagination — **not** a calendar. No
+  calendar rendering of reservations exists anywhere in the admin dashboard today (an earlier draft
+  of this section wrongly assumed one existed — caught and corrected before it stood as fact).
 
-**Real architecture question this raised, investigated before asking anyone**: does putting all 3
-videos on the page fit existing architecture, or does something new need building?
-- **Hero**: video 3 (the premium, logo-bearing one) is the natural Hero — this is exactly Sprint
-  2's existing `ReplaceMedia`/`hero.bg_image` shape (one video, autoplay background). **No new
-  architecture needed for the Hero.**
-- **The other 2 videos (shop-tour, product close-up)**: checked `GallerySection.jsx` directly —
-  its real data shape is `{ heading_ar, images: [{url, caption_ar}] }`, **images only, no video
-  support at all** (confirmed by reading the component, zero `video`/`mp4`/`isVideo` references
-  found). No existing section/Capability handles "gallery videos" today.
-- **Decision (per the Abstraction Rule — one real case doesn't justify a new shared Capability
-  yet)**: do not extend `GallerySection.jsx` or invent a new "Video Gallery" Capability for this
-  first case. Build a small, tenant-specific "Our Shop" section for RK Barber Shop only (matching
-  how beit-al-fakhar's bespoke sections work), holding these 2 videos directly. If a second real
-  tenant later needs the same thing, *that's* the point to consider a shared Capability — not now.
+### Unknowns
 
-**Confirmed via `SERVICE_TYPE_MAP` (`app/core/services.py`)**: no existing `service_type` combines
-`booking` + `catalog` — `"real_estate"`/`"hotel"` seed booking only, `"restaurant"`/`"ecommerce"`
-seed catalog-ish only, `"services"` seeds `["catalog"]` only. This tenant needs both. Resolution:
-seed a new explicit service list for this tenant directly (`["booking", "catalog",
-"whatsapp_ordering"]`) rather than forcing an existing `service_type` preset — not a schema change,
-just the first real tenant not matching any preset's assumption of "one module only."
+- Arabic business name — no real artifact confirms one; not guessed.
+- What happens to Videos 1 & 2 (see Phase 0.5, below — this is a decision, not an unknown fact, but
+  listed here because it's not yet resolved).
 
-**Booking complexity (confirmed by Salman)**: simple — one service type, no staff picker, but the
-Admin Dashboard needs a **calendar** view so the owner can see upcoming client bookings.
+### Decisions Required (Phase 0.5 — not decided during Discovery)
 
-**Correction — first claim here was wrong, caught before it stood as fact**: initially wrote that
-a calendar view already exists; actually reading `ReservationsTab.jsx` (552 lines) disproves that
-— it's a **table/list view** (status badges — `pending`/`confirmed`/`arrived`/`cancelled`/
-`no_show` — with forward-only status transitions and pagination), not a calendar. **Real gap
-confirmed**: no calendar view of reservations exists anywhere in the admin dashboard today. This
-is either new work for this tenant (a real UI feature, not an architecture change — reservations
-data already exists via `app/api/v1/admin/reservations.py`, only a calendar *rendering* of the same
-data is missing) or the existing table view is accepted as the MVP and a calendar is a named
-follow-up — flagged for a decision during actual development, not resolved here.
+- Do Videos 1 & 2 become a shared "Video Gallery" Capability, a tenant-specific section, folded
+  into a multi-clip Hero, or deferred entirely for a first version?
+- Does this tenant need a new `service_type` preset (`booking`+`catalog` combined) added to
+  `SERVICE_TYPE_MAP`, or explicit per-tenant `client_services` seeding outside the preset system —
+  an Implementation decision, not something Discovery resolves on its own.
+- Build a reservations calendar view now, or accept the existing table view as this tenant's MVP
+  and defer the calendar as a named follow-up.
 
 ---
 
@@ -70,13 +69,12 @@ Catalog together.
 
 ## 2. Architecture Questions Raised During the Build
 
-| Question asked | Answer found |
+| Question asked | Finding (fact only — decision lives in §0's "Decisions Required" or Phase 0.5) |
 |---|---|
-| Does `SERVICE_TYPE_MAP` have a preset combining `booking` + `catalog`? | **No.** Seed this tenant's `client_services` explicitly (`["booking", "catalog", "whatsapp_ordering"]`) rather than via any existing `service_type` preset — see §0. |
-| Is the 3-video Hero Sprint 2's plain `ReplaceMedia`, or something new? | **Plain `ReplaceMedia`, one video** (video 3) — the other 2 videos are not a Hero problem at all, see §0. |
-| Do the non-Hero videos need a new shared Capability (a "Video Gallery")? | **Not yet** — build tenant-specific for this first case; revisit only if a second tenant needs the same thing (Abstraction Rule). |
-| Does a reservations calendar view already exist? | **No — real gap confirmed**, not assumed. Data exists (`app/api/v1/admin/reservations.py`), only a calendar rendering is missing. Open decision: build now vs. defer, see §0. |
-| Did we need to modify an existing ADR or Principle? | Not yet — none of the above required touching `TOS-002`, `ADR-0003`, or any Principle; all fit within existing Capability boundaries. |
+| Does `SERVICE_TYPE_MAP` have a preset combining `booking` + `catalog`? | No such preset exists. |
+| Is the 3-video Hero Sprint 2's plain `ReplaceMedia`, or something new? | Video 3 alone fits plain `ReplaceMedia`. Videos 1 & 2 fit no existing mechanism. |
+| Does a reservations calendar view already exist? | No — confirmed by reading `ReservationsTab.jsx` directly; it's a table/list. |
+| Did we need to modify an existing ADR or Principle? | Not observed — everything found so far fits within existing Capability boundaries. |
 | Was a file's planned location wrong, or was the Implementation Contract incomplete for this case? | Not yet observed — too early, still Phase 0. Will be re-checked once real development starts. |
 
 ## 3. Navigation Check (real, timed)
@@ -101,13 +99,13 @@ collision, tech debt) — named as side findings explicitly, not folded into the
 
 ## 6. Unknowns
 
-What genuinely still needs Salman, after real investigation resolved everything discoverable:
 - **Arabic business name** — the video's logo watermark only confirms the English name ("RK Barber
   Shop"); no Arabic name found in any real artifact. Not guessed.
-- Whether to build a reservations calendar view now (real gap, §0) or accept the existing table
-  view as MVP for this tenant and defer the calendar as a named follow-up.
 - Real service list + prices — per Salman, the owner adds these via the Dashboard directly; no
   real data seeded now beyond a minimal empty/starter catalog structure.
+
+(The 3 open Decisions Required — Videos 1&2's fate, service-seeding mechanism, calendar timing —
+are tracked in §0, not repeated here; those are decisions pending Phase 0.5, not unresolved facts.)
 
 ## 7. Verdict — Does the Architecture Need to Change?
 
