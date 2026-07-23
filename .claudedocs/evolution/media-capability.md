@@ -83,3 +83,17 @@ waits for a second independently-motivated case before generalizing.
 ### Promoted?
 
 No.
+
+### Escalation Watch (added 2026-07-23, per Salman's explicit direction)
+
+This finding is not routine — it touches `rules/backend/architecture.md §9`'s "One Capability →
+One Contract → One Service → One Source of Truth" principle directly: two independent write paths
+for what's conceptually "the tenant's hero media" is exactly the shape that principle exists to
+prevent. It is deliberately **not** promoted to an ADR yet — only two real cases exist
+(generic/`bg_image_url`, bespoke/`hero_video_url`), and promoting on two cases would be the
+premature-abstraction mistake the Abstraction Rule exists to prevent. But it must not go quiet
+either: if a **third** real tenant case exercises Media in a way that either (a) needs a bespoke
+tenant to use the generic path, (b) needs a generic tenant to need bespoke-style derived assets, or
+(c) reveals a real bug caused by the two paths disagreeing — that is the confirming case this
+needs, and it should be escalated straight to an Architecture Review (`.claudedocs/reviews/`) or a
+real ADR at that point, not left to accumulate a fourth, fifth entry here indefinitely.
