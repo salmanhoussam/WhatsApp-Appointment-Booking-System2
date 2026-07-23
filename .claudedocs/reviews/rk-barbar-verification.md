@@ -5,9 +5,13 @@ found via investigation (below), not asked — confirmed **"RK Barber Shop"** (E
 logo watermark embedded in one of the tenant's own uploaded videos.
 
 **Tenant:** slug `hr` (confirmed by Salman) — **WhatsApp:** `96176985477` (confirmed) —
-**Date:** 2026-07-23 — **Status:** Onboarding steps 1-3 of Salman's 5-step order complete with real
-evidence (Client/User/Services/Settings/PageContent/PublicPage/Dashboard all verified). Steps 4
-(wire Hero to Video 3) and 5 (build "Our Shop" section for Videos 1 & 2) not started.
+**Date:** 2026-07-23 — **Status:** All 5 steps of Salman's onboarding order complete with real
+evidence. Hero wired to real Video 3 via the existing Media Capability
+(`PATCH /admin/media/hero-image`, no bypass), confirmed via direct DB read and a real headless-
+Chrome render. A new `video_story` section type (named after architectural responsibility, not
+content or tenant branding — Salman's explicit correction) renders Videos 1 & 2 as a video-led
+narrative, not a gallery — confirmed via real DB read (10 sections, correct order) and a real
+scrolled screenshot showing both videos with their real captions. This review is now closed.
 
 ## 0. Phase 0 — Tenant Discovery (real investigation, per Salman's explicit instruction)
 
@@ -91,16 +95,34 @@ Catalog together.
 | Does a reservations calendar view already exist? | No — confirmed by reading `ReservationsTab.jsx` directly; it's a table/list. |
 | Did we need to modify an existing ADR or Principle? | Not observed — everything found so far fits within existing Capability boundaries. |
 | Was a file's planned location wrong, or was the Implementation Contract incomplete for this case? | Not yet observed — too early, still Phase 0. Will be re-checked once real development starts. |
+| Does the Media Capability have one write path or several? | Two independent, undocumented write paths exist (`bg_image_url` via the generic Editing Engine vs. legacy `hero_video_url` for bespoke tenants only) — real finding, logged in `.claudedocs/evolution/media-capability.md` (2026-07-23 entry), not built around or silently worked past. |
+| Should video segments link to categories/products (a "video-led landing page")? | Real Gap, explicitly deferred by Salman: no real category/product data exists for `hr` yet (owner adds these via Dashboard later) — building segment-CTA navigation now would be premature abstraction on a single untested case. The `video_story` section's schema carries the metadata fields (`title`/`description`/`cta`/`target_category_id`) unread, so the door stays open without the logic being built prematurely. |
+| What should the new shared `SectionType` be named? | Salman's explicit correction: name it after architectural responsibility, not content or tenant branding. Rejected `our_shop` (ties a shared registry to one tenant) and `video_gallery` (implies "just a gallery," when the intent is a video leading the page's narrative). Chosen: `video_story`. |
 
 ## 3. Navigation Check (real, timed)
 
 Per the same discipline added to every ADR-0003 migration phase — not "was the right file
 technically reachable," but "how long did it actually take, for real, during this build":
 
-- Time to find the relevant Capability's Contract: ___
-- Time to find the relevant Principle (if any applied): ___
-- Any point where you gave up searching and re-read the whole old plan/mega-doc out of habit
-  instead of the new structure? (If yes, that's a real finding, not a personal failure — name it.)
+- **Time to find the relevant Capability's Contract**: no dedicated time — it doesn't exist yet.
+  ADR-0003's `capabilities/` folder (Phase 1) is still an empty `.gitkeep`; Phases 2-8 (which would
+  populate `capabilities/media.md`) haven't executed. The Media Capability's real mechanism was
+  found by 2 Explore-agent investigations grepping `app/api/v1/admin/`, `app/services/`,
+  `app/repositories/` directly — real, working, but slower than a single-file lookup should be
+  once Phase 5 exists.
+- **Time to find the relevant Principle (if any applied)**: same situation — `principles/` is
+  still empty. The relevant standing rules (Single-Source-of-Truth, Admin/Public Contract) live in
+  `.claude/rules/backend/architecture.md §9-10`, found via targeted grep, not a dedicated
+  principle file.
+- **Any point where the old mega-doc got reached for out of habit?** Yes, honestly — and it's a
+  real finding, not a personal failure, exactly per this section's own instruction: the "Media may
+  need a Processing Pipeline" insight (now filed properly in
+  `.claudedocs/evolution/media-capability.md`) was originally recorded inline in
+  `TENANT_OS_PLAN.md §14`, and that's still where it had to be found and read from — because
+  ADR-0003's migration hasn't moved that content anywhere else yet. This isn't a navigation failure
+  of the new structure; it's the expected, honest state of a migration still in Phase 1 of 8. It
+  will be worth re-running this exact check once Phases 2-8 execute, to confirm the new structure
+  actually gets faster, not just differently organized.
 
 ## 4. Confirmed Findings
 
@@ -136,6 +158,36 @@ trusting `seed_page_content.py`'s success message alone):
 - Dashboard (`localhost:5173/hr/dashboard`): real screenshot, sidebar shows نظرة عامة/الطلبات/
   الحجوزات/الكتالوج/الإعدادات — Reservations tab present only after fixing Finding #2 above.
 
+**Steps 4-5 (Hero → Video 3, "Our Shop"/video_story for Videos 1 & 2) — real evidence:**
+
+- Confirmed the 3 real video files in Supabase Storage (`RK Barbar/`) by exact byte-size match
+  against the already-downloaded local copies: Video 1 = `...02.01.14.mp4` (24.16s, 5,074,013
+  bytes, casual shop-tour), Video 2 = `...02.01.24.mp4` (13.07s, 2,654,497 bytes, product
+  close-up), Video 3 = `...02.01.45.mp4` (18.1s, 3,779,540 bytes, professional/logo). All 3 public
+  URLs verified reachable via a real HEAD request (HTTP 200, `Content-Length` matching exactly).
+- Hero wiring: real `PATCH /api/v1/admin/media/hero-image` with a real `hr` TENANT_ADMIN JWT,
+  `{"image_url": "<Video 3 URL>"}` → `{"success": true}`. Confirmed NOT trusting that message alone
+  — a direct DB read immediately after showed `hero.data.bg_image_url` set to the exact Video 3
+  URL. Used only the confirmed generic-tenant mechanism (`bg_image_url` via
+  `content_sections_repo.update_section_field`) — explicitly did not touch the separate, bespoke-
+  tenant-only `hero_video_url` column, per Salman's "no bypasses" instruction.
+- New `video_story` SectionType added (`app/schemas/page_content.py`), new
+  `VideoStorySection.jsx` component (following `HeroSection.jsx`'s video treatment and
+  `GallerySection.jsx`'s RTL heading-block convention), registered in
+  `frontend/src/components/dynamic-sections/index.js` and `DynamicPage.jsx`'s `SECTION_MAP`.
+  `hr`'s `page_content.json` updated to 10 sections in order: hero → story → video_story(Video 1)
+  → gallery → featured_items → video_story(Video 2) → testimonials → hours → location → cta —
+  reseeded via `seed_page_content.py hr`, confirmed via a real DB read (exact order, exact video
+  URLs, not assumed from the seed script's console output).
+- Real headless-Chrome + CDP verification (fresh isolated profile, port 9337, `--remote-allow-
+  origins=*`): all 3 real `<video>` elements present with the correct `src` URLs; zero console
+  errors/exceptions; body text contains "RK Barber Shop", "من محلنا", "منتجاتنا"; no empty-state
+  text. Real screenshots at 3 scroll positions confirm Hero plays Video 3's real footage, `video_
+  story #1` shows Video 1 with caption "جولة داخل المحل" ahead of "خدماتنا", `video_story #2` shows
+  Video 2 (real Elegance-brand product shelf, matching the original Phase 0 investigation's own
+  description) with caption "منتجات العناية بالشعر" ahead of "ساعات العمل"/"الموقع" — exact order
+  match with the DB read above.
+
 **Environment concern raised by Salman, closed with evidence, not assumed**: `DATABASE_URL` in
 `.env` points to `postgres.wefjghagwpkotrrdiqyi` — the exact same Supabase project used for every
 other real DB check this whole session. `FRONTEND_URL` is unset; the `salmansaas.com` value seen in
@@ -158,17 +210,30 @@ collision, tech debt) — named as side findings explicitly, not folded into the
   real data seeded now beyond the empty starter catalog structure.
 
 (Videos 1 & 2's fate and the reservations-calendar decision are resolved in §0's Phase 0.5;
-service-seeding is resolved in §4 above — the `barbershop` preset. Nothing tracked here is still
-open except the Arabic name.)
+service-seeding is resolved in §4 above — the `barbershop` preset. Videos 1 & 2 are now built —
+see §4's "Real end-to-end verification" additions below. Nothing tracked here is still open except
+the Arabic name.)
 
 ## 7. Verdict — Does the Architecture Need to Change?
 
 - [ ] No — the architecture held, as-is, for this real case.
-- [ ] Yes — Capability Contract(s) affected: ___
-- [ ] Yes — ADR(s) affected: ___
+- [x] Yes — Capability Contract(s) affected: **Media** — once ADR-0003 Phase 5 builds
+  `capabilities/media.md`, it must document both real write paths (`bg_image_url` generic /
+  `hero_video_url` bespoke) as two distinct mechanisms, not one — evidence:
+  `.claudedocs/evolution/media-capability.md`. Also affects the future `capabilities/content.md`
+  (or a new one) once `video_story` is documented as a real, shipped section type.
+- [ ] Yes — ADR(s) affected: ___ (deliberately not checked — nothing has stabilized through
+  multiple implementations yet; correctly logged as Evolution per Salman's own explicit decision,
+  not promoted prematurely).
 - [ ] Yes — Principle(s) affected: ___
-- [ ] Yes — the Implementation Contract's own template/structure needs a change: ___
+- [ ] Yes — the Implementation Contract's own template/structure needs a change: ___ (not found —
+  the gaps observed in §3 are Phases 2-8 not having executed yet, a known deferred state, not a
+  flaw in the Contract itself).
 
-If any "Yes" is checked, the actual edit happens as its own follow-up, referencing this Review as
-the evidence — this document itself is never edited afterward to reflect the fix (same immutability
-rule as every other Review).
+The actual Capability Contract edit happens as its own follow-up, once ADR-0003 Phase 5 executes,
+referencing this Review and the two Evolution Log entries as evidence — this document itself is
+never edited afterward to reflect that fix (same immutability rule as every other Review).
+
+**This review is closed.** Steps 4-5 of Salman's onboarding order are done with real evidence (§4).
+Remaining open item across the whole tenant: the real Arabic business name (§6) — not
+architecture, a pending business input from the real client.
