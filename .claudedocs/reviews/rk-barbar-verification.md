@@ -47,15 +47,29 @@ outcomes. Salman's catch: *"هيدا قرار معماري، وليس نتيجة
 - What happens to Videos 1 & 2 (see Phase 0.5, below — this is a decision, not an unknown fact, but
   listed here because it's not yet resolved).
 
-### Decisions Required (Phase 0.5 — not decided during Discovery)
+### Phase 0.5 — Architecture Decisions (Salman, 2026-07-23)
 
-- Do Videos 1 & 2 become a shared "Video Gallery" Capability, a tenant-specific section, folded
-  into a multi-clip Hero, or deferred entirely for a first version?
-- Does this tenant need a new `service_type` preset (`booking`+`catalog` combined) added to
-  `SERVICE_TYPE_MAP`, or explicit per-tenant `client_services` seeding outside the preset system —
-  an Implementation decision, not something Discovery resolves on its own.
-- Build a reservations calendar view now, or accept the existing table view as this tenant's MVP
-  and defer the calendar as a named follow-up.
+**Decision 1 — Videos 1 & 2: tenant-specific section, confirmed.** Hero = Video 3 (the
+professional one). A new section (name TBD — "Our Shop" / "Inside RK") shows Videos 1 & 2.
+Salman's reasoning goes beyond the Abstraction Rule: the real question was never "how do we
+display videos," it's "how does this Hero tell *this* shop's story" — beit-al-fakhar needed a
+frame-sequence Hero because of *its* story; this tenant may need a different section because of
+*its* story. UX and architecture agree here, not just architecture alone.
+
+**Decision 2 — a new Tenant Type: Barbershop, confirmed — reframed from how it was first proposed.**
+Salman's correction: this is not "add a `SERVICE_TYPE_MAP` key" — that's the *implementation*.
+The real decision is that a new Tenant Type ("Barbershop") now exists in this platform's product
+taxonomy; `SERVICE_TYPE_MAP` is merely where that decision gets executed. Recorded this way
+specifically so implementation details don't end up quietly driving architecture.
+
+**Decision 3 — Reservations calendar: explicitly REJECTED for v1, and the reasoning matters more
+than the answer.** My recommendation was wrong, and Salman named exactly why: *"وجود Gap لا يعني
+أن نسده"* — a Gap found during Discovery does not automatically become a Requirement. He asked for
+"simple booking," full stop; Discovery separately found no calendar view exists; I incorrectly
+treated "a gap exists" as "therefore build it." The real question — does the owner even need a
+calendar at ~10 bookings/day, or only once volume grows toward ~80/day — was never asked. **First
+version ships without a calendar. The Gap stays a named, known Gap — explicitly deferred, not
+in v1 scope, not silently dropped either.**
 
 ---
 
