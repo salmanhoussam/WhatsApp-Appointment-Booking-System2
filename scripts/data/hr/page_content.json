@@ -1,7 +1,7 @@
 {
   "_meta": {
     "template_key": "booking_showcase",
-    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md"
+    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md. Hero wired to real Video 3 (WhatsApp Video 2026-07-22 at 02.01.45.mp4) via the Media Capability's PATCH /admin/media/hero-image, 2026-07-23 -- kept here too so this file stays a faithful reseed source and doesn't blank the Hero back out on a future `seed_page_content.py hr` run. Two video_story sections added for Videos 1 & 2 -- see .claudedocs/reviews/rk-barbar-verification.md Phase 0.5 Decision 1."
   },
   "template_key": "booking_showcase",
   "page_type": "generic",
@@ -14,8 +14,8 @@
         "title_ar": "RK Barber Shop",
         "subtitle_ar": "حلاقة رجالية احترافية — احجز موعدك الآن",
         "cta_text_ar": "احجز موعدك",
-        "bg_image_url": "",
-        "bg_type": "color"
+        "bg_image_url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.45.mp4",
+        "bg_type": "video"
       }
     },
     {
@@ -30,15 +30,34 @@
       }
     },
     {
+      "id": "s_video_story_1",
+      "type": "video_story",
+      "order": 2,
+      "data": {
+        "heading_ar": "من محلنا",
+        "videos": [
+          {
+            "id": "v1_shop_tour",
+            "url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.14.mp4",
+            "caption_ar": "جولة داخل المحل",
+            "title": null,
+            "description": null,
+            "cta": null,
+            "target_category_id": null
+          }
+        ]
+      }
+    },
+    {
       "id": "s_gallery",
       "type": "gallery",
-      "order": 2,
+      "order": 3,
       "data": { "images": [] }
     },
     {
       "id": "s_featured",
       "type": "featured_items",
-      "order": 3,
+      "order": 4,
       "data": {
         "heading_ar": "خدماتنا",
         "limit": 6,
@@ -47,9 +66,28 @@
       }
     },
     {
+      "id": "s_video_story_2",
+      "type": "video_story",
+      "order": 5,
+      "data": {
+        "heading_ar": "منتجاتنا",
+        "videos": [
+          {
+            "id": "v2_products",
+            "url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.24.mp4",
+            "caption_ar": "منتجات العناية بالشعر",
+            "title": null,
+            "description": null,
+            "cta": null,
+            "target_category_id": null
+          }
+        ]
+      }
+    },
+    {
       "id": "s_testimonials",
       "type": "testimonials",
-      "order": 4,
+      "order": 6,
       "data": {
         "heading_ar": "آراء عملائنا",
         "items": []
@@ -58,7 +96,7 @@
     {
       "id": "s_hours",
       "type": "hours",
-      "order": 5,
+      "order": 7,
       "data": {
         "heading_ar": "ساعات العمل",
         "rows": [
@@ -69,7 +107,7 @@
     {
       "id": "s_location",
       "type": "location",
-      "order": 6,
+      "order": 8,
       "data": {
         "para_ar": "قريباً",
         "maps_url": "",
@@ -81,7 +119,7 @@
     {
       "id": "s_cta",
       "type": "cta",
-      "order": 7,
+      "order": 9,
       "data": {
         "text_ar": "احجز موعدك الآن أو تواصل معنا عبر واتساب",
         "link": "",

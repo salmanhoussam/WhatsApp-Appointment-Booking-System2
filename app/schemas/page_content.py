@@ -20,6 +20,10 @@ Section types supported:
   gallery         — freeform image upload grid
   location        — paragraph + maps_url + tag list
   cta             — full-width call-to-action banner
+  video_story     — sequence of video content-blocks that lead the page's
+                     narrative (not a gallery); each block carries a
+                     future-ready metadata model (title/description/CTA/
+                     target category) unused by the v1 renderer
 
 All section data is validated as Dict[str, Any] — content schema is
 intentionally loose to allow fields to evolve without migrations.
@@ -49,6 +53,7 @@ class SectionType(str, Enum):
     gallery         = "gallery"
     location        = "location"
     cta             = "cta"
+    video_story     = "video_story"
 
 
 # ── Individual section ────────────────────────────────────────────────────────

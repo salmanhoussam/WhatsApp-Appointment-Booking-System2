@@ -40,6 +40,7 @@ import {
   OffersSection,
   TestimonialsSection,
   HoursSection,
+  VideoStorySection,
 } from '../../../components/dynamic-sections'
 
 // ── Section component registry ────────────────────────────────────────────────
@@ -60,6 +61,7 @@ const SECTION_MAP = {
   offers:          OffersSection,
   testimonials:    TestimonialsSection,
   hours:           HoursSection,
+  video_story:     VideoStorySection,
 }
 
 // ── Page type → catalog-module list ──────────────────────────────────────────
