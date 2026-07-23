@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { motion, useScroll } from 'framer-motion';
-import FrameSequenceCanvas from './FrameSequenceCanvas';
+import FrameSequenceCanvas from '../../../../components/frame-sequence/FrameSequenceCanvas';
 import HeroContent from './HeroContent';
 import { useHeroSequence } from './useHeroSequence';
 import { walkthroughAssets } from './walkthroughAssets';
