@@ -6,11 +6,26 @@ Analysis, not written as a first draft — see
 Contract is based on. Any decision during execution is measured against **this document**, not
 improvised in the moment.
 
-**Status: Contract only. Zero files moved, renamed, or deleted by this document.** Each Phase below
-executes as its own separate commit, only after this Contract itself is reviewed and approved.
-Each Phase produces its own `.claudedocs/verification/ADR-0003_PHASE_N.md` evidence file, exactly
-the same convention already used for ADR-0001 (5 phases) and ADR-0002 (4 phases + a second
-contract's 4 phases) — real before/after state per phase, not "moved the files."
+**Revision note (2026-07-23):** originally filed as a flat `.claudedocs/implementation/
+ADR-0003_IMPLEMENTATION_CONTRACT.md` with phase evidence planned for flat
+`verification/ADR-0003_PHASE_N.md` files, matching ADR-0001/0002's exact convention. Salman's
+correction: an ADR is a decision (`.claudedocs/adr/ADR-0003.md`, immutable, done as of 2026-07-22)
+— what executes now is that decision's *implementation*, a different thing that shouldn't share the
+`ADR-000X_...` naming pattern once ADR-0012/ADR-0015 etc. exist and `verification/` would otherwise
+fill with dozens of ADR-prefixed files regardless of whether they're actually re-verifying a
+decision or just tracking its rollout. **Moved to this nested location**
+(`implementation/ADR-0003/CONTRACT.md`), and every Phase below now produces its evidence at
+`implementation/ADR-0003/PHASE_N.md`, not `verification/ADR-0003_PHASE_N.md`. `ADR-0001`/`ADR-0002`'s
+existing flat `verification/ADR-000X_PHASE_N.md` files are **left exactly as they are** — this
+convention applies going forward, starting with ADR-0003, not retroactively.
+
+**Status: Contract only. Zero files moved, renamed, or deleted by this document** (aside from this
+Contract's own relocation into `implementation/ADR-0003/`, itself a real Phase-0-preceding action,
+not part of the migration's file set). Each Phase below executes as its own separate commit, only
+after Phase 0 (below) formally freezes the Investigation and this Contract. Each Phase produces its
+own `implementation/ADR-0003/PHASE_N.md` evidence file — same per-phase discipline ADR-0001 (5
+phases) and ADR-0002 (4 phases + a second contract's 4 phases) already proved out, relocated per
+the naming correction above.
 
 ## 1. Scope
 
@@ -41,6 +56,22 @@ pre-existing top-level equivalent, no collision).
 | External references fixed | 11 | `CLAUDE.md`, `bo-hussein.md`, `backend/architecture.md` (5 lines), 7 code comments, `todo_list.md`, `documentation-policy.md` |
 
 ## 3. Phases
+
+### Phase 0 — Freeze
+
+**Preconditions:** Investigation (`INVESTIGATION.md`) and this Contract both reviewed.
+**Files affected:** None.
+**Validation:** This Contract's revision note above is read and its correction (nested
+`implementation/ADR-0003/` path) is the one being executed, not the original flat one.
+**Acceptance Criteria:**
+- ✓ Inventory approved
+- ✓ Contract approved
+- ✓ No files moved
+
+This phase exists to mark one formal moment where thinking ends and execution begins — the last
+point at which the whole migration can still be cancelled or re-scoped for free, before Phase 1
+creates the first real file. **Confirmed reached 2026-07-23**, per Salman's review of this Contract
+(9.5/10, one correction applied above, no further changes requested).
 
 ### Phase 1 — Create Architecture Skeleton
 
