@@ -40,6 +40,7 @@ VENUE_TYPE_MAP: dict[str, list[str]] = {
     "restaurant":  ["restaurant"],
     "hotel":       ["room", "suite", "villa"],
     "sports":      ["court", "field", "gym"],
+    "barbershop":  [],  # no unit types -- Booking here is appointment-based, not unit-based
 }
 
 # Maps venue_type → which client_services to seed at registration
@@ -48,6 +49,7 @@ VENUE_TYPE_MAP: dict[str, list[str]] = {
 _SERVICE_SEED_MAP: dict[str, list[str]] = {
     "store":       ["store", "catalog"],
     "restaurant":  ["restaurant", "catalog"],
+    "barbershop":  ["booking", "reservations", "catalog", "whatsapp_ordering"],
     "real_estate": ["catalog"],
     "hotel":       ["catalog"],
     "sports":      ["catalog"],

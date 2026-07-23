@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "template_key": "booking_showcase",
+    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md"
+  },
+  "template_key": "booking_showcase",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "RK Barber Shop",
+        "subtitle_ar": "حلاقة رجالية احترافية — احجز موعدك الآن",
+        "cta_text_ar": "احجز موعدك",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_story",
+      "type": "story",
+      "order": 1,
+      "data": {
+        "heading_ar": "من نحن",
+        "body_ar": "أضف وصف المحل الحقيقي من لوحة التحكم.",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_gallery",
+      "type": "gallery",
+      "order": 2,
+      "data": { "images": [] }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 3,
+      "data": {
+        "heading_ar": "خدماتنا",
+        "limit": 6,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_testimonials",
+      "type": "testimonials",
+      "order": 4,
+      "data": {
+        "heading_ar": "آراء عملائنا",
+        "items": []
+      }
+    },
+    {
+      "id": "s_hours",
+      "type": "hours",
+      "order": 5,
+      "data": {
+        "heading_ar": "ساعات العمل",
+        "rows": [
+          { "day_ar": "أيام الأسبوع", "open_ar": "قريباً", "close_ar": "قريباً", "closed": false }
+        ]
+      }
+    },
+    {
+      "id": "s_location",
+      "type": "location",
+      "order": 6,
+      "data": {
+        "para_ar": "قريباً",
+        "maps_url": "",
+        "tags": [],
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 7,
+      "data": {
+        "text_ar": "احجز موعدك الآن أو تواصل معنا عبر واتساب",
+        "link": "",
+        "accent": "#2F4F4F",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    }
+  ]
+}

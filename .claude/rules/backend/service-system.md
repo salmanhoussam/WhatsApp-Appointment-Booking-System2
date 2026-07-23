@@ -30,6 +30,7 @@ model ClientService {
 | `booking`             | Booking    | ✅ Live |
 | `gallery`             | Booking    | ✅ Live |
 | `whatsapp_ordering`   | Booking    | ✅ Live |
+| `reservations`        | Generic Admin Dashboard | ✅ Live — gates `app/api/v1/admin/reservations.py` AND drives `GenericAdminDashboard.jsx`'s Reservations tab visibility (`hasReservations = activeServices.includes('reservations')`). **Distinct from `booking`** — found undocumented 2026-07-23 onboarding RK Barber Shop (first real Barbershop-type tenant on the generic dashboard): seeding only `booking` (no `reservations`) left the Admin Reservations tab/API silently unreachable despite Booking being fully active. Any generic-dashboard tenant needing the Reservations UI must seed both keys. |
 | `restaurant`          | Restaurant | 🔄 Pending migration |
 | `store`               | Store      | 🔄 Pending migration |
 | `delivery_zones`      | Store      | 📋 Planned |
