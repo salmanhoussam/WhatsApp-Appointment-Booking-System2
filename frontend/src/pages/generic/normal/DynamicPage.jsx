@@ -41,6 +41,7 @@ import {
   TestimonialsSection,
   HoursSection,
   VideoStorySection,
+  StoryExperienceSection,
 } from '../../../components/dynamic-sections'
 
 // ── Section component registry ────────────────────────────────────────────────
@@ -62,6 +63,7 @@ const SECTION_MAP = {
   testimonials:    TestimonialsSection,
   hours:           HoursSection,
   video_story:     VideoStorySection,
+  story_experience: StoryExperienceSection,
 }
 
 // ── Page type → catalog-module list ──────────────────────────────────────────
@@ -310,11 +312,12 @@ export default function DynamicPage() {
             const Component = SECTION_MAP[section.type]
             if (!Component) return null
             return (
-              <Component
-                key={section.id}
-                data={section.data ?? {}}
-                {...sectionProps}
-              />
+              <div key={section.id} id={section.id}>
+                <Component
+                  data={section.data ?? {}}
+                  {...sectionProps}
+                />
+              </div>
             )
           })
         ) : (
