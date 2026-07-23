@@ -9,7 +9,20 @@ Without a fixed place for each kind of document, "why was this built this way" g
 ## The mandatory workflow
 
 ```
-ADR  →  Architecture Plan  →  Implementation Contract  →  Implementation  →  Verification  →  Post-Implementation Review  →  Archive
+Session Reports  →  Evolution Documents  →  ADR  →  Architecture Plan  →  Implementation Contract
+  →  Implementation  →  Verification  →  Post-Implementation Review  →  Archive
+```
+
+Added 2026-07-23 (Salman's own correction, applied verbatim): each of the first three stages
+answers a genuinely different question, and collapsing them is exactly what causes ADRs to turn
+into design journals and forces anyone reconstructing a decision to dig through dozens of session
+reports:
+
+```
+Session Reports        →  "What happened today?"
+Evolution Documents     →  "What have we learned over multiple sessions?"
+ADR                     →  "What decision have we now ratified?"
+Implementation Contract →  "How do we execute that decision?"
 ```
 
 - No architectural decision is implemented without an ADR first.
@@ -20,11 +33,53 @@ ADR  →  Architecture Plan  →  Implementation Contract  →  Implementation  
 
 This is exactly the process ADR-0001 was executed under; this file makes it the standing default instead of something re-explained each time.
 
+## Architecture Evolution Log
+
+A new stage, sitting between raw session logs and a ratified ADR — for insight that is real but
+hasn't stabilized yet. Established 2026-07-23, first real entries seeded during RK Barber Shop's
+Hero-wiring work (`.claudedocs/evolution/media-capability.md`) and a same-session tangent about
+prompts becoming architecture (`.claudedocs/evolution/prompt-system.md`).
+
+- **Location**: `.claudedocs/evolution/<topic>.md` — top-level, sibling to `adr/`, `reviews/`,
+  `sessions/`, NOT nested under `architecture/` (nesting it there would repeat the same
+  duplicated-folder mistake ADR-0003's own Investigation caught and corrected for `reviews/`/
+  `roadmap/`). One file per recurring topic — `editing-engine.md`, `media-capability.md`,
+  `prompt-system.md`, `capability-contracts.md`, `tenant-lifecycle.md` — not one file per session,
+  not one giant file. The file name is the topic itself; the folder name already says "evolution."
+- **When to append**: any session producing a real architectural insight — not routine work —
+  appends a new dated entry to the relevant topic file. Sessions stay the raw historical record
+  (rule 1, unaffected); the evolution file is where *understanding accumulates* across sessions on
+  one topic.
+- **Entry template**:
+  ```markdown
+  ## YYYY-MM-DD
+
+  ### Context
+  [what were we doing when this came up]
+
+  ### Discovery
+  [the real, concrete thing found]
+
+  ### Current Understanding
+  [the working model so far — may be revised by a later entry, never deleted]
+
+  ### Open Questions
+  [what's still unresolved]
+
+  ### Promoted?
+  No — or, once stabilized: Yes → ADR-000X
+  ```
+- **Promotion rule**: an evolution file gets promoted into a real ADR only once its understanding
+  has stabilized through multiple independent real implementations (this project's existing
+  Abstraction Rule, `rules/team-roles.md`, applied here to documentation itself) — never on a
+  single session's insight alone.
+
 ## Fixed folder structure
 
 ```
 .claudedocs/
 ├── adr/            ADR-000X.md               — the architectural decision itself, nothing else
+├── evolution/       <topic>.md                — accumulating insight, pre-ADR (see above)
 ├── architecture/    DOMAIN_NAME_PLAN.md        — design docs for large domains (no code, pre-ADR-implementation or standalone)
 ├── implementation/  ADR-000X_IMPLEMENTATION_CONTRACT.md
 ├── verification/    ADR-000X_PHASE_N.md (one per implementation step) + ADR-000X_FINAL.md
@@ -47,3 +102,4 @@ This is exactly the process ADR-0001 was executed under; this file makes it the 
 4. A big change (new ADR archived, new Domain plan approved) gets one line in that day's session log when it closes — no separate CHANGELOG.md exists yet; revisit this only if the project explicitly asks for one.
 5. `bo-hussein` (`.claude/agent/bo-hussein.md`) reads this file before routing any strategic/architectural request, so the workflow above is applied automatically rather than re-explained per request.
 6. When a single Implementation Contract is executed by more than one role/skill/agent (routine — `bo-hussein` routes work across multiple agents/skills per its routing tables), each phase's `verification/*.md` document must name which role/skill/agent executed that phase and the evidence it produced, attributed per phase rather than folded into one undifferentiated account. A phase executed by a single role needs no extra attribution beyond what rule 3's evidence standard already requires; this only applies once execution is split across more than one contributor.
+7. An `evolution/<topic>.md` entry is never deleted or rewritten to "clean it up" — same immutability as `reviews/`. A later entry may revise or supersede an earlier one's Current Understanding, but the earlier entry stays, so the accumulation itself stays honest history, not a single edited snapshot.
