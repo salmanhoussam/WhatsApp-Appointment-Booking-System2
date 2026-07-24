@@ -25,10 +25,12 @@ Section types supported:
                      future-ready metadata model (title/description/CTA/
                      target category) unused by the v1 renderer
   story_experience — scroll-driven frame-sequence canvas (real video frames,
-                     not a <video> tag) with "chapters": overlay text/CTA
-                     blocks that fade in/out as scroll progress crosses each
-                     chapter's own [progressStart, progressEnd) range. The
-                     video never stops scrubbing; only the overlay changes.
+                     not a <video> tag) with "chapters": the frame plays
+                     freely between chapters, then FREEZES on each chapter's
+                     hold_frame across its own [holdStart, holdEnd) scroll
+                     range while that chapter's overlay text/CTA fades in,
+                     holds, and fades out -- directed as a cinematic
+                     play/pause sequence, not a continuously scrubbing video.
 
 All section data is validated as Dict[str, Any] — content schema is
 intentionally loose to allow fields to evolve without migrations.

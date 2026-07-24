@@ -1,7 +1,7 @@
 {
   "_meta": {
     "template_key": "booking_showcase",
-    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md. Hero wired to real Video 3 (WhatsApp Video 2026-07-22 at 02.01.45.mp4) via the Media Capability's PATCH /admin/media/hero-image, 2026-07-23 -- kept here too so this file stays a faithful reseed source and doesn't blank the Hero back out on a future `seed_page_content.py hr` run. Video 1 rebuilt 2026-07-24 as a scroll-driven story_experience (77 real frames extracted via ffmpeg from the real 24.163s walkthrough video, uploaded to hr/pages/home/story/) -- see .claudedocs/reviews/rk-barbar-verification.md and .claudedocs/evolution/content-sections.md. Video 2 (products) stays a simple video_story section, untouched."
+    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md. Hero wired to real Video 3 (WhatsApp Video 2026-07-22 at 02.01.45.mp4) via the Media Capability's PATCH /admin/media/hero-image, 2026-07-23 -- kept here too so this file stays a faithful reseed source and doesn't blank the Hero back out on a future `seed_page_content.py hr` run. Video 1 rebuilt 2026-07-24 as a scroll-driven story_experience (77 real frames extracted via ffmpeg from the real 24.163s walkthrough video, uploaded to hr/pages/home/story/), then re-tuned same day into a play/hold cinematic sequence (frame freezes on each chapter's hold_frame while overlay text fades in/holds/out, centered and large, first chapter given the longest hold) -- see .claudedocs/reviews/rk-barbar-story-experience-verification.md and .claudedocs/evolution/content-sections.md. Video 2 (products) stays a simple video_story section, untouched."
   },
   "template_key": "booking_showcase",
   "page_type": "generic",
@@ -38,12 +38,14 @@
         "frame_count": 77,
         "native_width": 640,
         "native_height": 1148,
-        "scroll_range_vh": 320,
+        "scroll_range_vh": 420,
+        "_note": "Chapter holdEnd values must stay under the pinned-zone end (1 - 100/scroll_range_vh = ~0.762 for scroll_range_vh=420) -- past that the sticky pin releases and holds render mid-unpin instead of fully pinned. Booking's holdEnd (0.76) lands just under it; the remaining [0.76, 1.0] tail is the natural release/handoff into the next section, same idea as beit-al-fakhar's Hero handoff dissolve.",
         "chapters": [
           {
             "id": "entrance",
-            "progressStart": 0,
-            "progressEnd": 0.248,
+            "holdStart": 0.05,
+            "holdEnd": 0.21,
+            "hold_frame": 18,
             "title_ar": "RK Barber Shop",
             "subtitle_ar": "أهلاً بكم",
             "cta_label_ar": null,
@@ -51,8 +53,9 @@
           },
           {
             "id": "products",
-            "progressStart": 0.248,
-            "progressEnd": 0.497,
+            "holdStart": 0.30,
+            "holdEnd": 0.39,
+            "hold_frame": 29,
             "title_ar": "Premium Hair Products",
             "subtitle_ar": null,
             "cta_label_ar": "View Products",
@@ -60,8 +63,9 @@
           },
           {
             "id": "mirror",
-            "progressStart": 0.58,
-            "progressEnd": 0.68,
+            "holdStart": 0.47,
+            "holdEnd": 0.56,
+            "hold_frame": 48,
             "title_ar": "شكلك الجديد يبدأ هون",
             "subtitle_ar": null,
             "cta_label_ar": null,
@@ -69,8 +73,9 @@
           },
           {
             "id": "booking",
-            "progressStart": 0.828,
-            "progressEnd": 1.0,
+            "holdStart": 0.65,
+            "holdEnd": 0.76,
+            "hold_frame": 76,
             "title_ar": "جاهز لإطلالتك الجديدة؟",
             "subtitle_ar": null,
             "cta_label_ar": "Book Now",

@@ -103,3 +103,69 @@ tuning judgment call for Salman to make by eye, not an unresolved technical unkn
 - [ ] Yes — Implementation Contract structure needs a change: none found.
 
 **This review is closed.**
+
+---
+
+## Addendum — same-day UX tuning pass (2026-07-24, later)
+
+Appended (not a rewrite of the closed verdict above, per this project's Review immutability
+convention) — Salman reviewed the shipped Story Experience the same day and directed a real
+pacing/typography pass: overlay text was "too short/leaves in a flash" and bottom-anchored; he
+wanted a cinematic play → pause → text → pause → play rhythm instead of continuous scrubbing.
+
+### What changed
+
+`StoryExperienceSection.jsx` rebuilt around explicit play/hold segments: the frame advances freely
+between chapters, then **freezes** on each chapter's own `hold_frame` for its `[holdStart,
+holdEnd]` scroll range while the overlay (now centered vertically, ~2x larger heading, more
+letter-spacing) fades in, holds, and fades out — matching his literal spec ("Video → Pause →
+Welcome → Pause → Video continues"). The frame-sequence engine itself was not touched, only what
+`StoryExperienceSection` feeds it: `useTransform` bends raw scroll progress into a piecewise curve
+that goes flat during each hold, built from real per-second timing he gave (door 0-6s → frame
+index 18, products ~9s → 29, mirror ~15s → 48, chair area ~22s+ → 76, the last frame).
+
+### Two real bugs found and fixed during verification (not shipped blind)
+
+1. **Stale MotionValue reference bug**: the play/hold breakpoint arrays were rebuilt inline on
+   every render, so `useTransform` produced a new `effectiveProgress` MotionValue instance each
+   time — silently breaking `FrameSequenceCanvas`'s `useMotionValueEvent` subscription. Symptom:
+   real headless-Chrome screenshots showed a solid black canvas during holds, even though the
+   target frame (confirmed by downloading and viewing `frame_018.webp` directly) was a real,
+   well-lit shot. Fixed by memoizing the breakpoint arrays (and the `assets` object, same root
+   cause) with `useMemo`, keyed on `frameCount`/`chapters`/`frame_base_url`.
+2. **Hooks-order bug introduced by the same edit**: the early `if (...) return null` guard ended
+   up placed before the new `useMemo`/`useTransform` calls — a Rules-of-Hooks violation (hook call
+   order must be identical every render). Fixed by moving the guard to immediately before the JSX
+   `return`, after every hook call.
+3. **Sticky-pin/chapter-timing mismatch**: with `scroll_range_vh: 420`, the sticky-pinned inner
+   viewport only stays pinned through scroll progress `1 - 100/420 ≈ 0.762` — a fixed ratio,
+   independent of actual device viewport height (since `scroll_range_vh` is itself expressed in
+   `vh` units). The `booking` chapter's original hold (`0.86-1.0`) sat entirely past that point,
+   so it rendered mid-unpin (frame already scrolling away) instead of fully pinned — confirmed via
+   a real screenshot showing the section already scrolled past. Fixed by rescaling all 4 chapters'
+   `holdStart`/`holdEnd` to fit within `[0, 0.76]`, leaving `[0.76, 1.0]` as a deliberate release/
+   handoff tail into the next section (the same idea as beit-al-fakhar's own Hero handoff dissolve,
+   not a new concept). Added a dev-only `console.warn` guard in the component itself so a future
+   chapter/`scroll_range_vh` edit that reintroduces this mismatch is caught immediately, not
+   rediscovered by testing.
+
+### Real verification after both fixes
+
+Real headless-Chrome + CDP session (fresh profile, port 9339): all 4 chapters checked by scrolling
+to their real hold midpoints — each shows the correct real frame (confirmed against directly-
+downloaded reference copies of frames 18/29/48/76), correct real text (`RK Barber Shop`/`أهلاً بكم`,
+`Premium Hair Products`/`View Products`, `شكلك الجديد يبدأ هون`, `جاهز لإطلالتك الجديدة؟`/
+`Book Now`), centered and large. At every checkpoint, the inner sticky div's `getBoundingClientRect().top`
+was confirmed `0` (still fully pinned, not mid-unpin). Zero real console errors/exceptions across
+the full pass (one pre-existing, unrelated Framer Motion advisory warning about non-static
+positioning, present before this change too).
+
+### Verdict (addendum)
+
+Architecture held — both bugs were implementation mistakes introduced by this same tuning pass and
+caught by verification before being called done, not pre-existing issues. The sticky-pin/timing
+constraint is now a documented, guarded invariant (`console.warn` + `_note` in `page_content.json`)
+rather than tribal knowledge. No Evolution Log or Capability changes needed beyond what's already
+recorded above — this addendum is implementation-quality evidence, not a new architectural finding.
+
+**This addendum is closed.**
