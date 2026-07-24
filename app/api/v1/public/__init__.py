@@ -232,7 +232,7 @@ async def list_catalog_categories(
     client_id:  str = Depends(get_current_client),
     _svc=Depends(require_service("catalog")),
 ):
-    data = await catalog_service.list_categories(client_id, module_key, parent_id)
+    data = await catalog_service.list_categories_public(client_id, module_key, parent_id)
     return {"success": True, "data": data}
 
 
@@ -240,11 +240,11 @@ async def list_catalog_categories(
 async def list_catalog_category_items(
     slug:        str,
     category_id: str,
-    search:      Optional[str] = Query(None),
+    search:      Optional[str] = Query(None),  # accepted, not yet wired -- no search filtering exists in catalog_service
     client_id:   str = Depends(get_current_client),
     _svc=Depends(require_service("catalog")),
 ):
-    data = await catalog_service.get_category_items(client_id, category_id, search)
+    data = await catalog_service.get_category_items_public(client_id, category_id)
     return {"success": True, "data": data}
 
 
@@ -255,7 +255,7 @@ async def get_catalog_item(
     client_id: str = Depends(get_current_client),
     _svc=Depends(require_service("catalog")),
 ):
-    data = await catalog_service.get_item(client_id, item_id)
+    data = await catalog_service.get_item_public(client_id, item_id)
     return {"success": True, "data": data}
 
 
