@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-07-22
+# Last updated: 2026-07-24
 
 ## Completed Phases
 
@@ -169,7 +169,15 @@
 
 ## 🟡 Upcoming (بالأولوية)
 
-1. **RAG Chatbot per tenant** — يجاوب على أسئلة الزبائن عن القائمة/المنتجات — يستخدم awesome-llm-apps كـ reference
+0. **[الأولوية الحقيقية] Cross-tenant cart leak fix** — ثغرة حقيقية بالـ multi-tenancy (`generic-cart`
+   Zustand store مش مربوط بالـ slug) — الخطة جاهزة وموافق عليها بالـ Plan Mode
+   (`.claude/plans/we-moved-on-new-hazy-barto.md`)، التنفيذ متوقف مؤقتاً فقط (طلب صريح من سلمان
+   2026-07-24 لإعطاء الأولوية لـ Story Experience) — **لم يُلغَ، فقط مؤجل**. أول شي بالجلسة الجاية.
+1. **Story Experience — قرار الإنتاج** — `experiments/rk-barber-story-lab/` وصل لجولة 3 حقيقية
+   (كثافة الفريمات مقاسة بالبيانات، timeline-driven pacing مبني ومُتحقق منه فعلياً) — بس القرار
+   النهائي (أي technique + أي τ + هل نرجعه لـ Tenant OS) لسا رهن مراجعة سلمان الحية للـ lab.
+2. RK Barber — الاسم العربي الحقيقي للمحل — لسا بانتظار العميل الحقيقي.
+3. **RAG Chatbot per tenant** — يجاوب على أسئلة الزبائن عن القائمة/المنتجات — يستخدم awesome-llm-apps كـ reference
 2. **Phase 73: Olivello .glb model** — real olive .glb + morph targets (squish/teardrop on scroll)
 3. **Phase ~70: TenantTemplate table** — بدّل `page_templates/*.json` بجدول DB — Super Admin يدير من UI
 4. **SOLAIS-style 3D scene** — `LogoBlocks.jsx` (انفجار مكعبات + camera path)
