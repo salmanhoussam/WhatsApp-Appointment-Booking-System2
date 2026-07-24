@@ -118,3 +118,64 @@ just did) does not count — it has to be a second, independently-motivated tena
 No — the rendering engine is confirmed shared (2 real cases); the Chapters/Overlay-Blocks pattern
 itself still has exactly one real case (`hr`). Revisit this file the next time any tenant build
 considers a similar scroll-driven, chapter-overlay narrative.
+
+---
+
+## 2026-07-24 (later same day) — Reverted, and why that's still real signal
+
+### Context
+
+Same day, after the play/hold pacing fix. Salman gave direct negative feedback on the tuned
+result and, separately, on a standalone rendering-technique lab
+(`experiments/rk-barber-story-lab/`) built to answer whether canvas frames, native video, or a
+hybrid play/pause approach was the right engine. None of the 4 techniques satisfied him. Asked
+directly: motion/pacing felt uncomfortable, and video quality itself felt weak.
+
+### Discovery
+
+Both complaints traced to one real cause: **Video 1's footage is a casual, undeliberate phone
+pan** — motion blur, a shelf-to-chair jump covering most of the room in 0.3s of scroll. No
+rendering technique changes the pixels in the source video. The lab's own real measurements
+(zero functional defects across all 4 techniques, real 60fps throughout) confirm the ceiling was
+the footage, not the engineering.
+
+### Current Understanding — corrected from the entry above
+
+The earlier framing ("the Chapters/Overlay-Blocks pattern needs a second tenant *type* to
+promote") is still correct as far as it goes, but this real second data point adds a precondition
+the first entry didn't have evidence for yet: **the pattern also needs footage actually shot with
+deliberate, slow camera movement — matching beit-al-fakhar's own real precedent — not just "any
+video a tenant happens to have."** `hr`'s Video 1 is exactly the counter-case that proves this:
+same tenant, same section type, real chapters, real tuning — and it still didn't work, because the
+footage itself wasn't suited to the treatment. This is genuinely useful: it means the promotion
+question isn't only "how many tenant types," it's "how many tenant types *with suitable footage*."
+
+Salman's decision: revert `hr`'s Video 1 from `story_experience` back to a plain `video_story`
+section (matching Video 2's existing treatment) — keep the current footage, scale back ambition,
+rather than keep tuning a technique that was never the limiting factor.
+
+### What stays vs. what doesn't
+
+- `story_experience`'s SectionType, component, and the shared frame-sequence engine are **not
+  removed** — real, working, validated code, just not applicable to this footage. Available for a
+  future tenant whose footage is actually shot with the right camera intent.
+  `experiments/rk-barber-story-lab/` and the Design Laboratory Protocol
+  (`.claude/agent/frontend-architect.md`) stay as standing, reusable process — independent of this
+  one application's outcome.
+- `hr` itself is back to two plain `video_story` sections (Video 1 and Video 2), identical in
+  treatment, pending better footage if the ambition is revisited later.
+
+### Open Questions — promotion criteria, revised
+
+Unchanged bar (still needs a second, independently-motivated tenant *type*), plus the new
+precondition above (suitable footage, not just any footage). A future case that satisfies both —
+different tenant type *and* footage shot with deliberate camera movement — is the real second data
+point this pattern needs before promotion. A case with the right tenant type but unsuitable
+footage (like this one) doesn't count toward that threshold, and shouldn't be miscounted as if it
+did.
+
+### Promoted?
+
+No — if anything, this entry *lowers* confidence that two data points are close, since the second
+real attempt didn't survive contact with real footage. Revisit this file only once a tenant with
+both a different type and deliberately-shot footage attempts a similar treatment.

@@ -1,7 +1,7 @@
 {
   "_meta": {
     "template_key": "booking_showcase",
-    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md. Hero wired to real Video 3 (WhatsApp Video 2026-07-22 at 02.01.45.mp4) via the Media Capability's PATCH /admin/media/hero-image, 2026-07-23 -- kept here too so this file stays a faithful reseed source and doesn't blank the Hero back out on a future `seed_page_content.py hr` run. Video 1 rebuilt 2026-07-24 as a scroll-driven story_experience (77 real frames extracted via ffmpeg from the real 24.163s walkthrough video, uploaded to hr/pages/home/story/), then re-tuned same day into a play/hold cinematic sequence (frame freezes on each chapter's hold_frame while overlay text fades in/holds/out, centered and large, first chapter given the longest hold) -- see .claudedocs/reviews/rk-barbar-story-experience-verification.md and .claudedocs/evolution/content-sections.md. Video 2 (products) stays a simple video_story section, untouched."
+    "note": "Adapted from booking.json, not restaurant/store.json -- see rationale in scripts/data/hr/TEMPLATE_CHOICE.md. Hero wired to real Video 3 (WhatsApp Video 2026-07-22 at 02.01.45.mp4) via the Media Capability's PATCH /admin/media/hero-image, 2026-07-23. Video 1 was built as a scroll-driven story_experience (2026-07-24), then reverted the same day to a plain video_story section (matching Video 2's treatment) after real user feedback: no rendering technique fixed it because the problem was the source footage itself (casual, shaky, undeliberate camera movement), not the technique -- see .claudedocs/reviews/rk-barbar-story-experience-verification.md's final addendum and .claudedocs/evolution/content-sections.md. Both Video 1 and Video 2 are now simple video_story sections, untouched pending better footage."
   },
   "template_key": "booking_showcase",
   "page_type": "generic",
@@ -30,56 +30,20 @@
       }
     },
     {
-      "id": "s_story_experience",
-      "type": "story_experience",
+      "id": "s_video_story_1",
+      "type": "video_story",
       "order": 2,
       "data": {
-        "frame_base_url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/hr/pages/home/story",
-        "frame_count": 77,
-        "native_width": 640,
-        "native_height": 1148,
-        "scroll_range_vh": 420,
-        "_note": "Chapter holdEnd values must stay under the pinned-zone end (1 - 100/scroll_range_vh = ~0.762 for scroll_range_vh=420) -- past that the sticky pin releases and holds render mid-unpin instead of fully pinned. Booking's holdEnd (0.76) lands just under it; the remaining [0.76, 1.0] tail is the natural release/handoff into the next section, same idea as beit-al-fakhar's Hero handoff dissolve. Play-segment widths (the gaps between one chapter's holdEnd and the next holdStart) are allocated PROPORTIONALLY to how many real frames each segment must traverse (18/11/19/28 frames respectively) -- equal scroll-distance per play regardless of frame-count was the real cause of choppy/uneven playback found 2026-07-24 (up to 360 vs 122 frames-per-scroll-unit across segments); this keeps frame-advance speed roughly constant throughout.",
-        "chapters": [
+        "heading_ar": "من محلنا",
+        "videos": [
           {
-            "id": "entrance",
-            "holdStart": 0.073,
-            "holdEnd": 0.233,
-            "hold_frame": 18,
-            "title_ar": "RK Barber Shop",
-            "subtitle_ar": "أهلاً بكم",
-            "cta_label_ar": null,
-            "cta_target": null
-          },
-          {
-            "id": "products",
-            "holdStart": 0.278,
-            "holdEnd": 0.368,
-            "hold_frame": 29,
-            "title_ar": "Premium Hair Products",
-            "subtitle_ar": null,
-            "cta_label_ar": "View Products",
-            "cta_target": "#s_featured"
-          },
-          {
-            "id": "mirror",
-            "holdStart": 0.446,
-            "holdEnd": 0.536,
-            "hold_frame": 48,
-            "title_ar": "شكلك الجديد يبدأ هون",
-            "subtitle_ar": null,
-            "cta_label_ar": null,
-            "cta_target": null
-          },
-          {
-            "id": "booking",
-            "holdStart": 0.650,
-            "holdEnd": 0.760,
-            "hold_frame": 76,
-            "title_ar": "جاهز لإطلالتك الجديدة؟",
-            "subtitle_ar": null,
-            "cta_label_ar": "Book Now",
-            "cta_target": "#s_cta"
+            "id": "v1_shop_tour",
+            "url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.14.mp4",
+            "caption_ar": "جولة داخل المحل",
+            "title": null,
+            "description": null,
+            "cta": null,
+            "target_category_id": null
           }
         ]
       }

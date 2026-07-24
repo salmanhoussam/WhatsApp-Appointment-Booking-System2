@@ -223,3 +223,61 @@ Media — tracked as its own topic in `.claudedocs/evolution/capability-contract
 into this Story Experience-specific document.
 
 **This addendum is closed.**
+
+---
+
+## Final addendum — Story Experience reverted for Video 1 (2026-07-24, same day)
+
+After the play/hold pacing fix and the standalone rendering-technique lab
+(`experiments/rk-barber-story-lab/`, see its own README), Salman reviewed the real result and gave
+direct negative feedback: **"ما فهمت أنا شو صار، ولا واحدة من الرندر عجبتني"** — none of the 4
+rendering techniques produced a satisfying experience. Asked which specifically, he named two:
+the motion/pacing felt uncomfortable, and the video quality itself was weak.
+
+### Confirmed Finding
+
+Both complaints trace to the same real root cause, not two separate ones: **Video 1's source
+footage is a casual, undeliberate phone pan** (motion blur visible on direct frame inspection
+during the earlier benchmark; a shelf-to-chair jump revealing most of the room within 0.3s of
+"consecutive" 3.2fps samples) — not footage shot with a cinematic scroll-story in mind, unlike
+beit-al-fakhar's slow, deliberate walkthrough. No rendering technique changes the pixels in the
+source video; canvas frames, native seeking, and the hybrid play/pause approach are all just
+different ways of *displaying* the same footage. Confirmed via the lab's own real measurements
+that technique was not the limiting factor (all four ran cleanly, at real 60fps, with no functional
+defects) — the ceiling was the footage itself.
+
+### Decision (Salman, 2026-07-24)
+
+Keep the current footage (no reshoot commissioned now) but **scale back ambition**: Video 1 reverts
+from `story_experience` to a plain `video_story` section — the same simple autoplay/loop treatment
+Video 2 already uses, matching the lab's own finding that native video decode looks sharper than
+extracted frames, so the simplest option is also the best-quality one available for this footage.
+
+### Execution
+
+`scripts/data/hr/page_content.json`: `s_story_experience` (order 2) replaced with `s_video_story_1`
+(type `video_story`, Video 1, caption "جولة داخل المحل") — the exact section that existed before
+Story Experience work began. Reseeded and verified via a real DB read (10 sections, both Video 1
+and Video 2 now `video_story`) and a real headless-Chrome screenshot (Video 1 rendering calmly
+under "من محلنا," zero console errors).
+
+### What stays, what doesn't
+
+- `story_experience` SectionType, `StoryExperienceSection.jsx`, and the shared
+  `frame-sequence/` engine are **not removed** — they are real, working, validated code that simply
+  doesn't suit *this* footage. They remain available for footage actually shot with deliberate,
+  slow camera movement (matching beit-al-fakhar's own real precedent).
+- `experiments/rk-barber-story-lab/` stays as a real, valuable record — it's the reason this
+  reverted quickly and cleanly instead of continuing indefinite in-production tuning cycles.
+- The Design Laboratory Protocol added to `frontend-architect.md` this session stays as a standing
+  practice, independent of this specific application's outcome.
+
+### Updated Verdict
+
+This is not a failure to hide — it's exactly what a real investigation is supposed to produce when
+the honest answer is "the technique isn't the problem." `.claudedocs/evolution/content-sections.md`
+updated with this outcome: the Chapters/Overlay-Blocks pattern's second real case didn't validate
+the pattern for arbitrary footage — it validated that the pattern needs footage shot *for* it,
+which is itself a real, useful, generalizable finding.
+
+**This review is now fully closed.**
