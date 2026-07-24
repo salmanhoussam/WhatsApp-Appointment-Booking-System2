@@ -169,3 +169,57 @@ rather than tribal knowledge. No Evolution Log or Capability changes needed beyo
 recorded above — this addendum is implementation-quality evidence, not a new architectural finding.
 
 **This addendum is closed.**
+
+---
+
+## Second addendum — real playback stutter + a real, unrelated backend crash (2026-07-24, same day)
+
+Salman reported two problems after using the tuned page: (1) the video "is missing frames, looks
+choppy," including stutter during what should be a frozen hold; (2) a real backend 500 crash,
+pasted with its full traceback, on RK Barber's public page.
+
+### Confirmed Findings
+
+**Backend crash — unrelated to Story Experience, a real Catalog Capability bug**:
+`app/api/v1/public/__init__.py`'s public catalog endpoints called `catalog_service.list_categories`/
+`get_category_items`/`get_item` — none of these exist; only `list_categories_public`/
+`get_category_items_public`/`get_item_public` do, already correctly used by a separate nested
+router. Confirmed the frontend's actual call site (`catalogApi.js`) hits the broken one. Fixed by
+correcting the three function names to their real counterparts — not building new functionality,
+the correct implementation already existed elsewhere. Verified via real HTTP calls: 200 instead of
+500, real 404s instead of crashes for a nonexistent (but validly-formatted) UUID. Logged as a
+second real instance of "duplicate Capability implementation, one broken" in the new
+`.claudedocs/evolution/capability-contracts.md` (first instance was Media, previous session).
+
+**Playback stutter — two distinct, real, measured causes, not one**:
+1. `FrameSequenceCanvas` (the shared engine) had no guard against redrawing when the target frame
+   index hadn't changed. During a hold, `scrollYProgress` keeps firing on every scroll tick even
+   though the transformed frame index stays flat — each tick re-ran the full nearest-neighbor
+   search + `clearRect`/`drawImage` for an identical result. Confirmed real via an instrumented
+   headless-Chrome test (wrapped `CanvasRenderingContext2D.drawImage` with a counter): 15 in-hold
+   micro-scrolls produced **0** `drawImage` calls after adding a same-index skip guard (would have
+   fired on every one before). Pure performance fix, no behavior change — benefits beit-al-fakhar's
+   Hero too, though it wasn't reported there (shorter holds, less exposure).
+2. Chapter timing allocated roughly equal scroll-distance to each play-transition regardless of how
+   many real frames it needed to traverse. Measured directly: 91–360 frames-per-scroll-unit across
+   the 4 segments (entrance fastest at 360, products slowest at 91) — a real, quantified ~4x
+   variance, matching "looks like frames are skipping" precisely. Fixed by rescaling all 4
+   play-segment widths proportional to their real frame counts (18/11/19/28), keeping total scroll
+   budget and hold widths unchanged.
+
+### Verification
+
+Real HTTP checks for the backend fix (200s and proper 404s, not 500s). Real instrumented
+draw-count check for the redraw fix (0 vs ~15). Real headless-Chrome screenshots at all 4
+rebalanced chapter positions confirm correct frame + text + still-pinned (`sticky div top === 0`)
+at each. No regression check re-run on beit-al-fakhar this pass — the redraw guard is strictly
+additive (skips work, never changes what gets drawn), and beit-al-fakhar's Hero has no hold periods
+to exercise the changed code path differently than before.
+
+### Side Findings
+
+The Catalog Capability duplication is a real, second occurrence of a pattern first seen with
+Media — tracked as its own topic in `.claudedocs/evolution/capability-contracts.md`, not folded
+into this Story Experience-specific document.
+
+**This addendum is closed.**
