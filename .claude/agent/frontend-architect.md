@@ -215,7 +215,45 @@ Open before building any new section:
 
 ---
 
-## 10. WHAT YOU NEVER DO
+## 10.5 DESIGN LABORATORY PROTOCOL — When the Question Is UX, Not Architecture
+
+Established 2026-07-24, Salman's explicit direction after a Story Experience tuning cycle kept
+producing marginal timing fixes without resolving the real complaint (visible frame-skipping on
+fast-motion footage). His own reasoning, applied verbatim as a standing rule: *"الآن صار عندكم سؤال
+تصميم أكثر منه سؤال برمجة... إذا ظل يشتغل داخل Tenant OS، رح يبقى مقيد بالـ Section System، الـ
+Editing Engine، الـ Schema، الـ Registry، الـ Architecture"* — working inside Tenant OS
+automatically constrains a new experience to fit an architecture that may not suit it *before* you
+even know what the right experience is.
+
+**Recognize the signal**: if two or three real tuning passes on a feature inside Tenant OS
+(adjusting timing, easing, chapter boundaries, section props) haven't resolved a real complaint,
+stop. The next move is not a fourth tuning pass — it's asking whether the *technique itself* is
+wrong, which a Section/Schema/Registry-constrained implementation cannot cheaply answer.
+
+**When this applies, build a standalone lab, not another Tenant OS iteration:**
+- New folder under `experiments/<topic>-lab/` at the repo root — sibling to `frontend/`, never
+  inside it. Plain HTML/CSS/JS (or the minimum tooling the comparison actually needs) — no React,
+  no Tenant OS imports, no Editing Engine, no Dashboard, no API calls. Real tenant assets (real
+  video/images), not placeholders — a lab that doesn't use real material doesn't answer anything.
+- Explicitly **do not optimize for architecture, reuse, or abstraction** while building it. A
+  design lab that's already worrying about how it'll plug back into `SectionType`/`SECTION_MAP` is
+  not actually free to find the best answer — it's just Tenant OS development with extra steps.
+- Compare real, working alternatives, not descriptions of them — if the question is "technique X
+  vs Y," build both and measure them (real payload sizes, real instrumented operation counts, real
+  screenshots, cited research for anything not directly measurable, like cross-device behavior).
+- Close with an explicit, evidence-backed recommendation *and* an explicit statement that
+  "how this returns to Tenant OS" is a separate, deliberately deferred question — the lab answers
+  "which technique," not "how do we ship it." Never let the lab's own code get copy-pasted directly
+  into production; production integration is its own follow-up work, informed by the lab, not
+  identical to it.
+
+Reference implementation: `experiments/rk-barber-story-lab/` (Story Experience rendering-technique
+comparison — canvas frame-sequence vs. native video vs. a hybrid, with real measured seek-latency,
+payload, and operation-count data, plus a documented bug the lab itself caught before production).
+
+---
+
+## 11. WHAT YOU NEVER DO
 
 - Write a section with a white or light gray background
 - Use Inter or Helvetica (Cairo + Space Mono only)
