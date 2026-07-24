@@ -1,0 +1,68 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0a0a0f; color: #fff; font-family: 'Cairo', 'Segoe UI', sans-serif; }
+
+#lab-controls {
+  position: fixed; top: 12px; left: 12px; z-index: 9999;
+  background: rgba(20,20,26,0.92); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px; padding: 12px 14px; font-size: 13px;
+  backdrop-filter: blur(8px);
+  max-width: 340px;
+}
+.lab-badge {
+  font-family: monospace; font-size: 11px; color: #ffb84d;
+  margin-bottom: 8px; letter-spacing: 0.05em;
+}
+#lab-controls label { display: block; margin-bottom: 4px; color: rgba(255,255,255,0.7); }
+#lab-controls select { width: 100%; padding: 6px; border-radius: 6px; border: none; margin-bottom: 8px; }
+#stats {
+  font-family: monospace; font-size: 11px; color: #7ee787; white-space: pre-wrap;
+  margin: 0; line-height: 1.5;
+}
+
+#hero {
+  height: 70vh; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, #2F4F4F55 0%, #0a0a0f 70%);
+  text-align: center;
+}
+.hero-inner h1 { font-size: clamp(32px, 6vw, 56px); margin: 0 0 12px; font-weight: 900; }
+.hero-inner p { font-size: 18px; color: rgba(255,255,255,0.7); margin: 0 0 40px; }
+.scroll-hint { font-size: 13px; color: rgba(255,255,255,0.4); animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(8px)} }
+
+#story {
+  position: relative;
+  height: 450vh;
+}
+#storySticky {
+  position: sticky; top: 0; height: 100vh; overflow: hidden;
+  background: #000;
+}
+#frameCanvas, #nativeVideo {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.55) 100%);
+  pointer-events: none;
+}
+.chapter-overlay {
+  position: absolute; inset: 0; opacity: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 0 32px; pointer-events: none;
+}
+.chapter-overlay h2 {
+  font-size: clamp(34px, 7vw, 68px); font-weight: 900; margin: 0 0 18px;
+  letter-spacing: 0.01em; line-height: 1.15;
+  text-shadow: 0 4px 32px rgba(0,0,0,0.65);
+}
+.chapter-overlay p { font-size: clamp(15px, 2vw, 20px); color: rgba(255,255,255,0.85); margin: 0 0 32px; }
+.chapter-overlay .cta {
+  pointer-events: auto; background: #2F4F4F; color: #fff; border: none;
+  border-radius: 999px; padding: 14px 40px; font-size: 16px; font-weight: 700;
+  font-family: inherit; cursor: pointer; box-shadow: 0 8px 32px #2F4F4F66;
+}
+
+#after { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: #0a0a0f; }
+.after-inner { text-align: center; padding: 60px 24px; }
+.after-inner p { color: rgba(255,255,255,0.5); font-size: 14px; max-width: 420px; }

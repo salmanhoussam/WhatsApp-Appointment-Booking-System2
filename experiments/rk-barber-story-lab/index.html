@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RK Barber — Story Experience Lab (standalone, non-production)</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="lab-controls">
+    <div class="lab-badge">🧪 DESIGN LAB — not production</div>
+    <label for="techniqueSelect">Rendering technique:</label>
+    <select id="techniqueSelect">
+      <option value="canvas77">A — Canvas · 77 frames (3.2fps, current production)</option>
+      <option value="canvas230">B — Canvas · 230 frames (9.5fps, validated fix)</option>
+      <option value="nativeSeek">C — Native &lt;video&gt; · continuous currentTime seek</option>
+      <option value="hybrid">D — Hybrid · native play/pause + snap-on-hold</option>
+    </select>
+    <pre id="stats">loading…</pre>
+  </div>
+
+  <section id="hero">
+    <div class="hero-inner">
+      <h1>RK Barber Shop</h1>
+      <p>حلاقة رجالية احترافية</p>
+      <div class="scroll-hint">اسكرول لتبدأ القصة ↓</div>
+    </div>
+  </section>
+
+  <section id="story">
+    <div id="storySticky">
+      <canvas id="frameCanvas"></canvas>
+      <video id="nativeVideo" muted playsinline preload="auto" src="assets/video1.mp4"></video>
+      <div class="scrim"></div>
+
+      <div class="chapter-overlay" data-chapter="entrance">
+        <h2>RK Barber Shop</h2>
+        <p>أهلاً بكم</p>
+      </div>
+      <div class="chapter-overlay" data-chapter="products">
+        <h2>Premium Hair Products</h2>
+        <button class="cta">View Products</button>
+      </div>
+      <div class="chapter-overlay" data-chapter="mirror">
+        <h2>شكلك الجديد يبدأ هون</h2>
+      </div>
+      <div class="chapter-overlay" data-chapter="booking">
+        <h2>جاهز لإطلالتك الجديدة؟</h2>
+        <button class="cta">Book Now</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="after">
+    <div class="after-inner">
+      <h3>خدماتنا</h3>
+      <p>(placeholder — real page continues with services/catalog/booking below the Story Experience)</p>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
