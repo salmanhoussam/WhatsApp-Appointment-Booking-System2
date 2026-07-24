@@ -1,18 +1,47 @@
-// RK Barber — Story Experience Design Lab
+// RK Barber — Story Experience Design Lab (Round 2)
 // Standalone, non-production experiment. No React, no Tenant OS, no API.
-// Compares 4 rendering techniques for a scroll-driven video story with
-// play/hold pacing (video advances, freezes for chapter text, resumes).
+// Round 1 (2026-07-24) compared 4 rendering techniques on the original casual
+// footage and found the real ceiling was the source footage, not technique --
+// reverted to plain video_story in production. Round 2 (same day, later):
+// Salman supplied new, calmer, better-lit footage (`genuine.mp4`, edited via
+// CapCut) specifically re-shot/re-edited for this treatment. This file now
+// supports switching between BOTH video sources so the two can be compared
+// directly, not just re-tested in isolation.
 
-const VIDEO_DURATION = 24.163; // real, ffprobe-confirmed duration of video1.mp4
+const SOURCES = {
+  original: {
+    label: 'Original footage (round 1, casual/shaky)',
+    duration: 24.163,
+    videoSrc: 'assets/video1.mp4',
+    frameDir: 'assets/frames-77',
+    frameCount: 77,
+    frameExt: 'webp',
+    chapters: [
+      { id: 'entrance', timeSec: 5.6,  holdStart: 0.084, holdEnd: 0.233, title_ar: 'RK Barber Shop', subtitle_ar: 'أهلاً بكم' },
+      { id: 'products', timeSec: 9.0,  holdStart: 0.284, holdEnd: 0.368, title_ar: 'Premium Hair Products', cta_label_ar: 'View Products' },
+      { id: 'mirror',   timeSec: 15.0, holdStart: 0.458, holdEnd: 0.542, title_ar: 'شكلك الجديد يبدأ هون' },
+      { id: 'booking',  timeSec: 22.0, holdStart: 0.647, holdEnd: 0.750, title_ar: 'جاهز لإطلالتك الجديدة؟', cta_label_ar: 'Book Now' },
+    ],
+  },
+  genuine: {
+    label: 'New footage (round 2, calmer/re-edited via CapCut)',
+    duration: 20.0,
+    videoSrc: 'assets/genuine.mp4',
+    frameDir: 'assets/frames-genuine-120',
+    frameCount: 120,
+    frameExt: 'webp',
+    // Real content mapping, established by direct frame review of genuine.mp4:
+    // 0-3s entrance (door), 4-6s waiting area, 7-10s products/barber pole,
+    // 11-14s more shelf + chair, 15-19s arch/counter + chair (closing shot).
+    chapters: [
+      { id: 'entrance', timeSec: 2.5,  holdStart: 0.08,  holdEnd: 0.22, title_ar: 'RK Barber Shop', subtitle_ar: 'أهلاً بكم' },
+      { id: 'products',  timeSec: 9.0,  holdStart: 0.36,  holdEnd: 0.50, title_ar: 'Premium Hair Products', cta_label_ar: 'View Products' },
+      { id: 'service',   timeSec: 13.5, holdStart: 0.60,  holdEnd: 0.70, title_ar: 'خدمات احترافية بلمسة عصرية' },
+      { id: 'booking',   timeSec: 18.5, holdStart: 0.80,  holdEnd: 0.94, title_ar: 'جاهز لإطلالتك الجديدة؟', cta_label_ar: 'Book Now' },
+    ],
+  },
+};
 
-// Real per-second content mapping (established via direct footage review):
-// 0-6s door opens, 6-12s products, ~15s mirror, 20-24s chair area.
-const CHAPTERS = [
-  { id: 'entrance', timeSec: 5.6,  holdStart: 0.084, holdEnd: 0.233 },
-  { id: 'products', timeSec: 9.0,  holdStart: 0.284, holdEnd: 0.368 },
-  { id: 'mirror',   timeSec: 15.0, holdStart: 0.458, holdEnd: 0.542 },
-  { id: 'booking',  timeSec: 22.0, holdStart: 0.647, holdEnd: 0.750 },
-];
 const HOLD_FADE = 0.02;
 
 // ---- Shared: scroll progress + overlay opacity ------------------------------
@@ -21,11 +50,31 @@ const storyEl = document.getElementById('story');
 const stickyEl = document.getElementById('storySticky');
 const canvasEl = document.getElementById('frameCanvas');
 const videoEl = document.getElementById('nativeVideo');
-const overlayEls = Object.fromEntries(
-  [...document.querySelectorAll('.chapter-overlay')].map(el => [el.dataset.chapter, el])
-);
+const overlayContainer = document.getElementById('overlayContainer');
 const statsEl = document.getElementById('stats');
-const selectEl = document.getElementById('techniqueSelect');
+const techniqueSelect = document.getElementById('techniqueSelect');
+const sourceSelect = document.getElementById('sourceSelect');
+
+let VIDEO_DURATION = 0;
+let CHAPTERS = [];
+let overlayEls = {};
+
+function buildOverlayDom(chapters) {
+  overlayContainer.innerHTML = '';
+  overlayEls = {};
+  for (const ch of chapters) {
+    const div = document.createElement('div');
+    div.className = 'chapter-overlay';
+    div.dataset.chapter = ch.id;
+    div.innerHTML = `
+      <h2>${ch.title_ar}</h2>
+      ${ch.subtitle_ar ? `<p>${ch.subtitle_ar}</p>` : ''}
+      ${ch.cta_label_ar ? `<button class="cta">${ch.cta_label_ar}</button>` : ''}
+    `;
+    overlayContainer.appendChild(div);
+    overlayEls[ch.id] = div;
+  }
+}
 
 function rawProgress() {
   const rect = storyEl.getBoundingClientRect();
@@ -34,13 +83,10 @@ function rawProgress() {
   return Math.min(1, Math.max(0, scrolled / total));
 }
 
-// Piecewise linear interpolation, same technique as production's useTransform
-// breakpoints -- given sorted (input, output) pairs, find effective time for
-// current raw progress p.
-function buildTimeCurve() {
+function buildTimeCurve(chapters, duration) {
   const input = [0];
   const output = [0];
-  for (const ch of CHAPTERS) {
+  for (const ch of chapters) {
     input.push(ch.holdStart, ch.holdEnd);
     output.push(ch.timeSec, ch.timeSec);
   }
@@ -48,7 +94,6 @@ function buildTimeCurve() {
   output.push(output[output.length - 1]);
   return { input, output };
 }
-const TIME_CURVE = buildTimeCurve();
 
 function interpolate(curve, p) {
   const { input, output } = curve;
@@ -62,6 +107,7 @@ function interpolate(curve, p) {
   return output[output.length - 1];
 }
 
+let TIME_CURVE = { input: [0, 1], output: [0, 0] };
 function effectiveTime(p) {
   return interpolate(TIME_CURVE, p);
 }
@@ -69,6 +115,7 @@ function effectiveTime(p) {
 function updateOverlays(p) {
   for (const ch of CHAPTERS) {
     const el = overlayEls[ch.id];
+    if (!el) continue;
     let opacity;
     if (p < ch.holdStart - HOLD_FADE) opacity = 0;
     else if (p < ch.holdStart) opacity = (p - (ch.holdStart - HOLD_FADE)) / HOLD_FADE;
@@ -81,7 +128,7 @@ function updateOverlays(p) {
 
 // ---- Instrumentation ---------------------------------------------------------
 
-const stats = { drawCalls: 0, seekCalls: 0, playCalls: 0, pauseCalls: 0, lastFrameTime: performance.now(), fps: 0 };
+const stats = { drawCalls: 0, seekCalls: 0, playCalls: 0, pauseCalls: 0, fps: 0 };
 let fpsFrames = 0, fpsWindowStart = performance.now();
 function tickFps() {
   fpsFrames++;
@@ -95,32 +142,30 @@ function tickFps() {
 }
 requestAnimationFrame(tickFps);
 
-function renderStats(extra) {
+function renderStats() {
   statsEl.textContent =
-    `technique: ${selectEl.value}\n` +
-    `draw/seek calls: ${stats.drawCalls}\n` +
+    `source: ${sourceSelect.value}\n` +
+    `technique: ${techniqueSelect.value}\n` +
+    `draw/seek calls: ${stats.drawCalls}/${stats.seekCalls}\n` +
     `play()/pause() calls: ${stats.playCalls}/${stats.pauseCalls}\n` +
     `~fps: ${stats.fps}\n` +
-    (extra ? extra + '\n' : '');
+    `viewport: ${window.innerWidth}x${window.innerHeight}`;
 }
-setInterval(() => renderStats(), 300);
+setInterval(renderStats, 300);
 
 // ---- Technique A/B: Canvas frame-sequence ------------------------------------
 
-function makeCanvasTechnique(frameDir, frameCount) {
+function makeCanvasTechnique(frameDir, frameCount, frameExt) {
   let images = [];
-  let loaded = 0;
   let lastDrawnIndex = -1;
   let scrollHandler = null;
 
   function preload() {
     images = new Array(frameCount);
-    loaded = 0;
     for (let i = 0; i < frameCount; i++) {
       const img = new Image();
       img.decoding = 'async';
-      img.src = `${frameDir}/frame_${String(i + 1).padStart(3, '0')}.webp`;
-      img.onload = () => { loaded++; };
+      img.src = `${frameDir}/frame_${String(i + 1).padStart(3, '0')}.${frameExt}`;
       images[i] = img;
     }
   }
@@ -174,7 +219,6 @@ function makeCanvasTechnique(frameDir, frameCount) {
       window.removeEventListener('resize', resizeCanvas);
       images = [];
     },
-    loadedCount: () => loaded,
   };
 }
 
@@ -191,18 +235,13 @@ function makeNativeSeekTechnique() {
       scrollHandler = () => {
         const p = rawProgress();
         const t = effectiveTime(p);
-        try {
-          videoEl.currentTime = t;
-          stats.seekCalls++;
-        } catch (e) { /* seek before metadata ready */ }
+        try { videoEl.currentTime = t; stats.seekCalls++; } catch (e) {}
         updateOverlays(p);
       };
       window.addEventListener('scroll', scrollHandler, { passive: true });
       scrollHandler();
     },
-    unmount() {
-      window.removeEventListener('scroll', scrollHandler);
-    },
+    unmount() { window.removeEventListener('scroll', scrollHandler); },
   };
 }
 
@@ -210,7 +249,7 @@ function makeNativeSeekTechnique() {
 
 function makeHybridTechnique() {
   let scrollHandler = null;
-  let currentZone = null; // 'hold:<id>' or 'play:<index>'
+  let currentZone = null;
   let targetTime = 0;
   let timeUpdateHandler = null;
 
@@ -219,7 +258,6 @@ function makeHybridTechnique() {
       const ch = CHAPTERS[i];
       if (p >= ch.holdStart && p <= ch.holdEnd) return { kind: 'hold', chapter: ch };
     }
-    // between which chapters?
     for (let i = 0; i < CHAPTERS.length; i++) {
       if (p < CHAPTERS[i].holdStart) {
         const prevTime = i === 0 ? 0 : CHAPTERS[i - 1].timeSec;
@@ -251,11 +289,6 @@ function makeHybridTechnique() {
             videoEl.currentTime = zone.chapter.timeSec;
             stats.seekCalls++;
           } else {
-            // Entering (or re-entering, e.g. scrolled back up) a play zone:
-            // snap to the zone's start time if we're outside its real range
-            // (covers backward scroll -- native video has no reverse play,
-            // so backward movement always falls back to a direct seek; this
-            // is a real, honest limitation of this technique, not hidden).
             if (videoEl.currentTime < zone.fromTime - 0.05 || videoEl.currentTime > zone.toTime + 0.05) {
               videoEl.currentTime = zone.fromTime;
               stats.seekCalls++;
@@ -268,11 +301,6 @@ function makeHybridTechnique() {
             if (timeUpdateHandler) videoEl.removeEventListener('timeupdate', timeUpdateHandler);
             timeUpdateHandler = () => {
               if (videoEl.currentTime >= targetTime - 0.03) {
-                // Remove BEFORE touching currentTime again -- setting
-                // currentTime itself fires another 'timeupdate', which would
-                // still satisfy this same condition and re-enter forever
-                // (a real self-triggering feedback loop found via this lab's
-                // own instrumentation: pauseCalls hit 50,000+ in under 2s).
                 videoEl.removeEventListener('timeupdate', timeUpdateHandler);
                 timeUpdateHandler = null;
                 videoEl.pause();
@@ -298,29 +326,44 @@ function makeHybridTechnique() {
 
 // ---- Switcher ------------------------------------------------------------
 
-const techniques = {
-  canvas77: () => makeCanvasTechnique('assets/frames-77', 77),
-  canvas230: () => makeCanvasTechnique('assets/frames-230', 230),
-  nativeSeek: makeNativeSeekTechnique,
-  hybrid: makeHybridTechnique,
-};
+function techniquesFor(source) {
+  return {
+    canvas: () => makeCanvasTechnique(source.frameDir, source.frameCount, source.frameExt),
+    nativeSeek: makeNativeSeekTechnique,
+    hybrid: makeHybridTechnique,
+  };
+}
 
 let active = null;
 
-function switchTo(name) {
-  if (active) { active.unmount(); stats.drawCalls = 0; stats.seekCalls = 0; stats.playCalls = 0; stats.pauseCalls = 0; }
-  active = techniques[name]();
+function loadSource(sourceKey) {
+  const source = SOURCES[sourceKey];
+  VIDEO_DURATION = source.duration;
+  CHAPTERS = source.chapters;
+  TIME_CURVE = buildTimeCurve(CHAPTERS, VIDEO_DURATION);
+  videoEl.src = source.videoSrc;
+  buildOverlayDom(CHAPTERS);
+  return source;
+}
+
+function switchTo(sourceKey, techniqueKey) {
+  if (active) { active.unmount(); }
+  stats.drawCalls = 0; stats.seekCalls = 0; stats.playCalls = 0; stats.pauseCalls = 0;
+  const source = loadSource(sourceKey);
+  const techniques = techniquesFor(source);
+  active = techniques[techniqueKey]();
   active.mount();
   renderStats();
 }
 
-selectEl.addEventListener('change', () => switchTo(selectEl.value));
+techniqueSelect.addEventListener('change', () => switchTo(sourceSelect.value, techniqueSelect.value));
+sourceSelect.addEventListener('change', () => switchTo(sourceSelect.value, techniqueSelect.value));
 
-// URL param support for automated testing: ?mode=canvas77|canvas230|nativeSeek|hybrid
 const params = new URLSearchParams(location.search);
-const initialMode = params.get('mode') && techniques[params.get('mode')] ? params.get('mode') : 'canvas77';
-selectEl.value = initialMode;
-switchTo(initialMode);
+const initialSource = params.get('source') && SOURCES[params.get('source')] ? params.get('source') : 'genuine';
+const initialTechnique = params.get('technique') || 'canvas';
+sourceSelect.value = initialSource;
+techniqueSelect.value = initialTechnique;
+switchTo(initialSource, initialTechnique);
 
-// Expose for headless-Chrome test scripts
-window.__lab = { stats, rawProgress, effectiveTime, switchTo, CHAPTERS };
+window.__lab = { stats, rawProgress, effectiveTime, switchTo, SOURCES, get CHAPTERS() { return CHAPTERS; } };

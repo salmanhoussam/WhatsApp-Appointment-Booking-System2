@@ -4,18 +4,25 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RK Barber — Story Experience Lab (standalone, non-production)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <div id="lab-controls">
-    <div class="lab-badge">🧪 DESIGN LAB — not production</div>
+    <div class="lab-badge">🧪 DESIGN LAB — Round 2 — not production</div>
+    <label for="sourceSelect">Footage:</label>
+    <select id="sourceSelect">
+      <option value="original">Round 1 — original (casual/shaky)</option>
+      <option value="genuine">Round 2 — new footage (calmer, re-edited)</option>
+    </select>
     <label for="techniqueSelect">Rendering technique:</label>
     <select id="techniqueSelect">
-      <option value="canvas77">A — Canvas · 77 frames (3.2fps, current production)</option>
-      <option value="canvas230">B — Canvas · 230 frames (9.5fps, validated fix)</option>
-      <option value="nativeSeek">C — Native &lt;video&gt; · continuous currentTime seek</option>
-      <option value="hybrid">D — Hybrid · native play/pause + snap-on-hold</option>
+      <option value="canvas">Canvas frame-sequence</option>
+      <option value="nativeSeek">Native &lt;video&gt; · continuous seek</option>
+      <option value="hybrid">Hybrid · native play/pause</option>
     </select>
     <pre id="stats">loading…</pre>
   </div>
@@ -31,24 +38,9 @@
   <section id="story">
     <div id="storySticky">
       <canvas id="frameCanvas"></canvas>
-      <video id="nativeVideo" muted playsinline preload="auto" src="assets/video1.mp4"></video>
+      <video id="nativeVideo" muted playsinline preload="auto"></video>
       <div class="scrim"></div>
-
-      <div class="chapter-overlay" data-chapter="entrance">
-        <h2>RK Barber Shop</h2>
-        <p>أهلاً بكم</p>
-      </div>
-      <div class="chapter-overlay" data-chapter="products">
-        <h2>Premium Hair Products</h2>
-        <button class="cta">View Products</button>
-      </div>
-      <div class="chapter-overlay" data-chapter="mirror">
-        <h2>شكلك الجديد يبدأ هون</h2>
-      </div>
-      <div class="chapter-overlay" data-chapter="booking">
-        <h2>جاهز لإطلالتك الجديدة؟</h2>
-        <button class="cta">Book Now</button>
-      </div>
+      <div id="overlayContainer"></div>
     </div>
   </section>
 

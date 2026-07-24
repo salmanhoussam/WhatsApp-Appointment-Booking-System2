@@ -6,6 +6,47 @@ further in Story Experience *inside* Tenant OS, answer the UX/rendering-techniqu
 total isolation — no Section System, no Schema, no Registry, no architecture constraints — so a
 new experience isn't prematurely bent to fit an architecture that may not suit it.
 
+## Round 2 (2026-07-24, later same day) — new footage, same methodology
+
+Round 1 (below) concluded that none of the 4 rendering techniques were the real problem — the
+original footage (a casual, undeliberate phone pan) was the ceiling. Salman then supplied new,
+deliberately re-edited footage (`new-matirial/barbershop_genuine.mp4`, edited via CapCut — calmer
+camera movement, better lighting, real distinct beats: entrance → waiting area → products →
+service area → a well-lit arch/counter closing shot) and asked to repeat the same rigorous
+process, not skip straight back to production, this time also checking on a mobile viewport since
+the footage is itself framed for mobile (portrait, exported inside a blurred-fill landscape
+container — cropped clean via `ffmpeg -vf "crop=405:720:438:0"` for the lab).
+
+**What changed in the lab**: `index.html`/`script.js` now support a **footage source selector**
+alongside the technique selector (`?source=original|genuine&technique=canvas|nativeSeek|hybrid`),
+so both rounds stay comparable side by side rather than round 2 replacing round 1's evidence.
+Also fixed a real oversight from round 1: Cairo was referenced in CSS but never actually loaded —
+added a real Google Fonts `<link>` this round, so Arabic text now renders in the correct typeface
+instead of a silent system fallback.
+
+**Real result**: tested `genuine` footage across all 3 real techniques (canvas frame-sequence,
+native continuous seek, hybrid play/pause) at both desktop (1280×800) and mobile (390×844, 2x DPR)
+viewports — zero console errors on any combination, real screenshots confirm calm, well-lit,
+readable results at every chapter (entrance / products / service / booking), Cairo rendering
+correctly. Both canvas and hybrid produced a genuinely premium-feeling result on mobile — a clear,
+visible improvement over round 1, and this time the improvement is coming from the footage itself,
+not a rendering trick, matching round 1's own conclusion.
+
+New real content mapping for `genuine.mp4` (20s, established by direct frame review, distinct from
+round 1's timing): 0-3s entrance (door), 4-6s waiting area, 7-10s products/barber pole, 11-14s
+more shelf + chair, 15-19s arch/counter + chair (closing shot) — chapters retimed accordingly in
+`script.js`'s `SOURCES.genuine.chapters`.
+
+**Still not decided here, on purpose**: which single technique (canvas vs. hybrid) and exact
+chapter timing to bring back to production is a real choice worth watching live, not read off this
+document — same discipline as round 1. What round 2 *does* establish with real evidence: the
+footage-suitability problem round 1 identified is fixable with the right source material, and this
+new material clears that bar.
+
+---
+
+## Round 1 (original) findings below
+
 ## How to run it
 
 ```bash
