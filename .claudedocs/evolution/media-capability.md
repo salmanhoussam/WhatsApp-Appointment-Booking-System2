@@ -97,3 +97,70 @@ tenant to use the generic path, (b) needs a generic tenant to need bespoke-style
 (c) reveals a real bug caused by the two paths disagreeing — that is the confirming case this
 needs, and it should be escalated straight to an Architecture Review (`.claudedocs/reviews/`) or a
 real ADR at that point, not left to accumulate a fourth, fifth entry here indefinitely.
+
+---
+
+## 2026-07-24
+
+### Context
+
+Diagnosing RK Barber's Story Experience playback stutter. Real investigation (WebSearch + direct
+`ffprobe` inspection of the source video + a real 3-density extraction benchmark) confirmed two
+things: switching to native `video.currentTime` seeking would be a regression (this footage's own
+~1 keyframe/second GOP structure means arbitrary seeks are exactly the case documented to stutter
+across devices); and the real fix is raising extraction frame density — beit-al-fakhar's proven
+3.2fps (71 frames/22s) is real evidence for *slow, smooth* camera movement, but RK Barber's Video 1
+(fast pans, quick cuts, a moving person) visibly "teleports" between 3.2fps samples (demonstrated
+directly: two adjacent 3.2fps frames jump from a shelf shot to a fully-revealed barber chair with
+zero transition; the intermediate 9.5fps frame shows it emerging gradually).
+
+### Discovery
+
+Salman's explicit correction, given before any specific number was committed to production:
+**"Don't hardcode 230 frames as the Story Experience standard. Treat this as a validation profile
+for high-motion footage."** The generalizable insight isn't "230 frames is correct" — it's that
+**extraction frame density is a property of the source footage's motion characteristics, not a
+constant of the Story Experience section type, and it must be validated per real footage (as was
+just done, via direct A/B frame comparison + real payload measurement), not assumed from a table.**
+
+### Current Understanding
+
+Two real, independently-motivated data points now exist for how footage motion affects the needed
+extraction density:
+- **Slow/smooth** (beit-al-fakhar's Hero — steady walk-through, gentle camera movement): 3.2fps
+  (71 frames/22s) — visually sufficient, no complaints across this project's real usage.
+- **Fast/high-motion** (RK Barber's Video 1 — quick pans, cuts, a moving person): needs materially
+  higher density; 9.5fps (230 frames) confirmed via direct frame-by-frame comparison to resolve the
+  worst jump. 6.25fps (151 frames) was extracted and measured (4.34MB) but not yet visually
+  validated against the same worst-case jump.
+
+A working vocabulary — "slow" / "medium" / "fast" extraction profiles — is useful to *talk about*
+this going forward, but **is not yet a built system**: no config schema field, no picker UI, no
+automatic motion classifier exists or should exist yet. What these two cases actually prove isn't a
+shared VALUE (they disagree, on purpose) — it's the shared CONCEPT that density is a real parameter
+of the pipeline, decided per real footage. Building a formal profile system now, on two data
+points, would be exactly the premature-abstraction mistake the Abstraction Rule exists to prevent —
+the same discipline already applied to the dual-write-path finding above.
+
+### Open Questions
+
+- What's the real right fps for genuinely "medium" motion? Only "slow" (3.2fps) and "fast" (9.5fps)
+  are real, validated data points so far — "medium" is still a name with no evidence behind it.
+- Should frame-density selection ever be automated (e.g. measuring real inter-frame pixel-delta
+  from the source video to auto-suggest an fps), rather than a human judgment call plus a real A/B
+  comparison per tenant, as was just done by hand? Not attempted — would need a third or fourth
+  real case, with real cost/benefit evidence, to justify that investment.
+- Whether "profile" ever becomes a literal field in the `story_experience` section's data schema
+  (e.g. `extraction_profile: "fast"` alongside `frame_count`) is explicitly deferred — right now
+  `frame_count` alone (already a plain, per-tenant JSON field, no hardcoded default in
+  `StoryExperienceSection.jsx`) is sufficient; a named `extraction_profile` enum would be
+  documentation for humans/agents choosing a number, not new runtime behavior, and isn't
+  worth adding as a schema field until a third real footage type gives evidence for what values
+  the enum should even contain.
+
+### Promoted?
+
+No — same reasoning as the entry above: two real cases establish that density-per-footage is real,
+not yet what the actual profile boundaries/values should be. Stays in this log until a third real
+footage type (a different motion profile, independently exercised) either confirms three named
+tiers are enough or shows the axis is more continuous than discrete.
