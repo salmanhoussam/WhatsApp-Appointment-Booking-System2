@@ -20,7 +20,8 @@
     </select>
     <label for="techniqueSelect">Rendering technique:</label>
     <select id="techniqueSelect">
-      <option value="canvas">Canvas frame-sequence</option>
+      <option value="canvas">Canvas · direct scrub (scroll = progress, 1:1)</option>
+      <option value="canvasTimeline">Canvas · timeline-driven (eased, scrub:0.5s catch-up)</option>
       <option value="nativeSeek">Native &lt;video&gt; · continuous seek</option>
       <option value="hybrid">Hybrid · native play/pause</option>
     </select>

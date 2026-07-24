@@ -1,0 +1,51 @@
+Real motion-analysis run, 2026-07-24, against genuine.mp4 (20s, 404x720 cropped).
+Reference frames regenerated via:
+  ffmpeg -i assets/genuine.mp4 -vf "fps=15" -q:v 3 hi_%03d.jpg
+then measure_motion.py run against those 300 reference frames from the same directory
+(not committed here -- regenerate with the command above before re-running the script).
+
+300 reference frames at 15fps
+
+Per-second average inter-frame delta (15fps steps), 0-100 grayscale scale:
+  t= 0- 1s: mean= 1.39  max= 2.44
+  t= 1- 2s: mean= 6.04  max=11.25
+  t= 2- 3s: mean= 7.20  max=10.25
+  t= 3- 4s: mean=10.61  max=13.31
+  t= 4- 5s: mean=14.71  max=19.09
+  t= 5- 6s: mean=16.56  max=17.19
+  t= 6- 7s: mean= 9.77  max=17.09
+  t= 7- 8s: mean= 6.08  max=10.56
+  t= 8- 9s: mean= 7.52  max=11.21
+  t= 9-10s: mean= 6.00  max= 6.88
+  t=10-11s: mean= 4.46  max= 6.23
+  t=11-12s: mean= 8.94  max=14.17
+  t=12-13s: mean=14.88  max=16.40
+  t=13-14s: mean=13.32  max=13.62
+  t=14-15s: mean=14.84  max=15.24
+  t=15-16s: mean=14.86  max=15.43
+  t=16-17s: mean=15.68  max=16.78
+  t=17-18s: mean=13.13  max=17.41
+  t=18-19s: mean=19.84  max=23.32
+  t=19-20s: mean=21.03  max=23.88
+
+Overall: mean=11.31 max=23.88 (single 1/15s step -- the "true continuous motion" baseline)
+
+Sampling at 6fps (120 frames -- round 2's guessed density):
+  per-sample jump mean=28.02 max=67.40 (vs 15fps single-step mean=11.31)
+  -> ~2.5x more motion per visible step than true continuous playback
+
+Sampling at 10fps (200 frames):
+  per-sample jump mean=16.87 max=46.41
+  -> ~1.5x
+
+Sampling at 12fps (240 frames -- chosen for round 3):
+  per-sample jump mean=14.05 max=44.56
+  -> ~1.24x, closest practical match to the true-continuity baseline before
+     payload cost keeps climbing for diminishing further improvement
+
+Conclusion: 6fps was a real, measurable under-sampling for this footage's actual motion
+(confirmed quantitatively, not assumed) -- 12fps is the evidence-backed density, not a re-guess.
+Motion is also NOT uniform across the clip (ranges from mean=1.39 at the calm entrance to
+mean=21.03 at the busy closing shot) -- a uniform frame rate is a simplification; an adaptive/
+variable-density extraction (denser during high-motion segments) would be more efficient still,
+but wasn't built this pass -- flagged as a real open question, not assumed necessary.

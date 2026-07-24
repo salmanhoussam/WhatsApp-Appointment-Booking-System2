@@ -24,11 +24,16 @@ const SOURCES = {
     ],
   },
   genuine: {
-    label: 'New footage (round 2, calmer/re-edited via CapCut)',
+    label: 'New footage (round 2/3, calmer/re-edited via CapCut)',
     duration: 20.0,
     videoSrc: 'assets/genuine.mp4',
-    frameDir: 'assets/frames-genuine-120',
-    frameCount: 120,
+    // Round 3: real motion analysis (mean-abs-diff between real 15fps reference
+    // frames, see measure_motion.py in the round 3 evidence) found 6fps (120
+    // frames, round 2's guess) leaves ~2.5x more motion per visible step than
+    // true continuous playback -- 12fps (240 frames) brings that down to
+    // ~1.24x, the evidence-backed density, not a re-guess.
+    frameDir: 'assets/frames-genuine-240',
+    frameCount: 240,
     frameExt: 'webp',
     // Real content mapping, established by direct frame review of genuine.mp4:
     // 0-3s entrance (door), 4-6s waiting area, 7-10s products/barber pole,
@@ -155,10 +160,16 @@ setInterval(renderStats, 300);
 
 // ---- Technique A/B: Canvas frame-sequence ------------------------------------
 
-function makeCanvasTechnique(frameDir, frameCount, frameExt) {
+function makeCanvasTechnique(frameDir, frameCount, frameExt, inputModel = 'direct') {
   let images = [];
   let lastDrawnIndex = -1;
   let scrollHandler = null;
+  let rafId = null;
+  let currentP = 0;   // timeline model only: the actual displayed progress
+  let targetP = 0;    // timeline model only: where scroll wants it to go
+  let lastTick = 0;
+  const TAU = 0.5; // seconds to ~63% catch-up -- same range GSAP's scrub:0.5-1 uses for "cinematic reveals"
+  window.__timelineDebug = null; // exposed for real verification (see test scripts)
 
   function preload() {
     images = new Array(frameCount);
@@ -196,6 +207,13 @@ function makeCanvasTechnique(frameDir, frameCount, frameExt) {
     canvasEl.height = Math.round(rect.height * dpr);
   }
 
+  function drawAtProgress(p) {
+    const t = effectiveTime(p);
+    const index = Math.min(frameCount - 1, Math.round((t / VIDEO_DURATION) * (frameCount - 1)));
+    if (index !== lastDrawnIndex) drawFrame(index);
+    updateOverlays(p);
+  }
+
   return {
     mount() {
       canvasEl.style.display = 'block';
@@ -203,20 +221,44 @@ function makeCanvasTechnique(frameDir, frameCount, frameExt) {
       resizeCanvas();
       preload();
       lastDrawnIndex = -1;
-      scrollHandler = () => {
-        const p = rawProgress();
-        const t = effectiveTime(p);
-        const index = Math.min(frameCount - 1, Math.round((t / VIDEO_DURATION) * (frameCount - 1)));
-        if (index !== lastDrawnIndex) drawFrame(index);
-        updateOverlays(p);
-      };
-      window.addEventListener('scroll', scrollHandler, { passive: true });
       window.addEventListener('resize', resizeCanvas);
-      scrollHandler();
+
+      if (inputModel === 'direct') {
+        // scrub:true equivalent -- scroll position IS the displayed progress,
+        // instantly, every scroll event. This is what round 1/2 both used.
+        scrollHandler = () => drawAtProgress(rawProgress());
+        window.addEventListener('scroll', scrollHandler, { passive: true });
+        scrollHandler();
+      } else {
+        // 'timeline' -- scrub:<seconds> equivalent. Scroll only updates the
+        // TARGET; a persistent rAF loop eases the actually-displayed progress
+        // toward it with a real time constant (TAU), independent of how fast
+        // or erratically the user scrolls. Keeps animating for a bit after
+        // scroll stops -- this is the real, verifiable signature that
+        // distinguishes it from direct scrubbing (see test_timeline.py).
+        scrollHandler = () => { targetP = rawProgress(); };
+        window.addEventListener('scroll', scrollHandler, { passive: true });
+        targetP = rawProgress();
+        currentP = targetP;
+        lastTick = performance.now();
+
+        const loop = (now) => {
+          const dt = Math.min(0.1, (now - lastTick) / 1000);
+          lastTick = now;
+          const alpha = 1 - Math.exp(-dt / TAU);
+          currentP += (targetP - currentP) * alpha;
+          if (Math.abs(currentP) < 1e-6) currentP = 0;
+          drawAtProgress(currentP);
+          window.__timelineDebug = { currentP, targetP, t: now };
+          rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+      }
     },
     unmount() {
       window.removeEventListener('scroll', scrollHandler);
       window.removeEventListener('resize', resizeCanvas);
+      if (rafId) cancelAnimationFrame(rafId);
       images = [];
     },
   };
@@ -328,7 +370,8 @@ function makeHybridTechnique() {
 
 function techniquesFor(source) {
   return {
-    canvas: () => makeCanvasTechnique(source.frameDir, source.frameCount, source.frameExt),
+    canvas: () => makeCanvasTechnique(source.frameDir, source.frameCount, source.frameExt, 'direct'),
+    canvasTimeline: () => makeCanvasTechnique(source.frameDir, source.frameCount, source.frameExt, 'timeline'),
     nativeSeek: makeNativeSeekTechnique,
     hybrid: makeHybridTechnique,
   };

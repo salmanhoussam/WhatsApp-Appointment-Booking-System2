@@ -43,6 +43,88 @@ document — same discipline as round 1. What round 2 *does* establish with real
 footage-suitability problem round 1 identified is fixable with the right source material, and this
 new material clears that bar.
 
+## Round 3 (2026-07-24, later still) — the lab validated the engine, not the UX
+
+Salman's real correction after round 2: comparing rendering *techniques* (canvas vs. native vs.
+hybrid) validates that the **engine** works — it doesn't validate the **experience** we're trying
+to build. Two concrete, unresolved issues remained, and he asked for investigation before any more
+technique variants:
+
+1. **Visual clarity / frame density** — round 2's 120-frame (6fps) set was a guess, not validated
+   against this footage's actual motion.
+2. **Story pacing** — every technique so far binds displayed progress **directly** to scroll
+   position (`scrub: true`-equivalent, in GSAP's own vocabulary) — perceived playback speed is
+   whatever speed the user happens to scroll at, which doesn't read as "watching a sequence," it
+   reads as scrubbing one.
+
+### 1. Frame density — measured, not re-guessed
+
+Extracted a 15fps reference set (300 frames, the closest to "ground truth continuous motion"
+practical to work with) and computed real mean-absolute pixel difference between every consecutive
+pair (`evidence/measure_motion.py`, full output in `evidence/motion_analysis_output.txt`). Result:
+motion is real and substantial (grayscale delta up to 21-24 in the busiest seconds), and it is
+**not uniform** across the clip (as low as 1.4 in the first second, over 15x higher by the closing
+shot). Simulating what each candidate sampling density actually captures:
+
+| Density | Per-sample motion jump (mean) | vs. true-continuity baseline (11.31) |
+|---|---|---|
+| 6fps (120 frames, round 2's guess) | 28.02 | ~2.5x |
+| 10fps (200 frames) | 16.87 | ~1.5x |
+| **12fps (240 frames, chosen)** | **14.05** | **~1.24x** |
+
+12fps is now the evidence-backed density for this footage (real payload: 4.4MB vs. 2.3MB at 6fps —
+a real, honest cost, not free). The round-2 120-frame set has been removed from `assets/` since
+it's a superseded guess, not a kept alternative. Open question, not resolved this pass: motion is
+uneven enough that an *adaptive* density (denser only during the busy segments) would likely beat a
+uniform 12fps for the same total payload — flagged, not built.
+
+### 2. Story pacing — direct scrub vs. timeline-driven, implemented and verified
+
+Researched the real, named distinction (GSAP's own vocabulary, not invented here): `scrub: true` is
+instant 1:1 scroll-to-progress binding — what every technique tested through round 2 does, canvas
+and native alike. `scrub: <seconds>` decouples them — scroll sets a *target*, and a persistent
+animation loop eases the *displayed* value toward that target over a fixed real time constant,
+independent of how fast or unevenly the user scrolls. Sources below.
+
+Implemented this for real as a new technique, `canvasTimeline` — not a rendering change, an input-
+model change: a `requestAnimationFrame` loop runs continuously, exponentially smoothing
+`currentProgress` toward `targetProgress` (τ≈0.5s, in GSAP's own documented "cinematic reveal"
+range of 0.5-1s) — the canvas draw reads `currentProgress`, never raw scroll position directly.
+
+**Verified, not assumed**: instrumented `window.__timelineDebug` and captured real samples after a
+single scroll jump followed by **zero further scroll input**:
+
+```
+currentP=0.0873  targetP=0.6998  diff=0.6126
+currentP=0.1983  targetP=0.6998  diff=0.5015
+...
+currentP=0.6082  targetP=0.6998  diff=0.0916   (≈1s later, still closing the gap)
+```
+
+`currentP` keeps climbing toward the target for the better part of a second with **no scroll
+happening at all** — real, objective proof this is genuinely decoupled from scroll velocity, not a
+relabeled direct scrub. Real, honest cost found at the same time: this mode draws continuously
+(72 draw calls just reaching one chapter, vs. a handful for direct-scrub's event-driven draws) —
+a real performance/battery tradeoff for the smoother feel, not a free upgrade.
+
+Try it: `?source=genuine&technique=canvasTimeline` vs. `?source=genuine&technique=canvas` — same
+footage, same density, the only variable is whether progress is scrubbed directly or eased through
+a timeline.
+
+### Still not decided here
+
+Whether `canvasTimeline`'s eased feel is actually the "cinematic sequence" feel being aimed for is
+a real, human judgment call — the mechanism is now verified to work as designed; whether it's the
+*right* design is for watching it live, not for this document to assert. τ (currently 0.5s) is a
+starting point from GSAP's own documented range, not tuned against this specific footage yet.
+
+### Sources
+
+- [Scrub | GSAP Scroll — Annnimate](https://annnimate.com/learn/scroll/scrub)
+- [ScrollTrigger | GSAP Docs](https://gsap.com/docs/v3/Plugins/ScrollTrigger/)
+- [Easing on ScrollTrigger animations for scrub:true — GSAP forums](https://gsap.com/community/forums/topic/28649-easing-on-scrolltrigger-animations-for-scrub-true/)
+- [Animate elements on scroll with Scroll-driven animations — Chrome for Developers](https://developer.chrome.com/docs/css-ui/scroll-driven-animations)
+
 ---
 
 ## Round 1 (original) findings below
