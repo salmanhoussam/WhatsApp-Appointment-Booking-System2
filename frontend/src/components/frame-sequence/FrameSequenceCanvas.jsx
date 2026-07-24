@@ -104,7 +104,17 @@ export default function FrameSequenceCanvas({ assets, progress, style }) {
   }, [imagesRef.current[0]?.complete]);
 
   useMotionValueEvent(progress, 'change', (p) => {
-    drawFrame(indexForProgress(p));
+    const index = indexForProgress(p);
+    // Skip the redraw entirely when the target frame hasn't actually changed
+    // (2026-07-24: found via a real "hold" section where scrollYProgress
+    // keeps emitting 'change' events throughout a scroll-driven pause even
+    // though the derived frame index is pinned flat -- every one of those
+    // was re-running the nearest-loaded-neighbor search + a full
+    // clearRect+drawImage for a pixel-identical result, wasted main-thread
+    // work during scroll that read as stutter/jank on a held frame that
+    // should have been doing nothing at all).
+    if (index === lastDrawnIndexRef.current) return;
+    drawFrame(index);
   });
 
   return (

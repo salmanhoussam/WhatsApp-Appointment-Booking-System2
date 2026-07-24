@@ -39,12 +39,12 @@
         "native_width": 640,
         "native_height": 1148,
         "scroll_range_vh": 420,
-        "_note": "Chapter holdEnd values must stay under the pinned-zone end (1 - 100/scroll_range_vh = ~0.762 for scroll_range_vh=420) -- past that the sticky pin releases and holds render mid-unpin instead of fully pinned. Booking's holdEnd (0.76) lands just under it; the remaining [0.76, 1.0] tail is the natural release/handoff into the next section, same idea as beit-al-fakhar's Hero handoff dissolve.",
+        "_note": "Chapter holdEnd values must stay under the pinned-zone end (1 - 100/scroll_range_vh = ~0.762 for scroll_range_vh=420) -- past that the sticky pin releases and holds render mid-unpin instead of fully pinned. Booking's holdEnd (0.76) lands just under it; the remaining [0.76, 1.0] tail is the natural release/handoff into the next section, same idea as beit-al-fakhar's Hero handoff dissolve. Play-segment widths (the gaps between one chapter's holdEnd and the next holdStart) are allocated PROPORTIONALLY to how many real frames each segment must traverse (18/11/19/28 frames respectively) -- equal scroll-distance per play regardless of frame-count was the real cause of choppy/uneven playback found 2026-07-24 (up to 360 vs 122 frames-per-scroll-unit across segments); this keeps frame-advance speed roughly constant throughout.",
         "chapters": [
           {
             "id": "entrance",
-            "holdStart": 0.05,
-            "holdEnd": 0.21,
+            "holdStart": 0.073,
+            "holdEnd": 0.233,
             "hold_frame": 18,
             "title_ar": "RK Barber Shop",
             "subtitle_ar": "أهلاً بكم",
@@ -53,8 +53,8 @@
           },
           {
             "id": "products",
-            "holdStart": 0.30,
-            "holdEnd": 0.39,
+            "holdStart": 0.278,
+            "holdEnd": 0.368,
             "hold_frame": 29,
             "title_ar": "Premium Hair Products",
             "subtitle_ar": null,
@@ -63,8 +63,8 @@
           },
           {
             "id": "mirror",
-            "holdStart": 0.47,
-            "holdEnd": 0.56,
+            "holdStart": 0.446,
+            "holdEnd": 0.536,
             "hold_frame": 48,
             "title_ar": "شكلك الجديد يبدأ هون",
             "subtitle_ar": null,
@@ -73,8 +73,8 @@
           },
           {
             "id": "booking",
-            "holdStart": 0.65,
-            "holdEnd": 0.76,
+            "holdStart": 0.650,
+            "holdEnd": 0.760,
             "hold_frame": 76,
             "title_ar": "جاهز لإطلالتك الجديدة؟",
             "subtitle_ar": null,
