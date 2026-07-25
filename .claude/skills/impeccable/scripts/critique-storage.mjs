@@ -2,11 +2,11 @@
 /**
  * Critique persistence helper.
  *
- * Each run of /impeccable critique writes a per-target snapshot to
+ * Each critique run writes a per-target snapshot to
  *   .impeccable/critique/<timestamp>__<slug>.md
  * with a small YAML frontmatter carrying the score + P0/P1 counts.
  *
- * /impeccable polish reads the latest matching snapshot at start as its
+ * The polish workflow reads the latest matching snapshot at start as its
  * fix backlog. No other skill auto-reads critique output.
  *
  * The slug is derived mechanically from the *resolved* primary artifact
@@ -27,7 +27,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getCritiqueDir } from './impeccable-paths.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { getCritiqueDir } from './lib/impeccable-paths.mjs';
 
 const SLUG_MAX = 50;
 
@@ -221,6 +222,21 @@ function main(argv) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1]);
+  } catch {
+    // pathToFileURL normalizes Windows paths; keep it as a fallback for any
+    // environment where realpath is unavailable.
+    return import.meta.url === pathToFileURL(process.argv[1]).href;
+  }
+}
+
+// Why the realpath check: generated skills are often reached through symlinked
+// harness directories (for example a demo repo's `.agents` -> source `.agents`).
+// Node resolves import.meta.url to the real file, while process.argv[1] keeps
+// the symlink path. Comparing canonical paths prevents a silent exit-0 no-op.
+if (isMainModule()) {
   main(process.argv.slice(2));
 }
