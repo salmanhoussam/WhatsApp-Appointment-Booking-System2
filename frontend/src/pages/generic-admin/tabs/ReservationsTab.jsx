@@ -270,7 +270,13 @@ export default function ReservationsTab({ color }) {
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const mountedRef = useRef(true)
 
-  useEffect(() => () => { mountedRef.current = false }, [])
+  // mountedRef must be reset to true in the effect's setup, not just useRef(true)'s
+  // initializer -- see useCatalog.js / .claude/memory.md (2026-07-21) for the real
+  // StrictMode double-invoke bug this guards against.
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)

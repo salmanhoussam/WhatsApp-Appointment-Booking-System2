@@ -535,8 +535,14 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
   const [catalogItems,   setCatalogItems]   = useState([])
   const [catalogLoading, setCatalogLoading] = useState(true)
 
+  // mountedRef must be reset to true in the effect's setup, not just useRef(true)'s
+  // initializer -- see useCatalog.js / .claude/memory.md (2026-07-21) for the real
+  // StrictMode double-invoke bug this guards against.
   const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)

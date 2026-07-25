@@ -27,7 +27,16 @@ export default function FeaturedItemsSection({ data, accent, slug, moduleKey, on
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
 
-  useEffect(() => () => { mountedRef.current = false }, [])
+  // Same real bug already found/fixed in useCatalog.js (2026-07-21, see
+  // .claude/memory.md): a cleanup-only effect never resets mountedRef back to
+  // `true` on setup, so React StrictMode's dev-mode mount->cleanup->remount
+  // cycle permanently latches it to `false` -- every `if (mountedRef.current)`
+  // guard below then silently no-ops forever, so `loading` never resolves and
+  // the skeletons render forever even though the fetch succeeded.
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     if (!moduleKey || !slug) { setLoading(false); return }

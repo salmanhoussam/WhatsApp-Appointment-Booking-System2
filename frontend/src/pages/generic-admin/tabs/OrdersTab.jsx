@@ -365,7 +365,13 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  useEffect(() => () => { mountedRef.current = false }, [])
+  // mountedRef must be reset to true in the effect's setup, not just useRef(true)'s
+  // initializer -- see useCatalog.js / .claude/memory.md (2026-07-21) for the real
+  // StrictMode double-invoke bug this guards against.
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
