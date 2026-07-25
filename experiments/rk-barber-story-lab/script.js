@@ -38,11 +38,69 @@ const SOURCES = {
     // Real content mapping, established by direct frame review of genuine.mp4:
     // 0-3s entrance (door), 4-6s waiting area, 7-10s products/barber pole,
     // 11-14s more shelf + chair, 15-19s arch/counter + chair (closing shot).
+    // Round 4 (2026-07-25): Salman drew red annotation lines over a real shelf
+    // frame and asked for product name callouts positioned over the actual
+    // shelf, revealed by scroll -- moved the 'products' hold from t=9.0s (wide
+    // barber-pole angle) to t=12.0s (frame_144.webp, the close 4-row shelf shot
+    // that actually shows every product he pointed at) and added `productLabels`
+    // -- real xPct/yPct read directly off that frame, not guessed off a thumbnail.
     chapters: [
       { id: 'entrance', timeSec: 2.5,  holdStart: 0.08,  holdEnd: 0.22, title_ar: 'RK Barber Shop', subtitle_ar: 'أهلاً بكم' },
-      { id: 'products',  timeSec: 9.0,  holdStart: 0.36,  holdEnd: 0.50, title_ar: 'Premium Hair Products', cta_label_ar: 'View Products' },
+      {
+        id: 'products', timeSec: 12.0, holdStart: 0.36, holdEnd: 0.50,
+        title_ar: 'Premium Hair Products', cta_label_ar: 'View Products',
+        productLabels: [
+          { label_ar: 'سبراي',              xPct: 25, yPct: 27 },
+          { label_ar: 'واكس',                xPct: 64, yPct: 26 },
+          { label_ar: 'ريحة',                xPct: 24, yPct: 49 },
+          { label_ar: 'زيت الشعر',           xPct: 14, yPct: 63 },
+          { label_ar: 'شامبو',               xPct: 70, yPct: 61 },
+          { label_ar: 'القوائم',             xPct: 15, yPct: 74 },
+          { label_ar: 'زيت للعينين والشعر',  xPct: 74, yPct: 74 },
+        ],
+      },
       { id: 'service',   timeSec: 13.5, holdStart: 0.60,  holdEnd: 0.70, title_ar: 'خدمات احترافية بلمسة عصرية' },
       { id: 'booking',   timeSec: 18.5, holdStart: 0.80,  holdEnd: 0.94, title_ar: 'جاهز لإطلالتك الجديدة؟', cta_label_ar: 'Book Now' },
+    ],
+  },
+  storyboard: {
+    label: 'Round 6 — AI-generated, 4 captioned scenes, frame-sequence (real, admitted -- watermarked)',
+    duration: 20.25,
+    videoSrc: 'assets/storyboard.mp4',
+    // Real content, confirmed by extracting 1fps preview frames and viewing them
+    // directly (not assumed from the filename): 4 distinct, mostly-static ~5s
+    // scenes, each with its OWN animated caption already burned into the video
+    // pixels -- "Step Inside" (0-5s), "Grooming Musts" (5-10s), "Where Magic
+    // Happens" (10-15s), "Your Chair Awaits" (15-20s).
+    //
+    // Round 5 (2026-07-25) used the `hybrid` native-<video> technique here,
+    // reasoning the discrete/captioned scenes didn't need frame-by-frame
+    // scroll control. Salman's direct correction, same day: he wants frame
+    // images on scroll -- no <video> playback at all, in any section. Round 6
+    // switches this source to real extracted frames, same as `genuine`.
+    // Density picked the same evidence-based way as round 3 (see
+    // evidence/measure_motion.py's method): real mean-abs-pixel-diff against
+    // a 15fps reference set found this footage is 4 near-static scenes with
+    // 3 hard scene-cut jumps (unfixable by any sampling density) -- excluding
+    // those cuts, 12fps brings within-scene motion to ~1.2x true continuity,
+    // the same threshold round 3 used -- 243 frames, not a re-guess.
+    frameDir: 'assets/frames-storyboard-243',
+    frameCount: 243,
+    frameExt: 'webp',
+    // No title_ar on the first 3 holds -- the video already has its own caption
+    // for those beats; adding ours on top would just duplicate/clash. Only the
+    // last hold gets a real, useful addition: an actual "Book Now" CTA the
+    // source frames can't provide.
+    chapters: [
+      { id: 'entrance', timeSec: 2.0,  holdStart: 0.05, holdEnd: 0.20 },
+      { id: 'products',  timeSec: 7.0,  holdStart: 0.30, holdEnd: 0.45 },
+      { id: 'stations',  timeSec: 12.0, holdStart: 0.55, holdEnd: 0.70 },
+      // Salman flagged the real content at 15-20s ("Your Chair Awaits") as an
+      // unwanted composition -- checked every frame in that range, it's one
+      // static close-up the whole 5s, no cleaner alternative exists inside it.
+      // His call: keep it (it's the only "chair" beat available) but cut the
+      // hold to a brief ~1s instead of ~4s so the CTA doesn't linger on it.
+      { id: 'booking',   timeSec: 18.5, holdStart: 0.82, holdEnd: 0.855, title_ar: 'جاهز لإطلالتك الجديدة؟', cta_label_ar: 'Book Now' },
     ],
   },
 };
@@ -69,12 +127,18 @@ function buildOverlayDom(chapters) {
   overlayEls = {};
   for (const ch of chapters) {
     const div = document.createElement('div');
-    div.className = 'chapter-overlay';
+    div.className = ch.productLabels ? 'chapter-overlay has-hotspots' : 'chapter-overlay';
     div.dataset.chapter = ch.id;
+    const hotspots = (ch.productLabels || []).map(pl => `
+      <div class="hotspot-label" style="left:${pl.xPct}%; top:${pl.yPct}%;">
+        <span class="dot"></span><span class="tag">${pl.label_ar}</span>
+      </div>
+    `).join('');
     div.innerHTML = `
-      <h2>${ch.title_ar}</h2>
+      ${ch.title_ar ? `<h2>${ch.title_ar}</h2>` : ''}
       ${ch.subtitle_ar ? `<p>${ch.subtitle_ar}</p>` : ''}
       ${ch.cta_label_ar ? `<button class="cta">${ch.cta_label_ar}</button>` : ''}
+      ${hotspots}
     `;
     overlayContainer.appendChild(div);
     overlayEls[ch.id] = div;
@@ -379,6 +443,27 @@ function techniquesFor(source) {
 
 let active = null;
 
+// storyboard has its own baked-in "Step Inside" opening beat -- it IS the
+// header now (Salman's call: "خليه header، ما نعمل هذا section نحنا" -- work
+// on the header only, don't build the whole-page-background version), so the
+// separate plain-text #hero block above it would just be a redundant second
+// intro. Every other source keeps the original two-block layout unchanged.
+const heroEl = document.getElementById('hero');
+function syncHeroVisibility(sourceKey) {
+  heroEl.style.display = sourceKey === 'storyboard' ? 'none' : '';
+}
+
+// canvas/canvasTimeline need frameDir/frameCount, which storyboard doesn't
+// have on purpose (see its SOURCES comment) -- hide them for this source
+// instead of leaving a black-screen trap in the dropdown.
+const CANVAS_TECHNIQUE_VALUES = ['canvas', 'canvasTimeline'];
+function syncTechniqueOptions(sourceKey) {
+  const hasFrames = !!SOURCES[sourceKey].frameDir;
+  for (const opt of techniqueSelect.options) {
+    if (CANVAS_TECHNIQUE_VALUES.includes(opt.value)) opt.hidden = !hasFrames;
+  }
+}
+
 function loadSource(sourceKey) {
   const source = SOURCES[sourceKey];
   VIDEO_DURATION = source.duration;
@@ -386,6 +471,8 @@ function loadSource(sourceKey) {
   TIME_CURVE = buildTimeCurve(CHAPTERS, VIDEO_DURATION);
   videoEl.src = source.videoSrc;
   buildOverlayDom(CHAPTERS);
+  syncHeroVisibility(sourceKey);
+  syncTechniqueOptions(sourceKey);
   return source;
 }
 

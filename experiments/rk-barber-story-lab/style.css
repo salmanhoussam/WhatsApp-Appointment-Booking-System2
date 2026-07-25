@@ -56,11 +56,38 @@ html, body { margin: 0; padding: 0; background: #0a0a0f; color: #fff; font-famil
   letter-spacing: 0.01em; line-height: 1.15;
   text-shadow: 0 4px 32px rgba(0,0,0,0.65);
 }
+/* Round 4: chapters with product hotspots use a small top caption + bottom
+   CTA instead of one big centered block, so the hotspots (absolute, unaffected
+   by this flex layout) stay readable across the real shelf photo. */
+.chapter-overlay.has-hotspots {
+  justify-content: space-between; padding: 40px 32px 56px;
+}
+.chapter-overlay.has-hotspots h2 {
+  font-size: clamp(18px, 4vw, 26px); margin: 0;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.85);
+}
+.chapter-overlay.has-hotspots p { display: none; }
 .chapter-overlay p { font-size: clamp(15px, 2vw, 20px); color: rgba(255,255,255,0.85); margin: 0 0 32px; }
 .chapter-overlay .cta {
   pointer-events: auto; background: #2F4F4F; color: #fff; border: none;
   border-radius: 999px; padding: 14px 40px; font-size: 16px; font-weight: 700;
   font-family: inherit; cursor: pointer; box-shadow: 0 8px 32px #2F4F4F66;
+}
+
+.hotspot-label {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 6px;
+}
+.hotspot-label .dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #d4a853;
+  box-shadow: 0 0 0 4px rgba(212,168,83,0.25);
+  flex-shrink: 0;
+}
+.hotspot-label .tag {
+  background: rgba(10,10,15,0.72); border: 1px solid rgba(212,168,83,0.4);
+  backdrop-filter: blur(4px);
+  border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 700;
+  color: #fff; white-space: nowrap;
 }
 
 #after { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: #0a0a0f; }

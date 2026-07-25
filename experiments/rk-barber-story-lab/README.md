@@ -295,6 +295,132 @@ this lab does establish with real evidence:
 - [HTMLVideoElement.requestVideoFrameCallback() — MDN](https://developer.mozilla.org/en-US/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback)
 - [Web platform features explorer — requestVideoFrameCallback()](https://web-platform-dx.github.io/web-features-explorer/features/request-video-frame-callback/)
 
+## Round 4 (2026-07-25) — product hotspot labels over the real shelf
+
+Salman reviewed Round 3's result ("في تحسن واضح" — clear improvement) and asked for a further,
+real feature on top of it: name labels over the actual products on the shelf, revealed as the user
+scrolls through the story, matching a reference mockup he designed himself for this tenant (a
+static shelf-photo layout with icon+label callouts). He annotated a real screenshot with red lines
+over the products he wanted labeled and gave the exact list, top-to-bottom/left-to-right: سبراي,
+واكس, ريحة, زيت الشعر, شامبو, القوائم, زيت للعينين والشعر.
+
+Confirmed with him directly before building (two real ambiguities, not assumed): the mockup is his
+own reference design for this tenant, not existing code to match pixel-for-pixel; and the labels
+belong inside the Story Experience itself (as an extension of the existing `products` chapter), not
+a separate new section.
+
+**What changed:**
+- The `products` chapter's hold moved from `timeSec: 9.0` (frame_109, a wide angle that happens to
+  catch the barber pole, not a usable product shot) to `timeSec: 12.0` (frame_144, a close 4-row
+  shelf shot that actually shows every product Salman pointed at) — a deliberate, real trade
+  documented in `script.js`'s own comment, not a silent change.
+- A new `productLabels` array on that chapter: 7 entries, each `{ label_ar, xPct, yPct }`. The
+  `xPct`/`yPct` values were read directly off `frame_144.webp` by viewing the real frame and mapping
+  Salman's named order onto the actual visible product clusters (tall blue spray canisters →
+  top-left, gold-boxed set → top-right, pink/red small boxes → row 2, black bottles + pink
+  Schwarzkopf-style bottles → row 3, black bottle cluster + white dropper bottles → row 4) — not
+  guessed off a thumbnail description.
+- New `.hotspot-label` (dot + pill badge) rendered per entry, reusing the exact same
+  hold/fade-opacity mechanism every other chapter already uses (`updateOverlays`) — no new opacity
+  logic. When a chapter has `productLabels`, its big centered heading/CTA block switches to a small
+  top caption + bottom-pinned CTA (`.has-hotspots` class) so the seven labels have room across the
+  frame instead of competing with one giant centered block.
+
+**Verified, not assumed** (real headless-Chrome + CDP, 430×932 @2x mobile viewport, matching
+Salman's own note that this footage is mobile-framed): scrolled to the real hold progress
+(`p=0.43`, inside `holdStart 0.36–holdEnd 0.50`), captured a real screenshot — all seven labels land
+on their real, correct product clusters (see `products_hotspot_check2.png`, not committed here,
+regenerate via the CDP script pattern already established this session). Zero console errors.
+
+**Not done / explicitly deferred**, matching Salman's own scope: no linking labels to real
+category/item pages yet ("مستقبلاً فينا نعملهم دغري لينك على الآيتمز والكاتيجوري" — his own words,
+future work); this stays lab-only, not wired into `scripts/data/hr/page_content.json` — same
+Design Laboratory Protocol gate as every prior round, his live review decides if/when it goes back
+to Tenant OS.
+
+## Round 5 (2026-07-25) — a genuinely different footage type: AI-generated, pre-captioned
+
+Salman supplied a third, unrelated video (`storyboard.mp4`, downloaded from Supabase Storage,
+`hr/pages/home/try3/Storyboard 1.mp4`) and asked for "a new experience for it" — explicitly framed
+as wanting the *methodology* applied again, not a specific technique assumed in advance ("ما بعرف،
+انت شوف والعبلي شي حلو على ذوقك").
+
+**Investigated before building anything** (same discipline as every prior round): extracted a 1fps
+preview (20 frames) and viewed them directly. Real findings, confirmed by looking, not guessed from
+the filename:
+- Real portrait 1080×1920, 20.25s, already mobile-native — no crop needed (unlike `genuine.mp4`,
+  which needed cropping from a wider aspect).
+- A small "AI" watermark visible in the corner of every frame — flagged to Salman before building
+  anything, since it changes the right technique; he confirmed it's intentional ("AI-generated
+  بقصد").
+- The video is **4 distinct, mostly-static ~5s scenes**, each with its own animated caption already
+  burned into the pixels: "Step Inside" (0-5s) → "Grooming Musts" (5-10s) → "Where Magic Happens"
+  (10-15s) → "Your Chair Awaits" (15-20s).
+
+**Why frame-sequence was the wrong tool here, and hybrid was the right one — not assumed, reasoned
+from the real content**: frame-sequence + scroll-scrub exists to solve continuous, uncaptioned
+handheld camera motion (rounds 1-4's real problem). This footage is the opposite — discrete,
+near-static, already-captioned scenes. Re-running rounds 1-4's technique here would mean (a)
+extracting frames and losing real video quality/bitrate for no reason, since there's barely any
+motion to sample, and (b) needing our own overlay chapter titles, which would visually duplicate/
+clash with the captions already burned into the video. The already-built, already-debugged
+`hybrid` technique (native `<video>` plays forward for real between holds, pauses+snaps exactly on
+a chapter) fits this footage's real shape with zero new rendering code — reused as-is, only new
+`SOURCES.storyboard` chapter data.
+
+**What was added:** `SOURCES.storyboard` (`script.js`) — 4 chapters at the real scene midpoints
+(t=2.0/7.0/12.0/18.5s). The first three chapters have no `title_ar` at all (`buildOverlayDom` now
+guards against rendering an empty `<h2>` when a chapter has none) — the video's own caption already
+carries that beat, adding ours would be redundant. Only the last chapter adds real, useful value the
+video can't provide on its own: an actual "جاهز لإطلالتك الجديدة؟" + **Book Now** CTA button.
+`storyboard.mp4` was re-encoded 1080×1920 → 810×1440 (crf 23) for a reasonable web payload (30MB →
+4.3MB) without touching the AI-generated content itself.
+
+**Verified, not assumed**: real headless-Chrome + CDP, 430×932 @2x mobile viewport, scrolled through
+all 4 hold points, real screenshots at each (`sb_entrance.png`, `sb_products.png`,
+`sb_stations.png`, `sb_booking.png`, not committed — regenerate via the same CDP script pattern),
+zero console errors. Each hold shows the real captioned scene at full quality with no overlay
+clutter; the booking hold shows the CTA sitting cleanly above the video's own "Your Chair Awaits"
+caption, not fighting it.
+
+**Not done / explicitly deferred**: no product-hotspot labels on this source (would duplicate the
+video's own "Grooming Musts" caption for no real benefit — a judgment call, flagged here rather than
+silently decided); not wired into production, same Design Laboratory Protocol gate as every prior
+round.
+
+## Round 6 (2026-07-25) — corrected: frame images, not native video, and a real mobile bug
+
+Round 5 shipped to production using the `hybrid` technique (real `<video>` playing between
+holds), reasoned from the footage's own shape (discrete, already-captioned scenes). Salman's
+direct correction, immediately after seeing it live: **"أنا باللاب اللي عملناه اللي أعجبني وطلبته
+Native Video. أنت عملتلي Hybrid... بدي صور الفريمات، and scroll يعني ينعرض بس صور، ما بدي
+فيديوهات"** — what he actually approved in the lab and asked for was frame images on scroll, no
+`<video>` playback anywhere, in any section. My technical reasoning for `hybrid` wasn't wrong on
+its own terms, but it wasn't what he'd asked for — a real instance of Architecture Authority
+(`rules/engineering-manager-mode.md`: *"The user owns all architectural decisions... Never
+silently replace the architecture with your own preferences"*) being the thing that actually
+mattered here, not which technique is more "correct" for the footage shape in the abstract.
+
+**Fixed for real, not just reverted**: extracted real frames from `storyboard.mp4` (243 frames,
+480×854 WebP, 12fps — same evidence-based density methodology as round 3's `measure_motion.py`,
+adapted for this footage's real shape: 4 near-static scenes with 3 hard scene-cut jumps that no
+sampling density can smooth, excluding those cuts brings within-scene motion to ~1.2x true
+continuity at 12fps, matching round 3's own threshold, not a re-guess). `SOURCES.storyboard` now
+has `frameDir`/`frameCount` like `genuine` does; the `canvas`/`canvasTimeline` techniques that were
+hidden for this source in round 5 (no frames existed then) are real options again.
+
+**A second real bug, caught in the same message**: "شغلة تانية، على الموبايل مش ضابطة الصفحة
+كلها" — on a real phone, the section wasn't filling the screen. Root cause: `100vh` is calculated
+against the viewport with the mobile browser's address bar assumed *hidden* — on a real device
+with the address bar visible, the true visible area is smaller than `100vh`, so a sticky child
+sized at `100vh` overflows what's actually visible. This is exactly the kind of bug headless
+Chrome's device-metrics emulation cannot catch (headless has no address bar to show/hide, so `vh`
+and `svh` are identical there) — a real gap in this whole session's verification method, not
+something any of the many headless screenshots this session could have caught. Fixed in production
+(`StoryExperienceSection.jsx`) using `svh` (small viewport height — the guaranteed-smallest real
+viewport size) for both the outer scroll-distance height and the inner sticky height, keeping the
+`pinnedZoneEnd` ratio between them intact.
+
 ## A real bug found and fixed *during* this lab (worth keeping on record)
 
 The hybrid technique's first draft had a genuine self-triggering feedback loop: its `timeupdate`
