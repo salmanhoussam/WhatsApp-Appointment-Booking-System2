@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RK Barber Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  /* No overflow-x:hidden on html/body -- it silently breaks position:sticky
+     for #storySticky below (a real, reproducible CSS interaction: overflow
+     on an ancestor changes the scrolling-box calculation sticky relies on). */
+  html, body { margin: 0; padding: 0; background: #0a0a0f; color: #fff; font-family: 'Cairo', sans-serif; }
+  a { text-decoration: none; }
+
+  /* ---- Hero ---- */
+  #hero { position: relative; height: 100svh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #hero .scrim { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.35) 0%, rgba(0,0,0,.55) 100%); }
+  #hero .inner { position: relative; text-align: center; padding: 0 24px; }
+  #hero h1 { font-size: clamp(32px, 7vw, 56px); font-weight: 900; margin: 0 0 14px; text-shadow: 0 4px 24px rgba(0,0,0,.6); }
+  #hero p { font-size: clamp(14px, 2vw, 18px); color: rgba(255,255,255,.85); margin: 0 0 32px; }
+  #hero .cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #d4a853; color: #1a1208; border: none; border-radius: 999px;
+    padding: 14px 36px; font-size: 16px; font-weight: 800; font-family: inherit; cursor: pointer;
+    box-shadow: 0 8px 32px rgba(212,168,83,.4);
+  }
+
+  /* ---- Story Experience ---- */
+  #story { position: relative; height: 450svh; }
+  #storySticky { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; }
+  #frameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #story .scrim {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.55) 100%);
+  }
+  .chapter-overlay {
+    position: absolute; inset: 0; opacity: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 32px; text-align: center; pointer-events: none;
+  }
+  .chapter-overlay h2 {
+    font-size: clamp(28px, 6vw, 56px); font-weight: 900; margin: 0 0 14px; line-height: 1.15;
+    text-shadow: 0 4px 32px rgba(0,0,0,.65);
+  }
+  .chapter-overlay p { font-size: clamp(14px, 2vw, 18px); color: rgba(255,255,255,.85); margin: 0 0 26px; }
+  .chapter-overlay .cta {
+    pointer-events: auto; background: #2F4F4F; color: #fff; border: none;
+    border-radius: 999px; padding: 13px 34px; font-size: 15px; font-weight: 700;
+    font-family: inherit; cursor: pointer; box-shadow: 0 8px 28px rgba(47,79,79,.5);
+  }
+
+  /* ---- Story / About ---- */
+  #about { max-width: 720px; margin: 0 auto; padding: 72px 24px; text-align: center; }
+  #about .accent { width: 40px; height: 3px; background: #d4a853; margin: 0 auto 20px; border-radius: 2px; }
+  #about h2 { font-size: clamp(22px, 3.5vw, 32px); font-weight: 800; margin: 0 0 20px; }
+  #about p { font-size: 15px; line-height: 1.9; color: rgba(255,255,255,.75); margin: 0; }
+
+  /* ---- Services ---- */
+  #services { max-width: 900px; margin: 0 auto; padding: 0 24px 72px; }
+  #services h2 { font-size: clamp(22px, 3.5vw, 32px); font-weight: 800; margin: 0 0 28px; text-align: center; }
+  .service-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .service-card {
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 16px;
+    padding: 28px 20px; text-align: center;
+  }
+  .service-card .badge {
+    display: inline-block; background: #2F4F4F; color: #fff; font-size: 10px; font-weight: 800;
+    letter-spacing: .06em; padding: 3px 10px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .service-card h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+  .service-card .price { font-size: 24px; font-weight: 800; color: #d4a853; }
+  .service-card .price small { font-size: 12px; color: rgba(255,255,255,.5); font-weight: 600; }
+
+  /* ---- Final CTA ---- */
+  #finalCta { text-align: center; padding: 72px 24px 96px; }
+  #finalCta h2 { font-size: clamp(24px, 4vw, 36px); font-weight: 900; margin: 0 0 28px; }
+  #finalCta .cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #d4a853; color: #1a1208; border: none; border-radius: 999px;
+    padding: 16px 44px; font-size: 17px; font-weight: 800; font-family: inherit; cursor: pointer;
+    box-shadow: 0 8px 32px rgba(212,168,83,.4);
+  }
+
+  .preview-badge {
+    position: fixed; bottom: 12px; left: 12px; z-index: 999;
+    background: rgba(20,20,26,.85); border: 1px solid rgba(255,255,255,.15);
+    color: rgba(255,255,255,.6); font-size: 10px; padding: 6px 12px; border-radius: 999px;
+    font-family: monospace; backdrop-filter: blur(6px);
+  }
+</style>
+</head>
+<body>
+
+  <section id="hero">
+    <video src="https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.45.mp4" autoplay muted loop playsinline></video>
+    <div class="scrim"></div>
+    <div class="inner">
+      <h1>RK Barber Shop</h1>
+      <p>حلاقة رجالية احترافية — احجز موعدك الآن</p>
+      <a class="cta" href="#" data-wa>احجز موعدك</a>
+    </div>
+  </section>
+
+  <section id="story">
+    <div id="storySticky">
+      <canvas id="frameCanvas"></canvas>
+      <div class="scrim"></div>
+      <div id="overlayContainer"></div>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="accent"></div>
+    <h2>من نحن</h2>
+    <p>في RK Barber Shop، الحلاقة مش مجرد قصة شعر — هي تجربة كاملة من العناية والراحة. فريقنا من الحلاقين المحترفين بيقدملك خدمة دقيقة بلمسة عصرية، بأدوات ومنتجات مختارة بعناية، بمساحة صُممت لتخليك تشعر بالراحة من أول لحظة لآخر لحظة.</p>
+  </section>
+
+  <section id="services">
+    <h2>خدماتنا</h2>
+    <div class="service-grid">
+      <div class="service-card">
+        <span class="badge">مميز</span>
+        <h3>الشعر</h3>
+        <div class="price">٥ <small>USD</small></div>
+      </div>
+      <div class="service-card">
+        <span class="badge">مميز</span>
+        <h3>قصة</h3>
+        <div class="price">٥ <small>USD</small></div>
+      </div>
+      <div class="service-card">
+        <span class="badge">مميز</span>
+        <h3>كرياتين</h3>
+        <div class="price">٥ <small>USD</small></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="finalCta">
+    <h2>جاهز لإطلالتك الجديدة؟</h2>
+    <a class="cta" href="#" data-wa>احجز الآن عبر واتساب</a>
+  </section>
+
+  <div class="preview-badge">معاينة تصميم فقط — كل الأزرار بتفتح واتساب</div>
+
+<script>
+  // ---- All CTAs -> WhatsApp (Salman's explicit instruction: function doesn't
+  // matter for this preview, every button should just open WhatsApp) ----
+  const WHATSAPP_NUMBER = '96176985477';
+  function waLink(text) {
+    const msg = encodeURIComponent(text || 'مرحبا، حابب احجز موعد بـ RK Barber Shop');
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`;
+  }
+  function wireWhatsAppButtons() {
+    document.querySelectorAll('[data-wa], .chapter-overlay .cta').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.open(waLink(el.textContent.trim()), '_blank');
+      });
+    });
+  }
+
+  // ---- Story Experience: same proven frame-sequence technique as production ----
+  const CHAPTERS = [
+    { id: 'entrance', holdStart: 0.05, holdEnd: 0.15, hold_frame: 24, title_ar: 'RK Barber Shop', subtitle_ar: 'تجربة عناية رجالية استثنائية' },
+    { id: 'products', holdStart: 0.25, holdEnd: 0.35, hold_frame: 84, title_ar: 'منتجات عناية فاخرة', cta_label_ar: 'استكشف المجموعة' },
+    { id: 'stations', holdStart: 0.45, holdEnd: 0.55, hold_frame: 143, title_ar: 'قصات دقيقة باحتراف', cta_label_ar: 'احجز موعدك الآن' },
+    { id: 'booking', holdStart: 0.65, holdEnd: 0.675, hold_frame: 221, title_ar: 'جاهز لإطلالتك الجديدة؟', cta_label_ar: 'احجز الآن' },
+  ];
+  const FRAME_BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/hr/pages/home/story/frames';
+  const FRAME_COUNT = 243;
+  const HOLD_FADE = 0.025;
+
+  const storyEl = document.getElementById('story');
+  const stickyEl = document.getElementById('storySticky');
+  const canvasEl = document.getElementById('frameCanvas');
+  const overlayContainer = document.getElementById('overlayContainer');
+  const ctx = canvasEl.getContext('2d');
+
+  let images = new Array(FRAME_COUNT);
+  function preloadFrames() {
+    for (let i = 0; i < FRAME_COUNT; i++) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = `${FRAME_BASE}/frame_${String(i + 1).padStart(3, '0')}.webp`;
+      images[i] = img;
+    }
+  }
+  preloadFrames();
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvasEl.getBoundingClientRect();
+    canvasEl.width = Math.round(rect.width * dpr);
+    canvasEl.height = Math.round(rect.height * dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  let lastDrawn = -1;
+  function drawFrame(index) {
+    let img = images[index];
+    if (!img || !img.complete || img.naturalWidth === 0) {
+      for (let off = 1; off < FRAME_COUNT; off++) {
+        const back = images[index - off], fwd = images[index + off];
+        if (back && back.complete && back.naturalWidth > 0) { img = back; break; }
+        if (fwd && fwd.complete && fwd.naturalWidth > 0) { img = fwd; break; }
+      }
+    }
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    const cw = canvasEl.width, ch = canvasEl.height;
+    const canvasRatio = cw / ch, imgRatio = img.naturalWidth / img.naturalHeight;
+    let sx, sy, sw, sh;
+    if (imgRatio > canvasRatio) { sh = img.naturalHeight; sw = sh * canvasRatio; sy = 0; sx = (img.naturalWidth - sw) / 2; }
+    else { sw = img.naturalWidth; sh = sw / canvasRatio; sx = 0; sy = (img.naturalHeight - sh) / 2; }
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+    lastDrawn = index;
+  }
+
+  function buildOverlays() {
+    for (const ch of CHAPTERS) {
+      const div = document.createElement('div');
+      div.className = 'chapter-overlay';
+      div.dataset.chapter = ch.id;
+      div.innerHTML = `
+        ${ch.title_ar ? `<h2>${ch.title_ar}</h2>` : ''}
+        ${ch.subtitle_ar ? `<p>${ch.subtitle_ar}</p>` : ''}
+        ${ch.cta_label_ar ? `<button class="cta">${ch.cta_label_ar}</button>` : ''}
+      `;
+      overlayContainer.appendChild(div);
+    }
+  }
+  buildOverlays();
+  wireWhatsAppButtons();
+
+  const lastFrame = FRAME_COUNT - 1;
+  const inputBreakpoints = [0], outputBreakpoints = [0];
+  let prevFrame = 0;
+  for (const ch of CHAPTERS) {
+    const frac = (ch.hold_frame ?? prevFrame) / lastFrame;
+    inputBreakpoints.push(ch.holdStart, ch.holdEnd);
+    outputBreakpoints.push(frac, frac);
+    prevFrame = ch.hold_frame ?? prevFrame;
+  }
+  inputBreakpoints.push(1); outputBreakpoints.push(outputBreakpoints[outputBreakpoints.length - 1]);
+
+  function interpolate(p) {
+    if (p <= inputBreakpoints[0]) return outputBreakpoints[0];
+    for (let i = 1; i < inputBreakpoints.length; i++) {
+      if (p <= inputBreakpoints[i]) {
+        const t = (p - inputBreakpoints[i - 1]) / (inputBreakpoints[i] - inputBreakpoints[i - 1] || 1);
+        return outputBreakpoints[i - 1] + t * (outputBreakpoints[i] - outputBreakpoints[i - 1]);
+      }
+    }
+    return outputBreakpoints[outputBreakpoints.length - 1];
+  }
+
+  // Full container height as the denominator -- matches the production
+  // component's real progress semantic (Framer Motion's useScroll with
+  // offset ['start start','end start']), NOT height-minus-viewport. The
+  // chapter holdStart/holdEnd values below were calibrated against that
+  // semantic, so this must match it exactly or every hold lands at the
+  // wrong scroll position (found via real on-page testing, not assumed).
+  function rawProgress() {
+    const total = storyEl.offsetHeight;
+    const scrolled = -storyEl.getBoundingClientRect().top;
+    return Math.min(1, Math.max(0, scrolled / total));
+  }
+
+  function updateOverlays(p) {
+    for (const ch of CHAPTERS) {
+      const el = overlayContainer.querySelector(`[data-chapter="${ch.id}"]`);
+      if (!el) continue;
+      let opacity;
+      if (p < ch.holdStart - HOLD_FADE) opacity = 0;
+      else if (p < ch.holdStart) opacity = (p - (ch.holdStart - HOLD_FADE)) / HOLD_FADE;
+      else if (p < ch.holdEnd) opacity = 1;
+      else if (p < ch.holdEnd + HOLD_FADE) opacity = 1 - (p - ch.holdEnd) / HOLD_FADE;
+      else opacity = 0;
+      el.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+    }
+  }
+
+  function onScroll() {
+    const p = rawProgress();
+    const frameFrac = interpolate(p);
+    const index = Math.min(lastFrame, Math.round(frameFrac * lastFrame));
+    if (index !== lastDrawn) drawFrame(index);
+    updateOverlays(p);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+
+  images[0].onload = () => drawFrame(0);
+  onScroll();
+</script>
+</body>
+</html>
