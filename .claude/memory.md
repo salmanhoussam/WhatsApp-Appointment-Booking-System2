@@ -3490,3 +3490,27 @@ None this session.
 - Same broken `mountedRef` pattern not yet grepped for elsewhere in the codebase — only `useCatalog.js` was checked/fixed this session.
 - Store template's Service Contract — the next real step per the Restaurant → Store → Clinic roadmap once Restaurant's Reference Validation Rule audit is considered satisfied.
 - `.agent.md` (root) and `.claudelocaldocs/MASTER_PLAN.md` — both real, both deliberately left untouched pending Salman's own follow-up.
+
+## 2026-07-25 — Skills folder review closed (resolves 2026-07-21's open item)
+
+The "skills package manager artifacts... not resolved" item above is now resolved. Salman asked
+directly why so many overlapping/conflicting skill descriptions existed; investigation confirmed
+the real mechanism isn't "prompt bloat" (skills use progressive disclosure — only a triggered
+skill's full content loads) but real description-overlap risk: `industrial-brutalist-ui` and
+`minimalist-ui` (both symlinks into `.agents/skills/`) directly contradict
+`gs-mar-design-system`'s glassmorphism identity and could get false-positive-triggered. Resolution
+(commit `1bbd9bb`):
+- Added `frontend/mobile-viewport-quirks` — a real gap, found the same day (`100vh` overflowing on
+  a real phone that headless-Chrome's device-metrics emulation can't catch, since it has no
+  address bar to show/hide).
+- Removed the `industrial-brutalist-ui`/`minimalist-ui` symlinks only — the external
+  skills-package-manager tool itself (`.agents/`, `skills-lock.json`) is untouched, in case it's
+  used for other projects.
+- `impeccable` was a bigger real finding: it was a symlink to `.agents/skills/impeccable` since
+  2026-07-1[23], but that swap was never committed — git HEAD still had the old real 61-file
+  version tracked from `c02f415`, silently diverged from the working tree for ~2 weeks (a real,
+  uncommitted "External" drift item per `repository-hygiene.md`'s own taxonomy). Restored as a
+  real, repo-native directory (105 files) using the CURRENT external content, not the stale
+  2026-07-04 snapshot — confirmed the two differ substantially (the current version has
+  ios/android-native variants, hooks, init flow the old one lacked) before choosing which to keep.
+- `.claude/CLAUDE.md`'s own Skills section updated to list `mobile-viewport-quirks`, kept in sync.
