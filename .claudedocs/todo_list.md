@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-07-24
+# Last updated: 2026-07-25
 
 ## Completed Phases
 
@@ -169,13 +169,14 @@
 
 ## 🟡 Upcoming (بالأولوية)
 
-0. **[الأولوية الحقيقية] Cross-tenant cart leak fix** — ثغرة حقيقية بالـ multi-tenancy (`generic-cart`
-   Zustand store مش مربوط بالـ slug) — الخطة جاهزة وموافق عليها بالـ Plan Mode
-   (`.claude/plans/we-moved-on-new-hazy-barto.md`)، التنفيذ متوقف مؤقتاً فقط (طلب صريح من سلمان
-   2026-07-24 لإعطاء الأولوية لـ Story Experience) — **لم يُلغَ، فقط مؤجل**. أول شي بالجلسة الجاية.
-1. **Story Experience — قرار الإنتاج** — `experiments/rk-barber-story-lab/` وصل لجولة 3 حقيقية
-   (كثافة الفريمات مقاسة بالبيانات، timeline-driven pacing مبني ومُتحقق منه فعلياً) — بس القرار
-   النهائي (أي technique + أي τ + هل نرجعه لـ Tenant OS) لسا رهن مراجعة سلمان الحية للـ lab.
+0. ✅ **Cross-tenant cart leak fix — Done 2026-07-25** — `useGenericStore.js` scoped by tenant
+   slug + tenant-switch detection in `setConfig`; a real false-positive bug found while verifying
+   it (loading-placeholder `slug: 'unknown'` looking like a tenant change) was also found and fixed
+   same day. **Still uncommitted as of end of session 2026-07-25 — commit first thing next time.**
+1. ✅ **Story Experience — قرار الإنتاج، حسم 2026-07-25** — سلمان راجع الـ lab وقرر: الفيديو نفسه
+   يضل زي ما هو (frame-sequence canvas، الفريمات الحقيقية، نفس التوقيت)، بس الشغل الإضافي (about/
+   services/products) صار teasers قصيرة (عنوان + سطر + CTA) على الـ chapters الموجودة أصلاً، مش
+   chapters جديدة ومش معلومات كاملة. منفّذ فعليًا بـ `scripts/data/hr/page_content.json`.
 2. RK Barber — الاسم العربي الحقيقي للمحل — لسا بانتظار العميل الحقيقي.
 3. **RAG Chatbot per tenant** — يجاوب على أسئلة الزبائن عن القائمة/المنتجات — يستخدم awesome-llm-apps كـ reference
 2. **Phase 73: Olivello .glb model** — real olive .glb + morph targets (squish/teardrop on scroll)
