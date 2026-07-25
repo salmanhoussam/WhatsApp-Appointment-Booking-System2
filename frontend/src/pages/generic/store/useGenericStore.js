@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 // Module key priority — first matching active service wins
 function deriveModuleKey(services = []) {
@@ -16,6 +16,22 @@ function getSessionId(slug) {
   if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id) }
   return id
 }
+
+// The persisted cart itself was NOT scoped by tenant (real bug, found 2026-07-24/25:
+// a bookmarked/shared link to one tenant's /cart showed another tenant's real items)
+// -- `getSessionId` above already had the right per-slug convention, it just was never
+// applied to `cartItems`, the thing actually rendered on the cart page. Every generic
+// tenant page was reading/writing the exact same global `localStorage['generic-cart']`
+// key regardless of which tenant's URL you were on.
+function currentSlug() {
+  return window.location.pathname.split('/').filter(Boolean)[0] || 'unknown'
+}
+
+const scopedCartStorage = createJSONStorage(() => ({
+  getItem:    (name) => localStorage.getItem(`${currentSlug()}_${name}`),
+  setItem:    (name, value) => localStorage.setItem(`${currentSlug()}_${name}`, value),
+  removeItem: (name) => localStorage.removeItem(`${currentSlug()}_${name}`),
+}))
 
 const useGenericStore = create(
   persist(
@@ -36,10 +52,33 @@ const useGenericStore = create(
 
       setConfig: (config, activeServices = []) => {
         const moduleKey = deriveModuleKey(activeServices)
-        const updates   = { config, activeServices, moduleKey }
-        // Store module: lazily create a server-cart session ID
-        if (moduleKey === 'store' && config?.slug && !get().sessionId) {
-          updates.sessionId = getSessionId(config.slug)
+        const prevSlug  = get().config?.slug
+        const nextSlug  = config?.slug
+        // A client-side route change between two tenants (React Router swap, no full
+        // page reload) keeps this module-scoped Zustand singleton alive -- storage-key
+        // scoping alone only protects a fresh page load. Detect the actual tenant
+        // switch here and clear in-memory cart state too.
+        // useTenantConfig() returns a DEFAULT_CONFIG placeholder (slug: 'unknown')
+        // while the real fetch is in flight, so the very first setConfig call on any
+        // page load looks like a "previous tenant" -- real bug found while verifying
+        // this fix: it made every fresh load's placeholder->real transition look like
+        // a tenant switch and wiped a legitimately-persisted cart. 'unknown' is never
+        // a real slug, so it can never count as one side of an actual tenant change.
+        const tenantChanged =
+          prevSlug && nextSlug &&
+          prevSlug !== 'unknown' && nextSlug !== 'unknown' &&
+          prevSlug !== nextSlug
+
+        const updates = { config, activeServices, moduleKey }
+        if (tenantChanged) {
+          updates.cartItems      = []
+          updates.sessionId      = null
+          updates.activeCategory = null
+        }
+        // Store module: lazily create a server-cart session ID (or a fresh one if the
+        // tenant just changed, since `updates.sessionId` was just nulled above)
+        if (moduleKey === 'store' && nextSlug && (tenantChanged || !get().sessionId)) {
+          updates.sessionId = getSessionId(nextSlug)
         }
         set(updates)
       },
@@ -97,6 +136,7 @@ const useGenericStore = create(
     }),
     {
       name:       'generic-cart',
+      storage:    scopedCartStorage,
       partialize: (s) => ({ cartItems: s.cartItems, sessionId: s.sessionId }),
     }
   )
