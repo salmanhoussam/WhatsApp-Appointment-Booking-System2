@@ -24,13 +24,25 @@ Section types supported:
                      narrative (not a gallery); each block carries a
                      future-ready metadata model (title/description/CTA/
                      target category) unused by the v1 renderer
-  story_experience — scroll-driven frame-sequence canvas (real video frames,
-                     not a <video> tag) with "chapters": the frame plays
-                     freely between chapters, then FREEZES on each chapter's
-                     hold_frame across its own [holdStart, holdEnd) scroll
-                     range while that chapter's overlay text/CTA fades in,
-                     holds, and fades out -- directed as a cinematic
-                     play/pause sequence, not a continuously scrubbing video.
+  story_experience — scroll-driven narrative video, two rendering modes
+                     chosen by which data fields are present:
+                       (a) frame-sequence canvas (frame_base_url + frame_count):
+                           real video frames painted on <canvas>, for footage
+                           with continuous camera motion that needs true
+                           scroll-scrubbing.
+                       (b) native video (video_url + video_duration_sec):
+                           a real <video> plays forward between chapters and
+                           pauses+snaps on each chapter's own [holdStart,
+                           holdEnd) scroll range -- for footage that's already
+                           discrete/captioned scenes rather than continuous
+                           motion (added 2026-07-25, RK Barber Story
+                           Experience Lab round 5).
+                     Either mode: the frame/video plays freely between
+                     chapters, then FREEZES across each chapter's own
+                     [holdStart, holdEnd) scroll range while that chapter's
+                     overlay text/CTA fades in, holds, and fades out --
+                     directed as a cinematic play/pause sequence, not a
+                     continuously scrubbing video.
 
 All section data is validated as Dict[str, Any] — content schema is
 intentionally loose to allow fields to evolve without migrations.

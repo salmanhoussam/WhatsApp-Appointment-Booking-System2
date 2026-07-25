@@ -1,24 +1,41 @@
 /**
  * StoryExperienceSection — Dynamic Section Renderer
- * data: {
- *   frame_base_url, frame_count, native_width, native_height, scroll_range_vh,
- *   chapters: [{ id, holdStart, holdEnd, hold_frame, title_ar, subtitle_ar,
- *                cta_label_ar, cta_target }]
- * }
  *
- * Directed as a cinematic sequence, not a rendering section (2026-07-24 UX
- * tuning pass, per Salman's direct review): the video plays freely between
- * chapters, then FREEZES on each chapter's `hold_frame` for the
- * [holdStart, holdEnd] scroll range while that chapter's overlay fades in,
- * holds, and fades out — text is never scrubbing past over a moving image.
- * Once the overlay finishes, frame progression resumes into the next
- * chapter's hold frame.
+ * Two rendering modes, chosen by which data shape is present:
  *
- * The frame-sequence ENGINE itself (../frame-sequence/FrameSequenceCanvas)
- * is untouched and still just maps a linear 0-1 `progress` value to a frame
- * index — this file bends time before handing progress to it: `useTransform`
- * turns raw scroll progress into a piecewise curve that goes flat during
- * each hold window, built from the chapters' own hold_frame values below.
+ * 1. Frame-sequence mode (`frame_base_url` + `frame_count`): the ORIGINAL
+ *    mode, still used when real footage needs true scroll-scrubbed frame
+ *    control. data: {
+ *      frame_base_url, frame_count, native_width, native_height, scroll_range_vh,
+ *      chapters: [{ id, holdStart, holdEnd, hold_frame, title_ar, subtitle_ar,
+ *                   cta_label_ar, cta_target }]
+ *    }
+ *
+ * 2. Native-video mode (`video_url`): added 2026-07-25 after the RK Barber
+ *    Story Experience lab (`experiments/rk-barber-story-lab/`, rounds 1-5)
+ *    found real footage that's the OPPOSITE shape -- discrete, mostly-static,
+ *    already-captioned scenes (an AI-generated walkthrough) rather than
+ *    continuous handheld motion. Frame-sequence exists to solve continuous
+ *    motion; for discrete scenes it would mean extracting frames and losing
+ *    real video quality for no reason. This mode instead plays the real
+ *    <video> forward between chapters and pauses+snaps on each chapter's
+ *    own [holdStart, holdEnd) scroll range -- the lab's "hybrid" technique,
+ *    ported as-is (ported, not reinvented -- ~20 lines of real, already-
+ *    debugged zone-transition logic, ../../experiments/rk-barber-story-lab/
+ *    script.js's makeHybridTechnique). data: {
+ *      video_url, video_duration_sec, scroll_range_vh,
+ *      chapters: [{ id, timeSec, holdStart, holdEnd, title_ar?, subtitle_ar?,
+ *                   cta_label_ar?, cta_target? }]
+ *    }
+ *    Salman's explicit call after watching the lab live: chapters may omit
+ *    title_ar entirely when the video's own baked-in caption already carries
+ *    that beat -- ChapterOverlay below already renders nothing for a missing
+ *    title_ar, so no extra guard is needed here.
+ *
+ * Both modes share the exact same ChapterOverlay (fade-in/hold/fade-out
+ * driven by [holdStart, holdEnd], nothing else) and the exact same pinned-
+ * zone dev warning below -- the only real difference between the two modes
+ * is what paints the pixels behind the overlays.
  *
  * chapter title/subtitle/cta_label are plain strings, not yet wired to
  * EditableRegion -- no real Admin PATCH endpoint exists for story_experience
@@ -26,7 +43,7 @@
  * that silently does nothing, so it's deferred, not half-built.
  */
 import { useMemo, useRef } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion'
 import FrameSequenceCanvas from '../frame-sequence/FrameSequenceCanvas'
 
 const HOLD_FADE = 0.025
@@ -51,14 +68,16 @@ function ChapterOverlay({ chapter, scrollYProgress, accent }) {
         padding: '0 32px', textAlign: 'center', pointerEvents: 'none',
       }}
     >
-      <h3 style={{
-        margin: '0 0 18px', fontFamily: "'Cairo', sans-serif",
-        fontSize: 'clamp(34px, 7vw, 68px)', fontWeight: 900, color: '#fff',
-        letterSpacing: '0.01em', lineHeight: 1.15,
-        textShadow: '0 4px 32px rgba(0,0,0,0.65)',
-      }}>
-        {chapter.title_ar}
-      </h3>
+      {chapter.title_ar && (
+        <h3 style={{
+          margin: '0 0 18px', fontFamily: "'Cairo', sans-serif",
+          fontSize: 'clamp(34px, 7vw, 68px)', fontWeight: 900, color: '#fff',
+          letterSpacing: '0.01em', lineHeight: 1.15,
+          textShadow: '0 4px 32px rgba(0,0,0,0.65)',
+        }}>
+          {chapter.title_ar}
+        </h3>
+      )}
       {chapter.subtitle_ar && (
         <p style={{
           margin: '0 0 32px', fontFamily: "'Cairo', sans-serif",
@@ -89,13 +108,76 @@ function ChapterOverlay({ chapter, scrollYProgress, accent }) {
   )
 }
 
+// Native-video mode's play/hold engine -- ported from the lab's
+// makeHybridTechnique (experiments/rk-barber-story-lab/script.js), same
+// zone-transition logic, just driven by a Framer Motion scrollYProgress
+// subscription instead of a raw `scroll` DOM listener. Always called (hook
+// order must stay identical across renders); it's a real no-op whenever
+// `chapters` is empty, which is exactly what frame-sequence mode passes.
+function useHybridVideoPlayback(videoRef, scrollYProgress, chapters, videoDuration) {
+  const currentZoneRef = useRef(null)
+  const timeUpdateHandlerRef = useRef(null)
+
+  useMotionValueEvent(scrollYProgress, 'change', (p) => {
+    const video = videoRef.current
+    if (!video || chapters.length === 0) return
+
+    let zone = null
+    for (const ch of chapters) {
+      if (p >= ch.holdStart && p <= ch.holdEnd) { zone = { kind: 'hold', chapter: ch }; break }
+    }
+    if (!zone) {
+      for (let i = 0; i < chapters.length; i += 1) {
+        if (p < chapters[i].holdStart) {
+          const prevTime = i === 0 ? 0 : chapters[i - 1].timeSec
+          zone = { kind: 'play', fromTime: prevTime, toTime: chapters[i].timeSec, index: i }
+          break
+        }
+      }
+    }
+    if (!zone) {
+      const last = chapters[chapters.length - 1]
+      zone = { kind: 'play', fromTime: last?.timeSec ?? 0, toTime: videoDuration, index: chapters.length }
+    }
+
+    const zoneKey = zone.kind === 'hold' ? `hold:${zone.chapter.id}` : `play:${zone.index}`
+    if (zoneKey === currentZoneRef.current) return
+    currentZoneRef.current = zoneKey
+
+    if (zone.kind === 'hold') {
+      video.pause()
+      video.currentTime = zone.chapter.timeSec
+    } else {
+      if (video.currentTime < zone.fromTime - 0.05 || video.currentTime > zone.toTime + 0.05) {
+        video.currentTime = zone.fromTime
+      }
+      video.playbackRate = 1
+      video.play().catch(() => {})
+      const targetTime = zone.toTime
+      if (timeUpdateHandlerRef.current) video.removeEventListener('timeupdate', timeUpdateHandlerRef.current)
+      const handler = () => {
+        if (video.currentTime >= targetTime - 0.03) {
+          video.removeEventListener('timeupdate', handler)
+          timeUpdateHandlerRef.current = null
+          video.pause()
+          video.currentTime = targetTime
+        }
+      }
+      timeUpdateHandlerRef.current = handler
+      video.addEventListener('timeupdate', handler)
+    }
+  })
+}
+
 export default function StoryExperienceSection({ data, accent }) {
   const containerRef = useRef(null)
+  const videoRef = useRef(null)
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ['start start', 'end start'],
   })
 
+  const isVideoMode = !!data.video_url
   const frameCount = data.frame_count ?? 0
   const chapters = data.chapters ?? []
   const frameBaseUrl = data.frame_base_url
@@ -116,14 +198,9 @@ export default function StoryExperienceSection({ data, accent }) {
   // [holdStart, holdEnd] range at its hold_frame. useTransform interpolates
   // linearly between each (input, output) breakpoint pair, so a repeated
   // output value across two consecutive inputs is exactly a hold.
-  //
-  // Memoized: useTransform must receive the SAME array references across
-  // renders. Rebuilding fresh arrays inline (as this originally did) makes
-  // useTransform hand back a new MotionValue instance every render, which
-  // silently breaks FrameSequenceCanvas's useMotionValueEvent subscription
-  // (found via real headless-Chrome testing -- the canvas rendered nothing
-  // during a hold because the 'change' event it needed never fired against
-  // the stale, orphaned prior instance).
+  // Frame-sequence mode only -- harmless no-op work in video mode (chapters
+  // there lack hold_frame, so every breakpoint just collapses to 0), kept
+  // unconditional so hook order never depends on which mode is active.
   const { inputBreakpoints, outputBreakpoints } = useMemo(() => {
     const lastFrame = Math.max(frameCount - 1, 1)
     const input = [0]
@@ -144,6 +221,8 @@ export default function StoryExperienceSection({ data, accent }) {
   }, [frameCount, JSON.stringify(chapters)])
 
   const effectiveProgress = useTransform(scrollYProgress, inputBreakpoints, outputBreakpoints)
+
+  useHybridVideoPlayback(videoRef, scrollYProgress, isVideoMode ? chapters : [], data.video_duration_sec ?? 0)
 
   // The inner sticky viewport only stays pinned while scrollY is within
   // [top, top + height - 100vh] -- past that the CSS `position: sticky`
@@ -171,20 +250,42 @@ export default function StoryExperienceSection({ data, accent }) {
 
   // Guard placed after every hook call above (never before) -- hooks must
   // run in the same order on every render, so this can't be an early return
-  // ahead of useMemo/useTransform.
-  if (!frameBaseUrl || frameCount === 0) return null
+  // ahead of useMemo/useTransform/useMotionValueEvent.
+  if (!isVideoMode && (!frameBaseUrl || frameCount === 0)) return null
+  if (isVideoMode && !data.video_url) return null
 
   return (
     <section
       ref={containerRef}
       style={{
         position: 'relative',
-        height: `${data.scroll_range_vh ?? 320}vh`,
+        // `svh` (small viewport height), not `vh` -- 2026-07-25, real mobile
+        // bug: `vh` is calculated against the viewport with the browser's
+        // address bar HIDDEN, so on a real phone (address bar visible,
+        // shrinking the true visible area) a plain `100vh` sticky child is
+        // taller than what's actually visible, cutting the section off /
+        // leaving it not filling the screen. `svh` uses the smallest-ever
+        // viewport size instead, so it never overshoots what's really
+        // visible. Both the outer scroll-distance height and the inner
+        // sticky height must use the SAME unit -- pinnedZoneEnd above is a
+        // ratio between them (`1 - 100/scrollRangeVh`), and mixing vh/svh
+        // would silently throw that ratio off on exactly the devices this
+        // is fixing for.
+        height: `${data.scroll_range_vh ?? 320}svh`,
         marginLeft: -24, marginRight: -24, marginBottom: 56,
       }}
     >
-      <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
-        <FrameSequenceCanvas assets={assets} progress={effectiveProgress} />
+      <div style={{ position: 'sticky', top: 0, height: '100svh', overflow: 'hidden' }}>
+        {isVideoMode ? (
+          <video
+            ref={videoRef}
+            src={data.video_url}
+            muted playsInline preload="auto"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <FrameSequenceCanvas assets={assets} progress={effectiveProgress} />
+        )}
 
         <div style={{
           position: 'absolute', inset: 0,

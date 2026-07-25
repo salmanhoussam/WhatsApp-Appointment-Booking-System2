@@ -179,3 +179,62 @@ did.
 No — if anything, this entry *lowers* confidence that two data points are close, since the second
 real attempt didn't survive contact with real footage. Revisit this file only once a tenant with
 both a different type and deliberately-shot footage attempts a similar treatment.
+
+---
+
+## 2026-07-25 — A second rendering mode, and a real production graduation
+
+### Context
+
+Salman supplied a third, unrelated video for `hr` (`storyboard.mp4`, AI-generated, confirmed
+intentional — a small "AI" watermark is visible in every frame) and asked for "a new experience"
+for it, explicit about wanting the *methodology* applied again rather than a technique assumed in
+advance. Investigated in `experiments/rk-barber-story-lab/` (Round 5) before building anything —
+see that lab's README for the full real-frame investigation. Real content, confirmed by viewing a
+1fps preview, not guessed from the filename: 4 discrete, mostly-static ~5s scenes, each with its
+own animated caption already burned into the video pixels ("Step Inside" → "Grooming Musts" →
+"Where Magic Happens" → "Your Chair Awaits").
+
+### Discovery
+
+This footage is the *opposite* shape from Video 1's real problem (2026-07-24 entries above):
+continuous, uncaptioned handheld motion needs frame-sequence scroll-scrubbing; discrete,
+already-captioned near-static scenes don't — extracting frames for it would mean losing real video
+quality for motion that barely exists, and our own overlay chapter titles would duplicate/clash
+with captions already baked into the pixels. The lab's already-debugged `hybrid` technique (real
+`<video>` plays forward between chapters, pauses+snaps on each hold) fit this footage's real shape
+directly, reused as-is.
+
+**`StoryExperienceSection.jsx` now supports two rendering modes**, chosen by which data shape is
+present — `frame_base_url`+`frame_count` (the original frame-sequence mode, still real and still
+used by nothing in production today, since Video 1 was reverted) vs. `video_url` (new: native
+`<video>`, the lab's hybrid play/hold logic ported in ~40 lines, same `ChapterOverlay` component
+reused unchanged for both modes — it only ever needed `holdStart`/`holdEnd`). This is the
+architecture change the original plan (`.claude/plans/we-moved-on-new-hazy-barto.md`) explicitly
+flagged and deferred: *"a new `story_experience` rendering mode ... a bigger change than swapping a
+frame count, deferred intentionally until the UX itself is confirmed worth it."* That confirmation
+happened via the lab; this is it being built.
+
+**Real production graduation, not just a lab result**: Salman's explicit placement decision — leave
+`s_hero` untouched, replace `hr`'s `s_video_story_1` (the old, plain-looping "من محلنا" video)
+with this new video in `story_experience`'s new native-video mode. Deployed for real: uploaded the
+compressed video to `properties/hr/pages/home/story/storyboard.mp4`, seeded via
+`seed_page_content.py`, verified by reading the actual DB row back (not just trusting "seeded"
+output) and by real headless-Chrome screenshots at all 4 chapter holds against the live dev server,
+zero console errors, real Arabic CTA ("احجز الآن") confirmed clickable and scrolling to `#s_cta`.
+
+### Current Understanding
+
+`story_experience` is no longer a single-mode section type — it's one `SectionType` with two real,
+production-capable rendering strategies, chosen by footage shape rather than by tenant. This is
+still exactly one tenant (`hr`) for both modes, so the Chapters/Overlay-Blocks promotion bar from
+the 2026-07-24 entries is **unchanged** — a second rendering mode within the same tenant doesn't
+count toward "a second, independently-motivated tenant type," any more than `hr` reusing
+`video_story` twice did back on 2026-07-24.
+
+### Promoted?
+
+No — same bar as before (second tenant *type*, with footage suited to *either* mode). What changed
+today is that the pattern now has two proven-working real applications on the same tenant instead
+of one reverted attempt, which is a stronger base to promote from whenever that second tenant type
+does show up — but it isn't itself the second data point.

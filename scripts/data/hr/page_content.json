@@ -24,26 +24,56 @@
       "order": 1,
       "data": {
         "heading_ar": "من نحن",
-        "body_ar": "أضف وصف المحل الحقيقي من لوحة التحكم.",
+        "body_ar": "في RK Barber Shop، الحلاقة مش مجرد قصة شعر — هي تجربة كاملة من العناية والراحة. فريقنا من الحلاقين المحترفين بيقدملك خدمة دقيقة بلمسة عصرية، بأدوات ومنتجات مختارة بعناية، بمساحة صُممت لتخليك تشعر بالراحة من أول لحظة لآخر لحظة.",
         "bg_image_url": "",
         "bg_type": "color"
       }
     },
     {
       "id": "s_video_story_1",
-      "type": "video_story",
+      "type": "story_experience",
       "order": 2,
       "data": {
-        "heading_ar": "من محلنا",
-        "videos": [
+        "frame_base_url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/hr/pages/home/story/frames",
+        "frame_count": 243,
+        "native_width": 480,
+        "native_height": 854,
+        "scroll_range_vh": 450,
+        "chapters": [
           {
-            "id": "v1_shop_tour",
-            "url": "https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/RK%20Barbar/WhatsApp%20Video%202026-07-22%20at%2002.01.14.mp4",
-            "caption_ar": "جولة داخل المحل",
-            "title": null,
-            "description": null,
-            "cta": null,
-            "target_category_id": null
+            "id": "entrance",
+            "holdStart": 0.05,
+            "holdEnd": 0.15,
+            "hold_frame": 24,
+            "title_ar": "RK Barber Shop",
+            "subtitle_ar": "تجربة عناية رجالية استثنائية"
+          },
+          {
+            "id": "products",
+            "holdStart": 0.25,
+            "holdEnd": 0.35,
+            "hold_frame": 84,
+            "title_ar": "منتجات عناية فاخرة",
+            "cta_label_ar": "استكشف المجموعة",
+            "cta_target": "#s_featured"
+          },
+          {
+            "id": "stations",
+            "holdStart": 0.45,
+            "holdEnd": 0.55,
+            "hold_frame": 143,
+            "title_ar": "قصات دقيقة باحتراف",
+            "cta_label_ar": "احجز موعدك الآن",
+            "cta_target": "#s_cta"
+          },
+          {
+            "id": "booking",
+            "holdStart": 0.65,
+            "holdEnd": 0.675,
+            "hold_frame": 221,
+            "title_ar": "جاهز لإطلالتك الجديدة؟",
+            "cta_label_ar": "احجز الآن",
+            "cta_target": "#s_cta"
           }
         ]
       }
@@ -52,7 +82,9 @@
       "id": "s_gallery",
       "type": "gallery",
       "order": 3,
-      "data": { "images": [] }
+      "data": {
+        "images": []
+      }
     },
     {
       "id": "s_featured",
@@ -100,7 +132,12 @@
       "data": {
         "heading_ar": "ساعات العمل",
         "rows": [
-          { "day_ar": "أيام الأسبوع", "open_ar": "قريباً", "close_ar": "قريباً", "closed": false }
+          {
+            "day_ar": "أيام الأسبوع",
+            "open_ar": "قريباً",
+            "close_ar": "قريباً",
+            "closed": false
+          }
         ]
       }
     },
