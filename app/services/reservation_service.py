@@ -5,6 +5,8 @@ Works across: restaurant, services, real_estate, hotel.
 
 from datetime import datetime, timedelta
 
+from prisma import Json
+
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
 
@@ -64,6 +66,21 @@ async def create_reservation(
 
     effective_duration = duration_min or MODULE_DEFAULTS.get(module_key, {}).get("duration_min", 60)
 
+    # Working-hours check — Client.config.working_hours, reused JSON field, no migration.
+    # All times treated as UTC directly, matching how reservedAt is stored/compared everywhere
+    # else in this codebase today (no timezone-conversion utility exists in this path).
+    client = await prisma_client.client.find_unique(where={"id": client_id})
+    working_hours = (client.config or {}).get("working_hours") if client else None
+    if working_hours:
+        day_name = reserved_at.strftime("%A").lower()
+        if day_name in (working_hours.get("closed_days") or []):
+            raise ValueError(f"This business is closed on {day_name.capitalize()}.")
+        open_t, close_t = working_hours.get("open_time"), working_hours.get("close_time")
+        if open_t and close_t:
+            slot_time = reserved_at.strftime("%H:%M")
+            if not (open_t <= slot_time < close_t):
+                raise ValueError(f"Outside working hours ({open_t}-{close_t}).")
+
     # Conflict check — only relevant when metadata contains a specific table/resource label
     # For open "any table" reservations, skip the conflict block
     should_check_conflict = bool(
@@ -91,7 +108,7 @@ async def create_reservation(
         if _has_conflict(overlapping, reserved_at, effective_duration):
             raise ValueError(f"This slot is already reserved. Please choose a different time.")
 
-    reservation = await repo.create({
+    create_data = {
         "clientId":      client_id,
         "moduleKey":     module_key,
         "customerName":  customer_name,
@@ -101,8 +118,15 @@ async def create_reservation(
         "durationMin":   effective_duration,
         "status":        "pending",
         "notes":         notes,
-        "metadata":      metadata,
-    })
+    }
+    # Prisma's generated types for an optional Json? field reject a bare `None`/`dict` --
+    # they must be omitted entirely or wrapped in Json(...). Confirmed via direct diagnostic
+    # calls: omitting the key succeeds, `metadata: None` reproduces the real 500, `Json({...})`
+    # succeeds.
+    if metadata:
+        create_data["metadata"] = Json(metadata)
+
+    reservation = await repo.create(create_data)
     return _fmt(reservation)
 
 

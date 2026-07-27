@@ -30,26 +30,37 @@ class StatusUpdateIn(BaseModel):
 async def list_reservations(
     module_key: Optional[str] = Query(None, description="restaurant | services | real_estate | hotel"),
     status:     Optional[str] = Query(None),
-    date:       Optional[str] = Query(None, description="YYYY-MM-DD — filters by day"),
-    limit:      int = Query(50, le=200),
+    date:       Optional[str] = Query(None, description="YYYY-MM-DD — filters by a single day"),
+    date_from:  Optional[date] = Query(None, description="YYYY-MM-DD — range start, inclusive"),
+    date_to:    Optional[date] = Query(None, description="YYYY-MM-DD — range end, inclusive"),
+    limit:      int = Query(50, le=500),
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("reservations")),
 ):
-    date_from = date_to = None
+    range_from = range_to = None
     if date:
+        # Existing single-day behavior, unchanged.
         try:
             day = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            date_from = day
-            date_to   = day + timedelta(days=1)
+            range_from = day
+            range_to   = day + timedelta(days=1)
         except ValueError:
             raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    elif date_from or date_to:
+        # New — a 7-day range in one call, for the Reservations Calendar week view.
+        if date_from:
+            range_from = datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc)
+        if date_to:
+            # Inclusive of the whole calendar day, mirroring the single-`date` case above.
+            end_day  = datetime(date_to.year, date_to.month, date_to.day, tzinfo=timezone.utc)
+            range_to = end_day + timedelta(days=1)
 
     results = await reservation_service.list_reservations(
         client_id  = str(user.clientId),
         module_key = module_key,
         status     = status,
-        date_from  = date_from,
-        date_to    = date_to,
+        date_from  = range_from,
+        date_to    = range_to,
         limit      = limit,
     )
     return {"success": True, "data": results}
