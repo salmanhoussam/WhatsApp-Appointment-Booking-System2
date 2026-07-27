@@ -224,6 +224,25 @@ edit files himself, and does not execute a Service's own work. His responsibilit
   capabilities/<name>.md` Open Findings section (per ADR-0003), not silently fixed in passing. A standing
   responsibility, not a one-time favor — raised by Salman 2026-07-22 after Sprint 2 (Media
   Capability), and becomes materially more important once AI or Mobile Interfaces are real.
+- **End-to-End Verification Routine** — no Service/feature/bug-fix is reported "done" on a code
+  claim alone. Closing a real piece of work requires **real proof**, not "should work now":
+  1. **Data proof** — a real DB read-back (direct query dump, or an authenticated API response)
+     showing the actual row/state, with real IDs — never "it was created" alone.
+  2. **Visual proof** — for anything with a UI surface, a real headless-Chrome screenshot of the
+     actual rendered page, not an assumption that the data proof implies the UI is correct
+     (`investigation-protocol.md`'s "Runtime Before Assumption" rule — Data → Transformation →
+     State → Render → Visible UI are separate links; the first proves nothing about the last).
+  3. **Negative-case proof**, where applicable — if a fix/feature is meant to reject something
+     (e.g. a validation rule), a real failing case must be shown actually failing, not just the
+     happy path succeeding.
+  Established 2026-07-27 from a real case (RK Barber's Reservations feature): fixing a live 500
+  bug alone would not have been enough — the same verification pass that produced a real DB dump
+  and a real Calendar screenshot also caught two *more* independent real bugs a code-only "looks
+  fixed" claim would have missed (a field-name mismatch invisible in a table but immediately
+  visible in a calendar; a UTC-vs-local-timezone display bug only visible by actually looking at
+  the rendered screenshot). A standing responsibility going forward, not a one-time favor — applies
+  to every future Service/feature closure the same way (e.g. the Store Template pilot), not just
+  ones Salman explicitly asks to be screenshotted.
 
 ## Accountability Principle
 
