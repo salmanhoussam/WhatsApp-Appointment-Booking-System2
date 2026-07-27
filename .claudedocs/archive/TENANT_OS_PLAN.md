@@ -1,5 +1,16 @@
 # TENANT_OS_PLAN.md — Tenant Operating System: Architecture Plan
 
+**Superseded 2026-07-27 by ADR-0003 — see `architecture/TENANT_OS.md`, `architecture/principles/`,
+`adr/TOS-*`, `architecture/capabilities/*`.** Archived, not deleted, per `repository-hygiene.md`'s
+precedent. Every real fact in this document was traced to a new home during the ADR-0003 migration
+— see `implementation/ADR-0003/PHASE_7.md` for the section-by-section completeness check. Two real
+exceptions, named honestly rather than silently carried: §23–24 (Rollout Phases, the Client
+Journey Audit) were explicitly deferred, out of the migration's scope, and remain readable only
+here; the Booking/Units-specific rows of §6 and the Team/Staff rows of §19/§20/§21/§22 were never
+redistributed into `capabilities/*.md` because neither Units nor Team/Staff has passed the
+Capability Proposal gate (`adr/TOS-003-capability-contract-model.md`) as a ratified Tenant OS
+Capability — this document remains their only real record until one of them is proposed properly.
+
 **Status:** Design only. No code, no UI design, no new API, no database migration — a strategic
 architecture plan, per `.claude/rules/documentation-policy.md`. Follows the Service Execution
 Constitution's "real project state is the source of truth" principle throughout: every claim
