@@ -1,0 +1,67 @@
+[
+  {
+    "id": "619e0e57-092f-472b-9d30-fdd6063235eb",
+    "category": "Dresses",
+    "name_ar": "فستان صيفي بسيط",
+    "name_en": "Simple Summer Dress",
+    "description_ar": "فستان قطني خفيف، مناسب للاستخدام اليومي — منتج تجريبي بدون متغيرات (لون/مقاس).",
+    "description_en": "Lightweight cotton dress for everyday wear — synthetic test product, no variants (color/size).",
+    "price": 45.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": null,
+    "metadata": {}
+  },
+  {
+    "id": "fd191912-20b6-4e22-aae1-4662f31dd116",
+    "category": "Abayas",
+    "name_ar": "عباية سادة كلاسيكية",
+    "name_en": "Classic Plain Abaya",
+    "description_ar": "عباية سوداء كلاسيكية بقصة بسيطة — منتج تجريبي بدون متغيرات.",
+    "description_en": "Classic black abaya, simple cut — synthetic test product, no variants.",
+    "price": 60.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": null,
+    "metadata": {}
+  },
+  {
+    "id": "6ac5ad15-54cc-4129-b123-6af31ea05553",
+    "category": "Blouses",
+    "name_ar": "بلوزة قطنية بيضاء",
+    "name_en": "White Cotton Blouse",
+    "description_ar": "بلوزة قطنية بيضاء بسيطة — منتج تجريبي بدون متغيرات.",
+    "description_en": "Simple white cotton blouse — synthetic test product, no variants.",
+    "price": 25.0,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": null,
+    "metadata": {}
+  },
+  {
+    "id": "2c7a3373-eef4-4753-aa3f-b2505bb5384c",
+    "category": "Shoes",
+    "name_ar": "حذاء رياضي أساسي",
+    "name_en": "Basic Sneaker",
+    "description_ar": "حذاء رياضي أساسي بمقاس واحد ثابت لأغراض الاختبار — منتج تجريبي بدون متغيرات.",
+    "description_en": "Basic sneaker, single fixed size for test purposes — synthetic test product, no variants.",
+    "price": 35.0,
+    "currency": "USD",
+    "is_featured": true,
+    "image_url": null,
+    "metadata": {}
+  },
+  {
+    "id": "f14b8b1b-ba3e-4d4e-a270-20fd3a5d6721",
+    "category": "Accessories",
+    "name_ar": "وشاح بسيط",
+    "name_en": "Simple Scarf",
+    "description_ar": "وشاح قطني بسيط بلون واحد — منتج تجريبي بدون متغيرات.",
+    "description_en": "Simple single-color cotton scarf — synthetic test product, no variants.",
+    "price": 12.0,
+    "currency": "USD",
+    "is_featured": false,
+    "image_url": null,
+    "metadata": {}
+  }
+]

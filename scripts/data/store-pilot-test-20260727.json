@@ -1,0 +1,51 @@
+{
+  "_schema_version": "2.1",
+  "_description": "SYNTHETIC TEST FIXTURE — not a real business, not extracted by المحقق كونان. Authored manually 2026-07-27 to validate the Store Template pilot's Implementation Contract (.claudedocs/architecture/STORE_TEMPLATE_CONTRACT.md) — Simple Products only, Product Variants explicitly excluded per the Pragmatic Baseline decision. Uses obviously-fake owner contact details. Delete after the pilot run confirms the Contract, or keep as a reusable test fixture — do not treat as a real customer.",
+
+  "meta": {
+    "extracted_by": "manual-test-fixture",
+    "extracted_at": "2026-07-27T00:00:00Z",
+    "conversation_id": null,
+    "confidence": "high",
+    "needs_review": []
+  },
+
+  "client": {
+    "slug": "store-pilot-test-20260727",
+    "name_ar": "متجر تجريبي - اختبار الطيار الثاني",
+    "name_en": "Store Pilot Test (Service Contract Validation)",
+    "service_type": "store",
+    "status": "trial",
+    "currency": "USD",
+    "country_code": "LB",
+    "trial_ends_at": null
+  },
+
+  "owner": {
+    "name": "Test Fixture Owner",
+    "whatsapp": "+10000000001",
+    "email": "store-pilot-test-20260727@salmansaas-pilot-fixture.com",
+    "password_temp": "StorePilotTest2026"
+  },
+
+  "design": {
+    "primary_color": "#E8E8E8",
+    "page_type": "showcase",
+    "template_key": "fashion-grid",
+    "module_key": "store",
+    "hero_style": null
+  },
+
+  "services_config": {
+    "active_services": ["store"]
+  },
+
+  "catalog": {
+    "seed_from_template": true,
+    "categories": []
+  },
+
+  "restaurant_config": null,
+  "booking_config": null,
+  "store_config": null
+}

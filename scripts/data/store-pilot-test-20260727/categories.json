@@ -1,0 +1,42 @@
+[
+  {
+    "id": "b97f3281-0804-4cf7-8784-4803656fdc31",
+    "name_ar": "فساتين",
+    "name_en": "Dresses",
+    "sort_order": 1,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "cba26656-3d26-427b-97b9-6c9522784daa",
+    "name_ar": "عبايات",
+    "name_en": "Abayas",
+    "sort_order": 2,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "499db969-ba4d-4313-8b9d-4fb35c1c84f2",
+    "name_ar": "بلايز",
+    "name_en": "Blouses",
+    "sort_order": 3,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "528331a4-a6c6-42dc-bd09-e3df7eacfec7",
+    "name_ar": "أحذية",
+    "name_en": "Shoes",
+    "sort_order": 4,
+    "display_template": "grid",
+    "image_url": null
+  },
+  {
+    "id": "8eec973c-8101-4301-8921-9e5183dd971d",
+    "name_ar": "إكسسوارات",
+    "name_en": "Accessories",
+    "sort_order": 5,
+    "display_template": "grid",
+    "image_url": null
+  }
+]

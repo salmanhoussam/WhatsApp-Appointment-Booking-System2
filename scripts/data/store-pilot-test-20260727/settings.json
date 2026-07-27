@@ -1,0 +1,11 @@
+{
+  "_meta": {
+    "slug": "store-pilot-test-20260727",
+    "module_key": "store",
+    "currency": "USD",
+    "client_name_en": "Store Pilot Test (Service Contract Validation)",
+    "client_name_ar": "متجر تجريبي - اختبار الطيار الثاني",
+    "primary_color": "#E8E8E8",
+    "note": "SYNTHETIC TEST FIXTURE — Store Template pilot, Pragmatic Baseline (Simple Products only, Product Variants excluded per STORE_TEMPLATE_PLAN.md Section 5). Not a real business."
+  }
+}
