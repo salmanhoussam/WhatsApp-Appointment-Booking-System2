@@ -126,3 +126,26 @@ handled its inherited findings? This investigation deliberately stops short of d
 Implementation Contract until that scope call is made — per this project's own workflow
 (`documentation-policy.md`: Architecture Plan → Implementation Contract are separate steps, not
 one document).
+
+## 5. Tech Debt — Explicitly Deferred for This Pilot
+
+**Decided 2026-07-27**: Salman adopted a "Pragmatic Baseline" for the Store pilot — Simple
+Products only, none of the three items below get fixed or built as part of it. Named here
+explicitly, the same way Restaurant's own sign-off carried forward its inherited Customers/
+Team-Staff findings rather than fixing them first, so a future reader never mistakes "the pilot
+passed" for "these gaps are closed."
+
+1. **Product Variants** — the full gap described in §2 above (`metadata.variants` unshaped, no
+   admin/shopper UI, `StoreCartItem`/`StoreOrderItem` structural break). The pilot's `items.json`
+   deliberately omits `metadata.variants` entirely — Simple Products only, no color/size selection
+   anywhere in this pass.
+2. **Catalog Duplicate Architecture** (`store.py`/`restaurant.py` bypassing `catalog_service.py`) —
+   already tracked in `.claudedocs/architecture/capabilities/catalog.md`'s Open Findings.
+   Inherited by this pilot, not fixed by it.
+3. **Orders Missing Architecture** (no `store_order_service.py`, both admin and public checkout
+   call `store_repo` directly) — already tracked in
+   `.claudedocs/architecture/capabilities/orders.md`'s Open Findings. Inherited by this pilot, not
+   fixed by it.
+
+See `STORE_TEMPLATE_CONTRACT.md` for the actual pilot Implementation Contract built against this
+explicitly narrowed scope.
