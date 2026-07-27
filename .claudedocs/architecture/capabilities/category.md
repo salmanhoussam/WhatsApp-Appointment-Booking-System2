@@ -43,6 +43,26 @@ finding below.
 `GET /api/v1/public/{module}/catalog` — categories are returned nested with their items, same
 public read path as Catalog.
 
+## Single Source of Truth
+
+`CatalogCategory` is the model; `catalog_service.py` is the intended single write path.
+**Violated today** — shares Catalog's Duplicate Architecture finding.
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): Create/Rename/Delete Category ✅/✅; Reorder
+Categories 🔜/🔜 (same reorder Gap as Catalog).
+
+**Draft/Publish, Audit, Versioning, Activity**: shared platform-wide Gaps, same as `catalog.md` —
+not repeated in full here to avoid two independently-drifting copies.
+
+## Acceptance
+
+Not independently re-scored criterion-by-criterion — approximated at **~50%**, same profile as
+Catalog (shares its Contract/Implementation/Governance status). A future Implementation Contract
+that wants an exact figure would repeat `catalog.md`'s own per-criterion table for Category
+specifically.
+
 ## Maturity
 
 **Developing** — shares `catalog_service.py` and Catalog's own Duplicate Architecture finding; not

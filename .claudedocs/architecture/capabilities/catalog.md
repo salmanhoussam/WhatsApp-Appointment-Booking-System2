@@ -59,6 +59,46 @@ is the **only** correct write path — see Open Findings below for where this is
 `GET /api/v1/public/{module}/catalog` (already real, unchanged by this Capability's own work) —
 read-only, published items only.
 
+## Single Source of Truth
+
+`CatalogItem` is the model; `catalog_service.py` is the intended single write path. **Violated
+today** — see Open Findings (Duplicate Architecture).
+
+## Governance
+
+**Permissions** (Client / AI — identical by design, `../adr/TOS-001-tenant-os.md` §4's AI-plugs-in
+principle): Create/Edit/Delete/Archive/Publish Product ✅/✅; Create/Rename/Delete Category ✅/✅;
+Duplicate Product 🔜/🔜; Reorder Products/Categories 🔜/🔜 (blocked on the same reorder Gap noted in
+Contract above).
+
+**Draft/Publish**: provisional only — Publish today ≈ `CatalogItem.isActive`, not the staged
+Live Preview mechanism (`../adr/TOS-002-editing-engine.md` §4.6) — a distinct action, not yet
+built.
+
+**Audit / Versioning / Activity**: Gap, shared platform-wide (not specific to this Capability) —
+see `SecurityAuditLog`'s real, structurally-suitable-but-unused shape, named once rather than
+repeated per Capability file.
+
+## Acceptance
+
+Scored in full detail (this project's only Capability scored criterion-by-criterion, not
+approximated):
+
+| Criterion | Status | Score |
+|---|---|---|
+| Dashboard | ✅ Real (`CatalogTab.jsx`) | 1 |
+| AI | ❌ Not built | 0 |
+| API (tenant-authoring) | ❌ Not built — distinct from the existing shopper-facing public API | 0 |
+| Validation | ✅ Likely — Pydantic is this project's mandatory convention and `catalog.py` is confirmed clean; not independently re-verified field-by-field | 1 |
+| Audit | ❌ Gap | 0 |
+| Activity | ❌ Gap | 0 |
+| Permissions | ✅ Real rows exist in the Governance table above | 1 |
+| Draft/Publish | ⚠️ Provisional only | 0.5 |
+| Documentation | ✅ Real — `.claude/rules/frontend/catalog-contract.md`, `service-system.md`'s table entry, this file | 1 |
+
+**Total: 4.5 / 9 ≈ 50%.** A real, computed number — replaces "Catalog seems done" with an
+auditable figure anyone can recompute.
+
 ## Maturity
 
 **Developing** — Contract and a working Dashboard Interface exist, but Implementation carries a

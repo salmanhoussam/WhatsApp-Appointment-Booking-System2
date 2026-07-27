@@ -52,6 +52,25 @@ Capability's own section array.
 
 `GET /public/{slug}/config` — same keys, already real.
 
+## Single Source of Truth
+
+Shares `site-configuration.md`'s `Client.config` (Json) model and intended `client_service.py`
+write path — same violation, not independently tracked.
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): Change primary color/font (curated) ✅/✅;
+Reorder/show-hide page sections ✅/✅; Create a new section type or layout ❌/❌ (Template-owned,
+never a roadmap item for Client or AI); Change Checkout page layout ❌/❌ (same reason).
+
+**Draft/Publish, Audit, Versioning, Activity**: shared platform-wide Gaps, same as
+`site-configuration.md`.
+
+## Acceptance
+
+Not independently re-scored — approximated at **~44%**, same bar as Site Configuration (a
+narrower slice of the same underlying mechanism).
+
 ## Maturity
 
 **Developing** — a narrower slice of Site Configuration, sharing its same underlying

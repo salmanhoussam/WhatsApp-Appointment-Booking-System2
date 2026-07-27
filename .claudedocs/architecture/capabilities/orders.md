@@ -44,6 +44,28 @@ layered).
 Customer-facing order placement is out of this Capability's scope (handled by each module's public
 booking/checkout flow) — this Capability covers only the tenant-facing Admin view/management side.
 
+## Single Source of Truth
+
+`StoreOrder`/restaurant order model for Store/Restaurant — no dedicated service exists (Missing
+Architecture, below). Booking's own order-equivalent, `Booking`, correctly has `booking_service.py`
+as its single write path — not part of this Capability's own open gap.
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): View/update order status ✅/✅; Export orders
+🔜/🔜.
+
+**Draft/Publish**: not applicable to this Capability's own nature (an order's status transitions,
+not staged content).
+
+**Audit / Versioning / Activity**: shared platform-wide Gaps (see `catalog.md`'s Governance
+section for the `SecurityAuditLog` note, not repeated here).
+
+## Acceptance
+
+Not independently re-scored — approximated at **~38%** (Developing — Missing Architecture finding
+still open for Store/Restaurant).
+
 ## Maturity
 
 **Developing** — Dashboard works in production today for all three module types; Implementation is

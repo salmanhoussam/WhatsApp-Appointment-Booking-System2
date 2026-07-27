@@ -118,6 +118,24 @@ extended and fixed, per the Source of Truth note above.
 `GET /public/{slug}/config` — already real and unchanged for every field this Contract covers
 except Email (a confirmed Gap, not exposed).
 
+## Single Source of Truth
+
+`Client.config` (Json) is the model; `client_service.py` (exists) is the intended single write
+path. **Violated today** — see Open Findings (Broken Architecture, `settings.py`).
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): Brand name/logo/WhatsApp/email/currency ✅/✅;
+Custom domain/timezone/tax/languages 🔜/🔜; Edit SEO metadata 🔜/🔜.
+
+**Draft/Publish, Audit, Versioning, Activity**: shared platform-wide Gaps (see `catalog.md`'s
+Governance section for the `SecurityAuditLog` note, not repeated here).
+
+## Acceptance
+
+Not independently re-scored criterion-by-criterion — approximated at **~44%** (Developing —
+Broken Architecture finding still open).
+
 ## Maturity
 
 **Developing** — Contract and a partial Dashboard exist, but Implementation carries a live

@@ -38,6 +38,25 @@ is never mounted (see Open Findings).
 Not applicable — Customers is an Admin-only Capability; there is no tenant-facing public read
 surface for a tenant's own customer list.
 
+## Single Source of Truth
+
+`Customer` is the model; `customer_service.py` (exists, correctly used internally) is the single
+write path. **Route unreachable** — see Open Findings (Missing Architecture, one layer up from
+the Service itself).
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): View/edit customer info 🔜/🔜 — blocked on the
+unmounted-route finding below, not a permissions decision.
+
+**Draft/Publish, Audit, Versioning, Activity**: shared platform-wide Gaps, not independently
+tracked for this Capability given it isn't reachable yet at all.
+
+## Acceptance
+
+Not independently re-scored — approximated at **~13%**, the lowest of any real Capability
+(Experimental — unreachable route).
+
 ## Maturity
 
 **Experimental** — Service correctly built, but its route is unmounted and unguarded — unreachable

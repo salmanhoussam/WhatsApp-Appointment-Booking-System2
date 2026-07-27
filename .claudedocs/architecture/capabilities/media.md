@@ -48,6 +48,27 @@ Media URLs are read wherever the owning Capability's Public Contract exposes the
 `GET /public/{slug}/config` for `hero.bg_image`) — Media itself has no dedicated public read
 endpoint; it is always read through whichever Capability references the URL.
 
+## Single Source of Truth
+
+`GalleryImage` is the model for unit-gallery media; no dedicated service exists for its CRUD/
+reorder (Missing Architecture, below). Separately, `hero.bg_image` has a real, narrow, clean path
+through `media_service.py` → `content_sections_repo.py`.
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): Upload images/video (contextual) ✅/✅;
+Browse/reuse a shared Media Library 🔜/🔜 (blocked on the Media Library Gap in Contract above).
+
+**Draft/Publish, Audit, Versioning, Activity**: shared platform-wide Gaps (see `catalog.md`'s
+Governance section for the one real, structurally-suitable-but-unused `SecurityAuditLog` note,
+not repeated per file).
+
+## Acceptance
+
+Not independently re-scored criterion-by-criterion — approximated at **~38%** (Experimental,
+single-module only: `hero.bg_image` is one field on one section type, not a general cross-module
+Media Capability).
+
 ## Maturity
 
 **Experimental** — one new real Interface path (`hero.bg_image` via the Editing Engine) was added

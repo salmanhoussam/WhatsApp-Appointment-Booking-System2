@@ -56,6 +56,29 @@ with Site Configuration, per the ratified 2026-07-22 separation decision below).
 Admin/Public split (`../adr/TOS-002-editing-engine.md` §4.7) is a genuine end-to-end guarantee, not
 a mock.
 
+## Single Source of Truth
+
+`Client.config.content` (Json) is the model; `content_service.py` is the single write path — real
+and clean for `hero.title`/`story.heading`, no shared Broken-Architecture finding with Site
+Configuration (separated per the ratified 2026-07-22 decision).
+
+## Governance
+
+**Permissions** (Client / AI, identical by design): Edit Hero/About/Contact copy ✅/✅.
+
+**Draft/Publish**: the one real, working Live Preview precedent (`../adr/TOS-002-editing-engine.md`
+§4.6) — the Settings tab's `<iframe>`/`postMessage` bridge, generalized by the Editing Engine.
+
+**Audit / Versioning / Activity**: shared platform-wide Gaps (see `catalog.md`'s Governance
+section for the `SecurityAuditLog` note, not repeated here).
+
+## Acceptance
+
+Not independently re-scored criterion-by-criterion — approximated at **~44%** as of the last
+Health Dashboard pass (rides the same underlying mechanism Site Configuration's Contract depends
+on, though the two Capabilities' own Implementation are now cleanly separated per the ratified
+2026-07-22 decision noted above).
+
 ## Maturity
 
 **Stable** (as of 2026-07-22, up from Developing) — its own clean `content_service.py` (no shared
