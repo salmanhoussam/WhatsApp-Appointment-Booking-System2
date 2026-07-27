@@ -1,7 +1,8 @@
 """
 Content Capability — Service (Tenant OS: Contract -> Service -> Repository -> Database).
 
-Content is its own Capability, per TENANT_OS_PLAN.md S1a: kept separate from Site Configuration
+Content is its own Capability, per .claudedocs/architecture/capabilities/site-configuration.md's
+Ownership Matrix: kept separate from Site Configuration
 even though both currently persist into Client.config -- Capability (what the client can do) and
 Persistence (where it's stored) are different axes; Design Principle 5 ("One Capability. One
 Service.") means Content gets its own canonical Service rather than sharing client_service.py's

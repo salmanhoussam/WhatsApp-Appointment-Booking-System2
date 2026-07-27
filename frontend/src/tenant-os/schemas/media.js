@@ -1,8 +1,9 @@
 /**
  * Media Capability — Schema.
  *
- * TENANT_OS_PLAN.md §13 (Media Capability contract: "Upload image/video into a specific
- * context (hero, logo, product, unit gallery)"), §14 (Schema drives the generic renderer).
+ * .claudedocs/architecture/capabilities/media.md (Media Capability contract: "Upload image/video
+ * into a specific context (hero, logo, product, unit gallery)"), .claudedocs/adr/
+ * TOS-002-editing-engine.md (Schema drives the generic renderer).
  *
  * `uploadContext` maps to the existing, real `app/api/v1/admin/upload.py` FOLDER_MAP/
  * IMAGE_TYPE_MAP context key — Media reuses the real upload endpoint for the actual file

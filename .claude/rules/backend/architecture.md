@@ -112,10 +112,11 @@ about *data ownership*, not just *file placement*: a second route file writing t
 through a different path is exactly as much a violation as a route skipping the Service layer
 entirely, even when each individual file "looks correct" in isolation.
 
-`.claudedocs/architecture/TENANT_OS_PLAN.md` is where this principle is being actively audited and
-enforced today (its Single Source of Truth Matrix and classified Architecture Integrity Findings)
-— that document does not own this rule, it demonstrates applying it. Any future domain plan should
-link back here rather than restate the principle itself.
+`.claudedocs/architecture/capabilities/*.md` is where this principle is being actively audited and
+enforced today — each Capability's own Single Source of Truth line and classified Architecture
+Integrity Findings (taxonomy defined once in `.claudedocs/architecture/TENANT_OS.md`) — that
+folder does not own this rule, it demonstrates applying it. Any future domain plan should link
+back here rather than restate the principle itself.
 
 ## 10. Every Capability Exposes Two Contracts — Admin (Write) and Public (Read)
 
@@ -132,7 +133,7 @@ accident once more Capabilities and Interfaces (AI, Mobile) are added:
 > stable shape any tenant-facing renderer can depend on, future caching. Consumed by every
 > tenant-facing Interface, including a Dashboard's own live preview.
 
-Concretely, in the Tenant OS Editing Engine (`TENANT_OS_PLAN.md` §14) as already built: the
+Concretely, in the Tenant OS Editing Engine (`.claudedocs/adr/TOS-002-editing-engine.md`) as already built: the
 Dashboard's write path is `Dashboard → PATCH /api/v1/admin/{capability}/... → Service →
 Repository → DB`; the live preview `<iframe>` (and every real visitor) reads that same DB state
 back through a completely separate route, `GET /api/v1/public/{slug}/config` — never the Admin
@@ -146,14 +147,15 @@ No Interface — Dashboard, a future AI action, a future Mobile client — may r
 Repository directly, or cross the boundary (writing through the Public Contract, or reading
 Draft/unpublished state through it). Every write goes through an Admin route; every render goes
 through a Public route. A violation found anywhere is a **Broken Architecture** finding under
-`TENANT_OS_PLAN.md` §19's existing taxonomy — not a new category; the same one already defined
-there for a Route bypassing its Service, applied to this specific boundary.
+`.claudedocs/architecture/TENANT_OS.md`'s existing Architecture Integrity Finding Taxonomy — not a
+new category; the same one already defined there for a Route bypassing its Service, applied to
+this specific boundary.
 
-When Draft/Publish (`TENANT_OS_PLAN.md` §8) is built, this split is exactly what makes it a clean
+When Draft/Publish (`.claudedocs/adr/TOS-002-editing-engine.md` §4.6) is built, this split is exactly what makes it a clean
 addition rather than a rearchitecture: Admin Contract writes go to Draft Storage, a Publish step
 promotes Draft → Published, and the Public Contract only ever reads Published state — the Editing
 Engine itself does not change.
 
-`.claudedocs/architecture/TENANT_OS_PLAN.md` §14 is where this split is being actively exercised
-today (Content and Media Capabilities' real Admin routes vs. the Public config endpoint the live
-preview reads) — that document does not own this rule, it demonstrates applying it.
+`.claudedocs/architecture/capabilities/content.md` and `capabilities/media.md` are where this
+split is being actively exercised today (their real Admin routes vs. the Public config endpoint
+the live preview reads) — neither file owns this rule, they demonstrate applying it.

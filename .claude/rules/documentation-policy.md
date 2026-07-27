@@ -74,25 +74,60 @@ prompts becoming architecture (`.claudedocs/evolution/prompt-system.md`).
   Abstraction Rule, `rules/team-roles.md`, applied here to documentation itself) — never on a
   single session's insight alone.
 
-## Fixed folder structure
+## Folder structure — per ADR-0003 (Architecture Documentation System)
+
+Superseded 2026-07-27 (this migration's Phase 8) — the six-layer model below is ADR-0003 §4's real
+decision, not a restatement invented here; see `.claudedocs/adr/ADR-0003.md` for the full rationale
+and `.claudedocs/architecture/TENANT_OS.md` for a worked example of every layer populated for one
+real Domain (Tenant OS).
 
 ```
 .claudedocs/
-├── adr/            ADR-000X.md               — the architectural decision itself, nothing else
-├── evolution/       <topic>.md                — accumulating insight, pre-ADR (see above)
-├── architecture/    DOMAIN_NAME_PLAN.md        — design docs for large domains (no code, pre-ADR-implementation or standalone)
-├── implementation/  ADR-000X_IMPLEMENTATION_CONTRACT.md
-├── verification/    ADR-000X_PHASE_N.md (one per implementation step) + ADR-000X_FINAL.md
-├── reviews/         ADR-000X_POST_IMPLEMENTATION_REVIEW.md — never deleted, explains why the ADR was considered complete
-├── decisions/       short-lived / minor decisions that don't warrant a full ADR
-└── sessions/        daily session logs — unaffected by this policy, kept as-is
+├── adr/                 ADR-000X.md (platform-wide) and TOS-XXX-*.md (Tenant-OS-scoped, same
+│                        folder, distinguished by prefix, not nesting) — the decision itself,
+│                        nothing else
+├── evolution/           <topic>.md — accumulating insight, pre-ADR (see above)
+├── architecture/        Six layers, each answering one question, each its own rate of change:
+│   ├── README.md         entry point — what kind of thing am I even looking for
+│   ├── INDEX.md           the one navigation rollup — Decisions/Principles/Capabilities tables
+│   ├── <DOMAIN>.md        e.g. TENANT_OS.md — what a Domain is, at a glance, linking to the rest
+│   ├── principles/        P-XXX-*.md — what is permanently true, regardless of Capability
+│   │                      (rarely — years). Platform-wide principles stay in `.claude/rules/`
+│   │                      instead — never duplicated here; `INDEX.md` links to both explicitly.
+│   ├── capabilities/       <name>.md — Ownership/Contract/Operations/Schema/Admin projection/
+│   │                      Public projection/Single Source of Truth/Governance/Acceptance/
+│   │                      Maturity/Open Findings for ONE Capability, self-sufficient — no central
+│   │                      cross-cutting matrix file
+│   └── (other standalone Domain Plans — SUPER_ADMIN_DASHBOARD_PLAN.md, TENANT_LIFECYCLE_PLAN.md,
+│        etc. — unrelated to a given Domain's own six layers, confirmed no overlap per-Domain)
+├── implementation/      ADR-000X_IMPLEMENTATION_CONTRACT.md (ADR-0001/0002) or, from ADR-0003
+│                        onward, `implementation/ADR-000X/CONTRACT.md` + `PHASE_N.md` per phase —
+│                        the nested form distinguishes a decision's *implementation* from the
+│                        decision itself once many ADRs exist, per the Contract's own revision note
+├── verification/        ADR-000X_PHASE_N.md (ADR-0001/0002's flat form, left exactly as-is —
+│                        this split applies going forward, not retroactively) + ADR-000X_FINAL.md
+├── reviews/              flat, one file per architecture review or tenant verification — no
+│                        `architecture/`-nested duplicate (the mistake ADR-0003's own Investigation
+│                        caught and corrected)
+├── decisions/           short-lived / minor decisions that don't warrant a full ADR
+├── archive/              superseded documents, `git mv`'d not deleted, with a superseded-by header
+└── sessions/            daily session logs — unaffected by this policy, kept as-is
 ```
+
+**Standing cross-reference** — this file, `investigation-protocol.md`,
+`service-execution-constitution.md`, and `repository-hygiene.md` together define this project's
+whole evidence/documentation discipline: this file for *where* a document lives and in what
+sequence it's produced; `service-execution-constitution.md` for how a Service investigates and
+leaves evidence before executing; `investigation-protocol.md` for how a real bug/root-cause
+investigation is reported (Confirmed/Side Findings/Unknowns); `repository-hygiene.md` for drift
+categories and reference validation. Each governs a different moment in the same lifecycle rather
+than restating the others.
 
 ## Naming
 
-- ADRs: `ADR-000X.md` — sequential number, no slug in the filename (the slug/title lives inside the document).
-- Everything else that's ADR-scoped is prefixed with the same `ADR-000X_` to make the relationship obvious from the filename alone.
-- Architecture Plans use a descriptive `SCREAMING_SNAKE_CASE.md` name (e.g. `TENANT_LIFECYCLE_PLAN.md`), since they may exist before an ADR number is assigned or may span multiple future ADRs.
+- ADRs: `ADR-000X.md` — sequential number, no slug in the filename (the slug/title lives inside the document). Tenant-OS-scoped decisions use `TOS-XXX-<slug>.md` instead, in the same `adr/` folder.
+- Everything else that's ADR-scoped is prefixed with the same `ADR-000X_` (or, from ADR-0003 onward, nested under `implementation/ADR-000X/`) to make the relationship obvious from the filename alone.
+- A Domain's own six-layer `architecture/` content (its `<DOMAIN>.md`, `principles/*.md`, `capabilities/*.md`) uses descriptive kebab-case/PascalCase per ADR-0003 §4 — a legacy standalone Architecture Plan not yet migrated to this model may still use `SCREAMING_SNAKE_CASE.md` (e.g. `TENANT_LIFECYCLE_PLAN.md`) until it is.
 
 ## Rules
 

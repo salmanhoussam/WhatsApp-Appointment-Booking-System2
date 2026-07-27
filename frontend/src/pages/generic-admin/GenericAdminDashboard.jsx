@@ -268,7 +268,7 @@ export default function GenericAdminDashboard() {
   //
   // Field lookup is a small local capability->schema map, not a Dispatcher service — still
   // nothing built ahead of what two real Capabilities have actually proven
-  // (TENANT_OS_IMPLEMENTATION_REVIEW.md §1a/Q7).
+  // (.claudedocs/reviews/editing-engine-review.md §1a/Q7).
   const SCHEMAS_BY_CAPABILITY = { content: contentSchema, media: mediaSchema }
   const pendingImageFieldRef = useRef(null)
 

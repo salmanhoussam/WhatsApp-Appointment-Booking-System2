@@ -237,7 +237,7 @@ export default function DynamicPage() {
   }, [serverConfig])
 
   // ── Tenant OS Editing Engine — click-capture, iframe context only ────────────
-  // Sprint 1 scope (TENANT_OS_PLAN.md §14; TENANT_OS_IMPLEMENTATION_REVIEW.md):
+  // Sprint 1 scope (.claudedocs/adr/TOS-002-editing-engine.md; .claudedocs/reviews/editing-engine-review.md):
   // EditableRegion (frontend/src/tenant-os/EditableRegion.jsx) marks real fields with
   // data-capability/data-field-key attributes and nothing else — it has no knowledge of
   // any Interface. This is the Editing Engine's own Interface-side behavior: only active

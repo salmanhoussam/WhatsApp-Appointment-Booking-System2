@@ -4,9 +4,9 @@
  * Walks real EditableRegion registrations into the Page -> Region -> Field -> Operations
  * tree any Interface (Dashboard, AI, Mobile) can read. A flat in-memory registry is enough for
  * now — a real Page/Region grouping layer is intentionally not built ahead of a real need for
- * it (Abstraction Rule; TENANT_OS_IMPLEMENTATION_REVIEW.md Q5/Q7).
+ * it (Abstraction Rule; .claudedocs/reviews/editing-engine-review.md Q5/Q7).
  *
- * Real status, per CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md: registerRegion/unregisterRegion
+ * Real status, per .claudedocs/reviews/content-capability-review.md: registerRegion/unregisterRegion
  * genuinely run on every EditableRegion mount/unmount, but discoverRegions() has no callers yet
  * anywhere in the app — the real click-to-edit flow works via DynamicPage.jsx reading DOM
  * data-* attributes directly, not by querying this registry. This is real, working
@@ -14,7 +14,7 @@
  * up front (e.g. a real Dashboard overview, or AI planning) rather than reacting to a click —
  * intentionally not wired to anything until that real need exists.
  *
- * See TENANT_OS_PLAN.md §14.
+ * See .claudedocs/adr/TOS-002-editing-engine.md.
  */
 
 const registry = new Map()

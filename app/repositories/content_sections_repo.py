@@ -3,7 +3,7 @@ Content Sections Repository — Prisma-adjacent JSON manipulation for
 Client.config.content.sections[], shared across any Capability whose data lives there.
 
 Extracted from content_service.py's private helpers once a second Capability (Media, Sprint 2)
-needed the exact same shape -- per CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md, this is real,
+needed the exact same shape -- per .claudedocs/reviews/content-capability-review.md, this is real,
 mechanical section-array manipulation with no business logic of its own (find a section by
 `type`, read/patch one `data` field, write the whole config back), which belongs at the
 Repository layer, not duplicated as a private helper inside each Capability's own Service.

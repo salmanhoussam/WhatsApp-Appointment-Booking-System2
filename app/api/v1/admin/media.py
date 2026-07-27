@@ -2,8 +2,8 @@
 app/api/v1/admin/media.py — Media Capability routes.
 
 Tenant OS: a direct call site for the "ReplaceMedia" Operation on media.hero.bg_image -- not a
-generic Dispatcher endpoint, same reasoning as content.py (TENANT_OS_IMPLEMENTATION_REVIEW.md
-S1a/Q7). Takes an already-uploaded URL, not a file -- the real upload happens through the
+generic Dispatcher endpoint, same reasoning as content.py (.claudedocs/reviews/
+editing-engine-review.md S1a/Q7). Takes an already-uploaded URL, not a file -- the real upload happens through the
 existing `POST /api/v1/admin/upload/` endpoint first; this route only decides where the
 resulting URL is written.
 """

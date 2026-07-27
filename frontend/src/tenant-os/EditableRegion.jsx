@@ -6,13 +6,13 @@
  * has zero knowledge of whether a Dashboard, an AI Assistant, or anything else exists.
  * Overlay, Highlight, Selection, Hover, and Inspector behavior all belong to the Editing
  * Engine's Interface-side rendering (e.g. DynamicPage.jsx's click-capture effect), never to
- * this component — ratified in TENANT_OS_IMPLEMENTATION_REVIEW.md §1a (Finding 3).
+ * this component — ratified in .claudedocs/reviews/editing-engine-review.md §1a (Finding 3).
  *
  * `display: contents` keeps the wrapper invisible to layout; the data-* attributes are the
  * only real "extra" this component adds to the DOM, and they carry no styling or behavior
  * of their own.
  *
- * See TENANT_OS_PLAN.md §14.
+ * See .claudedocs/adr/TOS-002-editing-engine.md.
  */
 import { useEffect } from 'react'
 import { registerRegion, unregisterRegion } from './discovery'

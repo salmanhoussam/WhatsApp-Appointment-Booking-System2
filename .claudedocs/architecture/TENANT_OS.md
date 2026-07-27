@@ -98,6 +98,18 @@ directly: the same Schema a human's Dashboard renders as a form is what an AI re
 instruction needs, calling the identical Operation-execution endpoint a click would. Its permission
 ceiling is the Capability Matrix (Governance: Permissions), read directly, not a new decision.
 
+## Architecture Integrity Finding Taxonomy
+
+Every Capability file's Open Findings section uses exactly one of these three labels — defined
+once, here, rather than per-file, so a reader never has to guess what a label means:
+
+- **Broken Architecture** — a Service exists for this exact write path, and the Route bypasses it
+  anyway, going straight to a Repository. A clear, unambiguous break of an existing rule.
+- **Missing Architecture** — no Service exists for this Capability's writes at all. Not a bug; a
+  real, un-built piece of the architecture.
+- **Duplicate Architecture** — the same data is written by more than one independent code path,
+  each implemented differently, with no single canonical one.
+
 ## Capabilities
 
 See `INDEX.md`'s Capabilities table for the current Maturity/Open-Findings rollup, or go straight

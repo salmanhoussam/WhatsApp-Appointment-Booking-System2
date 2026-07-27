@@ -1,11 +1,12 @@
 /**
  * Content Capability — Schema.
  *
- * TENANT_OS_PLAN.md §13 (Content Capability contract), §14 (Schema drives the generic
- * renderer — Dashboard draws it, AI reads it, API uses it, all from this one definition).
+ * .claudedocs/architecture/capabilities/content.md (Content Capability contract),
+ * .claudedocs/adr/TOS-002-editing-engine.md (Schema drives the generic renderer — Dashboard
+ * draws it, AI reads it, API uses it, all from this one definition).
  * Deliberately a plain exported object, not a "Schema Registry" service — two Capability
  * fields don't justify that abstraction yet (Q7; reconfirmed in
- * CONTENT_CAPABILITY_ARCHITECTURE_REVIEW.md).
+ * .claudedocs/reviews/content-capability-review.md).
  *
  * `sectionType`/`dataField`/`apiPath`/`promptLabel` were previously duplicated in a second,
  * parallel `CONTENT_FIELDS` object inside `GenericAdminDashboard.jsx` — a real, present
