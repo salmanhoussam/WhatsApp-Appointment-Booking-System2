@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Component } from 'react'
 import { motion } from 'framer-motion'
 import adminApi from '../../../utils/admin.config'
+import useTenantConfig from '../../../hooks/useTenantConfig'
+import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const glass = {
@@ -29,7 +31,10 @@ const tdStyle = {
 }
 
 // ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_META = {
+// Exported so ReservationsWeekCalendar.jsx can reuse the exact same status vocabulary/colors
+// instead of re-implementing a 6th badge variant (see design-system Badge.jsx's fixed variants,
+// which don't map onto these 5 real reservation statuses).
+export const STATUS_META = {
   pending:   { label: 'معلّق',      bg: 'rgba(245,158,11,.15)', color: '#f59e0b' },
   confirmed: { label: 'مؤكّد',      bg: 'rgba(16,185,129,.15)', color: '#10b981' },
   arrived:   { label: 'وصل',        bg: 'rgba(52,211,153,.15)', color: '#34d399' },
@@ -50,20 +55,37 @@ const ALL_STATUSES = ['pending', 'confirmed', 'arrived', 'cancelled', 'no_show']
 const PAGE_SIZE    = 10
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtDate(iso) {
+export function fmtDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
-function fmtTime(iso) {
+export function fmtTime(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
 }
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
+function dateISO(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+function addDaysLocal(d, n) {
+  const copy = new Date(d)
+  copy.setDate(copy.getDate() + n)
+  return copy
+}
+function parseHourLoose(v) {
+  if (v == null) return null
+  const [h] = String(v).split(':')
+  const n = parseInt(h, 10)
+  return Number.isFinite(n) ? n : null
+}
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────
-function StatusBadge({ status, clickable, onClick }) {
+export function StatusBadge({ status, clickable, onClick }) {
   const m = STATUS_META[status] ?? { label: status, bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }
   return (
     <span
@@ -83,7 +105,7 @@ function StatusBadge({ status, clickable, onClick }) {
 }
 
 // ── StatusCell ────────────────────────────────────────────────────────────────
-function StatusCell({ reservation, onUpdate }) {
+export function StatusCell({ reservation, onUpdate }) {
   const [editing, setEditing] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const next = TRANSITIONS[reservation.status] ?? []
@@ -195,7 +217,7 @@ function MobileCardSkeleton({ rows = 5 }) {
 
 // ── Mobile reservation card ────────────────────────────────────────────────────
 function MobileReservationCard({ reservation, idx, color, onUpdate }) {
-  const dateAt = reservation.scheduled_at ?? reservation.created_at
+  const dateAt = reservation.reserved_at ?? reservation.created_at
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -268,7 +290,17 @@ export default function ReservationsTab({ color }) {
   const [showAllDates, setShowAllDates] = useState(false)
   const [page,         setPage]         = useState(1)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
+  const [viewMode,     setViewMode]     = useState('list') // 'list' | 'calendar'
+  const [weekStart,    setWeekStart]    = useState(() => startOfWeekSunday(new Date()))
   const mountedRef = useRef(true)
+
+  const { config } = useTenantConfig()
+  const hourRange = useMemo(() => {
+    const wh = config?.config?.working_hours
+    const open  = parseHourLoose(wh?.open_time)
+    const close = parseHourLoose(wh?.close_time)
+    return (open != null && close != null && close > open) ? [open, close] : [8, 22]
+  }, [config])
 
   // mountedRef must be reset to true in the effect's setup, not just useRef(true)'s
   // initializer -- see useCatalog.js / .claude/memory.md (2026-07-21) for the real
@@ -285,23 +317,43 @@ export default function ReservationsTab({ color }) {
   }, [])
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
+  // One fetch path shared by both views — the calendar is a different render
+  // branch over the same `reservations` state, not a parallel data source.
+  //
+  // requestSeqRef guards against out-of-order responses: switching viewMode/filters fires a
+  // new load() before a previous, slower one has resolved. Without this, an older in-flight
+  // request landing *after* a newer one can silently overwrite correct data with stale
+  // results (real race found while verifying the calendar toggle -- switching list->calendar
+  // quickly showed 0 reservations despite the calendar's own fetch having actually returned 3,
+  // because the earlier list-mode request's empty result landed second and clobbered it).
+  const requestSeqRef = useRef(0)
   const load = useCallback(async () => {
+    const mySeq = ++requestSeqRef.current
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (!showAllDates && dateFilter)  params.set('date',   dateFilter)
-      params.set('limit', '200')
+
+      if (viewMode === 'calendar') {
+        params.set('date_from', dateISO(weekStart))
+        params.set('date_to',   dateISO(addDaysLocal(weekStart, 6)))
+        params.set('limit', '500')
+      } else {
+        if (!showAllDates && dateFilter) params.set('date', dateFilter)
+        params.set('limit', '200')
+      }
 
       const res = await adminApi.get(`/reservations/?${params}`)
+      if (mySeq !== requestSeqRef.current) return // a newer request has since started; drop this one
       const raw = res?.data?.data ?? res?.data ?? []
       if (mountedRef.current) setReservations(Array.isArray(raw) ? raw : [])
     } catch {
+      if (mySeq !== requestSeqRef.current) return
       if (mountedRef.current) setReservations([])
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mySeq === requestSeqRef.current && mountedRef.current) setLoading(false)
     }
-  }, [statusFilter, dateFilter, showAllDates])
+  }, [statusFilter, dateFilter, showAllDates, viewMode, weekStart])
 
   useEffect(() => { load(); setPage(1) }, [load])
 
@@ -413,12 +465,34 @@ export default function ReservationsTab({ color }) {
           })}
         </div>
 
+        {/* List / Calendar toggle */}
+        <div style={{ display: 'flex', gap: 6, marginRight: isMobile ? 0 : 'auto' }}>
+          {[['list', 'قائمة'], ['calendar', 'تقويم']].map(([mode, label]) => {
+            const active = viewMode === mode
+            return (
+              <button
+                key={mode}
+                onClick={() => { setViewMode(mode); setPage(1) }}
+                style={{
+                  padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+                  background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+                  color: active ? color : 'rgba(255,255,255,0.4)',
+                  border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.08)'}`,
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Refresh — desktop only (mobile has it in date row) */}
-        {!isMobile && (
+        {!isMobile && viewMode === 'list' && (
           <button
             onClick={load}
             style={{
-              marginRight: 'auto', padding: '6px 16px', borderRadius: 8, fontSize: 12,
+              padding: '6px 16px', borderRadius: 8, fontSize: 12,
               background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
               border: `1px solid ${color}44`, color,
             }}
@@ -431,12 +505,30 @@ export default function ReservationsTab({ color }) {
       {/* ── Results count ──────────────────────────────────────────── */}
       {!loading && (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginBottom: 12 }}>
-          {reservations.length} حجز{showAllDates ? '' : ` — ${fmtDate(dateFilter + 'T00:00:00')}`}
+          {reservations.length} حجز
+          {viewMode === 'calendar'
+            ? ` — أسبوع ${dateISO(weekStart)} إلى ${dateISO(addDaysLocal(weekStart, 6))}`
+            : (showAllDates ? '' : ` — ${fmtDate(dateFilter + 'T00:00:00')}`)}
         </div>
       )}
 
-      {/* ── Content — cards on mobile, table on desktop ────────────── */}
-      {isMobile ? (
+      {/* ── Content ────────────────────────────────────────────────── */}
+      {viewMode === 'calendar' ? (
+        loading ? (
+          <div style={{ ...glass, padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+            جارٍ التحميل...
+          </div>
+        ) : (
+          <ReservationsWeekCalendar
+            reservations={reservations}
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            color={color}
+            onStatusChange={handleStatusChange}
+            hourRange={hourRange}
+          />
+        )
+      ) : isMobile ? (
         /* Mobile: cards */
         <div>
           {loading ? (
@@ -513,11 +605,11 @@ export default function ReservationsTab({ color }) {
                       </td>
 
                       <td style={{ ...tdStyle, fontSize: 12 }}>
-                        {fmtDate(res.scheduled_at ?? res.created_at)}
+                        {fmtDate(res.reserved_at ?? res.created_at)}
                       </td>
 
                       <td style={{ ...tdStyle, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-                        {fmtTime(res.scheduled_at ?? res.created_at)}
+                        {fmtTime(res.reserved_at ?? res.created_at)}
                       </td>
 
                       <td style={tdStyle}>
@@ -545,14 +637,16 @@ export default function ReservationsTab({ color }) {
         </div>
       )}
 
-      {/* ── Pagination ─────────────────────────────────────────────── */}
-      <Pagination
-        page={page}
-        total={reservations.length}
-        totalPages={totalPages}
-        onPage={setPage}
-        color={color}
-      />
+      {/* ── Pagination — list view only, the calendar shows everything at once ── */}
+      {viewMode === 'list' && (
+        <Pagination
+          page={page}
+          total={reservations.length}
+          totalPages={totalPages}
+          onPage={setPage}
+          color={color}
+        />
+      )}
     </div>
   )
 }
