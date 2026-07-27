@@ -39,22 +39,23 @@ treat the Capabilities table below as "doesn't exist," only as "not migrated yet
 
 ## Capabilities
 
-*(filled in Phase 5)*
-
 | Capability | Maturity | Location | Open Findings |
 |---|---|---|---|
 | Content | Stable | `capabilities/content.md` | — |
-| Media | Experimental | `capabilities/media.md` | 1 (ReplaceMedia Processing Pipeline, see `TOS-002`) |
-| Site Configuration | Developing | `capabilities/site-configuration.md` | 3 (Known Boundary Debt — Hero Copy/Video/Cover Image) |
+| Media | Experimental | `capabilities/media.md` | 2 (Missing Architecture — Gallery/unit-photos; ReplaceMedia Processing Pipeline, see `TOS-002`) |
+| Site Configuration | Developing | `capabilities/site-configuration.md` | 4 (Broken Architecture — `settings.py`; 3 Known Boundary Debt — Hero Copy/Video/Cover Image) |
 | Catalog | Developing | `capabilities/catalog.md` | 1 (Duplicate Architecture) |
 | Category | Developing | `capabilities/category.md` | shares Catalog's finding |
-| Theme | Developing | `capabilities/theme.md` | — |
-| Orders | Developing | `capabilities/orders.md` | 1 (Missing Architecture) |
-| Customers | Experimental | `capabilities/customers.md` | 1 (unmounted route) |
+| Theme | Developing | `capabilities/theme.md` | shares Site Configuration's finding |
+| Orders | Developing | `capabilities/orders.md` | 1 (Missing Architecture — Store/Restaurant) |
+| Customers | Experimental | `capabilities/customers.md` | 1 (Missing Architecture — unmounted route) |
 
-*(Table content above reflects real state as known at Phase 1 time, from the retired
-`TENANT_OS_PLAN.md` §19/§20 — re-verified, not just copied, when Phase 5 actually creates each
-Capability's own file.)*
+*(Re-verified against each Capability's own file during Phase 5 — not copied from the Phase 1
+stub. Two real Architecture Integrity Findings from the retired `TENANT_OS_PLAN.md` §19 are **not**
+represented above: Units (`units.py`, Broken Architecture) and Team/Staff (`team.py`, Missing
+Architecture) — neither is one of this migration's 8 Capability files, since neither has passed
+the Capability Proposal gate (`TOS-003`) as a ratified Tenant OS Capability. Flagged here rather
+than silently dropped; carried forward as a real gap for Phase 7's content-completeness check.)*
 
 ## Reviews
 
