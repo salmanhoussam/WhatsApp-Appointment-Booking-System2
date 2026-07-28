@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { hasCapability } from '../../../utils/capabilities'
 
 // Module key priority — first matching active service wins
 function deriveModuleKey(services = []) {
@@ -76,8 +77,14 @@ const useGenericStore = create(
           updates.activeCategory = null
         }
         // Store module: lazily create a server-cart session ID (or a fresh one if the
-        // tenant just changed, since `updates.sessionId` was just nulled above)
-        if (moduleKey === 'store' && nextSlug && (tenantChanged || !get().sessionId)) {
+        // tenant just changed, since `updates.sessionId` was just nulled above).
+        // Plural check (TOS-004) -- this must fire whenever Store is active, regardless of
+        // whether it also won the tenant-wide `moduleKey` priority contest. Found via the
+        // Search Verification gate ahead of Phase 5: for a tenant with Store active but NOT
+        // winning that priority (unlike `hr`, where `store` currently wins by chance), this
+        // session ID would never have been created and Store's real Cart/Checkout flow would
+        // have silently never initialized.
+        if (hasCapability(activeServices, 'store') && nextSlug && (tenantChanged || !get().sessionId)) {
           updates.sessionId = getSessionId(nextSlug)
         }
         set(updates)

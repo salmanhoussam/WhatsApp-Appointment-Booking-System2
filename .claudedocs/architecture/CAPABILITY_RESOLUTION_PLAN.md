@@ -2,11 +2,13 @@
 
 **Status:** Phase 1 complete (primitives). Phase 2 complete (Public Catalog rendering). Phase 3
 complete (Cart/Reserve gating). Phase 4 complete for its two live consumers (Overview, Orders);
-`KanbanBoard.jsx` explicitly not touched (dead code, unverifiable). A Search Verification
-(confirm no remaining Order-Capability derivation bypasses `hasCapability`/`hasOrderCapability`)
-is the required gate before Phase 5 starts — Phase 5 (delete the three duplicate derivations)
-remains design only until that verification passes. Revised as phases complete — this is a living
-plan, not a one-time snapshot.
+`KanbanBoard.jsx` explicitly not touched (dead code, unverifiable). **Search Verification run,
+2026-07-29** — see `.claudedocs/reviews/capability-resolution-search-verification.md`: found and
+fixed one genuine, previously-unreviewed exception (`useGenericStore.js`'s Store cart session-ID
+creation), and surfaced a **new precondition for Phase 5**: `GenericAdminDashboard.jsx`'s topbar
+badge is still `deriveModuleKey()`'s one live caller, so that function cannot be deleted until the
+badge's own display is redesigned or otherwise decided. Phase 5 is **not yet clear to start**.
+Revised as phases complete — this is a living plan, not a one-time snapshot.
 
 ## 1. The Target Model — the Capability Resolution Layer
 
