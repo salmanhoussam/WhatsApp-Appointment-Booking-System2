@@ -7,6 +7,7 @@ import useTenantSlug     from '../../../hooks/useTenantSlug'
 import { useTenantBase } from '../../../hooks/useTenantSlug'
 import TenantModuleNav   from '../../../design-system/organisms/TenantModuleNav'
 import useGenericStore   from '../store/useGenericStore'
+import { hasOrderCapability } from '../../../utils/capabilities'
 
 // ── Cart item row ─────────────────────────────────────────────────────────────
 
@@ -267,8 +268,12 @@ export default function CartPage() {
     }
   }, [cartItems, form, moduleKey, sessionId, slug, clearCart])
 
-  // ── Guard — redirect if unsupported module ────────────────────────────────
-  if (moduleKey && moduleKey !== 'restaurant' && moduleKey !== 'store') {
+  // ── Guard — hide Cart entirely if this tenant has no order-bearing capability at all ──────
+  // Plural check (TOS-004) against the tenant's real active_services, not the tenant-wide
+  // collapsed `moduleKey` -- a tenant with both Catalog and Store active (e.g. RK Barber) must
+  // still see a working Cart; the old check only happened to work for such a tenant because
+  // `store` outranked `catalog` in derivation priority, not because it was correct.
+  if (config && config.slug !== 'unknown' && !hasOrderCapability(config.active_services)) {
     return null
   }
 

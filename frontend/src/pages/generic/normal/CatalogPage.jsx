@@ -7,6 +7,7 @@ import { colors }                                       from '../../../design-sy
 import { useTenantBase }                                from '../../../hooks/useTenantSlug'
 import useGenericStore                                  from '../store/useGenericStore'
 import useCatalog                                       from '../../../hooks/useCatalog'
+import { hasOrderCapability }                           from '../../../utils/capabilities'
 import CatalogGrid                                      from '../../catalog/templates/CatalogGrid'
 import CatalogList                                      from '../../catalog/templates/CatalogList'
 import CatalogShowcase                                  from '../../catalog/templates/CatalogShowcase'
@@ -50,14 +51,17 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
   const { addItem, totalItems } = useGenericStore()
 
   const {
-    config, moduleKey,
+    config,
     categories, activeCategory, setActiveCategory,
     filteredItems, search, setSearch,
     isLoading, itemsLoading,
   } = useCatalog()
 
   const accent    = config?.primary_color ?? '#d4a853'
-  const canOrder  = moduleKey === 'restaurant' || moduleKey === 'store'
+  // Plural capability check (TOS-004) -- not the tenant-wide collapsed `moduleKey`. A tenant with
+  // both Catalog and Store active (e.g. RK Barber) must still see the cart affordance; the old
+  // `moduleKey === 'store'` check only worked for such a tenant by luck of derivation priority.
+  const canOrder  = hasOrderCapability(config?.active_services)
   const onAddCart = useCallback((item) => addItem(item, 1), [addItem])
 
   // Hooks must run unconditionally (Rules of Hooks) — always create the

@@ -1,10 +1,9 @@
 # Capability Resolution Plan — Migrating Off the Single Tenant-Wide `moduleKey`
 
-**Status:** Phase 1 complete (primitives introduced, zero behavior change). Phase 2 complete
-(Public Catalog rendering fixed — see `.claudedocs/reviews/rk-barber-phase2-catalog-fix-verification.md`
-for full evidence). Phases 3-5 are still design only — each gets its own Implementation Contract
-before any consumer is touched, per `documentation-policy.md`'s standard workflow. Revised as
-phases complete — this is a living plan, not a one-time snapshot.
+**Status:** Phase 1 complete (primitives). Phase 2 complete (Public Catalog rendering). Phase 3
+complete (Cart/Reserve gating). Phases 4-5 still design only — each gets its own Implementation
+Contract before any consumer is touched, per `documentation-policy.md`'s standard workflow. Revised
+as phases complete — this is a living plan, not a one-time snapshot.
 
 ## 1. The Target Model — the Capability Resolution Layer
 
@@ -101,7 +100,10 @@ categories — closing Finding #6 as a direct consequence of the same fix, not a
 **Phase 3 — Migrate Cart + Reserve gating** (#8, #9; confirm #10 needs no change). Verification: a
 real Add-to-Cart → Checkout click-through on `hr`'s live Catalog page (closing the Unknown left open
 in the Acceptance Review about UI-driven Cart not being re-walked), confirming the Cart page no
-longer disappears.
+longer disappears. **✅ Done, 2026-07-28** — see
+`.claudedocs/reviews/rk-barber-phase3-cart-gating-fix-verification.md`. `#10` (`ReservePage.jsx`)
+confirmed unaffected by direct read (its `MODULE_KEY_MAP` already collapses `store`/`catalog` to the
+identical output), not just assumed — zero lines changed there.
 
 **Phase 4 — Migrate the Admin Dashboard's Overview/Orders/Kanban** (#11, #12, #13). Verification:
 real screenshots of `hr`'s Admin Overview and Orders tabs showing real Store order data reliably —
