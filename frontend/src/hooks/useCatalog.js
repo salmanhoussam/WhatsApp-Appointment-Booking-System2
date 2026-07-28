@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import useTenantConfig from './useTenantConfig'
 import useTenantSlug from '../hooks/useTenantSlug'
 import useGenericStore from '../pages/generic/store/useGenericStore'
-import { fetchCategories, fetchItems } from '../services/catalogApi'
+import { fetchAllCategories, fetchItems } from '../services/catalogApi'
 
 /**
  * useCatalog — domain hook for any catalog-driven page.
@@ -48,11 +48,13 @@ export default function useCatalog() {
     return () => { mountedRef.current = false }
   }, [])
 
-  // Fetch categories once moduleKey + slug are ready
+  // Fetch every real category for this tenant once slug is ready -- no tenant-wide moduleKey
+  // gate. Each category already carries its own real `module_key` (TOS-004, Capability
+  // Resolution Layer); nothing here needs to know "the tenant's type" to fetch its categories.
   useEffect(() => {
-    if (!moduleKey || !slug) return
+    if (!slug) return
     setCatsLoading(true)
-    fetchCategories(moduleKey, slug)
+    fetchAllCategories(slug)
       .then(({ data }) => {
         if (!mountedRef.current) return
         const cats = data?.data ?? []
@@ -61,21 +63,22 @@ export default function useCatalog() {
       })
       .catch(() => { if (mountedRef.current) setCategories([]) })
       .finally(() => { if (mountedRef.current) setCatsLoading(false) })
-  }, [moduleKey, slug])
+  }, [slug])
 
-  // Fetch items when active category changes
+  // Fetch items when active category changes -- routed by THAT category's own module_key
+  // (per-record ownership), never a tenant-wide derived value.
   useEffect(() => {
-    if (!activeCategory || !moduleKey || !slug) return
+    if (!activeCategory || !slug) return
     setItemsLoading(true)
     setItems([])
-    fetchItems(moduleKey, slug, activeCategory.id)
+    fetchItems(activeCategory.module_key, slug, activeCategory.id)
       .then(({ data }) => {
         if (!mountedRef.current) return
         setItems(data?.data ?? [])
       })
       .catch(() => { if (mountedRef.current) setItems([]) })
       .finally(() => { if (mountedRef.current) setItemsLoading(false) })
-  }, [activeCategory, moduleKey, slug])
+  }, [activeCategory, slug])
 
   const filteredItems = useMemo(() => {
     if (!search.trim()) return items

@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { fetchCategories } from '../../services/catalogApi'
+import { fetchAllCategories } from '../../services/catalogApi'
 
 const TILE_COLORS = [
   'oklch(0.30 0.08 280)', 'oklch(0.28 0.07 320)',
@@ -16,7 +16,7 @@ const TILE_COLORS = [
   'oklch(0.31 0.07 160)', 'oklch(0.28 0.06 60)',
 ]
 
-export default function CategoriesGridSection({ data, accent, slug, moduleKey }) {
+export default function CategoriesGridSection({ data, accent, slug }) {
   const [categories, setCategories] = useState([])
   const [loading,    setLoading]    = useState(true)
   const mountedRef  = useRef(true)
@@ -32,12 +32,12 @@ export default function CategoriesGridSection({ data, accent, slug, moduleKey })
   }, [])
 
   useEffect(() => {
-    if (!moduleKey || !slug) { setLoading(false); return }
-    fetchCategories(moduleKey, slug)
+    if (!slug) { setLoading(false); return }
+    fetchAllCategories(slug)
       .then(res => { if (mountedRef.current) setCategories(res.data?.data ?? []) })
       .catch(() => { if (mountedRef.current) setCategories([]) })
       .finally(() => { if (mountedRef.current) setLoading(false) })
-  }, [moduleKey, slug])
+  }, [slug])
 
   if (!loading && categories.length === 0) return null
 

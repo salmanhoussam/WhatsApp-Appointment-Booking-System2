@@ -1,5 +1,13 @@
 import publicApi from '../utils/publicApi'
 
+// GET every category across every active capability, correctly attributed via each category's own
+// real `module_key` — no tenant-wide moduleKey collapse (TOS-004, Capability Resolution Layer).
+// Backed by the same generic endpoint the Admin Catalog tab already uses successfully when it
+// omits the module_key filter — confirmed real, not a new backend behavior.
+export function fetchAllCategories(slug) {
+  return publicApi.get(`/${slug}/catalog/categories`, { params: { client_slug: slug } })
+}
+
 // GET categories — module-aware endpoint routing
 export function fetchCategories(moduleKey, slug) {
   const base = { client_slug: slug }

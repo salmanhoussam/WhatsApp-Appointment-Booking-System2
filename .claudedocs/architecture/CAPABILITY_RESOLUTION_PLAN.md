@@ -1,9 +1,10 @@
 # Capability Resolution Plan — Migrating Off the Single Tenant-Wide `moduleKey`
 
-**Status:** Phase 1 complete (primitives introduced, zero behavior change — see §3). Phases 2-5 are
-still design only — each gets its own Implementation Contract before any consumer is touched, per
-`documentation-policy.md`'s standard workflow. Revised as phases complete — this is a living plan,
-not a one-time snapshot.
+**Status:** Phase 1 complete (primitives introduced, zero behavior change). Phase 2 complete
+(Public Catalog rendering fixed — see `.claudedocs/reviews/rk-barber-phase2-catalog-fix-verification.md`
+for full evidence). Phases 3-5 are still design only — each gets its own Implementation Contract
+before any consumer is touched, per `documentation-policy.md`'s standard workflow. Revised as
+phases complete — this is a living plan, not a one-time snapshot.
 
 ## 1. The Target Model — the Capability Resolution Layer
 
@@ -91,7 +92,11 @@ to the running app — nothing imports this file yet.
 exact path behind the Acceptance Review's Finding #5, so it closes the highest-impact known bug
 first. Verification: real screenshot of `hr`'s public homepage showing **both** its real haircut
 services and its real store products, each under their own correct heading — the precise before/
-after proof this migration exists to produce.
+after proof this migration exists to produce. **✅ Done, 2026-07-28** — see
+`.claudedocs/reviews/rk-barber-phase2-catalog-fix-verification.md`. Confirmed real: "خدماتنا" now
+shows the 3 real, `is_featured`-marked haircut items instead of store products; `/hr/catalog`'s
+category tabs (previously decorative) now correctly switch between real Services and real Store
+categories — closing Finding #6 as a direct consequence of the same fix, not a separate patch.
 
 **Phase 3 — Migrate Cart + Reserve gating** (#8, #9; confirm #10 needs no change). Verification: a
 real Add-to-Cart → Checkout click-through on `hr`'s live Catalog page (closing the Unknown left open

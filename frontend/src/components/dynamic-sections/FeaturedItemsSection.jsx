@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCategories, fetchItems } from '../../services/catalogApi'
+import { fetchAllCategories, fetchItems } from '../../services/catalogApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
 
 function SkeletonCard() {
@@ -22,7 +22,7 @@ function SkeletonCard() {
   )
 }
 
-export default function FeaturedItemsSection({ data, accent, slug, moduleKey, onAddToCart }) {
+export default function FeaturedItemsSection({ data, accent, slug, onAddToCart }) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
@@ -39,17 +39,22 @@ export default function FeaturedItemsSection({ data, accent, slug, moduleKey, on
   }, [])
 
   useEffect(() => {
-    if (!moduleKey || !slug) { setLoading(false); return }
+    if (!slug) { setLoading(false); return }
 
     const limit = data.limit ?? 6
 
-    fetchCategories(moduleKey, slug)
+    // Fetch every real category (no tenant-wide moduleKey collapse -- TOS-004), then pool items
+    // across ALL of them, each routed by its own real module_key. A tenant with more than one
+    // catalog-bearing capability active (e.g. RK Barber's real Services + Store categories) must
+    // have every one of its real categories representable here, not just whichever one a
+    // hardcoded "first category" happened to pick.
+    fetchAllCategories(slug)
       .then(res => {
         const cats = res.data?.data ?? []
         if (!cats.length) return []
-        // Fetch items from the first category only (avoids N+1)
-        return fetchItems(moduleKey, slug, cats[0].id)
-          .then(r => r.data?.data ?? [])
+        return Promise.all(
+          cats.map(cat => fetchItems(cat.module_key, slug, cat.id).then(r => r.data?.data ?? []))
+        ).then(itemsByCategory => itemsByCategory.flat())
       })
       .then(allItems => {
         if (!mountedRef.current) return
@@ -60,7 +65,7 @@ export default function FeaturedItemsSection({ data, accent, slug, moduleKey, on
       })
       .catch(() => { if (mountedRef.current) setItems([]) })
       .finally(() => { if (mountedRef.current) setLoading(false) })
-  }, [moduleKey, slug, data.limit])
+  }, [slug, data.limit])
 
   if (!loading && items.length === 0) return null
 
