@@ -72,8 +72,15 @@ function Field({ label, children }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid' }
+const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid', module_key: 'catalog' }
 const EMPTY_ITEM = { name_ar: '', name_en: '', price: '', currency: 'USD', description_ar: '', image_url: '' }
+
+const MODULE_KEY_META = {
+  catalog: { label: 'عام / خدمات', badge: 'خدمة', color: '#6366f1' },
+  store:   { label: 'متجر (منتجات للبيع)', badge: 'منتج', color: '#10b981' },
+  booking: { label: 'حجز', badge: 'حجز', color: '#f59e0b' },
+  restaurant: { label: 'مطعم', badge: 'قائمة', color: '#ef4444' },
+}
 
 export default function CatalogTab({ color }) {
   const [categories,   setCategories]   = useState([])
@@ -128,7 +135,7 @@ export default function CatalogTab({ color }) {
   const openEditCat   = (cat, e) => {
     e.stopPropagation()
     setEditingCat(cat)
-    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid' })
+    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid', module_key: cat.module_key ?? 'catalog' })
     setShowCatModal(true)
   }
 
@@ -277,7 +284,17 @@ export default function CatalogTab({ color }) {
                   transition: 'all 0.18s',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{cat.name_ar}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{cat.name_ar}</div>
+                  {(() => {
+                    const meta = MODULE_KEY_META[cat.module_key] ?? MODULE_KEY_META.catalog
+                    return (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${meta.color}22`, color: meta.color, fontWeight: 600 }}>
+                        {meta.badge}
+                      </span>
+                    )
+                  })()}
+                </div>
                 {cat.name_en && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>{cat.name_en}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button onClick={e => openEditCat(cat, e)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>تعديل</button>
@@ -351,6 +368,22 @@ export default function CatalogTab({ color }) {
           </Field>
           <Field label="اسم القسم (إنجليزي)">
             <input style={inputStyle} value={catForm.name_en} onChange={e => setCatForm(p => ({ ...p, name_en: e.target.value }))} placeholder="e.g. Women's Clothing" />
+          </Field>
+          <Field label="نوع القسم — خدمة أم منتج للبيع؟">
+            <select
+              style={{ ...inputStyle, opacity: editingCat ? 0.5 : 1 }}
+              value={catForm.module_key}
+              disabled={!!editingCat}
+              onChange={e => setCatForm(p => ({ ...p, module_key: e.target.value }))}
+            >
+              <option value="catalog">عام / خدمات (حجوزات، خدمات حلاقة...)</option>
+              <option value="store">متجر — منتجات حقيقية للبيع (سبراي، واكس...)</option>
+            </select>
+            {editingCat && (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+                لا يمكن تغيير نوع القسم بعد إنشائه — أنشئ قسمًا جديدًا بدلاً من ذلك
+              </div>
+            )}
           </Field>
           <Field label="طريقة العرض">
             <select style={inputStyle} value={catForm.display_template} onChange={e => setCatForm(p => ({ ...p, display_template: e.target.value }))}>

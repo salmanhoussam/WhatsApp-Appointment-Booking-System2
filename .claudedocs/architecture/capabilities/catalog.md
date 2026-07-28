@@ -104,6 +104,23 @@ auditable figure anyone can recompute.
 **Developing** — Contract and a working Dashboard Interface exist, but Implementation carries a
 live Architecture Integrity Finding (below), so it cannot yet be called Stable.
 
+**Missing Architecture (resolved 2026-07-28)** — `CatalogCategory.moduleKey` (`catalog|booking|
+restaurant|store`) was already the correct, working mechanism for separating a bookable service
+from a purchasable product — `store_repo.py` reads `category.moduleKey == "store"` for its Cart/
+Checkout queries and this was confirmed still true. But the Generic Admin Dashboard's
+`CatalogTab.jsx` never exposed `module_key` when creating a category (its `EMPTY_CAT` had no such
+field, so every category silently fell back to the backend's `module_key: str = "catalog"`
+default in `app/api/v1/admin/catalog.py`'s `CategoryCreate`), which is why a `services`-type
+tenant (RK Barber Shop) saw its haircut services and any future retail products flattened into one
+undifferentiated list. Fixed by adding a Service/Product type selector to the category-creation
+modal (set once, at creation — not editable afterward, since `CategoryUpdate` doesn't accept
+`module_key` either, deliberately left alone to avoid re-classifying a category with existing
+orders/reservations already keyed to its old module) plus a colored type badge on each category
+card. Verified end-to-end for real: a new `store`-moduleKey category + 4 real products (spray, wax,
+gel, cologne) were created for `hr`, surfaced correctly through `GET /public/store/products`, and a
+real Cart + Cash Checkout order was placed and confirmed both in the DB and in the Dashboard's
+Orders tab. See `.claudedocs/reviews/rk-barber-store-products-verification.md`.
+
 ## Open Findings
 
 **Duplicate Architecture** — `app/api/v1/admin/store.py` and `app/api/v1/admin/restaurant.py`
