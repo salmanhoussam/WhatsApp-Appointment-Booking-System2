@@ -34,3 +34,11 @@ migration usage says otherwise.
 
 ### Promoted?
 No — explicitly a "not now" watch-point, not a proposed change.
+
+## Related
+
+- `.claudedocs/adr/TOS-004-plural-capability-resolution.md` — the decision this file's own code
+  implements.
+- `.claudedocs/evolution/capability-contracts.md` — the accumulating "second/third implementation
+  grows unnoticed" pattern that TOS-004 is itself the third confirmed instance of; this file is
+  the resolution being built in response, not a fourth instance of the problem.

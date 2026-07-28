@@ -164,3 +164,13 @@ No — same reasoning as the entry above: two real cases establish that density-
 not yet what the actual profile boundaries/values should be. Stays in this log until a third real
 footage type (a different motion profile, independently exercised) either confirms three named
 tiers are enough or shows the axis is more continuous than discrete.
+
+## Related
+
+- `.claudedocs/evolution/capability-contracts.md` — this file's 2026-07-23 entry is the first real
+  case of the "second implementation grows unnoticed" pattern that file now tracks across three
+  independent instances (Media, Catalog routes, Capability Resolution).
+- `.claudedocs/adr/TOS-004-plural-capability-resolution.md` — a related but distinct problem (this
+  file's Escalation Watch is about two write *paths* for one field; TOS-004 is about a single
+  derived *value* collapsing a tenant's real plural capability set) — worth reading together, not
+  merging.
