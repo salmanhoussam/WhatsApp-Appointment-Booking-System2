@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import adminApi from '../../../utils/admin.config'
+import { hasCapability } from '../../../utils/capabilities'
 
 // ── Design tokens (shared with CatalogTab pattern) ────────────────────────────
 const glass = {
@@ -343,11 +344,22 @@ function TableSkeleton({ rows = 5 }) {
 // ── OrdersTab ─────────────────────────────────────────────────────────────────
 /**
  * Props:
- *   moduleKey   'restaurant' | 'store'
- *   color       tenant primary_color
- *   currency    e.g. 'USD'
+ *   activeServices  string[]  — the tenant's real active service keys (TOS-004, Capability
+ *                               Resolution Layer) — not a collapsed single moduleKey
+ *   color           tenant primary_color
+ *   currency        e.g. 'USD'
  */
-export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
+export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
+  // Which single order-bearing capability this tenant has, if any -- no real tenant has both
+  // Restaurant and Store/Catalog active at once today (Module Resolution Review, 2026-07-28);
+  // see CAPABILITY_RESOLUTION_PLAN.md's explicit Non-Goal on inventing merge behavior with zero
+  // real examples to design against. `orderEndpoint` below is passed to StatusCell/MobileOrderCard
+  // as their own `moduleKey` prop unchanged -- those describe which type is currently being
+  // rendered in this one tab instance, a legitimate local concept, not the tenant-wide collapse
+  // this migration retires.
+  const orderEndpoint = hasCapability(activeServices, 'restaurant') ? 'restaurant'
+    : hasCapability(activeServices, 'store') ? 'store'
+    : null
   const [orders,       setOrders]       = useState([])
   const [loading,      setLoading]      = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -375,10 +387,10 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
-    if (moduleKey !== 'restaurant' && moduleKey !== 'store') { setLoading(false); return }
+    if (!orderEndpoint) { setLoading(false); return }
     setLoading(true)
     try {
-      const res = await adminApi.get(`/${moduleKey}/orders`)
+      const res = await adminApi.get(`/${orderEndpoint}/orders`)
       const raw = res?.data?.data ?? res?.data ?? []
       if (mountedRef.current) setOrders(Array.isArray(raw) ? raw : [])
     } catch {
@@ -386,15 +398,15 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [moduleKey])
+  }, [orderEndpoint])
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
   // ── Status update ──────────────────────────────────────────────────────────
   const handleStatusChange = useCallback(async (orderId, newStatus) => {
-    await adminApi.patch(`/${moduleKey}/orders/${orderId}/status`, { status: newStatus })
+    await adminApi.patch(`/${orderEndpoint}/orders/${orderId}/status`, { status: newStatus })
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-  }, [moduleKey])
+  }, [orderEndpoint])
 
   // ── Sort toggle ────────────────────────────────────────────────────────────
   const handleSort = useCallback((col) => {
@@ -431,7 +443,7 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
 
   const totalPages   = Math.max(1, Math.ceil(sortedOrders.length / PAGE_SIZE))
   const pagedOrders  = sortedOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const statuses     = MODULE_STATUSES[moduleKey] ?? []
+  const statuses     = MODULE_STATUSES[orderEndpoint] ?? []
 
   // reset page when filter changes
   useEffect(() => { setPage(1) }, [statusFilter, search])
@@ -542,7 +554,7 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
                 order={order}
                 expanded={expandedId === order.id}
                 onExpand={() => setExpandedId(expandedId === order.id ? null : order.id)}
-                moduleKey={moduleKey}
+                moduleKey={orderEndpoint}
                 onUpdate={handleStatusChange}
                 color={color}
                 currency={currency}
@@ -608,7 +620,7 @@ export default function OrdersTab({ moduleKey, color, currency = 'USD' }) {
                           </td>
 
                           <td style={tdStyle}>
-                            <StatusCell order={order} moduleKey={moduleKey} onUpdate={handleStatusChange} />
+                            <StatusCell order={order} moduleKey={orderEndpoint} onUpdate={handleStatusChange} />
                           </td>
 
                           <td style={{ ...tdStyle, fontWeight: 700, color, whiteSpace: 'nowrap' }}>

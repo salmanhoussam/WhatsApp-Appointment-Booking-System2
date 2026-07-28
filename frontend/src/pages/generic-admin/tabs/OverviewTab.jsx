@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Component } from 'react'
 import { motion }       from 'framer-motion'
 import adminApi         from '../../../utils/admin.config'
+import { hasCapability, hasOrderCapability } from '../../../utils/capabilities'
 import StatCard         from '../components/StatCard'
 import ActivityFeed    from '../components/ActivityFeed'
 import TopItemsWidget  from '../components/TopItemsWidget'
@@ -519,11 +520,19 @@ function TopCatalogItems({ items, loading, color }) {
 /**
  * Props:
  *   color           string    — tenant primary_color
- *   moduleKey       string    — 'restaurant' | 'store' | 'catalog'
+ *   activeServices  string[]  — the tenant's real active service keys (TOS-004, Capability
+ *                               Resolution Layer) — not a collapsed single moduleKey
  *   hasReservations boolean
  *   currency        string
  */
-export default function OverviewTab({ color, moduleKey, hasReservations, currency = 'USD' }) {
+export default function OverviewTab({ color, activeServices, hasReservations, currency = 'USD' }) {
+  // Which single order-bearing capability this tenant has, if any -- no real tenant has both
+  // Restaurant and Store/Catalog active at once today (Module Resolution Review, 2026-07-28), so
+  // this resolves to one endpoint rather than merging; see CAPABILITY_RESOLUTION_PLAN.md's
+  // explicit Non-Goal on inventing merge behavior with zero real examples to design against.
+  const orderEndpoint = hasCapability(activeServices, 'restaurant') ? 'restaurant'
+    : hasCapability(activeServices, 'store') ? 'store'
+    : null
   const [orders,        setOrders]        = useState([])
   const [resStats,      setResStats]      = useState(null)
   const [ordersLoading, setOrdersLoading] = useState(true)
@@ -564,13 +573,13 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
 
   // ── Fetch orders ───────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
-    if (moduleKey !== 'restaurant' && moduleKey !== 'store') {
+    if (!orderEndpoint) {
       if (mountedRef.current) { setOrders([]); setOrdersLoading(false) }
       return
     }
     setOrdersLoading(true)
     try {
-      const res = await adminApi.get(`/${moduleKey}/orders`)
+      const res = await adminApi.get(`/${orderEndpoint}/orders`)
       const raw = res?.data?.data ?? res?.data ?? []
       if (mountedRef.current) setOrders(Array.isArray(raw) ? raw : [])
     } catch {
@@ -578,7 +587,7 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
     } finally {
       if (mountedRef.current) setOrdersLoading(false)
     }
-  }, [moduleKey])
+  }, [orderEndpoint])
 
   // ── Fetch reservation stats ────────────────────────────────────────────────
   const loadResStats = useCallback(async () => {
@@ -620,7 +629,7 @@ export default function OverviewTab({ color, moduleKey, hasReservations, currenc
   }, [loadOrders, loadResStats])
 
   const orderStatsLoading = ordersLoading || statsLoading
-  const hasOrders = moduleKey === 'restaurant' || moduleKey === 'store'
+  const hasOrders = hasOrderCapability(activeServices)
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (

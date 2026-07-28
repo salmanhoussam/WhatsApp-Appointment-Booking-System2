@@ -1,9 +1,12 @@
 # Capability Resolution Plan — Migrating Off the Single Tenant-Wide `moduleKey`
 
 **Status:** Phase 1 complete (primitives). Phase 2 complete (Public Catalog rendering). Phase 3
-complete (Cart/Reserve gating). Phases 4-5 still design only — each gets its own Implementation
-Contract before any consumer is touched, per `documentation-policy.md`'s standard workflow. Revised
-as phases complete — this is a living plan, not a one-time snapshot.
+complete (Cart/Reserve gating). Phase 4 complete for its two live consumers (Overview, Orders);
+`KanbanBoard.jsx` explicitly not touched (dead code, unverifiable). A Search Verification
+(confirm no remaining Order-Capability derivation bypasses `hasCapability`/`hasOrderCapability`)
+is the required gate before Phase 5 starts — Phase 5 (delete the three duplicate derivations)
+remains design only until that verification passes. Revised as phases complete — this is a living
+plan, not a one-time snapshot.
 
 ## 1. The Target Model — the Capability Resolution Layer
 
@@ -110,7 +113,15 @@ real screenshots of `hr`'s Admin Overview and Orders tabs showing real Store ord
 paired with the separate, already-tracked Finding #11a/#11b investigation (the `useTenantConfig`
 fallback and the still-unexplained Catalog-tab stuck-loading state), since this phase touches
 adjacent code but does **not** claim to fix those two issues by itself; they get their own
-verification regardless of this migration's outcome.
+verification regardless of this migration's outcome. **✅ Done, 2026-07-28** for #11 (Overview) and
+#12 (Orders) — see
+`.claudedocs/reviews/rk-barber-phase4-admin-dashboard-fix-verification.md`. Confirmed via real
+screenshots and a Network-domain capture that the fix's own request-routing logic is correct,
+independent of Finding #11b's separate, still-unresolved rendering-latency pattern (reproduced
+again during this verification, not newly caused by it). #13 (`KanbanBoard.jsx`) explicitly
+**not** touched — confirmed dead code with no live render path, so no real verification is
+possible; left exactly as the Plan describes, "relevant if/when this component is ever wired back
+in."
 
 **Phase 5 — Delete the three duplicate derivation functions** (#1, #2, #3) once every real consumer
 has been migrated and independently verified in Phases 2-4. Verification: `grep -rn

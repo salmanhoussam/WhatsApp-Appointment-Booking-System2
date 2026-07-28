@@ -357,13 +357,13 @@ export default function GenericAdminDashboard() {
         return (
           <OverviewTab
             color={color}
-            moduleKey={moduleKey}
+            activeServices={activeServices}
             hasReservations={hasReservations}
             currency={currency}
           />
         )
       case 'orders':
-        return <OrdersTab moduleKey={moduleKey} color={color} currency={currency} />
+        return <OrdersTab activeServices={activeServices} color={color} currency={currency} />
       case 'reservations':
         return <ReservationsTab color={color} />
       case 'catalog':
