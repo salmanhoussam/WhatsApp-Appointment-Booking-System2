@@ -147,7 +147,7 @@ export default function ReservePage() {
         : undefined
 
       const { data } = await publicApi.post(
-        `/${slug}/reservations/`,
+        `/reservations/`,
         {
           module_key:     MODULE_KEY_MAP[moduleKey] ?? 'services',
           customer_name:  form.customer_name,
