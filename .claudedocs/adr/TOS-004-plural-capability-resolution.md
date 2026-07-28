@@ -83,6 +83,26 @@ phased order to migrate them safely, is specified in the companion document,
 `.claudedocs/architecture/CAPABILITY_RESOLUTION_PLAN.md` (design only — no code is written by this
 ADR or that plan; Implementation Contracts follow per phase, per this project's standard workflow).
 
+### 4.1 Who Owns Capability Resolution?
+
+A question this decision creates and must not leave implicit: once `tenant.moduleKey` is gone, what
+answers "what capability is this?" for a given component? Before this decision, the (wrong) answer
+was **the tenant record itself** — a component asked the tenant "what type are you" and got back one
+value regardless of what it actually needed to know. After this decision, ownership moves to a
+**Capability Resolution Layer** — not the tenant object, not each component independently
+re-deriving its own guess, but the two small, shared primitives named in Option B above
+(`hasCapability(activeServices, key)` for plural membership; a direct read of the record's own
+`module_key` field for per-record ownership), implemented once
+(`frontend/src/utils/capabilities.js`, Phase 1) and called into by every consumer. Concretely: the
+Public Catalog page knows it's showing Catalog-capability items because it reads that specific
+category's own `module_key`, not because "the tenant is a catalog tenant." The Dashboard knows
+Booking is relevant because it asks the Capability Resolution Layer whether `booking` is active, not
+because "the tenant is a booking tenant." Cart knows Store items exist because it asks the same
+layer whether `store` is active, not because "the tenant is a store tenant." No single place owns
+"the tenant's type" going forward, because that was exactly the wrong ownership model this ADR
+retires — ownership moves from the tenant record to the resolution layer, which is asked a
+correctly-scoped question every time, never asked to name a tenant's one identity.
+
 ## 5. Single Source of Truth
 
 This ADR is the ratified decision that plural resolution replaces the single-`moduleKey` model. The

@@ -1,14 +1,17 @@
 # Capability Resolution Plan — Migrating Off the Single Tenant-Wide `moduleKey`
 
-**Status:** Design only. No code changes yet — this document is the Architecture Plan authorized by
-`.claudedocs/adr/TOS-004-plural-capability-resolution.md`; each phase below gets its own
-Implementation Contract before any of it is built, per `documentation-policy.md`'s standard
-workflow. Revised as phases complete — this is a living plan, not a one-time snapshot.
+**Status:** Phase 1 complete (primitives introduced, zero behavior change — see §3). Phases 2-5 are
+still design only — each gets its own Implementation Contract before any consumer is touched, per
+`documentation-policy.md`'s standard workflow. Revised as phases complete — this is a living plan,
+not a one-time snapshot.
 
-## 1. The Target Model
+## 1. The Target Model — the Capability Resolution Layer
 
-Replace "the tenant's one `moduleKey`" with two small, real primitives, both already backed by data
-that exists today — no new backend concept, no migration, no schema change:
+Per `TOS-004` §4.1: once `tenant.moduleKey` is retired, "what capability is this?" is answered by a
+named **Capability Resolution Layer** — not the tenant record, not each component re-deriving its
+own guess. Two small, real primitives, both already backed by data that exists today — no new
+backend concept, no migration, no schema change — implemented once
+(`frontend/src/utils/capabilities.js`) and called into by every consumer as they migrate:
 
 ```js
 // 1. Plural membership — "is capability X active for this tenant at all?"
@@ -62,11 +65,27 @@ Ordered so that at every phase boundary, the app is in a real, working, verifiab
 partial rewrite with some consumers on the old model and some on the new model producing
 inconsistent behavior mid-migration for the *same* decision.
 
-**Phase 1 — Introduce the primitives, touch nothing else.**
-Add `hasCapability(activeServices, key)` as a small, real, tested utility (likely
-`frontend/src/utils/` or alongside `useGenericStore.js`). Zero consumers changed yet. Verification:
-a unit-level check that `hasCapability(['catalog','store'], 'store')` and equivalents return
-correctly — trivial, but real, not skipped.
+**Phase 1 — Introduce the primitives, touch nothing else. ✅ Done, 2026-07-28.**
+Added `frontend/src/utils/capabilities.js`: `hasCapability(activeServices, key)` and
+`hasOrderCapability(activeServices)` (the one grouped "store or restaurant" check several
+consumers in §2 need, named once rather than re-derived per consumer). Zero consumers wired to it
+yet — confirmed via `grep -rn "hasCapability\|hasOrderCapability" frontend/src` returning only the
+new file's own definitions, nothing else. Real verification (this project has no test runner
+configured, so verified by direct execution, per this project's own preference for real runtime
+proof over mocks):
+```
+$ node -e "import('./src/utils/capabilities.js').then(({hasCapability, hasOrderCapability}) => {...})"
+hr has store: true
+hr has catalog: true
+hr has restaurant: false
+hr has order capability (store or restaurant): true
+catalog-only tenant has order capability: false
+empty/undefined services: false false false
+```
+Real `hr` active-services array (`catalog, booking, whatsapp_ordering, reservations, store`)
+produces the exact expected answers; a catalog-only tenant correctly has no order capability;
+`undefined`/`null`/empty inputs degrade safely to `false` rather than throwing. Zero behavior change
+to the running app — nothing imports this file yet.
 
 **Phase 2 — Migrate the Public-facing Catalog rendering path** (#4, #5, #6, #7 above) — this is the
 exact path behind the Acceptance Review's Finding #5, so it closes the highest-impact known bug
