@@ -11,7 +11,7 @@
  * ─── RETURNED SHAPE ──────────────────────────────────────────────────────────
  *   config = {
  *     slug, name_ar, name_en,
- *     primary_color, hero_video_url,
+ *     primary_color,
  *     whatsapp_number, currency,
  *     features:        { spatial, listings, booking, payment },
  *     unit_types:      string[],
@@ -36,7 +36,6 @@ const DEFAULT_CONFIG = {
   name_ar:         'المنصة',
   name_en:         'Platform',
   primary_color:   '#d4a853',
-  hero_video_url:  null,
   hero_image_url:  null,
   whatsapp_number: '',
   instagram_url:   null,

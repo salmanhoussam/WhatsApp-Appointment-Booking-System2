@@ -138,20 +138,31 @@ Broken Architecture finding still open).
 
 ## Maturity
 
-**Developing** — Contract and a partial Dashboard exist, but Implementation carries a live
-Broken-Architecture finding (below).
+**Developing** — Contract and a partial Dashboard exist. The Broken-Architecture finding is
+resolved (Sprint 3, Phase 2, 2026-07-29) — one real Service, one real write path — but Maturity
+stays Developing until Phase 3's Editing Engine integration (Brand/Contact/Currency/Theme) is also
+built; Implementation being clean is necessary but not sufficient for Stable per this project's own
+definition (needs at least one real Interface proven too, matching Content's own path to Stable).
 
 ## Open Findings
 
-**Broken Architecture — Site Configuration (`settings.py`).** `client_service.py` exists and
-already implements `create_client`/`get_client`/`update_client` — a real Service for exactly this
-write path. `settings.py` bypasses it entirely, calling `admin_client_repo` directly. A second,
-smaller defect in the same file: `client_service.py` itself calls `prisma_client` directly rather
-than delegating to a repository — itself a break of "Zero Prisma calls outside Repositories" — it
-would need that fixed before being wired in as-is, not just imported.
+**Broken Architecture — Site Configuration (`settings.py`) — ✅ Resolved 2026-07-29 (Sprint 3,
+Phase 2).** `client_service.py` (dead code, zero real callers, confirmed before deletion) was
+deleted rather than revived. `app/services/site_configuration_service.py` is the new, real Service
+— `settings.py`'s `GET`/`PATCH` routes now both call it, delegating to `admin_client_repo`, never
+`prisma_client` directly. See `.claudedocs/reviews/site-configuration-phase2-verification.md` for
+full evidence (real PATCH, real DB row diff, real revert, real Capability Isolation check).
 
-**Known Boundary Debt** — the 3 Hero-fragmentation findings documented in full above (Hero Copy
-duplicate, Hero Video dead pipeline, Hero Cover Image phantom reference).
+**Known Boundary Debt** — of the 3 Hero-fragmentation findings documented in full above:
+- **Hero Video dead pipeline — ✅ Resolved 2026-07-29 (deleted, not migrated)**: both writers
+  (`settings.py`'s field, `upload.py`'s `page_hero_video` bypass), `TenantHero.jsx`, and a
+  previously-unaccounted-for second consumer (smar's own bespoke `SettingsTab.jsx`, found live
+  during verification) are all gone. `Client.hero_video_url`'s DB column itself is deliberately
+  left in place — dropping a live schema column is a real migration, out of scope without a
+  staging/snapshot process.
+- **Hero Copy duplicate** and **Hero Cover Image phantom reference** remain open — explicitly out
+  of this Contract's scope (Content Capability's ownership / `ConfigurableHero.jsx`'s legacy
+  rendering path, not Site Configuration's write-path concern).
 
 ## Related
 

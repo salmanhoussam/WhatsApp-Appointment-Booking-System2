@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles, allow_during_soft_block
-from app.repositories import admin_client_repo as _client_repo
+from app.services import site_configuration_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Settings"])
@@ -29,7 +29,6 @@ class SettingsUpdateRequest(BaseModel):
     primary_color:   Optional[str]       = None
     page_type:       Optional[str]       = None
     template_key:    Optional[str]       = None
-    hero_video_url:  Optional[str]       = None
     whatsapp_number: Optional[str]       = None
     instagram_url:   Optional[str]       = None
     maps_url:        Optional[str]       = None
@@ -49,7 +48,7 @@ async def get_settings(
 ):
     """Return all editable branding/config fields for this tenant's Client row."""
     try:
-        client = await _client_repo.find_client_by_id(tenant["id"])
+        client = await site_configuration_service.get_client(tenant["id"])
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
 
@@ -60,7 +59,6 @@ async def get_settings(
             "name_en":         client.name_en,
             "primary_color":   client.primary_color,
             "page_type":       getattr(client, "pageType", None) or "normal",
-            "hero_video_url":  client.hero_video_url,
             "whatsapp_number": client.whatsapp_number,
             "instagram_url":   getattr(client, "instagram_url", None),
             "maps_url":        getattr(client, "maps_url", None),
@@ -88,25 +86,18 @@ async def update_settings(
     Partial update — only fields explicitly set in the request body are written.
     Clears the tenant cache so the next /public/config request picks up changes.
     """
-    _CAMEL = {"page_type": "pageType", "template_key": "templateKey"}
     raw = {k: v for k, v in body.model_dump().items() if v is not None}
-    update_data = {_CAMEL.get(k, k): v for k, v in raw.items()}
-    if not update_data:
+    if not raw:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
 
-    # Prisma Python requires Json() wrapper for Json? fields
-    from prisma import Json
-    for json_field in ("config", "features"):
-        if json_field in update_data and isinstance(update_data[json_field], dict):
-            update_data[json_field] = Json(update_data[json_field])
-
     try:
-        await _client_repo.update_client(tenant["id"], update_data)
+        updated = await site_configuration_service.update_settings(tenant["id"], raw)
         # Bust the in-process TTL cache so public /config reflects immediately
         invalidate_tenant_cache(tenant["slug"])
 
-        logger.info("⚙️  Settings updated for tenant '%s': %s", tenant["slug"], list(update_data.keys()))
-        return {"success": True, "updated_fields": list(update_data.keys())}
+        updated_fields = list(raw.keys())
+        logger.info("⚙️  Settings updated for tenant '%s': %s", tenant["slug"], updated_fields)
+        return {"success": True, "updated_fields": updated_fields}
 
     except Exception as e:
         logger.error(f"🔥 DB error updating settings for tenant {tenant}: {e}", exc_info=True)

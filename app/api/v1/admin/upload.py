@@ -31,7 +31,6 @@ router = APIRouter(prefix="/upload", tags=["Admin Upload"])
 FOLDER_MAP = {
     "catalog_item":   "catalog/{category_id}/{item_id}",
     "page_hero":      "pages/home/hero",
-    "page_hero_video":"pages/home/hero",
     "page_logo":      "pages/home/logo",
     "page_story":     "pages/home/story",
     "page_demo":      "pages/demo",
@@ -42,7 +41,6 @@ FOLDER_MAP = {
 IMAGE_TYPE_MAP = {
     "catalog_item":   "catalog",
     "page_hero":      "page_hero",
-    "page_hero_video":"page_hero",
     "page_logo":      "page_logo",
     "page_story":     "gallery",
     "page_demo":      "gallery",
@@ -96,11 +94,6 @@ async def upload_image(
 
     image_type = IMAGE_TYPE_MAP[context]
     image_id   = None
-
-    if context == "page_hero_video":
-        from app.repositories import admin_client_repo as _client_repo
-        await _client_repo.update_client(tenant["id"], {"hero_video_url": public_url})
-        return {"url": public_url, "image_id": None, "saved_to": "hero_video_url"}
 
     if context == "catalog_item":
         item = await _cat_repo.find_item(tenant["id"], item_id)

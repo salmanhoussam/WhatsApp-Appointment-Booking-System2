@@ -77,7 +77,6 @@ export default function SettingsTab() {
           name_ar:         d.name_ar         ?? '',
           name_en:         d.name_en         ?? '',
           primary_color:   d.primary_color   ?? '#d4a853',
-          hero_video_url:  d.hero_video_url  ?? '',
           whatsapp_number: d.whatsapp_number ?? '',
           instagram_url:   d.instagram_url   ?? '',
           maps_url:        d.maps_url        ?? '',
@@ -216,13 +215,6 @@ export default function SettingsTab() {
               value={form.maps_url}
               onChange={e => set('maps_url', e.target.value)}
               placeholder="https://maps.google.com/?q=…" dir="ltr" />
-          </div>
-          <div>
-            <label style={labelStyle}>رابط فيديو الواجهة (Supabase URL)</label>
-            <input style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 11 }}
-              value={form.hero_video_url}
-              onChange={e => set('hero_video_url', e.target.value)}
-              placeholder="https://…supabase.co/storage/v1/…/video.mp4" dir="ltr" />
           </div>
           <div>
             <label style={labelStyle}>عملة الأسعار</label>

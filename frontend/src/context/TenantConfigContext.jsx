@@ -54,7 +54,6 @@ export function useTenantConfigContext() {
       name_ar:         '',
       name_en:         '',
       primary_color:   '#d4a853',
-      hero_video_url:  null,
       whatsapp_number: '',
       instagram_url:   null,
       maps_url:        null,
