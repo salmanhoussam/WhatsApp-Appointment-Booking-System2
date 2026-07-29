@@ -121,6 +121,14 @@ gel, cologne) were created for `hr`, surfaced correctly through `GET /public/sto
 real Cart + Cash Checkout order was placed and confirmed both in the DB and in the Dashboard's
 Orders tab. See `.claudedocs/reviews/rk-barber-store-products-verification.md`.
 
+**Reviewed 2026-07-29 (Review 1)** — first Architecture Review under
+`.claude/rules/architecture-review-loop.md`. Beyond this file's own `moduleKey`-selector fix above,
+the same session's investigation grew into a platform-wide finding: every frontend consumer that
+collapsed a tenant's real plural capability set into one derived value has been migrated to
+`hasCapability`/`hasOrderCapability`, ratified as `.claudedocs/adr/TOS-004-plural-capability-
+resolution.md` and fully executed (5 phases + a Search Verification gate). Full ledger:
+`.claudedocs/maturity/catalog.md`.
+
 ## Open Findings
 
 **Duplicate Architecture** — `app/api/v1/admin/store.py` and `app/api/v1/admin/restaurant.py`
@@ -135,3 +143,7 @@ Contract to close, one canonical write path (`catalog_service.py`) for all three
 
 - `category.md` — shares this Capability's Service and Duplicate Architecture finding.
 - `../adr/TOS-003-capability-contract-model.md` — the Contract model this file follows.
+- `../adr/TOS-004-plural-capability-resolution.md` — the platform-wide capability-resolution
+  migration this Capability's own moduleKey fix grew into.
+- `../../maturity/catalog.md` — the full Architecture Review ledger this file's Maturity section
+  summarizes.

@@ -77,6 +77,12 @@ this is one field on one section type, not yet a general cross-module Media Capa
 Library, no browse/reuse). Stays Experimental until the broader Contract above is actually built,
 not just one Operation type proven.
 
+**Reviewed 2026-07-29 (Review 1, no change)** — first Architecture Review under
+`.claude/rules/architecture-review-loop.md`. Confirmed still Experimental: the dual hero-media
+write-path finding (`evolution/media-capability.md`, 2026-07-23) remains open but its own stated
+Escalation Watch trigger — a third real Media-specific case — has not occurred, so it is not yet an
+ADR candidate. Full ledger: `.claudedocs/maturity/media.md`.
+
 ## Open Findings
 
 **Missing Architecture — Gallery/Media (`gallery.py`).** No service exists for `GalleryImage`
@@ -96,3 +102,5 @@ re-explained — the ADR is the Single Source of Truth for the principle itself.
   Pipeline Known Requirement.
 - `content.md` — the one real Editing Engine Media path built so far (`hero.bg_image`) is a Content
   Capability field whose media is replaced via this Capability's Operation.
+- `../../maturity/media.md` — the full Architecture Review ledger this file's Maturity section
+  summarizes.

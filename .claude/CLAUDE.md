@@ -54,15 +54,19 @@ start_dev.bat              -- Start FastAPI + Prisma + React locally
 /audit --quick             -- Security scan only
 /memory-sync               -- Sync memory after schema changes or long sessions
 /bo-hussein [idea/goal]    -- CEO Orchestrator: analyzes idea, searches web, delegates to agents
+/architecture-review [topic] [--window N] -- Recurring maturity review of a Capability/Interface/
+                           System (default window: last 14 sessions) — evidence-only, appends to
+                           .claudedocs/maturity/[topic].md
 
 ## Rules (Path-Scoped — auto-loaded)
 rules/global.md                  -- Always: multi-tenancy, 4-layer, session protocol
 rules/engineering-manager-mode.md -- Always: EM/Tech-Lead persona — minimal changes, ask before redesigns, structured after-task reports
 rules/team-roles.md              -- Always: internal Architecture Guardian/Documentation Manager/QA/Code Reviewer roles, coordinated by the EM
-rules/documentation-policy.md    -- Always: ADR → Evolution Log → Architecture Plan → Implementation Contract → Implementation → Verification → Post-Implementation Review → Archive; folder structure per ADR-0003 (adr/, evolution/, architecture/ — itself six layers: README/INDEX/TENANT_OS.md, principles/, capabilities/, plus other domain plans — implementation/, verification/, reviews/, decisions/, sessions/, archive/)
+rules/documentation-policy.md    -- Always: ADR → Evolution Log → Architecture Plan → Implementation Contract → Implementation → Verification → Architecture Review → Post-Implementation Review → Archive; folder structure per ADR-0003 (adr/, evolution/, maturity/, architecture/ — itself six layers: README/INDEX/TENANT_OS.md, principles/, capabilities/, plus other domain plans — implementation/, verification/, reviews/, decisions/, sessions/, archive/)
 rules/service-execution-constitution.md -- Always: how every independent Service investigates context, leaves evidence, and handles missing input, before any Service Contract
-rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention
+rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention; Bo Hussein's repo-trustworthiness AND architecture-review-due checks
 rules/investigation-protocol.md  -- Always: bug/root-cause investigations write evidence files, report in Confirmed/Side Findings/Unknowns, separate Recommendation from Decision from Execution
+rules/architecture-review-loop.md -- Always: recurring maturity review per Capability/Interface/System (.claudedocs/maturity/<topic>.md), distinct from the one-shot Post-Implementation Review; pattern-escalation rule (2nd independent finding → ADR/Review candidate)
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern

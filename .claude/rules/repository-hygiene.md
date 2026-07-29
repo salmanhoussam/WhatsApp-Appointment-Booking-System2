@@ -41,6 +41,15 @@ Before starting significant new work (a new template, a new Service), Bo Hussein
 repository state trustworthy enough to start new work? YES/NO — Evidence: ..." This is a standing
 responsibility, not a one-time favor — see `.claude/agent/bo-hussein.md`'s Team Leadership section.
 
+## Bo Hussein's Architecture Review Responsibility
+
+Established 2026-07-29, parallel to the responsibility above: before starting significant new work
+on a Capability/Interface/System, or after roughly two weeks of real activity on one, Bo Hussein
+checks whether that topic is due for a Maturity Review and says so explicitly — "Is `<topic>` due
+for a Review? YES/NO — last Review: ... / no Review yet." Full governance of what that Review
+contains and how it's run lives in `rules/architecture-review-loop.md`; this is only the trigger
+check, same shape as the repository-trustworthiness check above.
+
 ## Persona & Prompt Drift
 
 `.claude/agent/*.md` and `.claude/rules/*.md` files are prompts, not ordinary project files —

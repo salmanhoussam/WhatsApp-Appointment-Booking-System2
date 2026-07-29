@@ -10,8 +10,14 @@ Without a fixed place for each kind of document, "why was this built this way" g
 
 ```
 Session Reports  →  Evolution Documents  →  ADR  →  Architecture Plan  →  Implementation Contract
-  →  Implementation  →  Verification  →  Post-Implementation Review  →  Archive
+  →  Implementation  →  Verification  →  Architecture Review  →  Post-Implementation Review  →  Archive
 ```
+
+Added 2026-07-29: **Architecture Review** here is a distinct, recurring stage — not the
+Post-Implementation Review immediately after it in the chain (that one is a one-shot, ADR-scoped
+gate; this one is a periodic maturity check on a Capability/Interface/System, repeated over its
+life). Governed in full by `rules/architecture-review-loop.md`, cross-referenced below — this file
+only places it in the sequence.
 
 Added 2026-07-23 (Salman's own correction, applied verbatim): each of the first three stages
 answers a genuinely different question, and collapsing them is exactly what causes ADRs to turn
@@ -87,6 +93,11 @@ real Domain (Tenant OS).
 │                        folder, distinguished by prefix, not nesting) — the decision itself,
 │                        nothing else
 ├── evolution/           <topic>.md — accumulating insight, pre-ADR (see above)
+├── maturity/            <topic>.md — recurring Architecture (Maturity) Review ledger, one per
+│                        Capability/Interface/System, appended to over time — see
+│                        `rules/architecture-review-loop.md`. Sibling to `evolution/`, not nested
+│                        under it: different question (post-implementation "did it hold up?" vs.
+│                        pre-ADR "what are we learning?"), same living-document mechanic.
 ├── architecture/        Six layers, each answering one question, each its own rate of change:
 │   ├── README.md         entry point — what kind of thing am I even looking for
 │   ├── INDEX.md           the one navigation rollup — Decisions/Principles/Capabilities tables
@@ -115,13 +126,15 @@ real Domain (Tenant OS).
 ```
 
 **Standing cross-reference** — this file, `investigation-protocol.md`,
-`service-execution-constitution.md`, and `repository-hygiene.md` together define this project's
-whole evidence/documentation discipline: this file for *where* a document lives and in what
-sequence it's produced; `service-execution-constitution.md` for how a Service investigates and
-leaves evidence before executing; `investigation-protocol.md` for how a real bug/root-cause
-investigation is reported (Confirmed/Side Findings/Unknowns); `repository-hygiene.md` for drift
-categories and reference validation. Each governs a different moment in the same lifecycle rather
-than restating the others.
+`service-execution-constitution.md`, `repository-hygiene.md`, and `architecture-review-loop.md`
+together define this project's whole evidence/documentation discipline: this file for *where* a
+document lives and in what sequence it's produced; `service-execution-constitution.md` for how a
+Service investigates and leaves evidence before executing; `investigation-protocol.md` for how a
+real bug/root-cause investigation is reported (Confirmed/Side Findings/Unknowns);
+`repository-hygiene.md` for drift categories and reference validation;
+`architecture-review-loop.md` for how a Capability/Interface/System gets periodically
+re-assessed after it's already implemented and verified once. Each governs a different moment in
+the same lifecycle rather than restating the others.
 
 ## Naming
 
@@ -138,3 +151,4 @@ than restating the others.
 5. `bo-hussein` (`.claude/agent/bo-hussein.md`) reads this file before routing any strategic/architectural request, so the workflow above is applied automatically rather than re-explained per request.
 6. When a single Implementation Contract is executed by more than one role/skill/agent (routine — `bo-hussein` routes work across multiple agents/skills per its routing tables), each phase's `verification/*.md` document must name which role/skill/agent executed that phase and the evidence it produced, attributed per phase rather than folded into one undifferentiated account. A phase executed by a single role needs no extra attribution beyond what rule 3's evidence standard already requires; this only applies once execution is split across more than one contributor.
 7. An `evolution/<topic>.md` entry is never deleted or rewritten to "clean it up" — same immutability as `reviews/`. A later entry may revise or supersede an earlier one's Current Understanding, but the earlier entry stays, so the accumulation itself stays honest history, not a single edited snapshot.
+8. A `maturity/<topic>.md` entry follows the same immutability rule as rule 7 — never deleted or rewritten, only appended to. Full governance in `rules/architecture-review-loop.md`.
