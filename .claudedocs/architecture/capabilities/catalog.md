@@ -147,3 +147,5 @@ Contract to close, one canonical write path (`catalog_service.py`) for all three
   migration this Capability's own moduleKey fix grew into.
 - `../../maturity/catalog.md` — the full Architecture Review ledger this file's Maturity section
   summarizes.
+- `../../reviews/capability-contract-consistency-review-2026-07-29.md` — re-confirms this file's
+  Duplicate Architecture finding is still real today, compared against Media and Content.

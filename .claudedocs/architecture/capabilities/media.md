@@ -45,8 +45,11 @@ CRUD/reorder, no Service layer — see Open Findings).
 ## Public Projection
 
 Media URLs are read wherever the owning Capability's Public Contract exposes them (e.g.
-`GET /public/{slug}/config` for `hero.bg_image`) — Media itself has no dedicated public read
-endpoint; it is always read through whichever Capability references the URL.
+`GET /public/{slug}/config` for `hero.bg_image`). **Correction (Capability Contract Consistency
+Review, 2026-07-29):** one dedicated public read endpoint does exist for unit-gallery images —
+`GET /{slug}/units/{unit_id}/gallery` (`app/api/v1/public/__init__.py:167`, calling a real
+`public_repo.list_gallery_images_for_unit`) — but a grep found zero real frontend callers of it.
+Real and wired, not a stub, but not a confirmed live Interface either.
 
 ## Single Source of Truth
 
@@ -104,3 +107,6 @@ re-explained — the ADR is the Single Source of Truth for the principle itself.
   Capability field whose media is replaced via this Capability's Operation.
 - `../../maturity/media.md` — the full Architecture Review ledger this file's Maturity section
   summarizes.
+- `../../reviews/capability-contract-consistency-review-2026-07-29.md` — real-code re-verification
+  of this file's Admin/Public Projection claims against Catalog and Content, including the Public
+  Projection correction above.

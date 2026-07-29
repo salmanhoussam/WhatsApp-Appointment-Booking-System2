@@ -104,3 +104,6 @@ click-capture/live-preview plumbing.
   are wired through.
 - `site-configuration.md` — the Ownership Matrix that keeps editorial text inside this Capability
   rather than Site Configuration, even for historically `config.hero`-nested fields.
+- `../../reviews/capability-contract-consistency-review-2026-07-29.md` — confirms this Capability
+  as the one clean single-Service reference case, compared against Media and Catalog's real
+  divergences.
