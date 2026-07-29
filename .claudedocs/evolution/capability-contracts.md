@@ -5,6 +5,25 @@ One Contract → One Service → One Source of Truth" principle actually holds i
 quietly drifts. See `.claude/rules/documentation-policy.md`'s "Architecture Evolution Log" section
 for what this file is and isn't.
 
+## ADR-0005 Candidate Watchlist
+
+Not an ADR. Not a Review. A single, quickly-scannable place so that two months from now, finishing
+Booking doesn't require re-reading this whole file to know whether ADR-0005 has "earned" being
+written yet — the answer lives here, updated as each Capability below is actually checked.
+
+**Evidence (independent instances confirmed so far)**
+- ✓ Media — dual hero-write-path (2026-07-23 entry below)
+- ✓ Catalog — `admin/restaurant.py`/`admin/store.py` bypassing `catalog_service.py`
+- ✓ Site Configuration — `client_service.py` built, never wired (Sprint 3, 2026-07-29)
+
+**Pending (next real cases to check against, not yet audited for this specific pattern)**
+- ☐ Site Configuration — re-check: has anything *beyond* the already-found `client_service.py`
+  case shown a converging solution shape?
+- ☐ Booking
+
+**Decision Threshold**: promote to ADR-0005 when two independent Capabilities converge on the same
+Contract *solution* — not merely on confirming the same problem repeats again.
+
 ## 2026-07-24
 
 ### Context
