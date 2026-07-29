@@ -118,6 +118,25 @@ Integrity Findings (taxonomy defined once in `.claudedocs/architecture/TENANT_OS
 folder does not own this rule, it demonstrates applying it. Any future domain plan should link
 back here rather than restate the principle itself.
 
+**Elevated to a stated Principle, 2026-07-29** — promoted from `evolution/capability-contracts.md`
+after three independent, confirmed real instances (Media's dual hero-write-path; Catalog's
+`admin/restaurant.py`/`admin/store.py` bypassing `catalog_service.py`; Site Configuration's
+`client_service.py` built-but-never-wired while `settings.py` used its own separate path) — enough
+to name the underlying shape explicitly, in Salman's own words:
+
+> **Each Capability should expose one canonical contract and one canonical write path. Parallel
+> implementations must be treated as temporary migration states, not permanent architecture.**
+
+This is a Principle, not yet an ADR — deliberately. The evidence confirms a repeating *problem*
+(a Capability drifting into more than one write path or out-of-sync Registry/Contract); it does not
+yet confirm a converged *solution* (a Service Registry? a Capability Registry? a unified Contract
+layer? a Dispatcher? something else) — writing an ADR now would jump from problem to solution
+without the verification cycle this project's own ADR discipline requires. ADR-0005 stays
+deliberately open, pending further real evidence across the next 2-3 Capabilities this principle
+gets checked against (Site Configuration, Booking, and others as they come up) — promoted to an ADR
+only once the solution itself, not just the symptom, converges. See
+`.claudedocs/evolution/capability-contracts.md`'s 2026-07-29 entry for the full reasoning.
+
 ## 10. Every Capability Exposes Two Contracts — Admin (Write) and Public (Read)
 
 Platform-wide principle, raised by Salman while reviewing the Tenant OS Editing Engine's real

@@ -102,9 +102,59 @@ on its own to become `TOS-004` directly (see Related below), skipping the "needs
 threshold since two *independent* cases (RK Barber's real bug + the dormant `health-gym` template's
 prior manual workaround) already existed for that specific finding.
 
+## 2026-07-29
+
+### Context
+
+The Architecture Checkpoint Review (post-Sprint 3) named the same pattern this file has tracked
+since 2026-07-23, this time citing three instances across three different Capabilities: Media's
+dual hero-write-path (2026-07-23 entry above), Catalog's `admin/restaurant.py`/`admin/store.py`
+bypassing `catalog_service.py` (already a named Open Finding in `catalog.md`), and Site
+Configuration's `client_service.py` (built, never wired — Sprint 3, this same session).
+
+### Discovery
+
+Salman's own explicit decision, given directly rather than left as a recommendation: the pattern
+has repeated enough to state as a general Principle, but not enough to promote to an ADR yet — an
+ADR must answer "what is the solution," and this evidence only confirms the *problem* repeats, not
+that any specific *solution* (Service Registry, Capability Registry, unified Contract, Dispatcher,
+or something else) has converged. Writing an ADR now would jump from problem to solution without
+this project's own verification cycle.
+
+### Current Understanding
+
+Promoted to a stated Principle in `rules/backend/architecture.md` §9 (2026-07-29): *"Each
+Capability should expose one canonical contract and one canonical write path. Parallel
+implementations must be treated as temporary migration states, not permanent architecture."*
+`ADR-0005` is explicitly named and deliberately left open — not scheduled, not designed — pending
+further real evidence from the next 2-3 Capabilities this Principle gets checked against (Site
+Configuration and Booking named explicitly as the next places to look, given both already surfaced
+real findings this session).
+
+### Open Questions
+
+- Same standing question this file has carried since 2026-07-24, now sharpened: when the *next*
+  instance is found (Site Configuration or Booking are the named candidates to watch), does a
+  converged solution shape become visible, or does a fourth instance just add more evidence to the
+  same still-open problem statement?
+
+### Promoted?
+
+Yes → Principle (`rules/backend/architecture.md` §9, 2026-07-29). **Not** yet → ADR — explicitly
+deferred, per Salman's own reasoning: `Finding → Principle → observe next 2-3 Capabilities → ADR
+only if/when the solution converges`, not `Finding → ADR` directly. This is a different, more
+conservative promotion than TOS-004's (which did jump straight from Finding to ADR) — the
+difference is that TOS-004's real solution was already clear from the evidence itself; this
+pattern's solution is not yet.
+
 ## Related
 
 - `.claudedocs/evolution/media-capability.md` — the first real case of this pattern (two hero-media
   write paths).
-- `.claudedocs/adr/TOS-004-plural-capability-resolution.md` — the third case's own promoted decision.
-- `.claudedocs/evolution/capability-resolution-layer.md` — the resolution being built in response.
+- `.claudedocs/adr/TOS-004-plural-capability-resolution.md` — the third case's own promoted decision
+  (a different instance of this same family, promoted directly to an ADR since its solution was
+  already clear — contrast with this entry's own, deliberately slower promotion).
+- `.claudedocs/evolution/capability-resolution-layer.md` — the resolution being built in response
+  (for the `TOS-004` case specifically, not this entry's still-open ADR-0005 candidate).
+- `.claudedocs/reviews/architecture-checkpoint-review-2026-07-29-addendum.md` — where this
+  promotion was first proposed and then explicitly deferred by Salman.
