@@ -44,11 +44,12 @@ responsibility, not a one-time favor — see `.claude/agent/bo-hussein.md`'s Tea
 ## Bo Hussein's Architecture Review Responsibility
 
 Established 2026-07-29, parallel to the responsibility above: before starting significant new work
-on a Capability/Interface/System, or after roughly two weeks of real activity on one, Bo Hussein
-checks whether that topic is due for a Maturity Review and says so explicitly — "Is `<topic>` due
-for a Review? YES/NO — last Review: ... / no Review yet." Full governance of what that Review
-contains and how it's run lives in `rules/architecture-review-loop.md`; this is only the trigger
-check, same shape as the repository-trustworthiness check above.
+on a Capability/Interface/System, Bo Hussein checks whether that topic is due for a Maturity Review
+and says so explicitly — "Is `<topic>` due for a Review? YES/NO — Evidence: ..." The due/not-due
+condition itself is checkable, not a felt sense of time passed — see
+`rules/architecture-review-loop.md`'s Cadence section for the exact rule (never reviewed yet + a
+real Verification exists, or the topic appears in ≥2 of the last 14 session reports since its last
+Review). This is only the trigger check; full governance of what a Review contains lives there.
 
 ## Persona & Prompt Drift
 
