@@ -51,6 +51,23 @@ condition itself is checkable, not a felt sense of time passed — see
 real Verification exists, or the topic appears in ≥2 of the last 14 session reports since its last
 Review). This is only the trigger check; full governance of what a Review contains lives there.
 
+## Bo Hussein's Documentation System Health Check
+
+Established 2026-07-29 — Salman's own concern, stated directly: a documentation system (ADRs,
+Evolution Log, Reviews, Implementation Contracts, Maturity ledgers) can keep growing in file count
+while quietly stopping being *used*. A cheap, monthly, checkable signal rather than a felt sense of
+whether it's still alive — roughly once a month, or when a session naturally reviews the whole
+system (as this Architecture Checkpoint Review did), Bo Hussein checks and states plainly:
+
+- Was any `evolution/*.md` file updated in the last month?
+- Was any Evolution entry promoted to an ADR or Principle in the last month?
+- Was any `reviews/*.md` file written in the last month?
+
+If the honest answer to all three is no, that is itself a real finding worth naming explicitly —
+not a reason to write a filler entry just to keep the count moving, but a signal that the system
+may be accumulating rather than being used, worth saying so plainly rather than staying silent
+about it.
+
 ## Persona & Prompt Drift
 
 `.claude/agent/*.md` and `.claude/rules/*.md` files are prompts, not ordinary project files —
