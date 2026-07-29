@@ -65,9 +65,59 @@ rule file now, per this project's own Abstraction Rule (`rules/team-roles.md`) �
 (Site Configuration's `UpdateConfiguration`) is not yet the second/third independent proof this
 project's own promotion threshold requires.
 
+## 2026-07-29 (same day, later — Phase 3 execution)
+
+### Context
+
+Executing Phase 3: investigating where `Client.name_ar` (Brand Name) actually renders on the real
+generic public page, to wrap it in `EditableRegion` per the entry above's own example ("Brand name
+inline, Theme tokens dashboard").
+
+### Discovery
+
+No real rendered surface exists. The only two places `name_ar` appears in `DynamicPage.jsx` are a
+demo-only `TrialRibbon` (never shown for a real tenant) and an empty-page fallback (only shown when
+zero sections exist). Making it Inline Editable would have required creating a rendered surface
+*for the sake of the test* — the reverse of this project's standing discipline (never build ahead
+of a real, proven need). Not executed; reported as a finding instead.
+
+### Current Understanding — revises the entry above's example, doesn't discard it
+
+**Finding**: Inline editing is not a capability requirement. It is a property of a rendered
+surface. Capabilities that do not naturally render on the public page remain Dashboard-only until
+a legitimate public surface exists.
+
+This is not a bug and not a TODO — it's the same architectural line the entry above already drew
+(Content → Rendered Content → Inline; Configuration → Global Configuration → Dashboard), now
+confirmed by a real negative case rather than assumed from a general principle. `Client.name_ar`
+stays Site Configuration's (Brand), unchanged — Brand is real and used elsewhere (Dashboard,
+browser title, metadata, share cards, search, email templates) even on pages whose body never
+literally renders it. The Editing Engine's actual goal was never "everything Inline" — it's
+"everything edited from its most suitable Interface," and Site Configuration having zero Inline
+Operations today is exactly what that goal predicts, not an exception to it.
+
+```
+Content              Dashboard ✅   Inline ✅
+Media                Dashboard ✅   Inline ✅
+Site Configuration    Dashboard ✅   Inline ❌ (unless a real public surface exists)
+```
+
+### Open Questions
+
+- If a real Brand-display surface is ever added to the public page, does it become Inline then, or
+  does Brand stay Dashboard-only by design regardless? Not yet decided — depends on whether such a
+  surface is ever built for a real product reason, not for this finding's sake.
+
+### Promoted?
+
+No — same reasoning as the entry above. This sharpens that entry's own open question about
+Interfaces rather than closing it.
+
 ## Related
 
 - `.claudedocs/adr/TOS-002-editing-engine.md` — where `UpdateField`/`ReplaceMedia` were first
   named as real Operation types; this entry's `UpdateConfiguration` is the natural fourth.
 - `.claudedocs/architecture/capabilities/site-configuration.md` — the Capability this insight came
   from applying in practice.
+- `.claudedocs/reviews/site-configuration-phase3-verification.md` — the real investigation
+  (`DynamicPage.jsx` read directly) behind the second entry's Discovery.
