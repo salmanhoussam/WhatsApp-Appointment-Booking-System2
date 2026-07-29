@@ -262,25 +262,21 @@ export default function GenericAdminDashboard() {
   const SCHEMAS_BY_CAPABILITY = { content: contentSchema, media: mediaSchema }
   const pendingImageFieldRef = useRef(null)
 
-  // Shared by both interaction types: patch the field's value into `settings`, and push it into
-  // the real live iframe the same way PREVIEW_UPDATE already does for the 3 primitive Settings
-  // fields — same real mechanism, more content.
+  // Shared by both interaction types: PATCH the field's real endpoint, then let the field's own
+  // schema entry decide how local state and the live preview get patched — this function never
+  // branches on which Capability or field it's handling (Site Configuration Sprint 3, Phase 3;
+  // see .claudedocs/evolution/capability-operations-model.md for why this matters — a
+  // capability-keyed branch here is exactly how a Switchboard/dispatcher forms unnoticed).
   const saveFieldValue = useCallback(async (field, newValue) => {
-    const existingContent = settings?.config?.content ?? {}
     try {
       await adminApi.patch(field.apiPath, { [field.apiField]: newValue })
 
-      const updatedSections = (existingContent.sections ?? []).map(s =>
-        s.type === field.sectionType ? { ...s, data: { ...s.data, [field.dataField]: newValue } } : s
+      const updatedSettings = field.applyLocalUpdate(settings, field, newValue)
+      setSettings(updatedSettings)
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'PREVIEW_UPDATE', config: field.getPreviewPatch(updatedSettings, newValue, field) },
+        '*'
       )
-      const updatedConfig = { ...(settings?.config ?? {}), content: { ...existingContent, sections: updatedSections } }
-
-      setSettings(prev => ({ ...prev, config: updatedConfig }))
-      // DynamicPage.jsx's PREVIEW_UPDATE handler does `Object.assign(patch, e.data.config)` —
-      // e.data.config's own keys land directly on tenantConfig's top level, not nested under
-      // tenantConfig.config. To patch tenantConfig.config.content, e.data.config itself must be
-      // `{ config: updatedConfig }`, not `updatedConfig` directly.
-      iframeRef.current?.contentWindow?.postMessage({ type: 'PREVIEW_UPDATE', config: { config: updatedConfig } }, '*')
     } catch (err) {
       window.alert('تعذّر حفظ التعديل — حاول مجدداً.')
     }
@@ -301,10 +297,9 @@ export default function GenericAdminDashboard() {
         return
       }
 
-      // UpdateField (text) — unchanged from Sprint 1.
-      const existingContent = settings?.config?.content ?? {}
-      const currentValue = existingContent.sections
-        ?.find(s => s.type === field.sectionType)?.data?.[field.dataField] ?? ''
+      // UpdateField (text) — current value now read via the field's own schema entry, not
+      // assumed to live inside content.sections (Site Configuration Sprint 3, Phase 3).
+      const currentValue = field.getCurrentValue(settings, field)
       const newValue = window.prompt(field.promptLabel, currentValue)
       if (newValue === null || newValue === currentValue) return
       await saveFieldValue(field, newValue)

@@ -10,7 +10,13 @@
  * transfer (Design Principle 2: prefer existing capability over new infrastructure); this
  * Schema's `apiPath` is only the second step, writing the already-uploaded URL into the
  * right place.
+ *
+ * `getCurrentValue`/`applyLocalUpdate`/`getPreviewPatch` (Site Configuration Sprint 3, Phase 3):
+ * shared with Content via `sectionFieldHelpers.js` since this field lives in the identical
+ * `content.sections` shape — see that file's own header for why.
  */
+
+import { getSectionFieldValue, applySectionFieldUpdate, getSectionFieldPreviewPatch } from './sectionFieldHelpers'
 
 export const mediaSchema = {
   'hero.bg_image': {
@@ -24,5 +30,8 @@ export const mediaSchema = {
                                  // reuse the same name for both, Media's route doesn't.
     apiPath:       '/media/hero-image',
     uploadContext: 'page_hero',
+    getCurrentValue:  getSectionFieldValue,
+    applyLocalUpdate: applySectionFieldUpdate,
+    getPreviewPatch:  getSectionFieldPreviewPatch,
   },
 }
