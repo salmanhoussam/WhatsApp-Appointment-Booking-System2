@@ -56,7 +56,9 @@ Based **only** on what Step 1 actually found, identify:
 - questions that are still open
 
 Do not invent anything. Do not summarize from memory. Every conclusion must be traceable to a
-specific session report — cite it.
+specific session report — cite it. Per `investigation-protocol.md`'s Evidence Interrogation
+section: be ready to name the exact file/session and the top 3 concrete findings from it — if you
+can't, you summarized instead of reviewing, and the claim doesn't count yet.
 
 **Pattern-escalation rule:** if a finding appears for the **second independent time** across what
 you just read, explicitly call it out as a candidate for ADR promotion or a full Architecture

@@ -117,7 +117,10 @@ Via the `/architecture-review` command (`.claude/commands/architecture-review.md
 is the constitution, that command is its operational instance, the same relationship
 `service-execution-constitution.md` has to a real Service Contract. The command is evidence-only
 (reads real session reports, never summarizes from memory) and ends with the same three-part
-Confirmed/Side/Unknowns discipline as `investigation-protocol.md` where relevant.
+Confirmed/Side/Unknowns discipline as `investigation-protocol.md` where relevant. Every claim a
+Review entry makes — including "I reviewed N sessions" itself — is held to that same file's
+Evidence Interrogation section (name the top 3 findings and what changed, or it wasn't really
+reviewed) — not restated here, inherited by reference.
 
 ## The pattern-escalation rule
 

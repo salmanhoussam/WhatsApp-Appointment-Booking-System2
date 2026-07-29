@@ -28,12 +28,47 @@ Every investigation report ends in exactly these three sections, in this order:
 - **Unknowns** — what remains unverified and why (e.g., no browser tool available, no server
   traceback captured). Never silently omitted — an investigation that can't fully close says so.
 
-## Claim Precision
+## Evidence Interrogation
 
-Never state a stronger conclusion than the evidence actually supports. If part of the system
-remains unverified, say exactly that: "all backend-side checks passed; visual browser confirmation
-is still required to close this" — not "the backend is 100% fine." A claim and its own stated gap
-must not contradict each other in the same report.
+Renamed and expanded 2026-07-29 (was "Claim Precision") — the original rule below still holds, but
+Salman named a real gap it didn't cover: it constrains how a claim is *worded*, but nothing
+actively tests whether a claim is *grounded*. A well-worded claim and a fabricated-but-plausible-
+sounding one read identically unless something interrogates the difference. This section now does
+both.
+
+**The original rule (wording) still applies:** never state a stronger conclusion than the evidence
+actually supports. If part of the system remains unverified, say exactly that: "all backend-side
+checks passed; visual browser confirmation is still required to close this" — not "the backend is
+100% fine." A claim and its own stated gap must not contradict each other in the same report.
+
+**The added rule (grounding) — every Claim must survive being asked:**
+
+- Name the exact files read.
+- Name the exact line numbers or function/section names relied on.
+- What alternative explanation was considered, and why was it excluded?
+- What specific evidence makes this the correct/canonical conclusion, and not another one?
+
+For any claim of the shape "I reviewed N session reports / N files / the codebase" specifically:
+name the top 3 concrete findings, which session/file each came from, and what changed as a result.
+**If this can't be answered, the claim was likely summarized or inferred, not actually reviewed —**
+treat it as unverified, not as done.
+
+**"Verified." is not evidence — an itemized list is.** Replace bare claims of "Verified" / "Done" /
+"Confirmed" with a concrete, checkable list:
+
+```
+Evidence:
+- Read file X (lines A-B)
+- Executed script Y — output: ...
+- Queried database Z — result: ...
+- Captured screenshot A — shows: ...
+```
+
+Every Claim needs its own evidence chain, not a single word standing in for one. This section is
+inherited by reference, not restated, from `service-execution-constitution.md` (a Service's
+`evidence.md`) and `architecture-review-loop.md` (an Architecture Review's Analysis step) — both
+already require "evidence, not a claim"; this section is where that requirement's exact shape and
+interrogation questions live.
 
 ## Separate Investigation → Recommendation → Decision → Execution
 
