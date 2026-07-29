@@ -7,7 +7,7 @@ import useTenantSlug     from '../../../hooks/useTenantSlug'
 import { useTenantBase } from '../../../hooks/useTenantSlug'
 import TenantModuleNav   from '../../../design-system/organisms/TenantModuleNav'
 import useGenericStore   from '../store/useGenericStore'
-import { hasOrderCapability } from '../../../utils/capabilities'
+import { hasCapability, hasOrderCapability } from '../../../utils/capabilities'
 
 // ── Cart item row ─────────────────────────────────────────────────────────────
 
@@ -179,15 +179,25 @@ export default function CartPage() {
   const navigate   = useNavigate()
   const accent     = config?.primary_color ?? '#d4a853'
 
-  const { moduleKey, sessionId, cartItems, updateQuantity, removeItem, clearCart, totalPrice, setConfig: setStoreConfig } =
+  const { sessionId, cartItems, updateQuantity, removeItem, clearCart, totalPrice, setConfig: setStoreConfig } =
     useGenericStore()
 
-  // Sync config into store so moduleKey is available even on direct /cart navigation
+  // Sync config into store (activeServices is what every real consumer reads) even on direct
+  // /cart navigation
   useEffect(() => {
     if (config && config.slug !== 'unknown') {
       setStoreConfig(config, config.active_services ?? [])
     }
   }, [config, setStoreConfig])
+
+  const activeServices = config?.active_services ?? []
+  // Which single order-bearing capability this cart is for, if any -- no real tenant has both
+  // Restaurant and Store active at once today (Module Resolution Review, 2026-07-28). A real
+  // per-transaction decision (which endpoint, which fields), not a tenant-wide collapse -- kept
+  // local to this component rather than sourced from a deleted store field.
+  const moduleKey = hasCapability(activeServices, 'restaurant') ? 'restaurant'
+    : hasCapability(activeServices, 'store') ? 'store'
+    : null
 
   const [form, setForm] = useState({
     customer_name:    '',

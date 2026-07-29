@@ -25,6 +25,7 @@ import { AnimatePresence }              from 'framer-motion'
 
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import useGenericStore  from '../store/useGenericStore'
+import { hasOrderCapability } from '../../../utils/capabilities'
 import CartBadge      from '../../../design-system/molecules/CartBadge'
 import CartDrawer     from '../../../design-system/organisms/CartDrawer'
 import ConfigurableHero from '../../../components/ConfigurableHero'
@@ -269,24 +270,22 @@ export default function DynamicPage() {
   const pageType = tenantConfig.page_type     || 'normal'
 
   const activeServices = tenantConfig.active_services ?? []
-  const moduleKey = activeServices.includes('restaurant') ? 'restaurant'
-    : activeServices.includes('store')      ? 'store'
-    : activeServices.includes('catalog')    ? 'catalog'
-    : null
 
   const sections = (tenantConfig.config?.content?.sections ?? [])
     .filter(s => s?.type)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   const cartCount = totalItems()
-  const showCart  = !!moduleKey
+  // Plural capability check (TOS-004) -- the old `!!moduleKey` was true even for a catalog-only
+  // tenant with nothing to actually check out; this is also a correctness fix, made consistent
+  // with CatalogPage.jsx/CartPage.jsx's identical already-fixed check.
+  const showCart  = hasOrderCapability(activeServices)
 
   // Props injected into every section component
   const sectionProps = {
     slug,
     accent,
     currency,
-    moduleKey,
     config: tenantConfig,
     onAddToCart: addItem,
   }

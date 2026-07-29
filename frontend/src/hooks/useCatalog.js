@@ -18,9 +18,9 @@ import { fetchAllCategories, fetchItems } from '../services/catalogApi'
 export default function useCatalog() {
   const { config, isLoading: configLoading } = useTenantConfig()
   const slug = useTenantSlug()
-  const { moduleKey, setConfig: setStoreConfig } = useGenericStore()
+  const { setConfig: setStoreConfig } = useGenericStore()
 
-  // Push config into store so moduleKey gets derived from active_services
+  // Push config into store (active_services is what every real consumer reads)
   useEffect(() => {
     if (config && !configLoading) {
       setStoreConfig(config, config.active_services ?? [])
@@ -97,7 +97,6 @@ export default function useCatalog() {
 
   return {
     config,
-    moduleKey,
     categories,
     activeCategory,
     setActiveCategory,

@@ -2,14 +2,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { hasCapability } from '../../../utils/capabilities'
 
-// Module key priority — first matching active service wins
-function deriveModuleKey(services = []) {
-  if (services.includes('restaurant')) return 'restaurant'
-  if (services.includes('store'))      return 'store'
-  if (services.includes('catalog'))    return 'catalog'
-  return null
-}
-
 // Per-slug session ID stored in localStorage — prevents cross-tenant cart leakage
 function getSessionId(slug) {
   const key = `${slug}_cart_session`
@@ -39,7 +31,6 @@ const useGenericStore = create(
     (set, get) => ({
       // ── Config ────────────────────────────────────────────────────────────
       config:         null,
-      moduleKey:      null,
       activeServices: [],
       sessionId:      null,   // used by store module for server-side cart
       activeCategory: null,
@@ -52,7 +43,6 @@ const useGenericStore = create(
       // ── Actions ───────────────────────────────────────────────────────────
 
       setConfig: (config, activeServices = []) => {
-        const moduleKey = deriveModuleKey(activeServices)
         const prevSlug  = get().config?.slug
         const nextSlug  = config?.slug
         // A client-side route change between two tenants (React Router swap, no full
@@ -70,7 +60,7 @@ const useGenericStore = create(
           prevSlug !== 'unknown' && nextSlug !== 'unknown' &&
           prevSlug !== nextSlug
 
-        const updates = { config, activeServices, moduleKey }
+        const updates = { config, activeServices }
         if (tenantChanged) {
           updates.cartItems      = []
           updates.sessionId      = null

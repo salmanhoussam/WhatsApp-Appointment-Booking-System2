@@ -6,14 +6,7 @@ import useTenantConfig   from '../../../hooks/useTenantConfig'
 import useTenantSlug     from '../../../hooks/useTenantSlug'
 import { useTenantBase } from '../../../hooks/useTenantSlug'
 import TenantModuleNav   from '../../../design-system/organisms/TenantModuleNav'
-import useGenericStore   from '../store/useGenericStore'
-
-// Maps our moduleKey to the VALID_MODULE_KEYS expected by the reservations API
-const MODULE_KEY_MAP = {
-  restaurant: 'restaurant',
-  store:      'services',
-  catalog:    'services',
-}
+import { hasCapability } from '../../../utils/capabilities'
 
 // ── Field atom ────────────────────────────────────────────────────────────────
 
@@ -106,7 +99,6 @@ export default function ReservePage() {
   const navigate   = useNavigate()
   const accent     = config?.primary_color ?? '#d4a853'
 
-  const { moduleKey } = useGenericStore()
   const activeServices = config?.active_services ?? []
   const hasReservations = activeServices.includes('reservations')
 
@@ -141,15 +133,16 @@ export default function ReservePage() {
       // Combine date + time into an ISO datetime string
       const reservedAt = new Date(`${form.date}T${form.time}:00`).toISOString()
 
-      // Module-specific metadata
-      const metadata = moduleKey === 'restaurant'
+      // Module-specific metadata -- plural capability check (TOS-004), not a tenant-wide moduleKey
+      const isRestaurant = hasCapability(activeServices, 'restaurant')
+      const metadata = isRestaurant
         ? { party_size: Number(form.party_size) || undefined }
         : undefined
 
       const { data } = await publicApi.post(
         `/reservations/`,
         {
-          module_key:     MODULE_KEY_MAP[moduleKey] ?? 'services',
+          module_key:     isRestaurant ? 'restaurant' : 'services',
           customer_name:  form.customer_name,
           customer_phone: form.customer_phone,
           customer_email: form.customer_email || null,
@@ -172,7 +165,7 @@ export default function ReservePage() {
     } finally {
       setSubmitting(false)
     }
-  }, [form, moduleKey, slug])
+  }, [form, activeServices, slug])
 
   // ── Guard — service not active ────────────────────────────────────────────
   if (!hasReservations) {
@@ -266,7 +259,7 @@ export default function ReservePage() {
             />
           </div>
 
-          {moduleKey === 'restaurant' && (
+          {hasCapability(activeServices, 'restaurant') && (
             <Field
               label="عدد الأشخاص"
               type="number"

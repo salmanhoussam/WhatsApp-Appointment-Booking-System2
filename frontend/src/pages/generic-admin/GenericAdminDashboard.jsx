@@ -102,16 +102,6 @@ function IconLogout({ size = 18, color }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Derive module key from the active service list.
- * Matches the same logic used by backend endpoints.
- */
-function deriveModuleKey(activeServices = []) {
-  if (activeServices.includes('restaurant')) return 'restaurant'
-  if (activeServices.includes('store'))      return 'store'
-  return 'catalog'
-}
-
-/**
  * Build the nav array. "reservations" tab is conditional.
  */
 function buildNav(hasReservations) {
@@ -341,7 +331,6 @@ export default function GenericAdminDashboard() {
   const tenantName      = settings?.name_ar        ?? 'لوحة التحكم'
   const currency        = settings?.currency       ?? config?.currency ?? 'USD'
   const activeServices  = config?.active_services  ?? []
-  const moduleKey       = deriveModuleKey(activeServices)
   const hasReservations = activeServices.includes('reservations')
   const NAV             = useMemo(() => buildNav(hasReservations), [hasReservations])
 
@@ -523,12 +512,6 @@ export default function GenericAdminDashboard() {
               <span style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {NAV.find(n => n.id === activeTab)?.labelAr ?? ''}
               </span>
-            </div>
-            <div style={{
-              fontSize: 11, color: 'rgba(255,255,255,0.18)',
-              letterSpacing: '0.08em', fontFamily: 'monospace',
-            }}>
-              {moduleKey.toUpperCase()} · {currency}
             </div>
           </div>
         )}

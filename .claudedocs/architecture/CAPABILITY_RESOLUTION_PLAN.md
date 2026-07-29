@@ -1,14 +1,12 @@
 # Capability Resolution Plan — Migrating Off the Single Tenant-Wide `moduleKey`
 
-**Status:** Phase 1 complete (primitives). Phase 2 complete (Public Catalog rendering). Phase 3
-complete (Cart/Reserve gating). Phase 4 complete for its two live consumers (Overview, Orders);
-`KanbanBoard.jsx` explicitly not touched (dead code, unverifiable). **Search Verification run,
-2026-07-29** — see `.claudedocs/reviews/capability-resolution-search-verification.md`: found and
-fixed one genuine, previously-unreviewed exception (`useGenericStore.js`'s Store cart session-ID
-creation), and surfaced a **new precondition for Phase 5**: `GenericAdminDashboard.jsx`'s topbar
-badge is still `deriveModuleKey()`'s one live caller, so that function cannot be deleted until the
-badge's own display is redesigned or otherwise decided. Phase 5 is **not yet clear to start**.
-Revised as phases complete — this is a living plan, not a one-time snapshot.
+**Status: COMPLETE, 2026-07-29.** All 5 phases done — see
+`.claudedocs/reviews/capability-resolution-phase5-verification.md` for the final Architecture
+Success Criteria assessment. The topbar badge (the last precondition the Search Verification found)
+was removed entirely per Salman's explicit decision, and one more real gap
+(`CartPage.jsx`'s own dependency on the deleted store field) was found and fixed during this final
+phase's own verification. `Tenant → One Module` is fully retired; `Tenant → Capabilities`
+(`hasCapability`/`hasOrderCapability`) is the sole canonical source across the frontend.
 
 ## 1. The Target Model — the Capability Resolution Layer
 
