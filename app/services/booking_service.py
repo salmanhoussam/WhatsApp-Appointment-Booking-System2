@@ -28,13 +28,19 @@ class BookingService:
         # Ensure isoformat is handled properly
         check_in = datetime.fromisoformat(booking_data["checkIn"])
         check_out = datetime.fromisoformat(booking_data["checkOut"])
-        
+
         is_available = await self.booking_repo.check_availability(
             unit_id, check_in, check_out, client_id=client_id
         )
-        
+
         if not is_available:
             raise ValueError("This unit is already booked for the selected dates.")
+
+        # Write the parsed datetimes back — booking_data still held the raw "YYYY-MM-DD"
+        # strings from the request body, which Prisma's create() rejects (it needs real
+        # datetime objects for DateTime-typed fields, not bare date strings).
+        booking_data["checkIn"] = check_in
+        booking_data["checkOut"] = check_out
         # Ensure status is properly applied based on payment method
         payment_method = booking_data.get("payment_method", "cash")
         booking_data["status"] = "confirmed" if payment_method == "cash" else "pending"
