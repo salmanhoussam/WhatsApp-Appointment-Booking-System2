@@ -102,6 +102,138 @@ Rule (`rules/team-roles.md`) and this file's own promotion rule
 (`documentation-policy.md`'s "an evolution file gets promoted into a real ADR only once its
 understanding has stabilized through multiple independent real implementations").
 
+## 2026-07-31
+
+### Context
+
+Barber — the 2nd real Reservation Strategy case, chosen deliberately over Coworking (close enough
+to Clinic to be a real reusability test, not so different that nothing would be shared regardless)
+— was built today. Per Salman's explicit instruction, it was built **as if Clinic didn't exist**:
+its own `Barber` table (`prisma/schema.prisma`, no `type`/`specialty` columns), its own migration
+(`prisma/migrations/add_barbers_table.sql`), its own repository (`app/repositories/barber_repo.py`),
+its own `_resolve_barber()` (`app/services/reservation_service.py:120-138`) and
+`find_overlapping_by_barber()` (`app/repositories/reservation_repo.py:102-121`), its own admin route
+(`app/api/v1/admin/barbers.py`), its own public listing endpoint (`GET
+/public/reservations/barbers`) — none of it calling into Clinic's `_resolve_resource()`,
+`RESOURCE_BACKED_MODULE_KEYS`, or `find_overlapping_by_resource()`. This entry records the
+comparison Salman asked for once Barber was live-verified end to end (per-barber working hours
+including a live edit taking effect immediately, overlap conflict detection, cross-barber
+independence at the same wall-clock time, role gating, cancel lifecycle — same rigor as Clinic's
+own 2026-07-30 verification, against a fresh disposable `barberlab-test` tenant, not `hr`, per
+Salman's explicit instruction not to touch the real RK Barber Shop tenant).
+
+### Discovery
+
+**What turned out to be literally identical, built independently:**
+
+- `_resolve_resource()` (`reservation_service.py:99-117`) and `_resolve_barber()`
+  (`reservation_service.py:120-138`) are structurally identical: guard on module_key, require an
+  id from `metadata`, fetch the row scoped by `clientId`, raise `ValueError` if missing/inactive,
+  return the row. Same 5-step shape, arrived at independently for a different entity.
+- `find_overlapping_by_resource()` (`reservation_repo.py:79-100`) and
+  `find_overlapping_by_barber()` (`reservation_repo.py:102-121`) are identical: same ±4h window,
+  same `status: {"in": [...]}` filter, same `exclude_id` parameter never yet called by anything.
+- Both independently needed a **real FK column** on `Reservation` (`resourceId`, `barberId`) rather
+  than a metadata key for their primary entity reference — the same Metadata Field Test reasoning,
+  applied fresh to Barber's own conflict-check needs, landed on the same answer.
+- Both reused the existing `Service` model directly for priced offerings (haircut/beard trim,
+  cleaning/braces) rather than inventing a new concept — confirmed via the seed data
+  (`scripts/seed_barber_arch_test.py`), not assumed.
+- Both converged on the identical admin role matrix (`SUPER_ADMIN`/`TENANT_ADMIN` write,
+  `+MANAGER_RESERVATIONS` read) via the Ownership Question asked fresh for Barber, not copied from
+  `resources.py`'s comment.
+- Both real, independent implementations still call the same **pre-existing**
+  `_check_working_hours()` utility (`reservation_service.py:80-96`) for the actual date/closed-day
+  math — this one is legitimate shared infra, not duplicated, because it predates Clinic itself
+  (used for the tenant-wide `Client.config.working_hours` fallback on every module_key, not
+  something Clinic invented).
+- Barber's fields ended up 5-of-7 identical to Resource's: `name`, `phone`, `isActive`,
+  `workingHours`, `sortOrder` all present on both, independently chosen.
+
+**What turned out similar but genuinely not identical:**
+
+- Resource has a `type` discriminator (`"doctor"` today, designed for future resource types) and a
+  `specialty` field; Barber has neither (`prisma/schema.prisma`'s `Barber` model). Built without
+  speculating about a future 3rd resource kind, Barber's real requirements never asked for a type
+  column. This is real evidence Resource's `type` may have been premature generalization — or it
+  may turn out justified once a case genuinely needs more than one resource kind per tenant
+  (a future Coworking case with both desks and rooms, say). Still open, not resolved by this case
+  alone.
+- The Working Hours resolution block in `create_reservation()` (`reservation_service.py:174-191`)
+  is visibly more awkward for barber than for resource — an artifact of Barber's branch being
+  bolted onto an existing function on the 2nd pass, not a genuine domain difference. Worth naming
+  as a code-shape scar from build *order*, separate from the real domain findings above.
+- The two public listing endpoints differ in shape: `GET /public/reservations/resources?module_key=`
+  (needs a `MODULE_KEY_TO_RESOURCE_TYPE` lookup, since Resource is multi-type) vs. `GET
+  /public/reservations/barbers` (no module_key param at all, since Barber has no type dimension).
+  This isn't an independent difference — it's a direct, downstream consequence of the `type`-column
+  divergence just above, not a second separate finding.
+
+**What was genuinely Clinic-only** (would not transfer even if extraction happened): the `type`
+discriminator's generality itself, and the `specialty` field — both medical-framing choices with no
+Barber equivalent modeled. Notably thin: most of what *looked* Clinic-specific during the original
+4-revision design (the pipeline, the resolve/conflict-check shape, the FK-over-metadata call) turned
+out to be general Reservation Strategy mechanics, not Clinic-specific after all — confirmed now by
+a second real, independent build reaching the same shape, not assumed from the first build alone.
+
+### Current Understanding
+
+Two real, independently-built cases now show:
+1. The 6-stage pipeline held for a second case without needing to change shape or add a stage.
+2. The `_resolve_X()` / `find_overlapping_by_X()` pair is, concretely, the same shape twice —
+   the strongest, most literal duplication found (not merely "looks similar").
+3. The one genuine unresolved question a shared abstraction would have to answer correctly is the
+   `type`-column question: does a future 3rd case need multiple kinds of resource per tenant (making
+   Resource's `type` field the right call), or does every case turn out to be single-kind like Barber
+   (making `type` unnecessary generality)? Two cases can't answer this — a 3rd case that genuinely
+   needs multiple resource kinds in one tenant would.
+
+### Open Questions
+
+- Does `ReservationStrategy`/`ReservationProfile`/registry extraction happen now, given this
+  evidence, or does the `type`-column question above warrant waiting for a 3rd case first? This is
+  Salman's decision to make with this comparison in hand, per his own explicit instruction
+  ("نجلس ونحدد ما الذي يستحق الاستخراج، وما الذي يجب أن يبقى خاصًا بكل حالة") — not concluded here.
+- If extraction does happen, does `Resource` and `Barber` merge into one shared table (dropping
+  Barber's leaner shape) or does the shared code operate over two separate tables via a common
+  repository interface? Not decided — a real design question the extraction step itself would need
+  to resolve, not answered by this comparison alone.
+- `barberlab-test` (disposable test tenant, `scripts/seed_barber_arch_test.py`) — kept for now in
+  case Salman wants to re-run any check; safe to delete whenever it's no longer needed (no real
+  customer data, isolated from `hr`/RK Barber Shop throughout).
+
+### Decision (2026-07-31, Salman, after reviewing the diff + bo-hussein's analysis above)
+
+**No extraction now — not because the duplication isn't real, but because it isn't costly yet.**
+bo-hussein's analysis (above) recommended extracting the small `_resolve_X()`/`find_overlapping_by_X()`
+pair now, reasoning the duplication was concrete and the extraction reversible. Salman agreed the
+duplication is real but drew the line differently: merging two functions with exactly two
+consumers trades a small, cheap duplication for a new abstraction that itself hasn't proven its
+shape is right yet — particularly since the `type`-column question (Current Understanding #3
+above) is still open. Extracting a helper today and having to re-shape it next week if `Resource`
+itself changes shape is a worse outcome than leaving two short, readable functions alone for now.
+
+**Sharpened trigger for when extraction becomes justified** — not just "two cases exist" (this
+entry's own evidence), but one of:
+1. **A 3rd real case appears** (Coworking or otherwise) and the same `_resolve_X()`/
+   `find_overlapping_by_X()` shape repeats a *third* time — three independent confirmations of the
+   identical shape is much stronger evidence than two, and would also finally exercise the
+   `type`-column question for real (does the 3rd case need multiple resource kinds in one tenant?).
+2. **Routine maintenance pain appears first** — a bug fix or feature change to the shared
+   Reservation pipeline starts requiring edits to both the Clinic branch and the Barber branch
+   together, more than once. That's the concrete signal that the duplication has become a
+   maintenance cost, not just a line-count observation.
+
+Neither has happened yet. Both `RESOURCE_BACKED_MODULE_KEYS` (clinic) and the barber-specific code
+in `reservation_service.py` stay exactly as built today — no `ReservationStrategy`, no
+`ReservationProfile`, no shared resolve/conflict-check helper, no `Resource`/`Barber` schema
+merge — until one of the two triggers above is real, not anticipated.
+
+### Promoted?
+
+No — deliberately deferred, per the Decision above. Not "not decided yet" — decided not to,
+for a stated reason, with two concrete future triggers named instead of a vague "later."
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,

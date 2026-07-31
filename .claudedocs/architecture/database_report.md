@@ -294,3 +294,4 @@ Guest checkout supported (`customerId` nullable).
 | 2026-04-27 | Added CatalogCategory, CatalogItem, PlatformService, ClientService | +4 models |
 | 2026-04-30 | Client gains: status, trial_ends_at, service_type, pageType, templateKey | Field additions |
 | 2026-05-05 | GalleryImage: +catalogItemId FK + imageType field | `npx prisma db push` ✅ |
+| 2026-07-31 | Barber (new model, 2nd Reservation Strategy case): id, clientId, name, phone, isActive, workingHours Json?, sortOrder + Reservation.barberId FK (nullable, onDelete: SetNull) | `prisma db push` ✅ — see `prisma/migrations/add_barbers_table.sql` and `.claudedocs/evolution/reservation-capability.md`'s 2026-07-31 entry. Note: the 2026-07-30 Resource model + Reservation.resourceId FK addition was never logged in this table — a real, pre-existing gap in this auto-reporting rule, not backfilled here (out of scope for today's edit), flagged for Salman to decide whether it's worth adding retroactively. |
