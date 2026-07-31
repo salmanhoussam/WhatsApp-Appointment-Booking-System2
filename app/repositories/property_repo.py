@@ -30,6 +30,13 @@ class PropertyRepository:
 
     async def create(self, client_id: str, data: dict):
         """Create a new property for an enterprise client."""
+        # The Property model's Prisma field name is `isActive`, not `is_active` -- the incoming
+        # dict (from PropertyCreate.dict()) uses the schema's own snake_case field name, which
+        # Prisma rejects ("Field does not exist in enclosing type"). Remap here, where Prisma
+        # field-name knowledge belongs.
+        data = dict(data)
+        if "is_active" in data:
+            data["isActive"] = data.pop("is_active")
         return await self.db.property.create(
             data={
                 **data,
