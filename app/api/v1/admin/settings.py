@@ -8,9 +8,13 @@ PATCH /api/v1/admin/settings — updates allowed fields
 Auth: any valid tenant JWT (client OR admin user token both carry 'slug').
 """
 
+import base64
+import io
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -19,6 +23,10 @@ from app.services import site_configuration_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Settings"])
+
+# Canonical public URL base — matches the documented pattern (demo.salmansaas.com/{slug}/{
+# defaultRedirect}, rules/frontend/routing.md). Overridable via env for other environments.
+STORE_QR_BASE_URL = os.getenv("STORE_QR_BASE_URL", "https://demo.salmansaas.com")
 
 
 # ── Pydantic schema ───────────────────────────────────────────────────────────
@@ -102,3 +110,30 @@ async def update_settings(
     except Exception as e:
         logger.error(f"🔥 DB error updating settings for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.get("/settings/qr")
+async def get_store_qr(
+    _soft_block = Depends(allow_during_soft_block),  # ADR-0002 §9.1 — must be declared first
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    Generate a QR code image encoding this tenant's real public store URL, for the merchant to
+    display/print (Store Template Pilot, 2026-07-31 — "no complex QR system, generating a QR for
+    the store's public page is enough" per Salman's explicit scope). Not stored — generated fresh
+    on every call, since the URL itself never changes and there's nothing to cache.
+    """
+    url = f"{STORE_QR_BASE_URL}/{tenant['slug']}/store"
+
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    png_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    return {
+        "success": True,
+        "data": {
+            "url":        url,
+            "image_b64":  png_base64,
+        },
+    }

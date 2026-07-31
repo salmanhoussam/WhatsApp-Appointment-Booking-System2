@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import adminApi from '../../../utils/admin.config'
 
 const inputStyle = {
@@ -90,6 +90,76 @@ const FONT_OPTS = [
   { key: 'Tajawal',  label: 'Tajawal' },
   { key: 'Inter',    label: 'Inter'   },
 ]
+
+// ── Store QR — deliberately minimal (Store Template Pilot, 2026-07-31) ────────
+// Generates on demand from the backend (GET /admin/settings/qr), no complex QR system --
+// one static image encoding the tenant's real public store URL, per Salman's explicit scope.
+function StoreQRSection({ color }) {
+  const [qr,      setQr]      = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+  const [copied,  setCopied]  = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    adminApi.get('/settings/qr')
+      .then(({ data }) => { if (data.success) setQr(data.data) })
+      .catch(() => setError('تعذّر توليد رمز QR'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load]) // eslint-disable-line
+
+  const copyLink = () => {
+    if (!qr?.url) return
+    navigator.clipboard.writeText(qr.url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <>
+      <div style={{ ...sectionTitle, marginBottom: 14 }}>رابط متجرك ورمز QR</div>
+      <div style={{ ...glass, marginBottom: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+        {loading && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>جاري التوليد...</div>}
+        {error && <div style={{ fontSize: 13, color: '#ff8080' }}>{error}</div>}
+        {qr && (
+          <>
+            <img
+              src={`data:image/png;base64,${qr.image_b64}`}
+              alt="QR code لمتجرك"
+              style={{ width: 140, height: 140, borderRadius: 10, background: '#fff', padding: 8 }}
+            />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                اطبع هذا الرمز واعرضه في متجرك — يفتح الزبون المتجر مباشرة من هاتفه
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px',
+              }}>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', direction: 'ltr', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {qr.url}
+                </span>
+                <button
+                  onClick={copyLink}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${color}55`, background: 'transparent', color,
+                    cursor: 'pointer', fontFamily: "'Cairo', sans-serif", flexShrink: 0,
+                  }}
+                >
+                  {copied ? '✓ تم النسخ' : 'نسخ الرابط'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -203,6 +273,9 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
           </div>
         </Field>
       </div>
+
+      {/* ── Store QR ──────────────────────────────────────────────────── */}
+      <StoreQRSection color={form.primary_color} />
 
       {/* ── Design & Templates ────────────────────────────────────────── */}
       <div style={{ ...sectionTitle, marginBottom: 14 }}>التصميم والمظهر</div>
