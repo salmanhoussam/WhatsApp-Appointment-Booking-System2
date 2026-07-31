@@ -260,6 +260,53 @@ async def get_current_tenant(
     )
 
 
+async def get_authenticated_tenant(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    """
+    Strict variant of get_current_tenant() for administrative routes only.
+
+    Accepts ONLY a valid JWT Bearer token (Client-type or Admin-type — both
+    carry 'slug', matching get_current_tenant()'s own JWT branch exactly, so
+    every currently-working admin flow — Client-root login fallback in
+    admin/Login.jsx, Admin/User login, any require_roles(...) check layered
+    on top by the route itself — keeps working unchanged).
+
+    Deliberately DROPS get_current_tenant()'s X-Tenant-Slug header,
+    ?client_slug= query param, and subdomain fallbacks — those exist for
+    public routes (genuinely anonymous by design) and were never meant to
+    double as authentication for /api/v1/admin/*. Found 2026-07-30: every
+    admin mutation route using only get_current_tenant() was reachable by an
+    unauthenticated caller via those exact fallbacks (see
+    .claudedocs/reviews/SECURITY-2026-07-30-admin-authorization-bypass.md).
+
+    This is the router-level floor for the entire admin surface — it
+    guarantees SOME authenticated identity exists, nothing more. Per-route
+    role authorization (which of TENANT_ADMIN/MANAGER_RESERVATIONS/
+    MANAGER_UNITS/SUPER_ADMIN may proceed) stays exactly where it already is:
+    require_roles(...) declared by the individual route, same as today.
+
+    Raises 401 if no Authorization header, an invalid/expired token, or a
+    token with no 'slug' claim.
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid Authorization header. Expected: Bearer <token>",
+        )
+
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+
+    slug = payload.get("slug")
+    if not slug:
+        raise HTTPException(status_code=401, detail="Malformed token payload.")
+
+    return await _verify_tenant(slug, endpoint=request.url.path)
+
+
 async def allow_during_soft_block(request: Request) -> None:
     """
     ADR-0002 §9.1 — opt-in dependency for routes that must remain reachable

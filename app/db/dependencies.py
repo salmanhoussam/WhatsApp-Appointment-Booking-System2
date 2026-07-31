@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.core.tenant import (
     get_current_tenant,
     get_current_admin_user,
+    get_authenticated_tenant,
     invalidate_tenant_cache,
 )
 
@@ -32,6 +33,7 @@ async def get_current_client(
 __all__ = [
     "get_current_tenant",
     "get_current_admin_user",
+    "get_authenticated_tenant",
     "get_current_client",
     "invalidate_tenant_cache",
 ]

@@ -5,6 +5,21 @@ Admin unit management — list all, toggle availability, create, block dates.
 Mounted at: /api/v1/admin/units  (prefix on router)
 Auth:       any valid tenant JWT via get_current_tenant
 Tenancy:    every query filtered by clientId from the token
+
+Authorization (Authorization Hardening, 2026-07-30 — approved matrix):
+  Every route -> SUPER_ADMIN, TENANT_ADMIN, or MANAGER_UNITS only.
+  Resource = Units; Owner = MANAGER_UNITS (already the role's documented
+  scope in rules/backend/security.md — "Unit management only"), unlike
+  team.py where the denial was "no use case yet." MANAGER_RESERVATIONS is
+  denied on EVERY route including GET, decided only after inspecting the
+  real response shape of list_units() (see get_all_admin() below): it
+  returns inactive units too, plus admin-only display fields (sort_order,
+  position_x/position_y) and full editorial content (content_blocks,
+  amenities, rules_policies) — this is an Administrative Unit Management
+  view, not a lean "Unit Entity" a booking workflow would need. Standing
+  principle from this decision: never widen an administrative endpoint's
+  role list to serve an operational need — build a new, narrowly-scoped
+  operational endpoint instead (Least Privilege; see todo_list.md).
 """
 
 from datetime import date, timedelta
@@ -14,6 +29,7 @@ from typing import List, Optional, Any
 from prisma import Json
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.core.tenant import require_roles
 from app.services.storage_service import (
     upload_unit_image as _svc_upload,
     delete_unit_image as _svc_delete,
@@ -136,7 +152,10 @@ def _fmt(unit) -> dict:
 # ── Routes — collection endpoints FIRST, then item endpoints ──────────────────
 
 @router.get("/")
-async def list_units(tenant: dict = Depends(get_current_tenant)):
+async def list_units(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
+):
     """Return ALL units for this tenant (active + inactive) — admin view."""
     units = await _unit_repo.get_all_admin(tenant["id"])
     return [_fmt(u) for u in units]
@@ -146,6 +165,7 @@ async def list_units(tenant: dict = Depends(get_current_tenant)):
 async def create_unit(
     body: UnitCreate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Create a new unit.
@@ -190,6 +210,7 @@ async def update_unit(
     unit_id: str,
     body: UnitUpdate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """Update unit details (toggles, names, capacity, amenities, images)."""
     # Verify ownership before updating
@@ -259,6 +280,7 @@ async def block_dates(
     unit_id: str,
     body: BlockDatesRequest,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Create a 'blocked' booking for a date range (maintenance, seasonal closure, etc.).
@@ -311,6 +333,7 @@ async def set_date_overrides(
     unit_id: str,
     body: DateOverrideRequest,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Upsert Price records for [start_date, end_date] (inclusive).
@@ -364,6 +387,7 @@ async def upload_image(
     unit_id: str,
     file: UploadFile = File(...),
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Upload an image for a unit to Supabase Storage.
@@ -396,6 +420,7 @@ async def delete_image(
     unit_id: str,
     body: ImageDeleteRequest,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Remove an image from Supabase Storage and from Unit.images array.
@@ -421,6 +446,7 @@ async def delete_image(
 async def delete_unit(
     unit_id: str,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     """
     Permanently delete a unit and all its associated bookings, prices, and images.

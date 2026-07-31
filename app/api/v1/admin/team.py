@@ -1,6 +1,16 @@
 """
 app/api/v1/admin/team.py
 Team (staff/managers) management — mounted at /api/v1/admin/team.
+
+Authorization (Authorization Hardening, 2026-07-30 — approved matrix):
+  GET/POST /team, DELETE /team/{id} -> SUPER_ADMIN or TENANT_ADMIN only.
+  Resource = user accounts; Owner = Tenant Admin (ADR-0004 Information
+  Ownership Model's ownership question, applied here). Managers are denied
+  because no business use case exists TODAY for a Manager to view or manage
+  colleague accounts — not because this is an absolute architectural
+  prohibition. If a real use case appears later (e.g. a "assign to staff
+  member" picker needing names/ids only), it gets its own reviewed Matrix or
+  a separate limited-field endpoint, not a widened role list on this one.
 """
 
 import logging
@@ -9,7 +19,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
-from app.core.tenant import get_current_tenant
+from app.core.tenant import get_current_tenant, require_roles
 from app.core.security import get_password_hash
 from app.repositories import user_repo as _repo
 
@@ -29,7 +39,10 @@ class TeamMemberCreate(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/team")
-async def list_team(tenant: dict = Depends(get_current_tenant)):
+async def list_team(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
     """Return all active users for this tenant — passwords excluded."""
     try:
         users = await _repo.find_users_by_client(tenant["id"])
@@ -53,6 +66,7 @@ async def list_team(tenant: dict = Depends(get_current_tenant)):
 async def create_team_member(
     body: TeamMemberCreate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Create a new staff member.
@@ -95,6 +109,7 @@ async def create_team_member(
 async def deactivate_team_member(
     user_id: str,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """Soft-deactivate a team member. Verifies ownership before acting."""
     try:
