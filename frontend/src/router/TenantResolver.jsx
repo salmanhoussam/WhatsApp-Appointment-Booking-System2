@@ -57,7 +57,13 @@ function TenantFallback() {
 // ── Main Resolver ─────────────────────────────────────────────────────────────
 export default function TenantResolver() {
   const hostname    = window.location.hostname || '';
-  const isLocalhost = hostname === 'localhost' || hostname.startsWith('127.0.0.1');
+  // 192.168.* (LAN IP, used for on-network device testing) must count as local/path-based mode —
+  // same exclusion useTenantSlug.js's _isSubdomainMode() already applies. Without it, `parts[0]`
+  // ('192') gets treated as a subdomain slug, so even a REGISTERED tenant (e.g. smar) is looked up
+  // as tenantRegistry['192'] (not found) and silently falls through to the generic fallback router
+  // instead of its own real routes — confirmed 2026-08-01 as the reason smar/showcase stayed blank
+  // even after fixing App.jsx's own copy of this same gap.
+  const isLocalhost = hostname === 'localhost' || hostname.startsWith('127.0.0.1') || hostname.startsWith('192.168.');
 
   // Subdomain detection (production): smar.salmansaas.com → 'smar'
   const parts     = hostname.split('.');
