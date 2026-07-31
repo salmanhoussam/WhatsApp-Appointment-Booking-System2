@@ -99,6 +99,29 @@ class ReservationRepository:
             where["id"] = {"not": exclude_id}
         return await self.db.reservation.find_many(where=where)
 
+    async def find_overlapping_by_barber(
+        self,
+        client_id: str,
+        barber_id: str,
+        reserved_at: datetime,
+        duration_min: int,
+        exclude_id: str | None = None,
+    ) -> list:
+        """Conflict lookup for the barber-backed Reservation Strategy (2nd real case, built
+        independently of find_overlapping_by_resource() above per Salman's instruction, 2026-07-31
+        -- not a call into that function, a fresh one scoped by the real barberId FK instead."""
+        window_start = reserved_at - timedelta(hours=4)
+        window_end   = reserved_at + timedelta(hours=4)
+        where: dict = {
+            "clientId":   client_id,
+            "barberId":   barber_id,
+            "status":     {"in": ["pending", "confirmed", "arrived"]},
+            "reservedAt": {"gte": window_start, "lte": window_end},
+        }
+        if exclude_id:
+            where["id"] = {"not": exclude_id}
+        return await self.db.reservation.find_many(where=where)
+
     async def update_status(self, reservation_id: str, client_id: str, status: str):
         # update_many() returns a plain int (the row count) in this prisma-client-py version
         # (0.15.0, confirmed directly in venv/lib/.../prisma/actions.py), not an object with a

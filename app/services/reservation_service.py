@@ -1,12 +1,19 @@
 """
 Reservation Service — business logic for slot-based reservations.
-Works across: restaurant, services, real_estate, hotel, clinic.
+Works across: restaurant, services, real_estate, hotel, clinic, barber.
 
 Pipeline (fixed, always in this order — see the Reservation Strategy Architecture design doc,
 Correction 1): Validate -> Resolve Resource -> Working Hours -> Conflict Check -> Create ->
 Post Actions. Concrete, Clinic-specific logic lives inline in named helper functions per stage
 (Correction 4) — deliberately not extracted into a generic Strategy/registry yet; that extraction
-only happens once a second real case (Coworking, Barber) proves what's actually shared.
+only happens once a second real case proves what's actually shared.
+
+"barber" (added 2026-07-31) is that second real case. Per Salman's explicit instruction, it was
+built AS IF clinic/Resource didn't exist — its own Barber table, its own _resolve_barber/
+conflict-check code below, deliberately not calling into _resolve_resource or
+RESOURCE_BACKED_MODULE_KEYS. The two branches are intentionally near-duplicates in places; that
+duplication is the point — it's the raw material for the honest post-hoc comparison recorded in
+.claudedocs/evolution/reservation-capability.md, instead of an assumed one.
 """
 
 from datetime import datetime, timedelta
@@ -15,7 +22,7 @@ from prisma import Json
 
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
-from app.repositories import resource_repo
+from app.repositories import resource_repo, barber_repo
 
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
@@ -27,12 +34,15 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "real_estate": {"duration_min": 60},
     "hotel":       {"duration_min": 60},
     "clinic":      {"duration_min": 30},
+    "barber":      {"duration_min": 30},
 }
 
 # moduleKeys whose Reservation is backed by a real Resource row (Reservation.resourceId) rather
 # than the legacy free-text metadata key (table_label/staff_id/unit_id). Only "clinic" today —
 # restaurant/services/real_estate deliberately keep the legacy path unchanged (Correction 2/§3b
-# scope boundary in the design doc).
+# scope boundary in the design doc). "barber" is deliberately NOT added to this set — it has its
+# own resourceId-equivalent (barberId) and its own resolve/conflict-check path below, built
+# independently rather than folded into this set.
 RESOURCE_BACKED_MODULE_KEYS = {"clinic"}
 
 
@@ -50,6 +60,7 @@ def _fmt(r) -> dict:
         "notes":          r.notes,
         "metadata":       r.metadata or {},
         "resource_id":    getattr(r, "resourceId", None),
+        "barber_id":      getattr(r, "barberId", None),
         "created_at":     r.createdAt.isoformat(),
     }
 
@@ -106,6 +117,27 @@ async def _resolve_resource(client_id: str, module_key: str, metadata: dict | No
     return resource
 
 
+async def _resolve_barber(client_id: str, module_key: str, metadata: dict | None):
+    """Pipeline stage: Resolve [Barber]. Only runs for module_key == 'barber'. Written
+    independently of _resolve_resource() above (2026-07-31, 2nd real Reservation Strategy case,
+    built as if clinic didn't exist) — returns the Barber row (or None) so Working Hours and
+    Conflict Check know whose calendar to check. Raises ValueError if barber_id is
+    missing/invalid, same as the clinic path requires its own resource_id."""
+    if module_key != "barber":
+        return None
+
+    barber_id = (metadata or {}).get("barber_id")
+    if not barber_id:
+        raise ValueError("'barber' reservations require a barber_id.")
+
+    barber = await barber_repo.find_barber(client_id, barber_id)
+    if not barber:
+        raise ValueError("Barber not found for this tenant.")
+    if not barber.isActive:
+        raise ValueError("This barber is not currently accepting reservations.")
+    return barber
+
+
 async def create_reservation(
     client_id:      str,
     module_key:     str,
@@ -134,13 +166,28 @@ async def create_reservation(
     # and Conflict Check, since both need to know whose calendar to read.
     resource = await _resolve_resource(client_id, module_key, metadata)
 
+    # -- Resolve [Barber] --------------------------------------------------------------------------
+    # 2nd real Reservation Strategy case, built independently of the Resource path above
+    # (2026-07-31) — its own function, its own column, no shared dispatch set.
+    barber = await _resolve_barber(client_id, module_key, metadata)
+
     # -- Working Hours ---------------------------------------------------------------------------
     # Resource's own working_hours takes priority when set; falls back to the tenant-wide
     # Client.config.working_hours otherwise (unchanged behavior for moduleKeys with no Resource).
     working_hours = resource.workingHours if (resource and resource.workingHours) else None
-    if working_hours is None:
+    if working_hours is None and barber is None:
         client = await prisma_client.client.find_unique(where={"id": client_id})
         working_hours = (client.config or {}).get("working_hours") if client else None
+
+    # Barber's own working_hours, resolved independently of the resource block above — falls back
+    # to the tenant-wide Client.config.working_hours the same way, written as its own block rather
+    # than merged into the resource one.
+    if barber is not None:
+        working_hours = barber.workingHours if barber.workingHours else None
+        if working_hours is None:
+            client = await prisma_client.client.find_unique(where={"id": client_id})
+            working_hours = (client.config or {}).get("working_hours") if client else None
+
     _check_working_hours(reserved_at, working_hours)
 
     # -- Conflict Check --------------------------------------------------------------------------
@@ -150,6 +197,12 @@ async def create_reservation(
         candidates = await repo.find_overlapping_by_resource(client_id, resource.id, reserved_at, effective_duration)
         if _has_conflict(candidates, reserved_at, effective_duration):
             raise ValueError("This resource is already booked for that time. Please choose a different time.")
+    elif barber:
+        # Barber-backed path — real barberId FK, its own query, written independently of the
+        # resource branch above even though the shape ends up similar.
+        candidates = await repo.find_overlapping_by_barber(client_id, barber.id, reserved_at, effective_duration)
+        if _has_conflict(candidates, reserved_at, effective_duration):
+            raise ValueError("This barber is already booked for that time. Please choose a different time.")
     else:
         # Legacy path (restaurant/services/real_estate without a formal Resource row) — unchanged.
         should_check_conflict = bool(
@@ -195,6 +248,8 @@ async def create_reservation(
         create_data["metadata"] = Json(metadata)
     if resource:
         create_data["resourceId"] = resource.id
+    if barber:
+        create_data["barberId"] = barber.id
 
     reservation = await repo.create(create_data)
 

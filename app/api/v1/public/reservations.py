@@ -13,11 +13,11 @@ from pydantic import BaseModel
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 from app.services import reservation_service
-from app.repositories import resource_repo
+from app.repositories import resource_repo, barber_repo
 
 router = APIRouter()
 
-VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel", "clinic"]
+VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel", "clinic", "barber"]
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -36,6 +36,9 @@ class ReservationIn(BaseModel):
     # real_estate → { "unit_id": "...", "guests": 2, "viewing_type": "in_person" }
     # clinic      → { "resource_id": "uuid", "service_id": "uuid" }  (resource_id also mirrored
     #                to the real Reservation.resourceId FK — see resource_repo.py)
+    # barber      → { "barber_id": "uuid", "service_id": "uuid" }  (barber_id also mirrored to the
+    #                real Reservation.barberId FK — see barber_repo.py; built independently of
+    #                the clinic/resource_id path, 2nd real Reservation Strategy case, 2026-07-31)
     metadata:       Optional[dict] = None
 
 
@@ -101,6 +104,22 @@ async def list_public_resources(
             {"id": r.id, "name": r.name, "specialty": r.specialty, "type": r.type}
             for r in resources
         ],
+    }
+
+
+@router.get("/barbers")
+async def list_public_barbers(
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """List active Barbers for this tenant — e.g. a 'choose your barber' picker for barber
+    bookings. Written as its own endpoint rather than folded into /resources above, per the
+    independent-build instruction (2026-07-31) — there's no module_key/resource_type mapping to
+    look up here, since barber isn't a Resource.type value at all."""
+    barbers = await barber_repo.list_barbers(tenant["id"], active_only=True)
+    return {
+        "success": True,
+        "data": [{"id": b.id, "name": b.name} for b in barbers],
     }
 
 

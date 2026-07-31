@@ -75,6 +75,7 @@ model Client {
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations      Reservation[]
   resources         Resource[]
+  barbers           Barber[]
   // -- CRM snapshot -----------------------------------------------------------
   // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
@@ -695,6 +696,11 @@ model Reservation {
   // real_estate -> { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
   // clinic      -> { "resource_id": "uuid", "service_id": "uuid" }  (resource_id also mirrored
   //                below as a real FK -- see Reservation Strategy Architecture design doc)
+  // barber      -> { "barber_id": "uuid", "service_id": "uuid" }  (barber_id also mirrored below
+  //                as a real FK -- second real Reservation Strategy case, built independently of
+  //                clinic per Salman's explicit instruction, 2026-07-31: own Barber table, own
+  //                resolve/working-hours/conflict-check code in reservation_service.py. See
+  //                .claudedocs/evolution/reservation-capability.md for the comparison once done.)
   metadata Json? @map("metadata")
 
   // Real FK, added for the "clinic" moduleKey's per-resource conflict/working-hours checks --
@@ -704,6 +710,11 @@ model Reservation {
   resourceId String?   @map("resource_id") @db.Uuid
   resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
 
+  // Real FK for the "barber" moduleKey -- deliberately its OWN column, not a reuse of resourceId,
+  // per the same independent-build instruction above. onDelete: SetNull for the same reason.
+  barberId String? @map("barber_id") @db.Uuid
+  barber   Barber? @relation(fields: [barberId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -711,6 +722,7 @@ model Reservation {
   @@index([clientId, moduleKey, reservedAt])
   @@index([clientId, status])
   @@index([clientId, resourceId, reservedAt])
+  @@index([clientId, barberId, reservedAt])
   @@map("reservations")
   @@schema("public")
 }
@@ -748,6 +760,40 @@ model Resource {
   @@index([clientId, type])
   @@index([clientId, isActive])
   @@map("resources")
+  @@schema("public")
+}
+
+// A barbershop's staff calendar -- the 2nd real Reservation Strategy case (2026-07-31).
+// Built deliberately independent of Resource/Clinic (Salman's explicit instruction: build as if
+// Clinic didn't exist, so a later comparison is honest evidence, not an assumption). Real,
+// independent field decisions for this table:
+//   - no `type` discriminator: unlike Resource, there is only one kind of thing here (a barber),
+//     so a future-proofing type column wasn't justified by any real requirement today.
+//   - no `specialty`: nothing in this build needs to filter/search barbers by a skill tag; adding
+//     one now would be exactly the kind of speculative field the Metadata Field Test's reasoning
+//     argues against, applied here to a real column instead of a metadata key.
+// See .claudedocs/evolution/reservation-capability.md for the post-build comparison against
+// Resource once both are live-verified.
+model Barber {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  name         String   @map("name")
+  phone        String?  @map("phone")
+  isActive     Boolean  @default(true) @map("is_active")
+  // Same shape as Client.config.working_hours / Resource.workingHours: {"closed_days": [...],
+  // "open_time": "HH:MM", "close_time": "HH:MM"} -- independently arrived at the same shape
+  // because it's the one shape reservation_service.py's _check_working_hours() (pre-existing,
+  // domain-agnostic utility) understands; not copied from Resource's own field.
+  workingHours Json?    @map("working_hours")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([clientId, isActive])
+  @@map("barbers")
   @@schema("public")
 }
 
