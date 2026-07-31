@@ -75,6 +75,9 @@ rules/frontend/routing.md           -- Registry lazy routing, FM12 rule
 rules/frontend/animations.md        -- Awwwards springs, parallax, video pivot
 rules/frontend/scaffolding.md       -- New tenant folder structure
 rules/frontend/feature-structure.md -- Bulletproof React: hooks/ layer, useQuery, no fetch in sections/
+rules/frontend/browser-verification-protocol.md -- Real Playwright MCP browser evidence required
+                           before frontend conclusions; what to always collect, what never to assume
+                           from console/network/curl alone (established 2026-08-01)
 rules/smar-tenant.md                -- Smar-specific complete reference
 
 ## Agents (.claude/agent/)
