@@ -12,6 +12,15 @@ Context-based path routing (matches storage-tenant.md FOLDER_MAP):
   page_demo     → pages/demo/
   unit_cover    → units/{unit_id}/cover/
   unit_gallery  → units/{unit_id}/gallery/
+
+Authorization (Authorization Hardening, 2026-07-31): SUPER_ADMIN, TENANT_ADMIN only.
+
+Ownership reasoning: this single endpoint spans unit photos AND catalog/page content — no
+MANAGER_CATALOG/MANAGER_CONTENT role exists today, and MANAGER_UNITS already has an equivalent
+path for unit_cover/unit_gallery via units.py's own /images sub-routes, so denying it here doesn't
+remove real capability for that role. Conservative default per Salman's explicit call: keep
+Admin-only until either a dedicated content role exists, or this gets split into
+/upload/unit, /upload/catalog, /upload/page with per-context roles.
 """
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -19,6 +28,7 @@ from typing import Optional
 
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.core.tenant import require_roles
 from app.services.storage_service import upload_to_gallery_path
 from app.repositories import admin_catalog_repo as _cat_repo
 from app.repositories import gallery_repo as _gallery
@@ -68,6 +78,7 @@ async def upload_image(
     caption_ar:  Optional[str]  = Form(None),
     caption_en:  Optional[str]  = Form(None),
     tenant:      dict            = Depends(get_current_tenant),
+    _user:       dict            = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     if context not in FOLDER_MAP:
         raise HTTPException(

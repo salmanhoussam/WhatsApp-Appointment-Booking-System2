@@ -2,6 +2,12 @@
 Admin Restaurant API — /api/v1/admin/restaurant/
 JWT required (TENANT_ADMIN or MANAGER_RESERVATIONS).
 Categories and items are stored in CatalogCategory/CatalogItem (module_key='restaurant').
+
+Authorization (Authorization Hardening, 2026-07-31, completing the docstring above's stated but
+previously unenforced intent): all routes -> SUPER_ADMIN, TENANT_ADMIN, MANAGER_RESERVATIONS.
+Found unenforced (get_current_admin_user only, no require_roles call) while finishing the
+Authorization Hardening initiative -- same gap class as team.py/units.py/bookings.py, not a
+separate initiative.
 """
 
 from datetime import date, datetime, timezone
@@ -11,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.db.dependencies import get_current_admin_user
+from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.repositories import admin_catalog_repo as _cat_repo
 from app.repositories import restaurant_admin_repo as _rest_repo
@@ -106,6 +113,7 @@ class CategoryIn(BaseModel):
 async def list_categories(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     cats = await _cat_repo.list_categories(
         client_id=str(user.clientId),
@@ -120,6 +128,7 @@ async def create_category(
     body: CategoryIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     cat = await _cat_repo.create_category(data={
         "clientId":  str(user.clientId),
@@ -138,6 +147,7 @@ async def update_category(
     body: CategoryIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     cat = await _cat_repo.find_active_category(
         str(user.clientId), category_id, module_key="restaurant"
@@ -159,6 +169,7 @@ async def delete_category(
     category_id: str,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     result = await _cat_repo.delete_category_by_filter(
         str(user.clientId), category_id, module_key="restaurant"
@@ -189,6 +200,7 @@ async def list_items(
     category_id: Optional[str] = None,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     items = await _cat_repo.list_items(
         client_id=str(user.clientId),
@@ -204,6 +216,7 @@ async def create_item(
     body: CatalogItemIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id  = str(user.clientId)
     restaurant = await _get_restaurant(client_id)
@@ -241,6 +254,7 @@ async def update_item(
     body: CatalogItemIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     item = await _cat_repo.find_item(client_id, item_id, module_key="restaurant")
@@ -273,6 +287,7 @@ async def delete_item(
     item_id: str,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     result = await _cat_repo.delete_item_by_filter(client_id, item_id, module_key="restaurant")
@@ -293,6 +308,7 @@ async def list_orders(
     limit: int = 50,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     restaurant = await _get_restaurant(str(user.clientId))
     if status and status not in ORDER_STATUSES:
@@ -308,6 +324,7 @@ async def update_order_status(
     body: OrderStatusIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     if body.status not in ORDER_STATUSES:
         raise HTTPException(
@@ -340,6 +357,7 @@ async def update_order_status(
 async def order_stats(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("restaurant")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     restaurant  = await _get_restaurant(str(user.clientId))
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)

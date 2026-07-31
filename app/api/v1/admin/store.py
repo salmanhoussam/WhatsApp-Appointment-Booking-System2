@@ -2,6 +2,10 @@
 Admin Store API — /api/v1/admin/store/
 JWT required (TENANT_ADMIN or MANAGER_RESERVATIONS).
 Categories and products stored in CatalogCategory/CatalogItem (module_key='store').
+
+Authorization (Authorization Hardening, 2026-07-31, completing the docstring above's stated but
+previously unenforced intent): all routes -> SUPER_ADMIN, TENANT_ADMIN, MANAGER_RESERVATIONS.
+Same gap class as restaurant.py — found unenforced while finishing this initiative.
 """
 
 from datetime import date, datetime, timezone
@@ -11,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.db.dependencies import get_current_admin_user
+from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.repositories import admin_catalog_repo as _cat_repo
 from app.repositories import store_admin_repo as _store_repo
@@ -116,6 +121,7 @@ async def list_products(
     limit:       int            = Query(50, le=200),
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     items = await _cat_repo.list_items(
         client_id=str(user.clientId),
@@ -135,6 +141,7 @@ async def create_product(
     body: ProductIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     if not body.category_id:
@@ -173,6 +180,7 @@ async def update_product(
     body: ProductIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     product = await _cat_repo.find_item(client_id, product_id, module_key="store")
@@ -206,6 +214,7 @@ async def delete_product(
     product_id: str,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     result = await _cat_repo.delete_item_by_filter(client_id, product_id, module_key="store")
@@ -229,6 +238,7 @@ class CategoryIn(BaseModel):
 async def list_categories(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     cats = await _cat_repo.list_categories(
         client_id=str(user.clientId),
@@ -243,6 +253,7 @@ async def create_category(
     body: CategoryIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     cat = await _cat_repo.create_category(data={
         "clientId":  str(user.clientId),
@@ -263,6 +274,7 @@ async def update_category(
     body: CategoryIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     cat = await _cat_repo.find_active_category(client_id, category_id, module_key="store")
@@ -285,6 +297,7 @@ async def delete_category(
     category_id: str,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
     result = await _cat_repo.delete_category_by_filter(client_id, category_id, module_key="store")
@@ -305,6 +318,7 @@ async def list_orders(
     limit:  int           = Query(50, le=200),
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     if status and status not in ORDER_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
@@ -318,6 +332,7 @@ async def update_order_status(
     body: OrderStatusIn,
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     if body.status not in ORDER_STATUSES:
         raise HTTPException(
@@ -348,6 +363,7 @@ async def update_order_status(
 async def order_stats(
     user=Depends(get_current_admin_user),
     _svc=Depends(require_service("store")),
+    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
     orders      = await _store_repo.list_today_orders(str(user.clientId), today_start)

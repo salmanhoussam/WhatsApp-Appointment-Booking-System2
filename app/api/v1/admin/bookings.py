@@ -1,3 +1,19 @@
+"""
+app/api/v1/admin/bookings.py
+Admin booking management — list, manual create, status update, general update.
+Mounted at: /api/v1/admin/bookings
+
+Authorization (Authorization Hardening, 2026-07-31): all 4 routes ->
+SUPER_ADMIN, TENANT_ADMIN, MANAGER_RESERVATIONS.
+
+Ownership reasoning: managing reservations (viewing, creating a manual/phone-in booking,
+changing status, editing notes) is MANAGER_RESERVATIONS's actual day-to-day job -- unlike
+units.py's admin-view GET, there's no editorial/internal-only field here to withhold from them.
+MANAGER_UNITS excluded from all 4 routes -- no demonstrated need for a units manager to see
+customer name/phone/payment_reference or create/edit bookings; Least Privilege (units.py's own
+precedent) says build a narrow endpoint later if a real need appears, not widen this one.
+"""
+
 import asyncio
 import logging
 from datetime import date, datetime
@@ -8,6 +24,7 @@ from pydantic import BaseModel
 
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.core.tenant import require_roles
 from app.repositories import BookingRepository, CustomerRepository
 from app.schemas.booking import BookingResponse
 from app.services import BookingService
@@ -100,6 +117,7 @@ async def list_bookings(
     date_from: Optional[date] = Query(None),
     date_to:   Optional[date] = Query(None),
     current_client: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     """Paginated admin view of all reservations for this tenant."""
     try:
@@ -138,6 +156,7 @@ async def create_booking(
     background_tasks: BackgroundTasks,
     current_client:   dict         = Depends(get_current_tenant),
     service:          BookingService = Depends(get_booking_service),
+    _user:            dict         = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     try:
         booking = await service.create_booking(
@@ -180,6 +199,7 @@ async def update_booking_status(
     booking_id:     str,
     body:           StatusUpdate,
     current_client: dict = Depends(get_current_tenant),
+    _user:          dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     """Update booking status — tenant-scoped via JWT."""
     try:
@@ -202,6 +222,7 @@ async def update_booking(
     booking_id:     str,
     body:           AdminBookingUpdate,
     current_client: dict = Depends(get_current_tenant),
+    _user:          dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     try:
         existing = await _booking_repo.find_by_id(booking_id, current_client["id"])

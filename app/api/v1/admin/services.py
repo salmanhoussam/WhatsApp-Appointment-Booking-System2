@@ -4,12 +4,24 @@ Admin service management — list, create, update, toggle, delete.
 Mounted at: /api/v1/admin/services
 Auth:       JWT via get_current_tenant
 Tenancy:    every query filtered by clientId from the token
+
+Authorization (Authorization Hardening, 2026-07-31):
+  GET /                        -> SUPER_ADMIN, TENANT_ADMIN, MANAGER_UNITS, MANAGER_RESERVATIONS
+  POST/PATCH/DELETE            -> SUPER_ADMIN, TENANT_ADMIN, MANAGER_UNITS
+
+Ownership reasoning: confirmed by reading the code (service_repo has no other caller anywhere in
+the codebase) that this file is exclusively the property/unit-scoped add-on path (create_service
+auto-assigns propertyId via find_first_property) — Clinic/Barber's Service rows are seeded
+directly, never through this route. Write ownership stays with MANAGER_UNITS (matches this file's
+real current scope); MANAGER_RESERVATIONS gets read-only, since a reservations manager may need to
+see/reference available services (no PII/pricing-sensitive risk in a read-only Service listing).
 """
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from app.db.dependencies import get_current_tenant
+from app.core.tenant import require_roles
 from app.repositories import service_repo as _repo
 
 router = APIRouter(prefix="/services", tags=["Admin Services"])
@@ -60,7 +72,10 @@ def _fmt(s) -> dict:
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.get("/")
-async def list_services(tenant: dict = Depends(get_current_tenant)):
+async def list_services(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS", "MANAGER_RESERVATIONS")),
+):
     services = await _repo.list_services(tenant["id"])
     return [_fmt(s) for s in services]
 
@@ -69,6 +84,7 @@ async def list_services(tenant: dict = Depends(get_current_tenant)):
 async def create_service(
     body: ServiceCreate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     prop = await _repo.find_first_property(tenant["id"])
 
@@ -93,6 +109,7 @@ async def update_service(
     service_id: str,
     body: ServiceUpdate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     existing = await _repo.find_service(tenant["id"], service_id)
     if not existing:
@@ -120,6 +137,7 @@ async def update_service(
 async def delete_service(
     service_id: str,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     existing = await _repo.find_service(tenant["id"], service_id)
     if not existing:

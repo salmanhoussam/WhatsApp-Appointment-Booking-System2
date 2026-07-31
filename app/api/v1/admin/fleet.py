@@ -8,13 +8,23 @@ GET  /fleet/alerts             → unread driver alerts
 PATCH /fleet/alerts/{id}/read → mark alert as read
 POST /fleet/trips/import       → upload Uber CSV for a vehicle
 DELETE /fleet/drivers/{id}/data → DSGVO erasure (wipes GPS + personal data)
+
+Authorization (Authorization Hardening, 2026-07-31): SUPER_ADMIN, TENANT_ADMIN only, all 6 routes.
+
+Ownership reasoning: no operational fleet role exists today; the DSGVO erasure route alone
+justifies keeping this admin-only. Same "no business case today, not a permanent prohibition"
+framing as team.py.
+
+Note: every route here reads tenant["client_id"], which doesn't exist on the dict
+get_current_tenant() returns ({"id", "slug", "currency"}) -- a real, pre-existing bug, logged
+separately in todo_list.md, deliberately not fixed as part of this authorization change.
 """
 
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Path
 
-from app.core.tenant import get_current_tenant
+from app.core.tenant import get_current_tenant, require_roles
 from app.services import fleet_dashboard_service, uber_import_service
 from app.repositories import fleet_repo, samsara_event_repo
 
@@ -25,7 +35,10 @@ router = APIRouter(prefix="/fleet", tags=["Admin Fleet"])
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @router.get("/dashboard")
-async def get_fleet_dashboard(tenant: dict = Depends(get_current_tenant)):
+async def get_fleet_dashboard(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
     """Returns the full fleet summary: vehicles, revenue, alerts, health score."""
     client_id = tenant["client_id"]
     return await fleet_dashboard_service.get_fleet_dashboard(client_id)
@@ -34,7 +47,10 @@ async def get_fleet_dashboard(tenant: dict = Depends(get_current_tenant)):
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
 @router.get("/vehicles")
-async def list_vehicles(tenant: dict = Depends(get_current_tenant)):
+async def list_vehicles(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
     client_id = tenant["client_id"]
     vehicles  = await fleet_repo.get_all_vehicles(client_id)
     return {
@@ -61,7 +77,10 @@ async def list_vehicles(tenant: dict = Depends(get_current_tenant)):
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
 @router.get("/alerts")
-async def list_alerts(tenant: dict = Depends(get_current_tenant)):
+async def list_alerts(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
     client_id = tenant["client_id"]
     alerts    = await samsara_event_repo.get_unread_alerts(client_id)
     return {
@@ -84,6 +103,7 @@ async def list_alerts(tenant: dict = Depends(get_current_tenant)):
 async def mark_alert_read(
     alert_id: str = Path(...),
     tenant:   dict = Depends(get_current_tenant),
+    _user:    dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     client_id = tenant["client_id"]
     await samsara_event_repo.mark_alert_read(alert_id, client_id)
@@ -98,6 +118,7 @@ async def import_trips(
     driver_id:  str | None= Form(None),
     file:       UploadFile = File(...),
     tenant:     dict       = Depends(get_current_tenant),
+    _user:      dict       = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Upload a CSV exported from Uber Fleet Portal.
@@ -130,6 +151,7 @@ async def import_trips(
 async def erase_driver_data(
     driver_id: str = Path(...),
     tenant:    dict = Depends(get_current_tenant),
+    _user:     dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     DSGVO Right to Erasure (§17 DSGVO).

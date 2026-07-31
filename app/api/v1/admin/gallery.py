@@ -4,6 +4,13 @@ Gallery image management — upload, list, reorder, caption, hide/show, delete.
 Mounted at: /api/v1/admin/gallery
 Auth:       JWT via get_current_tenant
 Tenancy:    every query filtered by clientId from the token
+
+Authorization (Authorization Hardening, 2026-07-31): all 5 routes ->
+SUPER_ADMIN, TENANT_ADMIN, MANAGER_UNITS.
+
+Ownership reasoning: unit photos are unit-editorial content — the same owner units.py already
+gives its own `/images` sub-routes. MANAGER_RESERVATIONS excluded, matching units.py's existing
+precedent (they consume unit data for bookings, they don't curate a unit's presentation).
 """
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
@@ -11,6 +18,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.db.client import prisma_client  # needed by _unit_repo instantiation
 from app.db.dependencies import get_current_tenant
+from app.core.tenant import require_roles
 from app.services.storage_service import (
     upload_to_gallery_path as _svc_gallery_upload,
     delete_unit_image      as _svc_delete,
@@ -56,7 +64,11 @@ def _fmt(img) -> dict:
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.get("/{unit_id}")
-async def list_gallery(unit_id: str, tenant: dict = Depends(get_current_tenant)):
+async def list_gallery(
+    unit_id: str,
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
+):
     unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
@@ -72,6 +84,7 @@ async def upload_gallery_image(
     span_size:      str        = Form("small"),
     folder_context: str        = Form(None),
     tenant:         dict       = Depends(get_current_tenant),
+    _user:          dict       = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
@@ -104,6 +117,7 @@ async def update_gallery_image(
     image_id: str,
     body: CaptionUpdate,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     existing = await _gallery.find_gallery_image(image_id, tenant["id"])
     if not existing:
@@ -127,6 +141,7 @@ async def reorder_gallery(
     unit_id: str,
     body: List[ReorderItem],
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     unit = await _unit_repo.get_by_id(unit_id, tenant["id"])
     if not unit:
@@ -142,6 +157,7 @@ async def reorder_gallery(
 async def delete_gallery_image(
     image_id: str,
     tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     existing = await _gallery.find_gallery_image(image_id, tenant["id"])
     if not existing:

@@ -2,6 +2,16 @@
 app/api/v1/admin/dashboard.py
 Admin dashboard stats — requires a valid admin JWT.
 
+Authorization (Authorization Hardening, 2026-07-31): both routes ->
+SUPER_ADMIN, TENANT_ADMIN, MANAGER_RESERVATIONS.
+
+Ownership reasoning: confirmed by reading the actual response bodies — both endpoints return
+revenue figures (confirmed_revenue, monthly_revenue) and customer PII (upcoming_checkins[].
+customer.{name,phone}) bundled together with occupancy data in one payload, not separable. Per
+Salman's own Least Privilege principle (units.py's precedent): don't widen a mixed endpoint to
+serve one operational need (occupancy) when it also exposes revenue/PII that need doesn't require.
+MANAGER_UNITS stays out — if an occupancy-only view is needed later, build a narrow endpoint for it.
+
 GET /api/v1/admin/dashboard?year=2025&month=6
 
 Response shape:
@@ -28,7 +38,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db.client import prisma_client
-from app.core.tenant import get_current_tenant
+from app.core.tenant import get_current_tenant, require_roles
 from app.repositories.dashboard_repo import DashboardRepository
 from app.repositories import BookingRepository, UnitRepository
 
@@ -49,6 +59,7 @@ async def get_dashboard(
     month: int = Query(default=None, ge=1, le=12, description="Month 1–12 (defaults to current month)"),
     tenant: dict = Depends(get_current_tenant),
     repo: DashboardRepository = Depends(_get_repo),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     """
     Admin dashboard — returns booking stats, upcoming arrivals, and
@@ -139,7 +150,10 @@ async def get_dashboard(
 
 
 @router.get("/dashboard/stats")
-async def get_quick_stats(tenant: dict = Depends(get_current_tenant)):
+async def get_quick_stats(
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
+):
     """
     4 KPI numbers for the top of the Bookings tab.
     Returns: today_bookings, pending_count, monthly_revenue, available_units.
