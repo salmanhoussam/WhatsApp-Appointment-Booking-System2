@@ -123,7 +123,14 @@ export default function TenantRegisterPage() {
 
     try {
       // Step 1 — Register → returns USER JWT directly (no separate login needed)
-      const MODULE_TO_VENUE = { store: 'ecommerce', restaurant: 'restaurant', catalog: 'services' }
+      // venue_type must match a real key in registration_service.py's _SERVICE_SEED_MAP so the
+      // right client_services get seeded. "ecommerce" was wrong here -- that key doesn't exist in
+      // _SERVICE_SEED_MAP (only "store" does, seeding ["store", "catalog"]), so every store-module
+      // template registration silently fell through to the map's own default (["catalog"] only,
+      // never "store") -- confirmed 2026-07-31 as the real root cause of the Store Template
+      // pilot's stuck tenant. Fixed to match module_key -> service key 1:1, per the template
+      // registry's own documented intent (see template-registry.js's module_key comment block).
+      const MODULE_TO_VENUE = { store: 'store', restaurant: 'restaurant', catalog: 'services' }
       const venueType = MODULE_TO_VENUE[template?.module_key] ?? 'real_estate'
 
       setProgress('جاري إنشاء الحساب...')
