@@ -3,10 +3,20 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { hasCapability } from '../../../utils/capabilities'
 
 // Per-slug session ID stored in localStorage — prevents cross-tenant cart leakage
+// crypto.randomUUID() only exists in a secure context (HTTPS or literal "localhost") — accessing
+// the dev server over a LAN IP (e.g. for on-device Pilot testing, http://192.168.x.x) is NOT a
+// secure context, so crypto.randomUUID is undefined there and throws, uncaught, crashing the whole
+// store page (confirmed 2026-08-01: this was the actual root cause of the Local Pilot's white
+// page). Fall back to a non-crypto random ID — this is a cart session key, not a security token.
 function getSessionId(slug) {
   const key = `${slug}_cart_session`
   let id = localStorage.getItem(key)
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id) }
+  if (!id) {
+    id = crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    localStorage.setItem(key, id)
+  }
   return id
 }
 
