@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from prisma import Json
 
 from app.db.dependencies import get_current_admin_user
 from app.core.tenant import require_roles
@@ -158,7 +159,7 @@ async def create_product(
     if body.variants:                      meta["variants"]         = body.variants
     if body.brand:                         meta["brand"]            = body.brand
 
-    product = await _cat_repo.create_item(data={
+    create_data = {
         "clientId":      client_id,
         "categoryId":    body.category_id,
         "nameAr":        body.name_ar,
@@ -169,8 +170,14 @@ async def create_product(
         "imageUrl":      body.image_url,
         "isFeatured":    body.is_featured,
         "isActive":      body.is_active,
-        "metadata":      meta if meta else None,
-    })
+    }
+    # metadata is a Json? field -- Prisma's Python client rejects an explicit None (confirmed
+    # 2026-07-31, same root cause already fixed in store_repo.py's shippingAddress and
+    # property_repo.py's is_active): the key must be omitted entirely, never set to None.
+    if meta:
+        create_data["metadata"] = Json(meta)
+
+    product = await _cat_repo.create_item(data=create_data)
     return {"success": True, "data": _fmt_product(product)}
 
 
@@ -194,7 +201,7 @@ async def update_product(
     if body.variants:                      meta["variants"]         = body.variants
     if body.brand:                         meta["brand"]            = body.brand
 
-    updated = await _cat_repo.update_item(product_id, {
+    update_data = {
         "categoryId":    body.category_id,
         "nameAr":        body.name_ar,
         "nameEn":        body.name_en,
@@ -204,8 +211,11 @@ async def update_product(
         "imageUrl":      body.image_url,
         "isFeatured":    body.is_featured,
         "isActive":      body.is_active,
-        "metadata":      meta if meta else None,
-    })
+    }
+    if meta:
+        update_data["metadata"] = Json(meta)
+
+    updated = await _cat_repo.update_item(product_id, update_data)
     return {"success": True, "data": _fmt_product(updated)}
 
 
