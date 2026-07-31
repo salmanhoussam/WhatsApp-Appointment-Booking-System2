@@ -15,9 +15,10 @@ Ownership reasoning: no operational fleet role exists today; the DSGVO erasure r
 justifies keeping this admin-only. Same "no business case today, not a permanent prohibition"
 framing as team.py.
 
-Note: every route here reads tenant["client_id"], which doesn't exist on the dict
-get_current_tenant() returns ({"id", "slug", "currency"}) -- a real, pre-existing bug, logged
-separately in todo_list.md, deliberately not fixed as part of this authorization change.
+Fixed 2026-07-31: every route previously read tenant["client_id"], which doesn't exist on the
+dict get_current_tenant() returns ({"id", "slug", "currency"}) -- every call 500'd with a
+KeyError, unrelated to the auth work above. Now reads tenant["id"], matching every other admin
+route in this codebase.
 """
 
 import logging
@@ -40,7 +41,7 @@ async def get_fleet_dashboard(
     _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """Returns the full fleet summary: vehicles, revenue, alerts, health score."""
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
     return await fleet_dashboard_service.get_fleet_dashboard(client_id)
 
 
@@ -51,7 +52,7 @@ async def list_vehicles(
     tenant: dict = Depends(get_current_tenant),
     _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
     vehicles  = await fleet_repo.get_all_vehicles(client_id)
     return {
         "success": True,
@@ -81,7 +82,7 @@ async def list_alerts(
     tenant: dict = Depends(get_current_tenant),
     _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
     alerts    = await samsara_event_repo.get_unread_alerts(client_id)
     return {
         "success": True,
@@ -105,7 +106,7 @@ async def mark_alert_read(
     tenant:   dict = Depends(get_current_tenant),
     _user:    dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
     await samsara_event_repo.mark_alert_read(alert_id, client_id)
     return {"success": True}
 
@@ -125,7 +126,7 @@ async def import_trips(
     vehicle_id: the FleetVehicle UUID in our DB.
     driver_id:  optional — links trips to a driver.
     """
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
 
     # Verify vehicle belongs to this client
     vehicle = await fleet_repo.get_vehicle(vehicle_id, client_id)
@@ -158,6 +159,6 @@ async def erase_driver_data(
     Wipes all personal data for the driver: name, phone, GPS events, Uber token.
     Irreversible.
     """
-    client_id = tenant["client_id"]
+    client_id = tenant["id"]
     await fleet_repo.delete_driver_data(client_id, driver_id)
     return {"success": True, "message": "Driver data erased"}
