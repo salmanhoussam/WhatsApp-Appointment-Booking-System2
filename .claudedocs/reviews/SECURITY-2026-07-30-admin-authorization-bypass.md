@@ -1,7 +1,15 @@
 # Security Finding — Admin Route Authorization Bypass via `get_current_tenant`
 
 **Severity: Critical**
-**Status: Confirmed, not yet fixed**
+**Status: FIXED — 2026-07-31.** All 9 files below now enforce `require_roles(...)` per-route, plus
+the router-level `get_authenticated_tenant` floor (Phase 1, 2026-07-30). `team.py`/`units.py` were
+live-verified 2026-07-30; `bookings.py`/`gallery.py`/`properties.py`/`services.py`/`upload.py`/
+`fleet.py`/`dashboard.py` live-verified 2026-07-31. **Two additional files found and fixed in the
+same pass, not originally in this table**: `restaurant.py`/`store.py` — a narrower variant of this
+same gap (they already used `get_current_admin_user`, so *some* valid admin identity was required;
+they were simply missing the final `require_roles(...)` role check, despite their own docstrings
+already stating the intended roles). Full role matrix and evidence per file in
+`.claudedocs/sessions/2026-07-31.md`.
 **Discovered**: 2026-07-30, during a Role Hierarchy architecture review (unrelated original goal —
 found as a side effect of tracing how Admin routes are gated)
 **Follows**: `investigation-protocol.md` (Confirmed / Side Findings / Unknowns, Evidence
@@ -118,3 +126,31 @@ exist and are already proven correct elsewhere in this same codebase (§4 above)
 2. Confirm severity/priority ranking — this session's own conclusion (see session discussion,
    2026-07-30) places this above Role Hierarchy ADR-0006, Store Template Pilot, Catalog Admin
    Bypass, and Dead Scaffolding.
+
+## Resolution (2026-07-31)
+
+Both decisions above were made explicitly: (1) fix authorized, executed file-by-file with an
+Authorization Matrix (Ownership Question + Least Privilege) proposed and approved per file before
+implementation, per the same rhythm established for `team.py`/`units.py`; (2) this initiative
+stayed the priority over the items listed until fully closed. Final role matrix, all 9 files:
+
+| File | Roles |
+|---|---|
+| `team.py` | `SUPER_ADMIN`, `TENANT_ADMIN` (all routes) |
+| `units.py` | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_UNITS` (all routes) |
+| `bookings.py` | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_RESERVATIONS` (all routes) |
+| `gallery.py` | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_UNITS` (all routes) |
+| `properties.py` | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_UNITS` (both routes) |
+| `services.py` | GET: `+MANAGER_RESERVATIONS` (read-only); POST/PATCH/DELETE: `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_UNITS` |
+| `upload.py` | `SUPER_ADMIN`, `TENANT_ADMIN` only (conservative default — no dedicated catalog/content role exists yet) |
+| `fleet.py` | `SUPER_ADMIN`, `TENANT_ADMIN` only (all 6 routes — no operational fleet role exists) |
+| `dashboard.py` | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_RESERVATIONS` (both routes — `MANAGER_UNITS` deliberately excluded, response bodies bundle revenue + customer PII with occupancy) |
+| `restaurant.py` (added mid-initiative) | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_RESERVATIONS` (all 11 routes) |
+| `store.py` (added mid-initiative) | `SUPER_ADMIN`, `TENANT_ADMIN`, `MANAGER_RESERVATIONS` (all 11 routes) |
+
+Three pre-existing, unrelated bugs were found during live verification and deliberately NOT fixed
+(logged as independent tickets in `todo_list.md`, per Salman's explicit instruction not to let
+bug-fixing scope-creep into this initiative): `bookings.py POST /`'s Prisma `data.client`/date-format
+error, `properties.py`'s `GET /` response-serialization mismatch + `POST /`'s Prisma error, and
+`fleet.py`'s `tenant["client_id"]` KeyError (every route). `dashboard.py/booking_repo.py`'s
+date-serialization bug was already logged 2026-07-30.
