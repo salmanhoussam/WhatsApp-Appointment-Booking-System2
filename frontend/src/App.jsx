@@ -52,12 +52,17 @@ const DatingPageResolver = lazy(() => import('./pages/dating/DatingPageResolver'
 const DatingCreatePage   = lazy(() => import('./pages/dating/DatingCreatePage'));
 
 // Detect subdomain mode at module scope (stable across renders)
+// _IS_LOCAL_HOST mirrors useTenantSlug.js's own _isSubdomainMode() check — a private LAN IP
+// (192.168.x.x, used for on-network device testing) must be treated as path-based/local mode,
+// same as localhost/127.*, or this file and useTenantSlug.js disagree on IS_SUBDOMAIN_MODE and
+// register the tenant catch-all as the wrong route pattern (/* instead of /:slug/*), breaking
+// TenantResolver's pathnameBase assumption silently (blank #root, no console error).
 const _h = window.location.hostname;
-const IS_SUBDOMAIN_MODE =
-  _h !== 'localhost' && !_h.startsWith('127.') && _h.split('.').length >= 3;
+const _IS_LOCAL_HOST = _h === 'localhost' || _h.startsWith('127.') || _h.startsWith('192.168.');
+const IS_SUBDOMAIN_MODE = !_IS_LOCAL_HOST && _h.split('.').length >= 3;
 const IS_DEMO_SUBDOMAIN  = IS_SUBDOMAIN_MODE && _h.startsWith('demo.');
 // salmansaas.com (no subdomain, not localhost) → serve showcase at root
-const IS_SHOWCASE_DOMAIN = !IS_SUBDOMAIN_MODE && _h !== 'localhost' && !_h.startsWith('127.');
+const IS_SHOWCASE_DOMAIN = !IS_SUBDOMAIN_MODE && !_IS_LOCAL_HOST;
 
 function NotFound() {
   return (
