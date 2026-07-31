@@ -129,7 +129,7 @@ function Field({ label, type = 'text', value, onChange, required, placeholder })
 
 // ── Success screen ────────────────────────────────────────────────────────────
 
-function SuccessScreen({ accent, orderId, onBack }) {
+function SuccessScreen({ accent, orderId, whatsappSent, onBack }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -150,6 +150,11 @@ function SuccessScreen({ accent, orderId, onBack }) {
       <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>
         تم استلام طلبك!
       </h2>
+      {whatsappSent && (
+        <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+          جارٍ فتح واتساب لإرسال تفاصيل الطلب...
+        </p>
+      )}
       {orderId && (
         <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
           رقم الطلب: <span style={{ color: accent, fontWeight: 600 }}>{orderId.slice(0, 8)}</span>
@@ -168,6 +173,35 @@ function SuccessScreen({ accent, orderId, onBack }) {
       </button>
     </motion.div>
   )
+}
+
+// ── WhatsApp order message (store module) ──────────────────────────────────────
+// Generalized from beit-al-fakhar/checkout/CheckoutPage.jsx's buildWhatsAppMessage() --
+// the first bespoke build already proved this logic live (2026-07-21, CDP-verified real
+// wa.me sends). This is the 2nd real case: the same message shape, reused for the generic
+// (shared) checkout path instead of a tenant-specific one, per this project's Abstraction
+// Rule (generalize once a 2nd real case proves the shape, not before).
+function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, currency, orderId }) {
+  const lines = []
+  lines.push(`طلب جديد${businessName ? ` من ${businessName}` : ''} 🛍️`)
+  lines.push('')
+  lines.push(`الاسم: ${form.customer_name}`)
+  lines.push(`الهاتف: ${form.customer_phone}`)
+  if (form.shipping_address) lines.push(`عنوان التوصيل: ${form.shipping_address}`)
+  lines.push(`طريقة الدفع: ${form.payment_method}`)
+  if (form.notes) lines.push(`ملاحظات: ${form.notes}`)
+  lines.push('')
+  lines.push('المنتجات المطلوبة:')
+  cartItems.forEach((item) => {
+    const priceText = item.price
+      ? `${(item.price * item.quantity).toLocaleString('ar-SA')}`
+      : 'السعر يُحدد حسب الطلب'
+    lines.push(`- ${item.name_ar || item.name_en} × ${item.quantity} — ${priceText}`)
+  })
+  lines.push('')
+  lines.push(totalPrice > 0 ? `الإجمالي: ${totalPrice.toLocaleString('ar-SA')} ${currency}` : 'الإجمالي: السعر يُحدد حسب الطلب')
+  if (orderId) lines.push('', `رقم الطلب: ${orderId.slice(0, 8)}`)
+  return lines.join('\n')
 }
 
 // ── CartPage ──────────────────────────────────────────────────────────────────
@@ -207,9 +241,10 @@ export default function CartPage() {
     payment_method:   'cash',
     shipping_address: '',
   })
-  const [submitting, setSubmitting] = useState(false)
-  const [error,      setError]      = useState(null)
-  const [orderId,    setOrderId]    = useState(null)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [error,        setError]        = useState(null)
+  const [orderId,      setOrderId]      = useState(null)
+  const [whatsappSent, setWhatsappSent] = useState(false)
 
   const f = useCallback((key) => ({
     value:    form[key],
@@ -266,7 +301,25 @@ export default function CartPage() {
           },
           { params }
         )
-        setOrderId(data?.data?.id ?? null)
+        const newOrderId = data?.data?.id ?? null
+        setOrderId(newOrderId)
+
+        // Send the order to the merchant via WhatsApp — generalized from
+        // beit-al-fakhar/checkout/CheckoutPage.jsx's proven buildWhatsAppMessage() (2026-07-21,
+        // CDP-verified live). 2nd real case for this logic, reused for the generic checkout path.
+        const phone = (config?.whatsapp_number || '').replace(/[^0-9]/g, '')
+        if (phone) {
+          const message = buildStoreWhatsAppMessage({
+            businessName: config?.name_ar,
+            form,
+            cartItems,
+            totalPrice: totalPrice(),
+            currency: config?.currency ?? 'USD',
+            orderId: newOrderId,
+          })
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
+          setWhatsappSent(true)
+        }
       }
 
       clearCart()
@@ -276,7 +329,7 @@ export default function CartPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [cartItems, form, moduleKey, sessionId, slug, clearCart])
+  }, [cartItems, form, moduleKey, sessionId, slug, clearCart, config, totalPrice])
 
   // ── Guard — hide Cart entirely if this tenant has no order-bearing capability at all ──────
   // Plural check (TOS-004) against the tenant's real active_services, not the tenant-wide
@@ -293,7 +346,7 @@ export default function CartPage() {
       <div style={{ minHeight: '100vh', background: '#0a0a0f', direction: 'rtl' }}>
         <TenantModuleNav />
         <div style={{ maxWidth: 640, margin: '0 auto', padding: '88px 20px 80px' }}>
-          <SuccessScreen accent={accent} orderId={orderId} onBack={() => navigate(`${base}/${moduleKey === 'restaurant' ? 'menu' : 'store'}`)} />
+          <SuccessScreen accent={accent} orderId={orderId} whatsappSent={whatsappSent} onBack={() => navigate(`${base}/${moduleKey === 'restaurant' ? 'menu' : 'store'}`)} />
         </div>
       </div>
     )
