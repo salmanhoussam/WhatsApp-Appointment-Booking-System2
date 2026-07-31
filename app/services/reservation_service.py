@@ -1,6 +1,12 @@
 """
 Reservation Service — business logic for slot-based reservations.
-Works across: restaurant, services, real_estate, hotel.
+Works across: restaurant, services, real_estate, hotel, clinic.
+
+Pipeline (fixed, always in this order — see the Reservation Strategy Architecture design doc,
+Correction 1): Validate -> Resolve Resource -> Working Hours -> Conflict Check -> Create ->
+Post Actions. Concrete, Clinic-specific logic lives inline in named helper functions per stage
+(Correction 4) — deliberately not extracted into a generic Strategy/registry yet; that extraction
+only happens once a second real case (Coworking, Barber) proves what's actually shared.
 """
 
 from datetime import datetime, timedelta
@@ -9,6 +15,7 @@ from prisma import Json
 
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
+from app.repositories import resource_repo
 
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
@@ -19,7 +26,14 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "services":    {"duration_min": 60},
     "real_estate": {"duration_min": 60},
     "hotel":       {"duration_min": 60},
+    "clinic":      {"duration_min": 30},
 }
+
+# moduleKeys whose Reservation is backed by a real Resource row (Reservation.resourceId) rather
+# than the legacy free-text metadata key (table_label/staff_id/unit_id). Only "clinic" today —
+# restaurant/services/real_estate deliberately keep the legacy path unchanged (Correction 2/§3b
+# scope boundary in the design doc).
+RESOURCE_BACKED_MODULE_KEYS = {"clinic"}
 
 
 def _fmt(r) -> dict:
@@ -35,6 +49,7 @@ def _fmt(r) -> dict:
         "status":         r.status,
         "notes":          r.notes,
         "metadata":       r.metadata or {},
+        "resource_id":    getattr(r, "resourceId", None),
         "created_at":     r.createdAt.isoformat(),
     }
 
@@ -51,6 +66,46 @@ def _has_conflict(existing_list: list, new_start: datetime, new_duration_min: in
     return False
 
 
+def _check_working_hours(reserved_at: datetime, working_hours: dict | None) -> None:
+    """Pipeline stage: Working Hours. Raises ValueError if reserved_at falls outside
+    working_hours. Shared regardless of whose working_hours dict is passed in (tenant-wide
+    Client.config.working_hours, or a Resource's own working_hours) — same shape either way:
+    {"closed_days": [...], "open_time": "HH:MM", "close_time": "HH:MM"}.
+    All times treated as UTC directly, matching how reservedAt is stored/compared everywhere
+    else in this codebase today (no timezone-conversion utility exists in this path)."""
+    if not working_hours:
+        return
+    day_name = reserved_at.strftime("%A").lower()
+    if day_name in (working_hours.get("closed_days") or []):
+        raise ValueError(f"This business is closed on {day_name.capitalize()}.")
+    open_t, close_t = working_hours.get("open_time"), working_hours.get("close_time")
+    if open_t and close_t:
+        slot_time = reserved_at.strftime("%H:%M")
+        if not (open_t <= slot_time < close_t):
+            raise ValueError(f"Outside working hours ({open_t}-{close_t}).")
+
+
+async def _resolve_resource(client_id: str, module_key: str, metadata: dict | None):
+    """Pipeline stage: Resolve Resource. Only runs for RESOURCE_BACKED_MODULE_KEYS (clinic today).
+    Returns the Resource row (or None if this moduleKey doesn't use one) so later stages
+    (Working Hours, Conflict Check) know whose calendar to check. Raises ValueError if the
+    caller's resource_id is missing/invalid — this must run before Working Hours/Conflict Check,
+    since both need to know which resource's schedule to read."""
+    if module_key not in RESOURCE_BACKED_MODULE_KEYS:
+        return None
+
+    resource_id = (metadata or {}).get("resource_id")
+    if not resource_id:
+        raise ValueError(f"'{module_key}' reservations require a resource_id.")
+
+    resource = await resource_repo.find_resource(client_id, resource_id)
+    if not resource:
+        raise ValueError("Resource not found for this tenant.")
+    if not resource.isActive:
+        raise ValueError("This resource is not currently accepting reservations.")
+    return resource
+
+
 async def create_reservation(
     client_id:      str,
     module_key:     str,
@@ -62,52 +117,65 @@ async def create_reservation(
     metadata:       dict | None,
     customer_email: str | None = None,
 ) -> dict:
+    """
+    Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
+    order, regardless of module_key: Validate -> Resolve Resource -> Working Hours ->
+    Conflict Check -> Create -> Post Actions.
+    """
     repo = ReservationRepository(prisma_client)
 
+    # -- Validate ------------------------------------------------------------------------------
+    # (Duration default resolution — a Validate-adjacent concern: what this reservation's
+    # duration is, absent an explicit override.)
     effective_duration = duration_min or MODULE_DEFAULTS.get(module_key, {}).get("duration_min", 60)
 
-    # Working-hours check — Client.config.working_hours, reused JSON field, no migration.
-    # All times treated as UTC directly, matching how reservedAt is stored/compared everywhere
-    # else in this codebase today (no timezone-conversion utility exists in this path).
-    client = await prisma_client.client.find_unique(where={"id": client_id})
-    working_hours = (client.config or {}).get("working_hours") if client else None
-    if working_hours:
-        day_name = reserved_at.strftime("%A").lower()
-        if day_name in (working_hours.get("closed_days") or []):
-            raise ValueError(f"This business is closed on {day_name.capitalize()}.")
-        open_t, close_t = working_hours.get("open_time"), working_hours.get("close_time")
-        if open_t and close_t:
-            slot_time = reserved_at.strftime("%H:%M")
-            if not (open_t <= slot_time < close_t):
-                raise ValueError(f"Outside working hours ({open_t}-{close_t}).")
+    # -- Resolve Resource ------------------------------------------------------------------------
+    # Only runs for RESOURCE_BACKED_MODULE_KEYS (clinic today). Must happen before Working Hours
+    # and Conflict Check, since both need to know whose calendar to read.
+    resource = await _resolve_resource(client_id, module_key, metadata)
 
-    # Conflict check — only relevant when metadata contains a specific table/resource label
-    # For open "any table" reservations, skip the conflict block
-    should_check_conflict = bool(
-        metadata and (
-            metadata.get("table_label") or
-            metadata.get("staff_id") or
-            metadata.get("unit_id")
+    # -- Working Hours ---------------------------------------------------------------------------
+    # Resource's own working_hours takes priority when set; falls back to the tenant-wide
+    # Client.config.working_hours otherwise (unchanged behavior for moduleKeys with no Resource).
+    working_hours = resource.workingHours if (resource and resource.workingHours) else None
+    if working_hours is None:
+        client = await prisma_client.client.find_unique(where={"id": client_id})
+        working_hours = (client.config or {}).get("working_hours") if client else None
+    _check_working_hours(reserved_at, working_hours)
+
+    # -- Conflict Check --------------------------------------------------------------------------
+    if resource:
+        # Resource-backed path (clinic) — real resourceId FK, indexed query, no metadata
+        # string-matching needed.
+        candidates = await repo.find_overlapping_by_resource(client_id, resource.id, reserved_at, effective_duration)
+        if _has_conflict(candidates, reserved_at, effective_duration):
+            raise ValueError("This resource is already booked for that time. Please choose a different time.")
+    else:
+        # Legacy path (restaurant/services/real_estate without a formal Resource row) — unchanged.
+        should_check_conflict = bool(
+            metadata and (
+                metadata.get("table_label") or
+                metadata.get("staff_id") or
+                metadata.get("unit_id")
+            )
         )
-    )
+        if should_check_conflict:
+            candidates = await repo.find_overlapping(client_id, module_key, reserved_at, effective_duration)
+            resource_key = (
+                metadata.get("table_label") or
+                metadata.get("staff_id") or
+                metadata.get("unit_id")
+            )
+            overlapping = [
+                c for c in candidates
+                if (c.metadata or {}).get("table_label") == resource_key
+                or (c.metadata or {}).get("staff_id") == resource_key
+                or (c.metadata or {}).get("unit_id") == resource_key
+            ]
+            if _has_conflict(overlapping, reserved_at, effective_duration):
+                raise ValueError("This slot is already reserved. Please choose a different time.")
 
-    if should_check_conflict:
-        candidates = await repo.find_overlapping(client_id, module_key, reserved_at, effective_duration)
-        # Filter by the specific resource
-        resource_key = (
-            metadata.get("table_label") or
-            metadata.get("staff_id") or
-            metadata.get("unit_id")
-        )
-        overlapping = [
-            c for c in candidates
-            if (c.metadata or {}).get("table_label") == resource_key
-            or (c.metadata or {}).get("staff_id") == resource_key
-            or (c.metadata or {}).get("unit_id") == resource_key
-        ]
-        if _has_conflict(overlapping, reserved_at, effective_duration):
-            raise ValueError(f"This slot is already reserved. Please choose a different time.")
-
+    # -- Create ------------------------------------------------------------------------------------
     create_data = {
         "clientId":      client_id,
         "moduleKey":     module_key,
@@ -125,8 +193,17 @@ async def create_reservation(
     # succeeds.
     if metadata:
         create_data["metadata"] = Json(metadata)
+    if resource:
+        create_data["resourceId"] = resource.id
 
     reservation = await repo.create(create_data)
+
+    # -- Post Actions --------------------------------------------------------------------------
+    # No-op today for every module_key — confirmed no pricing field on Reservation, no
+    # notification call anywhere in this path (Reservation Lifecycle & Workflow section of the
+    # design doc). Kept as an explicit, empty stage rather than omitted, so the fixed pipeline
+    # stays visible in the code even where a stage currently does nothing.
+
     return _fmt(reservation)
 
 

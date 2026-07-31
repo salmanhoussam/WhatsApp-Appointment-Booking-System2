@@ -76,17 +76,44 @@ class ReservationRepository:
             where["id"] = {"not": exclude_id}
         return await self.db.reservation.find_many(where=where)
 
+    async def find_overlapping_by_resource(
+        self,
+        client_id: str,
+        resource_id: str,
+        reserved_at: datetime,
+        duration_min: int,
+        exclude_id: str | None = None,
+    ) -> list:
+        """Same ±4h window strategy as find_overlapping, but scoped by the real resourceId FK
+        (indexed via @@index([clientId, resourceId, reservedAt])) instead of moduleKey + time
+        only — no metadata string-matching needed for resource-backed reservations."""
+        window_start = reserved_at - timedelta(hours=4)
+        window_end   = reserved_at + timedelta(hours=4)
+        where: dict = {
+            "clientId":   client_id,
+            "resourceId": resource_id,
+            "status":     {"in": ["pending", "confirmed", "arrived"]},
+            "reservedAt": {"gte": window_start, "lte": window_end},
+        }
+        if exclude_id:
+            where["id"] = {"not": exclude_id}
+        return await self.db.reservation.find_many(where=where)
+
     async def update_status(self, reservation_id: str, client_id: str, status: str):
-        result = await self.db.reservation.update_many(
+        # update_many() returns a plain int (the row count) in this prisma-client-py version
+        # (0.15.0, confirmed directly in venv/lib/.../prisma/actions.py), not an object with a
+        # .count attribute -- fixed 2026-07-30, see todo_list.md for the pre-existing bug report.
+        updated_count = await self.db.reservation.update_many(
             where={"id": reservation_id, "clientId": client_id},
             data={"status": status},
         )
-        if result.count == 0:
+        if updated_count == 0:
             return None
         return await self.find_by_id(reservation_id, client_id)
 
     async def cancel(self, reservation_id: str, client_id: str, customer_phone: str):
-        result = await self.db.reservation.update_many(
+        # Same update_many() return-type fix as update_status() above.
+        updated_count = await self.db.reservation.update_many(
             where={
                 "id":            reservation_id,
                 "clientId":      client_id,
@@ -95,4 +122,4 @@ class ReservationRepository:
             },
             data={"status": "cancelled"},
         )
-        return result.count > 0
+        return updated_count > 0

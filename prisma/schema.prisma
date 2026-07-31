@@ -74,6 +74,7 @@ model Client {
   catalogItems      CatalogItem[]
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations      Reservation[]
+  resources         Resource[]
   // -- CRM snapshot -----------------------------------------------------------
   // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
@@ -674,7 +675,7 @@ model Reservation {
   id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientId  String @map("client_id") @db.Uuid
   moduleKey String @map("module_key")
-  // "restaurant" | "services" | "real_estate" | "hotel"
+  // "restaurant" | "services" | "real_estate" | "hotel" | "clinic"
 
   customerName  String  @map("customer_name")
   customerPhone String  @map("customer_phone")
@@ -692,7 +693,16 @@ model Reservation {
   // restaurant  -> { "table_label": "A4", "party_size": 4 }
   // services    -> { "service_name": "haircut", "staff_id": "uuid" }
   // real_estate -> { "unit_id": "uuid", "guests": 2, "viewing_type": "in_person" }
+  // clinic      -> { "resource_id": "uuid", "service_id": "uuid" }  (resource_id also mirrored
+  //                below as a real FK -- see Reservation Strategy Architecture design doc)
   metadata Json? @map("metadata")
+
+  // Real FK, added for the "clinic" moduleKey's per-resource conflict/working-hours checks --
+  // nullable because moduleKeys with no formal Resource row (restaurant's table_label today)
+  // never set it. onDelete: SetNull -- deactivating/removing a Resource must never cascade-delete
+  // historical Reservation rows.
+  resourceId String?   @map("resource_id") @db.Uuid
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -700,7 +710,44 @@ model Reservation {
 
   @@index([clientId, moduleKey, reservedAt])
   @@index([clientId, status])
+  @@index([clientId, resourceId, reservedAt])
   @@map("reservations")
+  @@schema("public")
+}
+
+// ================================================================================
+// RESOURCES -- per-resource schedule for the Reservation capability (a doctor today;
+// a desk/chair/vehicle if a future moduleKey needs one). Single table for v1 (Reservation
+// Strategy Architecture design doc, Correction 2, revised 2026-07-30): `type` discriminates
+// what the row represents ("doctor" today); resource-type-specific fields beyond
+// name/specialty/phone (license_number, bio, salary, ...) are deferred until a real need
+// appears, per this project's Abstraction Rule -- do not add them speculatively.
+// ================================================================================
+
+model Resource {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @map("client_id") @db.Uuid
+  type         String   @map("type")
+  // "doctor" today -- freeform string, matching this schema's existing moduleKey/unit_type
+  // convention (no rigid enum anywhere else in this file either).
+  name         String   @map("name")
+  specialty    String?  @map("specialty")
+  phone        String?  @map("phone")
+  isActive     Boolean  @default(true) @map("is_active")
+  // Same shape as Client.config.working_hours: {"closed_days": [...], "open_time": "HH:MM",
+  // "close_time": "HH:MM"}. Reservation Strategy's scheduling logic reads this first, falling
+  // back to Client.config.working_hours only when null.
+  workingHours Json?    @map("working_hours")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([clientId, type])
+  @@index([clientId, isActive])
+  @@map("resources")
   @@schema("public")
 }
 

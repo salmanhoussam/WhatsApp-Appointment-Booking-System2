@@ -1,7 +1,7 @@
 """
 Public Reservations API — /api/v1/public/reservations/
 No auth required. Gated by require_service("reservations").
-Works for: restaurant tables, service appointments, property viewings.
+Works for: restaurant tables, service appointments, property viewings, clinic appointments.
 """
 
 from datetime import datetime, timezone
@@ -13,10 +13,11 @@ from pydantic import BaseModel
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 from app.services import reservation_service
+from app.repositories import resource_repo
 
 router = APIRouter()
 
-VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel"]
+VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel", "clinic"]
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,8 @@ class ReservationIn(BaseModel):
     # restaurant  → { "table_label": "A4", "party_size": 4 }
     # services    → { "service_name": "...", "staff_id": "..." }
     # real_estate → { "unit_id": "...", "guests": 2, "viewing_type": "in_person" }
+    # clinic      → { "resource_id": "uuid", "service_id": "uuid" }  (resource_id also mirrored
+    #                to the real Reservation.resourceId FK — see resource_repo.py)
     metadata:       Optional[dict] = None
 
 
@@ -72,6 +75,33 @@ async def create_reservation(
         raise HTTPException(status_code=409, detail=str(exc))
 
     return {"success": True, "data": result}
+
+
+# module_key -> Resource.type — only "clinic" is resource-backed today (RESOURCE_BACKED_MODULE_KEYS
+# in reservation_service.py); this map stays in lockstep with that set.
+MODULE_KEY_TO_RESOURCE_TYPE = {"clinic": "doctor"}
+
+
+@router.get("/resources")
+async def list_public_resources(
+    module_key: str = Query(...),
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """List active Resources for a moduleKey — e.g. a 'choose your doctor' picker for clinic
+    bookings. Only active resources are ever returned publicly."""
+    resource_type = MODULE_KEY_TO_RESOURCE_TYPE.get(module_key)
+    if not resource_type:
+        return {"success": True, "data": []}
+
+    resources = await resource_repo.list_resources(tenant["id"], resource_type=resource_type, active_only=True)
+    return {
+        "success": True,
+        "data": [
+            {"id": r.id, "name": r.name, "specialty": r.specialty, "type": r.type}
+            for r in resources
+        ],
+    }
 
 
 @router.get("/{reservation_id}")

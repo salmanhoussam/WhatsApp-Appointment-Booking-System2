@@ -12,6 +12,7 @@ from . import client_services_repo
 from . import gallery_repo
 from . import admin_catalog_repo
 from . import service_repo
+from . import resource_repo
 from . import price_repo
 from . import restaurant_admin_repo
 from . import store_admin_repo
@@ -32,6 +33,7 @@ __all__ = [
     "gallery_repo",
     "admin_catalog_repo",
     "service_repo",
+    "resource_repo",
     "price_repo",
     "restaurant_admin_repo",
     "store_admin_repo",
