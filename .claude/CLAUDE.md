@@ -121,3 +121,17 @@ context compacted (auto OR manual /compact) → BEFORE continuing any other work
   silently drop session history that only lived in ephemeral context; the session log is its
   permanent home. Do this silently, without asking, every single time a compact summary appears
   at the start of a turn.
+before saying "Compact" or "Ready for Compact" (self-initiated OR about to run /compact) →
+  Session Closure Checklist, mandatory, in order (established 2026-08-01, Salman's explicit
+  instruction — this must never require him to remind you again):
+  1. Update .claudedocs/sessions/YYYY-MM-DD.md — what was accomplished, what didn't start, the
+     exact resume point.
+  2. Update any open Investigation/Evidence work (.claudedocs/work/.../summary.md) — close it out
+     or state its real current status, never leave it silently stale.
+  3. Update Evolution/Rules if a new rule or Capability actually emerged this session (per the
+     Abstraction Rule — only if real, not speculative).
+  4. Update Memory — only for a genuine long-term decision or a real change in how work gets done,
+     not routine progress.
+  5. Write a Report inside the session file: Completed / Open Risks / Next Milestone /
+     START HERE NEXT SESSION.
+  Only after all five does the turn end with "Ready for Compact."
