@@ -101,6 +101,15 @@ export const SERVICE_CATALOG = {
     route:    (slug) => `/${slug}/catalog`,
     priority: 10,
   },
+
+  // ── Reservations module (generic — barbers, clinics, staff-based booking) ──
+  reservations: {
+    labelAr:  'احجز موعد',
+    labelEn:  'Book',
+    icon:     'calendar',
+    route:    (slug) => `/${slug}/reserve`,
+    priority: 15,
+  },
 };
 
 /**

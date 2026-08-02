@@ -288,6 +288,9 @@ export default function DynamicPage() {
     currency,
     config: tenantConfig,
     onAddToCart: addItem,
+    // Only set when this tenant has "reservations" active -- HeroSection falls back to its
+    // original scroll-down behavior when this is null, so no other tenant's hero CTA changes.
+    reserveHref: activeServices.includes('reservations') ? `/${slug}/reserve` : null,
   }
 
   return (

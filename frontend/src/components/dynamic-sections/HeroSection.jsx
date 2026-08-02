@@ -3,6 +3,7 @@
  * data: { title_ar, subtitle_ar, cta_text_ar, bg_image_url, bg_type }
  */
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import EditableRegion from '../../tenant-os/EditableRegion'
 import { contentSchema } from '../../tenant-os/schemas/content'
 import { mediaSchema } from '../../tenant-os/schemas/media'
@@ -11,11 +12,18 @@ const S_TITLE  = { type: 'spring', stiffness: 80,  damping: 18, mass: 1.2 }
 const S_BODY   = { type: 'spring', stiffness: 70,  damping: 18, mass: 1.2, delay: 0.12 }
 const S_CTA    = { type: 'spring', stiffness: 280, damping: 24, mass: 0.6, delay: 0.26 }
 
-export default function HeroSection({ data, accent }) {
+// reserveHref (optional) -- injected by DynamicPage.jsx only when this tenant has
+// "reservations" active. Without it every tenant keeps the original scroll-down behavior
+// unchanged; with it, a hero CTA that promises "Book an appointment" actually navigates there
+// instead of just scrolling (confirmed via real Browser Verification, 2026-08-02 -- the button
+// existed and rendered, but clicking it never reached the reservation page).
+export default function HeroSection({ data, accent, reserveHref }) {
   const isVideo = data.bg_image_url?.match(/\.(mp4|webm|mov)$/i)
   const hasBg   = !!data.bg_image_url
+  const navigate = useNavigate()
 
   const scrollDown = () => window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' })
+  const handleCtaClick = () => (reserveHref ? navigate(reserveHref) : scrollDown())
 
   return (
     <section style={{
@@ -120,7 +128,7 @@ export default function HeroSection({ data, accent }) {
             transition={S_CTA}
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.97 }}
-            onClick={scrollDown}
+            onClick={handleCtaClick}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
               padding: '14px 40px',
