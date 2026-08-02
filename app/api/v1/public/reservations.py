@@ -4,7 +4,7 @@ No auth required. Gated by require_service("reservations").
 Works for: restaurant tables, service appointments, property viewings, clinic appointments.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -121,6 +121,34 @@ async def list_public_barbers(
         "success": True,
         "data": [{"id": b.id, "name": b.name} for b in barbers],
     }
+
+
+@router.get("/availability")
+async def get_availability(
+    barber_id:    str = Query(...),
+    date_str:     str = Query(..., alias="date", description="YYYY-MM-DD"),
+    duration_min: int = Query(...),
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """Reservation Pilot, Phase 1 — real open slots for a given barber/date/service duration.
+    Thin route per api-rules.md — all logic lives in reservation_service.get_available_slots()."""
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD.")
+
+    try:
+        slots = await reservation_service.get_available_slots(
+            client_id     = tenant["id"],
+            barber_id     = barber_id,
+            target_date   = target_date,
+            duration_min  = duration_min,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {"success": True, "data": slots}
 
 
 @router.get("/{reservation_id}")

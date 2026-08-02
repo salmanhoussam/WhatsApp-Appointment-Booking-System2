@@ -122,6 +122,24 @@ class ReservationRepository:
             where["id"] = {"not": exclude_id}
         return await self.db.reservation.find_many(where=where)
 
+    async def find_by_barber_on_date(
+        self,
+        client_id: str,
+        barber_id: str,
+        day_start: datetime,
+        day_end: datetime,
+    ) -> list:
+        """One query for a barber's whole day, used by the availability slot-generator
+        (Reservation Pilot Phase 1) so candidate-slot filtering happens in memory instead of
+        one DB round-trip per candidate -- find_overlapping_by_barber() above is the right
+        shape for checking a single proposed booking, not for generating many candidates."""
+        return await self.db.reservation.find_many(where={
+            "clientId":   client_id,
+            "barberId":   barber_id,
+            "status":     {"in": ["pending", "confirmed", "arrived"]},
+            "reservedAt": {"gte": day_start, "lte": day_end},
+        })
+
     async def update_status(self, reservation_id: str, client_id: str, status: str):
         # update_many() returns a plain int (the row count) in this prisma-client-py version
         # (0.15.0, confirmed directly in venv/lib/.../prisma/actions.py), not an object with a

@@ -313,9 +313,12 @@ async def admin_update_item(
         "isFeatured":    is_featured,
         "isActive":      is_active,
         "sortOrder":     sort_order,
-        "metadata":      metadata,
         "categoryId":    category_id,
     }.items() if v is not None}
+    # Prisma's optional Json field rejects a bare dict -- must be wrapped in Json(...),
+    # same fix already applied in reservation_service.py's create_reservation().
+    if metadata is not None:
+        patch["metadata"] = Json(metadata)
     updated = await admin_catalog_repo.update_item(item_id, patch)
     return {"id": updated.id}
 

@@ -16,7 +16,7 @@ duplication is the point — it's the raw material for the honest post-hoc compa
 .claudedocs/evolution/reservation-capability.md, instead of an assumed one.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from prisma import Json
 
@@ -260,6 +260,75 @@ async def create_reservation(
     # stays visible in the code even where a stage currently does nothing.
 
     return _fmt(reservation)
+
+
+async def get_available_slots(
+    client_id:      str,
+    barber_id:      str,
+    target_date:    date,
+    duration_min:   int,
+    slot_step_min:  int = 30,
+) -> list[dict]:
+    """
+    Reservation Pilot, Phase 1 — the one genuinely new piece of this pipeline.
+    Generates candidate start times across `target_date` in `slot_step_min` increments and
+    filters them through the already-existing, already-proven pipeline stages — no new
+    validation logic: _check_working_hours() (reads Barber.workingHours) and _has_conflict()
+    (real conflict-checking). Fetches the barber's existing bookings for the day in ONE query
+    (find_by_barber_on_date) rather than one query per candidate slot -- an early version of
+    this function called find_overlapping_by_barber() per-candidate and was real-world too
+    slow under any DB latency; this is the fix, found and applied during Phase 1's own
+    verification, not a redesign.
+    No buffer time between bookings for v1, per Salman's explicit scope lock in
+    implementation_plan_reservation_pilot.md's "Explicitly Out of Scope for v1" section.
+    """
+    barber = await barber_repo.find_barber(client_id, barber_id)
+    if not barber:
+        raise ValueError("Barber not found for this tenant.")
+    if not barber.isActive:
+        raise ValueError("This barber is not currently accepting reservations.")
+
+    working_hours = barber.workingHours or {}
+    open_time  = working_hours.get("open_time")
+    close_time = working_hours.get("close_time")
+    closed_days = working_hours.get("closed_days") or []
+
+    day_name = target_date.strftime("%A").lower()
+    if day_name in closed_days or not open_time or not close_time:
+        return []
+
+    # reservedAt is stored/returned timezone-aware (UTC) -- same assumption
+    # _check_working_hours() already documents ("All times treated as UTC directly"). Every
+    # datetime built here must be tz-aware too, or comparisons against real Reservation rows
+    # raise TypeError (found and fixed during Phase 1's own verification, real evidence: a
+    # live "can't compare offset-naive and offset-aware datetimes" error).
+    repo = ReservationRepository(prisma_client)
+    day_start = datetime.combine(target_date, datetime.strptime(open_time, "%H:%M").time(), tzinfo=timezone.utc)
+    day_end   = datetime.combine(target_date, datetime.strptime(close_time, "%H:%M").time(), tzinfo=timezone.utc)
+
+    # Single query for the whole day's existing bookings -- conflict checks below are all
+    # in-memory against this list, not one DB round-trip per candidate.
+    existing_today = await repo.find_by_barber_on_date(
+        client_id, barber_id,
+        datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc),
+        datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc),
+    )
+
+    slots: list[dict] = []
+    candidate = day_start
+    while candidate + timedelta(minutes=duration_min) <= day_end:
+        try:
+            _check_working_hours(candidate, working_hours)
+        except ValueError:
+            candidate += timedelta(minutes=slot_step_min)
+            continue
+
+        if not _has_conflict(existing_today, candidate, duration_min):
+            slots.append({"time": candidate.strftime("%H:%M"), "datetime": candidate.isoformat()})
+
+        candidate += timedelta(minutes=slot_step_min)
+
+    return slots
 
 
 async def get_reservation(client_id: str, reservation_id: str, customer_phone: str | None = None) -> dict | None:

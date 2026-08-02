@@ -14,10 +14,11 @@
  *   then renders the protected page on the next pass.
  */
 
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 
 export default function ProtectedRoute({ children }) {
   const location = useLocation();
+  const { slug: routeSlug } = useParams();
 
   // ── SSO token handoff ────────────────────────────────────────────────────────
   const params   = new URLSearchParams(location.search);
@@ -36,6 +37,28 @@ export default function ProtectedRoute({ children }) {
 
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+
+  // ── Tenant-match guard ──────────────────────────────────────────────────────
+  // A JWT left over from a previously-visited tenant must not be allowed to
+  // render a different tenant's protected route — confirmed real bug,
+  // 2026-08-02 (Product Readiness Audit): navigating straight to a new
+  // tenant's admin URL while an old tenant's token was still in localStorage
+  // let components mount and fire real requests scoped to the OLD tenant
+  // before anything caught the mismatch. Only runs when the current route
+  // actually carries a :slug param to compare against (subdomain-mode routes
+  // with no :slug segment are unaffected by this check, unchanged).
+  if (routeSlug) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload?.slug && payload.slug !== routeSlug) {
+        localStorage.removeItem('admin_access_token');
+        return <Navigate to="/login" replace />;
+      }
+    } catch {
+      // malformed token — fall through, the existing 401 response interceptor
+      // in admin.config.js already handles this case downstream
+    }
   }
 
   return children;
