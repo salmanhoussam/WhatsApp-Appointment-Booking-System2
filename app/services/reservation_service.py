@@ -314,9 +314,14 @@ async def get_available_slots(
         datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc),
     )
 
+    now = datetime.now(timezone.utc)
     slots: list[dict] = []
     candidate = day_start
     while candidate + timedelta(minutes=duration_min) <= day_end:
+        if candidate < now:
+            candidate += timedelta(minutes=slot_step_min)
+            continue
+
         try:
             _check_working_hours(candidate, working_hours)
         except ValueError:
