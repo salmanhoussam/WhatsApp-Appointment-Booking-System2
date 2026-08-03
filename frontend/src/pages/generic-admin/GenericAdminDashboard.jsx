@@ -550,6 +550,12 @@ export default function GenericAdminDashboard() {
       ════════════════════════════════════════════════════════════════ */}
       <main style={{
         flex: 1,
+        minWidth: 0, // flex items default to min-width:auto, refusing to shrink below their
+                     // widest child's content size -- without this, a wide inner element (e.g.
+                     // the Calendar tab's week grid) forces this whole <main> past the viewport
+                     // instead of being clipped/scrolled locally by its own overflow-x:auto
+                     // wrapper. Root cause of a real mobile horizontal-overflow bug (2026-08-03),
+                     // confirmed via a real DOM ancestor-chain trace, not overflow-x:hidden here.
         marginLeft: isMobile ? 0 : SIDEBAR_W,
         display: 'flex', flexDirection: 'column',
         minHeight: '100vh',
@@ -695,6 +701,9 @@ export default function GenericAdminDashboard() {
               transition={SPRING_SNAPPY}
               style={{
                 flex: 1,
+                minWidth: 0, // same fix as <main> above -- this is a flex-column child of <main>
+                             // and needs the same override, or it re-widens past the viewport on
+                             // its own even once <main> can shrink.
                 padding: isMobile ? '20px 16px 100px' : '28px 32px',
                 direction: 'rtl',
               }}

@@ -399,7 +399,12 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             value={showAllDates ? '' : dateFilter}
             onChange={e => { setDateFilter(e.target.value); setShowAllDates(false) }}
             disabled={showAllDates}
-            style={{ ...inputStyle, flex: 1, colorScheme: 'dark', opacity: showAllDates ? 0.4 : 1 }}
+            style={{
+              ...inputStyle, flex: 1, minWidth: 0, colorScheme: 'dark', opacity: showAllDates ? 0.4 : 1,
+              // Native date inputs have their own UA-defined content width, which a flex item
+              // won't shrink below without an explicit min-width:0 -- a second, independent real
+              // cause of the same mobile horizontal-overflow bug (this row is flex-wrap:nowrap).
+            }}
           />
           <button
             onClick={() => { setDateFilter(todayISO()); setShowAllDates(false) }}
