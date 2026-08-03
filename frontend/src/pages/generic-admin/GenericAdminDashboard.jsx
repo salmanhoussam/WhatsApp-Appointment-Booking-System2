@@ -426,7 +426,7 @@ export default function GenericAdminDashboard() {
       case 'orders':
         return <OrdersTab activeServices={activeServices} color={color} currency={currency} />
       case 'calendar':
-        return <ReservationsTab color={color} defaultView="calendar" />
+        return <ReservationsTab color={color} defaultView="today" />
       case 'reservations':
         return <ReservationsTab color={color} defaultView="list" />
       case 'catalog':

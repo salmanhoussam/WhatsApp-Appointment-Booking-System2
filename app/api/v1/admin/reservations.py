@@ -24,6 +24,11 @@ class StatusUpdateIn(BaseModel):
     status: str
 
 
+class RescheduleIn(BaseModel):
+    reserved_at: datetime
+    barber_id:   Optional[str] = None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/")
@@ -126,6 +131,31 @@ async def update_status(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Reservation not found.")
+    return {"success": True, "data": result}
+
+
+@router.patch("/{reservation_id}/reschedule")
+async def reschedule(
+    reservation_id: str,
+    body: RescheduleIn,
+    user=Depends(get_current_admin_user),
+    _svc=Depends(require_service("reservations")),
+):
+    """Calendar drag-and-drop -- time and/or staff reassignment. All conflict/working-hours
+    logic lives in reservation_service.reschedule_reservation(), reused from create_reservation();
+    nothing decided here or in the frontend."""
+    try:
+        result = await reservation_service.reschedule_reservation(
+            client_id       = str(user.clientId),
+            reservation_id  = reservation_id,
+            new_reserved_at = body.reserved_at,
+            new_barber_id   = body.barber_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
     if not result:
         raise HTTPException(status_code=404, detail="Reservation not found.")

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
+import ReservationsTodayView from '../components/ReservationsTodayView'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const glass = {
@@ -282,7 +283,7 @@ function MobileReservationCard({ reservation, idx, color, onUpdate }) {
  * API: GET /reservations/?status=&date=YYYY-MM-DD
  *      PATCH /reservations/{id}/status  { status }
  *
- * `defaultView` ('list' | 'calendar') -- lets GenericAdminDashboard reuse this exact component
+ * `defaultView` ('list' | 'today' | 'week') -- lets GenericAdminDashboard reuse this exact component
  * (unchanged internals, including its own already-verified List/Calendar toggle) for both the new
  * top-level "Calendar" nav item and the "Reservations" nav item, per the Dashboard Navigation
  * Refactor (2026-08-03) -- rather than duplicating this tab's state/loading/request-sequencing
@@ -296,7 +297,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   const [showAllDates, setShowAllDates] = useState(false)
   const [page,         setPage]         = useState(1)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
-  const [viewMode,     setViewMode]     = useState(defaultView) // 'list' | 'calendar'
+  const [viewMode,     setViewMode]     = useState(defaultView) // 'list' | 'today' | 'week'
   const [weekStart,    setWeekStart]    = useState(() => startOfWeekSunday(new Date()))
   const mountedRef = useRef(true)
 
@@ -340,10 +341,13 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
 
-      if (viewMode === 'calendar') {
+      if (viewMode === 'week') {
         params.set('date_from', dateISO(weekStart))
         params.set('date_to',   dateISO(addDaysLocal(weekStart, 6)))
         params.set('limit', '500')
+      } else if (viewMode === 'today') {
+        params.set('date', todayISO())
+        params.set('limit', '200')
       } else {
         if (!showAllDates && dateFilter) params.set('date', dateFilter)
         params.set('limit', '200')
@@ -367,6 +371,16 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   const handleStatusChange = useCallback(async (id, newStatus) => {
     await adminApi.patch(`/reservations/${id}/status`, { status: newStatus })
     setReservations(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r))
+  }, [])
+
+  // Calendar drag-and-drop / popover reschedule -- thin call to the Phase 3.1 endpoint, which
+  // reuses create_reservation()'s own conflict/working-hours checks. This function does not
+  // decide anything; it throws on 409/error so the caller (ReservationsTodayView) can revert its
+  // own optimistic update, same shape as handleStatusChange above.
+  const handleReschedule = useCallback(async (id, patch) => {
+    const { data } = await adminApi.patch(`/reservations/${id}/reschedule`, patch)
+    const updated = data?.data
+    if (updated) setReservations(prev => prev.map(r => r.id === id ? updated : r))
   }, [])
 
   // ── Pagination ─────────────────────────────────────────────────────────────
@@ -476,26 +490,46 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
           })}
         </div>
 
-        {/* List / Calendar toggle */}
-        <div style={{ display: 'flex', gap: 6, marginRight: isMobile ? 0 : 'auto' }}>
-          {[['list', 'قائمة'], ['calendar', 'تقويم']].map(([mode, label]) => {
-            const active = viewMode === mode
-            return (
-              <button
-                key={mode}
-                onClick={() => { setViewMode(mode); setPage(1) }}
-                style={{
-                  padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
-                  background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
-                  color: active ? color : 'rgba(255,255,255,0.4)',
-                  border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.08)'}`,
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
+        {/* View switcher — List is its own pill; Today/Week is one segmented control (Phase 3.1,
+            2026-08-03) so switching feels like moving between two modes of the same calendar, not
+            two separate pages, per Salman's explicit note. */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginRight: isMobile ? 0 : 'auto' }}>
+          <button
+            onClick={() => { setViewMode('list'); setPage(1) }}
+            style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+              background: viewMode === 'list' ? `${color}22` : 'rgba(255,255,255,0.04)',
+              color: viewMode === 'list' ? color : 'rgba(255,255,255,0.4)',
+              border: `1px solid ${viewMode === 'list' ? `${color}55` : 'rgba(255,255,255,0.08)'}`,
+            }}
+          >
+            قائمة
+          </button>
+
+          <div style={{
+            display: 'flex', borderRadius: 20, padding: 2,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            {[['today', 'اليوم'], ['week', 'الأسبوع']].map(([mode, label]) => {
+              const active = viewMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => { setViewMode(mode); setPage(1) }}
+                  style={{
+                    padding: '5px 14px', borderRadius: 18, fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: "'Cairo', sans-serif", border: 'none',
+                    background: active ? color : 'transparent',
+                    color: active ? '#0a0a0f' : 'rgba(255,255,255,0.45)',
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Refresh — desktop only (mobile has it in date row) */}
@@ -517,14 +551,16 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
       {!loading && (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginBottom: 12 }}>
           {reservations.length} حجز
-          {viewMode === 'calendar'
+          {viewMode === 'week'
             ? ` — أسبوع ${dateISO(weekStart)} إلى ${dateISO(addDaysLocal(weekStart, 6))}`
+            : viewMode === 'today'
+            ? ` — اليوم ${fmtDate(todayISO() + 'T00:00:00')}`
             : (showAllDates ? '' : ` — ${fmtDate(dateFilter + 'T00:00:00')}`)}
         </div>
       )}
 
       {/* ── Content ────────────────────────────────────────────────── */}
-      {viewMode === 'calendar' ? (
+      {viewMode === 'week' ? (
         loading ? (
           <div style={{ ...glass, padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
             جارٍ التحميل...
@@ -537,6 +573,21 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             color={color}
             onStatusChange={handleStatusChange}
             hourRange={hourRange}
+          />
+        )
+      ) : viewMode === 'today' ? (
+        loading ? (
+          <div style={{ ...glass, padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+            جارٍ التحميل...
+          </div>
+        ) : (
+          <ReservationsTodayView
+            reservations={reservations}
+            date={todayISO()}
+            hourRange={hourRange}
+            color={color}
+            onStatusChange={handleStatusChange}
+            onReschedule={handleReschedule}
           />
         )
       ) : isMobile ? (
