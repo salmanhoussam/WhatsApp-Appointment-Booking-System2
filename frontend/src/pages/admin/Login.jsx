@@ -16,10 +16,10 @@ export default function Login() {
 
     const USER_URL   = import.meta.env.VITE_API_URL
       ? `${import.meta.env.VITE_API_URL}/api/v1/auth/users/login`
-      : 'http://127.0.0.1:8000/api/v1/auth/users/login';
+      : '/api/v1/auth/users/login';
     const CLIENT_URL = import.meta.env.VITE_API_URL
       ? `${import.meta.env.VITE_API_URL}/api/v1/auth/login`
-      : 'http://127.0.0.1:8000/api/v1/auth/login';
+      : '/api/v1/auth/login';
 
     try {
       let data;
@@ -33,7 +33,14 @@ export default function Login() {
 
       const { token, slug: returnedSlug } = data;
       localStorage.setItem('admin_access_token', token);
-      navigate(`/dashboard/${returnedSlug}/units`);
+      // `smar` is the one tenant with its own dedicated dashboard (SmarAdminDashboard), where
+      // "units" is a real, meaningful sub-route -- left untouched. Every other tenant goes
+      // through GenericAdminDashboard, which ignores this path segment entirely (its tabs are
+      // client-side state, not routes) but still shows it in the address bar; "/calendar" reads
+      // correctly for reservations-enabled tenants rather than the vestigial "/units" (Dashboard
+      // Navigation Refactor, 2026-08-03).
+      const landing = returnedSlug === 'smar' ? 'units' : 'calendar';
+      navigate(`/dashboard/${returnedSlug}/${landing}`);
     } catch (err) {
       setError('بيانات الدخول غير صحيحة. تأكد من البيانات وحاول مرة أخرى.');
       console.error('Login error:', err);

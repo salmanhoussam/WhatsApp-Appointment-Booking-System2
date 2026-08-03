@@ -281,8 +281,14 @@ function MobileReservationCard({ reservation, idx, color, onUpdate }) {
  * Only rendered when 'reservations' service is active (enforced by GenericAdminDashboard).
  * API: GET /reservations/?status=&date=YYYY-MM-DD
  *      PATCH /reservations/{id}/status  { status }
+ *
+ * `defaultView` ('list' | 'calendar') -- lets GenericAdminDashboard reuse this exact component
+ * (unchanged internals, including its own already-verified List/Calendar toggle) for both the new
+ * top-level "Calendar" nav item and the "Reservations" nav item, per the Dashboard Navigation
+ * Refactor (2026-08-03) -- rather than duplicating this tab's state/loading/request-sequencing
+ * logic into a second component.
  */
-export default function ReservationsTab({ color }) {
+export default function ReservationsTab({ color, defaultView = 'list' }) {
   const [reservations, setReservations] = useState([])
   const [loading,      setLoading]      = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -290,7 +296,7 @@ export default function ReservationsTab({ color }) {
   const [showAllDates, setShowAllDates] = useState(false)
   const [page,         setPage]         = useState(1)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
-  const [viewMode,     setViewMode]     = useState('list') // 'list' | 'calendar'
+  const [viewMode,     setViewMode]     = useState(defaultView) // 'list' | 'calendar'
   const [weekStart,    setWeekStart]    = useState(() => startOfWeekSunday(new Date()))
   const mountedRef = useRef(true)
 

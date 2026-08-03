@@ -64,6 +64,52 @@ function IconCatalog({ size = 18, color }) {
   )
 }
 
+function IconList({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+  )
+}
+
+function IconStaff({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
+
+function IconCustomers({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+      <path d="M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  )
+}
+
+function IconNotifications({ size = 18, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 01-3.46 0"/>
+    </svg>
+  )
+}
+
 function IconSettings({ size = 18, color }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -102,19 +148,38 @@ function IconLogout({ size = 18, color }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Build the nav array. "reservations" tab is conditional.
+ * Build the nav array.
+ *
+ * Dashboard Navigation Refactor (2026-08-03, Salman's explicit instruction): for a reservations-
+ * enabled tenant, the sidebar is reordered around the owner's actual daily workflow -- Calendar
+ * first, Overview (Analytics) last -- instead of the original Overview-first generic order.
+ * Scoped strictly to `hasReservations` tenants (today: only `hr`) so no other live tenant
+ * (footlab, caracas, ...) sees any change here -- they keep the exact original nav untouched.
+ *
+ * 'staff', 'customers', 'notifications' are real nav entries pointing at the existing
+ * ComingSoonTab placeholder -- their own build is a separate future phase (per Salman's
+ * instruction not to build calendar/staff features yet); this phase is the navigation shape only.
  */
 function buildNav(hasReservations) {
-  const base = [
-    { id: 'overview',  labelAr: 'نظرة عامة', Icon: IconOverview  },
-    { id: 'orders',    labelAr: 'الطلبات',   Icon: IconOrders    },
-    { id: 'catalog',      labelAr: 'الكتالوج',    Icon: IconCatalog      },
-    { id: 'settings',     labelAr: 'الإعدادات',   Icon: IconSettings     },
-  ]
-  if (hasReservations) {
-    base.splice(2, 0, { id: 'reservations', labelAr: 'الحجوزات', Icon: IconCalendar })
+  if (!hasReservations) {
+    return [
+      { id: 'overview', labelAr: 'نظرة عامة', Icon: IconOverview },
+      { id: 'orders',   labelAr: 'الطلبات',   Icon: IconOrders   },
+      { id: 'catalog',  labelAr: 'الكتالوج',  Icon: IconCatalog  },
+      { id: 'settings', labelAr: 'الإعدادات', Icon: IconSettings },
+    ]
   }
-  return base
+  return [
+    { id: 'calendar',      labelAr: 'التقويم',    Icon: IconCalendar      },
+    { id: 'reservations',  labelAr: 'الحجوزات',   Icon: IconList          },
+    { id: 'catalog',       labelAr: 'الكتالوج',   Icon: IconCatalog       },
+    { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
+    { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
+    { id: 'notifications', labelAr: 'الإشعارات',  Icon: IconNotifications },
+    { id: 'settings',      labelAr: 'الإعدادات',  Icon: IconSettings      },
+    { id: 'orders',        labelAr: 'الطلبات',    Icon: IconOrders        },
+    { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
+  ]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -329,6 +394,18 @@ export default function GenericAdminDashboard() {
   const hasReservations = activeServices.includes('reservations')
   const NAV             = useMemo(() => buildNav(hasReservations), [hasReservations])
 
+  // Calendar becomes the default landing tab once we know this is a reservations tenant --
+  // `hasReservations` starts false (DEFAULT_CONFIG) until the real config fetch resolves, so this
+  // fires exactly once per real session for a tenant like `hr`, never overriding a tab the owner
+  // has already clicked into afterward.
+  const hasSetDefaultRef = useRef(false)
+  useEffect(() => {
+    if (hasReservations && !hasSetDefaultRef.current) {
+      hasSetDefaultRef.current = true
+      setActiveTab('calendar')
+    }
+  }, [hasReservations])
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem('admin_access_token')
     window.location.href = '/login'
@@ -348,10 +425,18 @@ export default function GenericAdminDashboard() {
         )
       case 'orders':
         return <OrdersTab activeServices={activeServices} color={color} currency={currency} />
+      case 'calendar':
+        return <ReservationsTab color={color} defaultView="calendar" />
       case 'reservations':
-        return <ReservationsTab color={color} />
+        return <ReservationsTab color={color} defaultView="list" />
       case 'catalog':
         return <CatalogTab color={color} />
+      case 'staff':
+        return <ComingSoonTab label="إدارة الموظفين" color={color} />
+      case 'customers':
+        return <ComingSoonTab label="العملاء" color={color} />
+      case 'notifications':
+        return <ComingSoonTab label="الإشعارات" color={color} />
       case 'settings':
         return <SettingsTab settings={settings} onUpdated={setSettings} color={color} />
       default:
