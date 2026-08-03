@@ -1,17 +1,14 @@
 import { useState, useCallback } from 'react'
 import { useNavigate }           from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion }                from 'framer-motion'
 import publicApi              from '../../../utils/publicApi'
-import useTenantConfig        from '../../../hooks/useTenantConfig'
 import useTenantSlug          from '../../../hooks/useTenantSlug'
 import { useTenantBase }      from '../../../hooks/useTenantSlug'
-import useReservationWizard   from '../../../hooks/useReservationWizard'
+import useReservationBooking  from '../../../hooks/useReservationBooking'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
 import { hasCapability }      from '../../../utils/capabilities'
 
-const SPRING = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
-
-// ── Field atom (shared shape between the legacy form and the wizard's confirm step) ────────────
+// ── Field atom (used only by the legacy generic form) ───────────────────────────────────────────
 
 function Field({ label, type = 'text', value, onChange, required, placeholder, hint, as: Tag = 'input', rows }) {
   const shared = {
@@ -104,242 +101,209 @@ function LoadingDot({ accent }) {
   )
 }
 
-// ── Reservation Wizard — one journey, not four pages ────────────────────────────────────────────
-// Service Picker -> Staff Picker -> Live Calendar Slots -> Confirmation, all inside one card that
-// swaps its inner content per step (AnimatePresence), never a route change. Consumes only the
-// existing Phase 1 backend (barbers/availability/create) -- no slot or conflict logic lives here.
+// ── Single-screen booking page ───────────────────────────────────────────────────────────────────
+// One screen, nothing routed/stepped: service + staff pickers up top, a real day-strip calendar,
+// a time-slot grid, a running booking summary, and one "confirm via WhatsApp" action. Redesigned
+// 2026-08-02 per Salman's explicit product review of the original 4-step wizard (🟡 Improve --
+// the backend/logic was right, the presentation wasn't). Consumes only the existing backend
+// (barbers/availability/create) -- no slot or conflict logic lives here.
 
-const STEPS = [
-  { key: 'service', label: 'الخدمة' },
-  { key: 'staff',   label: 'الحلاق' },
-  { key: 'slot',    label: 'الموعد' },
-  { key: 'confirm', label: 'التأكيد' },
-]
-
-function StepDots({ step, accent }) {
-  const idx = STEPS.findIndex((s) => s.key === step)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 26 }}>
-      {STEPS.map((s, i) => (
-        <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: i < STEPS.length - 1 ? 1 : undefined }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 700,
-              background: i <= idx ? accent : 'rgba(255,255,255,0.08)',
-              color: i <= idx ? '#0a0a0f' : 'rgba(255,255,255,0.35)',
-              transition: 'all 0.2s',
-            }}>
-              {i < idx ? '✓' : i + 1}
-            </div>
-            <span style={{
-              fontSize: 10, color: i <= idx ? accent : 'rgba(255,255,255,0.3)',
-              whiteSpace: 'nowrap',
-            }}>
-              {s.label}
-            </span>
-          </div>
-          {i < STEPS.length - 1 && (
-            <div style={{ flex: 1, height: 1, background: i < idx ? accent : 'rgba(255,255,255,0.08)', marginBottom: 16 }} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PickCard({ selected, accent, onClick, title, subtitle }) {
+function Pill({ selected, accent, onClick, children }) {
   return (
     <button
       onClick={onClick}
       style={{
-        width: '100%', textAlign: 'right', cursor: 'pointer',
-        padding: '16px 18px', borderRadius: 12,
-        background: selected ? `${accent}18` : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${selected ? accent : 'rgba(255,255,255,0.08)'}`,
-        color: '#fff', fontFamily: "'Cairo', sans-serif",
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        transition: 'all 0.15s',
+        padding: '9px 18px', borderRadius: 999, cursor: 'pointer',
+        background: selected ? accent : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${selected ? accent : 'rgba(255,255,255,0.12)'}`,
+        color: selected ? '#0a0a0f' : '#fff',
+        fontSize: 13, fontWeight: 600, fontFamily: "'Cairo', sans-serif",
+        whiteSpace: 'nowrap',
       }}
     >
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{subtitle}</div>}
-      </div>
-      {selected && <span style={{ color: accent, fontSize: 16 }}>✓</span>}
+      {children}
     </button>
   )
 }
 
-function ReservationWizard({ wiz, accent, base, navigate }) {
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em',
+      textTransform: 'uppercase', marginBottom: 10, fontWeight: 700,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function BookingScreen({ booking, accent }) {
   const {
-    step, goBack,
-    barbers, barbersLoading, selectedBarber, chooseBarber,
-    services, servicesLoading, selectedService, chooseService,
-    date, setDate, slots, slotsLoading, selectedSlot, chooseSlot,
-    customerName, setCustomerName, customerPhone, setCustomerPhone,
-    submitting, submitError, submit, reservationId,
-  } = wiz
+    dayStrip, selectedDate, chooseDate,
+    services, servicesLoading, selectedServiceId, selectedService, chooseService,
+    barbers, barbersLoading, selectedBarberId, selectedBarber, chooseBarber,
+    slots, slotsLoading, selectedSlot, chooseSlot,
+    submitting, submitError, reservationId, confirmViaWhatsApp,
+    formatArabicDate,
+  } = booking
 
-  const today = new Date().toISOString().slice(0, 10)
-
-  if (step === 'success') {
+  if (reservationId) {
     return (
-      <SuccessScreen accent={accent} reservationId={reservationId} onBack={() => navigate(`${base}`)} />
+      <div style={{
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 16, padding: '40px 24px', textAlign: 'center',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%', margin: '0 auto 20px',
+          background: `${accent}22`, border: `2px solid ${accent}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+        }}>
+          ✓
+        </div>
+        <h2 style={{ margin: '0 0 10px', fontSize: 20, fontWeight: 700, color: '#fff' }}>
+          تم إنشاء حجزك
+        </h2>
+        <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.5)', maxWidth: 380, marginInline: 'auto' }}>
+          فتحنا لك واتساب برسالة جاهزة — أرسلها لصاحب المحل لتأكيد الحجز نهائياً.
+          رقم الحجز: <span style={{ color: accent }}>{reservationId.slice(0, 8)}</span>
+        </p>
+      </div>
     )
   }
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 16, padding: '28px 24px',
+      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 16, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 28,
     }}>
-      <StepDots step={step} accent={accent} />
-
-      {/* Running summary of choices made so far -- keeps this feeling like one booking, not four
-          disconnected screens. */}
-      {(selectedService || selectedBarber || selectedSlot) && (
-        <div style={{
-          display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20,
-          fontSize: 12, color: 'rgba(255,255,255,0.5)',
-        }}>
-          {selectedService && <span style={{ color: accent }}>{selectedService.name_ar}</span>}
-          {selectedBarber && <span>· {selectedBarber.name}</span>}
-          {selectedSlot && <span>· {date} {selectedSlot.time}</span>}
-        </div>
-      )}
-
-      <AnimatePresence mode="wait">
-        {step === 'service' && (
-          <motion.div key="service" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={SPRING}
-            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {servicesLoading && <LoadingDot accent={accent} />}
-            {!servicesLoading && services.length === 0 && (
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
-                لا توجد خدمات قابلة للحجز حالياً.
-              </p>
-            )}
-            {services.map((item) => (
-              <PickCard
-                key={item.id}
-                accent={accent}
-                selected={selectedService?.id === item.id}
-                onClick={() => chooseService(item)}
-                title={item.name_ar}
-                subtitle={`${item.metadata?.duration_min} دقيقة · $${item.price}`}
-              />
+      {/* ── Service + Staff ─────────────────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel>الخدمة</SectionLabel>
+        {servicesLoading ? <LoadingDot accent={accent} /> : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {services.map((s) => (
+              <Pill key={s.id} accent={accent} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)}>
+                {s.name_ar} · {s.metadata?.duration_min}د · ${s.price}
+              </Pill>
             ))}
-          </motion.div>
+          </div>
         )}
+      </div>
 
-        {step === 'staff' && (
-          <motion.div key="staff" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={SPRING}
-            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {barbersLoading && <LoadingDot accent={accent} />}
+      <div>
+        <SectionLabel>الحلاق</SectionLabel>
+        {barbersLoading ? <LoadingDot accent={accent} /> : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {barbers.map((b) => (
-              <PickCard
-                key={b.id}
-                accent={accent}
-                selected={selectedBarber?.id === b.id}
-                onClick={() => chooseBarber(b)}
-                title={b.name}
-              />
+              <Pill key={b.id} accent={accent} selected={selectedBarberId === b.id} onClick={() => chooseBarber(b.id)}>
+                {b.name}
+              </Pill>
             ))}
-            <BackButton onClick={goBack} />
-          </motion.div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Calendar ─────────────────────────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel>التقويم</SectionLabel>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          {dayStrip.map((d) => {
+            const active = d.iso === selectedDate
+            return (
+              <button
+                key={d.iso}
+                onClick={() => chooseDate(d.iso)}
+                style={{
+                  minWidth: 62, padding: '10px 6px', borderRadius: 12, cursor: 'pointer',
+                  background: active ? accent : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${active ? accent : 'rgba(255,255,255,0.1)'}`,
+                  color: active ? '#0a0a0f' : '#fff',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  fontFamily: "'Cairo', sans-serif",
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 600 }}>{d.weekday}</span>
+                <span style={{ fontSize: 16, fontWeight: 800 }}>{d.dayNum}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          {slotsLoading && <LoadingDot accent={accent} />}
+          {!slotsLoading && slots.length === 0 && (
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+              لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
+            </p>
+          )}
+          {!slotsLoading && slots.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
+              {slots.map((s) => (
+                <button
+                  key={s.time}
+                  onClick={() => chooseSlot(s)}
+                  style={{
+                    padding: '10px 0', borderRadius: 8, cursor: 'pointer',
+                    background: selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.1)'}`,
+                    color: selectedSlot?.time === s.time ? '#0a0a0f' : '#fff',
+                    fontSize: 13, fontWeight: 600, fontFamily: "'Cairo', sans-serif",
+                  }}
+                >
+                  {s.time}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Booking summary + confirm ────────────────────────────────────────────────────── */}
+      <div style={{
+        borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20,
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <SectionLabel>ملخص الحجز</SectionLabel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+          <div>الخدمة: <span style={{ color: '#fff', fontWeight: 600 }}>{selectedService?.name_ar ?? '—'}</span></div>
+          <div>الحلاق: <span style={{ color: '#fff', fontWeight: 600 }}>{selectedBarber?.name ?? '—'}</span></div>
+          <div>
+            الوقت:{' '}
+            <span style={{ color: '#fff', fontWeight: 600 }}>
+              {selectedSlot ? `${formatArabicDate(selectedDate)} - ${selectedSlot.time}` : '—'}
+            </span>
+          </div>
+        </div>
+
+        {submitError && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 8,
+            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+            color: '#fca5a5', fontSize: 13,
+          }}>
+            {submitError}
+          </div>
         )}
 
-        {step === 'slot' && (
-          <motion.div key="slot" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={SPRING}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Field label="التاريخ" type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-              {...{ min: today }} />
-            {slotsLoading && <LoadingDot accent={accent} />}
-            {!slotsLoading && slots.length === 0 && (
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
-                لا توجد مواعيد متاحة في هذا التاريخ — جرّب تاريخاً آخر.
-              </p>
-            )}
-            {!slotsLoading && slots.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {slots.map((s) => (
-                  <button
-                    key={s.time}
-                    onClick={() => chooseSlot(s)}
-                    style={{
-                      padding: '10px 0', borderRadius: 8, cursor: 'pointer',
-                      background: selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.1)'}`,
-                      color: selectedSlot?.time === s.time ? '#0a0a0f' : '#fff',
-                      fontSize: 13, fontWeight: 600, fontFamily: "'Cairo', sans-serif",
-                    }}
-                  >
-                    {s.time}
-                  </button>
-                ))}
-              </div>
-            )}
-            <BackButton onClick={goBack} />
-          </motion.div>
-        )}
-
-        {step === 'confirm' && (
-          <motion.form key="confirm" onSubmit={submit} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={SPRING}
-            style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Field label="الاسم" required placeholder="اسمك الكريم"
-              value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-            <Field label="رقم الهاتف" type="tel" required placeholder="+961..."
-              value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-
-            {submitError && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                color: '#fca5a5', fontSize: 13,
-              }}>
-                {submitError}
-              </div>
-            )}
-
-            <motion.button
-              type="submit"
-              disabled={submitting || !customerName || !customerPhone}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                padding: '14px 0',
-                background: submitting ? 'rgba(255,255,255,0.1)' : accent,
-                border: 'none', borderRadius: 12,
-                color: '#fff', fontSize: 15, fontWeight: 700,
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: (!customerName || !customerPhone) ? 0.5 : 1,
-                fontFamily: "'Cairo', sans-serif",
-              }}
-            >
-              {submitting ? 'جارٍ التأكيد...' : 'تأكيد الحجز'}
-            </motion.button>
-            <BackButton onClick={goBack} />
-          </motion.form>
-        )}
-      </AnimatePresence>
+        <motion.button
+          onClick={confirmViaWhatsApp}
+          disabled={submitting || !selectedService || !selectedBarber || !selectedSlot}
+          whileTap={{ scale: 0.97 }}
+          style={{
+            padding: '14px 0',
+            background: submitting ? 'rgba(255,255,255,0.1)' : '#25D366',
+            border: 'none', borderRadius: 12,
+            color: '#0a0a0f', fontSize: 15, fontWeight: 700,
+            cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: (!selectedService || !selectedBarber || !selectedSlot) ? 0.5 : 1,
+            fontFamily: "'Cairo', sans-serif",
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          {submitting ? 'جارٍ التأكيد...' : 'تأكيد عبر واتساب'}
+        </motion.button>
+      </div>
     </div>
-  )
-}
-
-function BackButton({ onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        alignSelf: 'flex-start', background: 'transparent', border: 'none',
-        color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer',
-        fontFamily: "'Cairo', sans-serif", padding: '4px 0',
-      }}
-    >
-      ← رجوع
-    </button>
   )
 }
 
@@ -456,8 +420,8 @@ export default function ReservePage() {
   const slug     = useTenantSlug()
   const base     = useTenantBase()
   const navigate = useNavigate()
-  const wiz      = useReservationWizard()
-  const { config, configLoading, mode } = wiz
+  const booking  = useReservationBooking()
+  const { config, configLoading, mode } = booking
   const accent   = config?.primary_color ?? '#d4a853'
 
   const activeServices = config?.active_services ?? []
@@ -495,7 +459,7 @@ export default function ReservePage() {
             ←
           </button>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>احجز موعد</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>احجز موعدك</h1>
             {config?.name_ar && (
               <p style={{ margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
                 {config.name_ar}
@@ -506,8 +470,8 @@ export default function ReservePage() {
 
         {(configLoading || mode === 'loading') && <LoadingDot accent={accent} />}
 
-        {!configLoading && mode === 'wizard' && (
-          <ReservationWizard wiz={wiz} accent={accent} base={base} navigate={navigate} />
+        {!configLoading && mode === 'booking' && (
+          <BookingScreen booking={booking} accent={accent} />
         )}
 
         {!configLoading && mode === 'legacy' && (
