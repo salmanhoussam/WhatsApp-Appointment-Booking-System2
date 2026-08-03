@@ -5,6 +5,7 @@ import { fetchAllCategories, fetchItems } from '../services/catalogApi'
 import publicApi from '../utils/publicApi'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+const AR_WEEKDAYS_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
@@ -15,19 +16,34 @@ function todayUTC() {
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
 }
 
-function buildDayStrip(count = 7) {
-  const start = todayUTC()
-  const days = []
-  for (let i = 0; i < count; i++) {
-    const d = new Date(start)
-    d.setUTCDate(start.getUTCDate() + i)
-    days.push({
-      iso:     d.toISOString().slice(0, 10),
-      weekday: AR_WEEKDAYS[d.getUTCDay()],
-      dayNum:  d.getUTCDate(),
+function isoOf(d) {
+  return d.toISOString().slice(0, 10)
+}
+
+// Real month-grid (Calendly-style "full month view" rather than a short day-strip -- fewer clicks
+// to reach a day further out, and reads as an actual calendar, not a scrollable list of buttons).
+function buildMonthGrid(monthOffset) {
+  const today = todayUTC()
+  const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, 1))
+  const startWeekday = first.getUTCDay()
+  const daysInMonth = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
+
+  const cells = []
+  for (let i = 0; i < startWeekday; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), d))
+    cells.push({
+      iso:     isoOf(date),
+      dayNum:  d,
+      isPast:  date.getTime() < today.getTime(),
+      isToday: date.getTime() === today.getTime(),
     })
   }
-  return days
+
+  return {
+    label: `${AR_MONTHS[first.getUTCMonth()]} ${first.getUTCFullYear()}`,
+    cells,
+  }
 }
 
 function formatArabicDate(iso) {
@@ -35,25 +51,22 @@ function formatArabicDate(iso) {
   return `${AR_WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${AR_MONTHS[d.getUTCMonth()]}`
 }
 
-// No real customer identity is collected in this Pilot flow -- confirmation happens over
-// WhatsApp instead (Salman's explicit product decision, 2026-08-02). Reservation.customerName/
-// customerPhone are non-nullable columns (prisma/schema.prisma:681-682), so a clearly-marked
-// placeholder is stored; the shop owner reconciles the real customer against the incoming
-// WhatsApp message by hand, same as the rest of this Pilot's manual pending->confirmed flow.
+// No real customer identity is collected on the primary (WhatsApp) path -- confirmation happens
+// over WhatsApp instead (Salman's explicit product decision, 2026-08-02, kept unchanged in this
+// redesign). Reservation.customerName/customerPhone are non-nullable columns
+// (prisma/schema.prisma:681-682), so a clearly-marked placeholder is stored on that path; the
+// secondary (local) path still collects and stores the real name/phone.
 const WHATSAPP_PLACEHOLDER_NAME  = 'زبون واتساب'
 const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
 
 /**
- * useReservationBooking — domain hook for the single-screen booking page (Reservation Pilot,
- * Phase 2 redesign). Everything is visible at once: service + staff selects, a real day-strip
- * calendar, a time-slot grid, a booking summary, and a single WhatsApp-confirm action. Consumes
- * only the existing backend (barbers/availability/create) -- no slot or conflict logic here.
+ * useReservationBooking — domain hook for the single-screen booking page (Reservation Pilot).
+ * Everything lives on one screen: service + staff pickers, a real month-grid calendar with the
+ * time-slot grid for the selected day, a running booking summary, and two confirm paths --
+ * WhatsApp (primary) and a local name/phone form (secondary, collapsed by default). Consumes only
+ * the existing backend (barbers/availability/create) -- no slot or conflict logic here.
  *
- * `mode` tells the page which UI to render:
- *   'loading' — still resolving whether this tenant has barbers configured
- *   'booking' — real Barber rows exist -> this single-screen booking experience
- *   'legacy'  — no Barber rows -> the original generic date/time form, unchanged, for every
- *               other generic tenant (restaurant table reservations, etc.)
+ * `mode`: 'loading' | 'booking' (real Barber rows exist) | 'legacy' (generic date/time form).
  */
 export default function useReservationBooking() {
   const { config, isLoading: configLoading } = useTenantConfig()
@@ -67,16 +80,23 @@ export default function useReservationBooking() {
   const [servicesLoading, setServicesLoading] = useState(false)
   const [selectedServiceId, setSelectedServiceId] = useState(null)
 
-  const dayStrip = useMemo(() => buildDayStrip(7), [])
-  const [selectedDate, setSelectedDate] = useState(dayStrip[0].iso)
+  const [monthOffset, setMonthOffset] = useState(0)
+  const monthGrid = useMemo(() => buildMonthGrid(monthOffset), [monthOffset])
+  const [selectedDate, setSelectedDate] = useState(() => isoOf(todayUTC()))
 
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState(null)
 
+  const [showLocalForm, setShowLocalForm] = useState(false)
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [reservationId, setReservationId] = useState(null)
+  const [confirmMethod, setConfirmMethod] = useState(null) // 'whatsapp' | 'local'
+  const [whatsappUrl, setWhatsappUrl] = useState(null) // fallback link if the tab open was blocked
 
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -84,7 +104,6 @@ export default function useReservationBooking() {
     return () => { mountedRef.current = false }
   }, [])
 
-  // Mode detection -- real Barber rows, not a hardcoded tenant slug.
   useEffect(() => {
     if (!slug) return
     setBarbersLoading(true)
@@ -101,7 +120,6 @@ export default function useReservationBooking() {
 
   const mode = barbersLoading ? 'loading' : (barbers.length > 0 ? 'booking' : 'legacy')
 
-  // Bookable services -- only fetched once we know this is a barber-mode tenant.
   useEffect(() => {
     if (mode !== 'booking' || !slug) return
     setServicesLoading(true)
@@ -142,38 +160,57 @@ export default function useReservationBooking() {
       .finally(() => { if (mountedRef.current) setSlotsLoading(false) })
   }, [slug, selectedBarberId, selectedDate, durationMin])
 
-  // Changing service/staff/day invalidates whatever was already confirmed, so the summary/CTA
-  // always reflects the current selection, not a stale one.
-  const chooseService = useCallback((id) => { setSelectedServiceId(id); setReservationId(null) }, [])
-  const chooseBarber  = useCallback((id) => { setSelectedBarberId(id); setReservationId(null) }, [])
-  const chooseDate    = useCallback((iso) => { setSelectedDate(iso); setReservationId(null) }, [])
-  const chooseSlot    = useCallback((slot) => { setSelectedSlot(slot); setReservationId(null) }, [])
+  const resetConfirmation = useCallback(() => {
+    setReservationId(null)
+    setConfirmMethod(null)
+    setWhatsappUrl(null)
+  }, [])
 
+  const chooseService = useCallback((id) => { setSelectedServiceId(id); resetConfirmation() }, [resetConfirmation])
+  const chooseBarber  = useCallback((id) => { setSelectedBarberId(id); resetConfirmation() }, [resetConfirmation])
+  const chooseDate    = useCallback((iso) => { setSelectedDate(iso); resetConfirmation() }, [resetConfirmation])
+  const chooseSlot    = useCallback((slot) => { setSelectedSlot(slot); resetConfirmation() }, [resetConfirmation])
+  const goPrevMonth   = useCallback(() => setMonthOffset((m) => Math.max(0, m - 1)), [])
+  const goNextMonth   = useCallback(() => setMonthOffset((m) => m + 1), [])
+  const toggleLocalForm = useCallback(() => setShowLocalForm((v) => !v), [])
+
+  const canConfirm = !!(selectedService && selectedBarber && selectedSlot)
+
+  const createReservation = useCallback(async (name, phone) => {
+    const { data } = await publicApi.post(
+      '/reservations/',
+      {
+        module_key:     'barber',
+        customer_name:  name,
+        customer_phone: phone,
+        reserved_at:    selectedSlot.datetime,
+        duration_min:   durationMin,
+        metadata:       { barber_id: selectedBarber.id, service_id: selectedService.id },
+      },
+      { params: { client_slug: slug } }
+    )
+    return data?.data?.id ?? null
+  }, [selectedSlot, durationMin, selectedBarber, selectedService, slug])
+
+  // WhatsApp (primary) confirm path.
   const confirmViaWhatsApp = useCallback(async () => {
-    if (!selectedService || !selectedBarber || !selectedSlot || !config?.whatsapp_number) return
+    if (!canConfirm || !config?.whatsapp_number) return
     setSubmitError(null)
     setSubmitting(true)
+
+    // The tab is opened SYNCHRONOUSLY, inside this click handler's own call stack, before any
+    // `await`. Browsers only associate window.open() with the user's trusted click gesture when
+    // there's no async gap first -- opening after an awaited network call is exactly what
+    // triggers the "popup blocked" notification bar (confirmed via Browser Verification,
+    // 2026-08-03, see the Reservation Pilot plan's WhatsApp investigation). Opening a blank tab
+    // now and navigating it once the POST resolves keeps the tab inside the trusted gesture.
+    const waTab = window.open('about:blank', '_blank')
+
     try {
-      // Reservation is created (status "pending") BEFORE WhatsApp opens -- per Salman's explicit
-      // requirement: the slot must be held the moment it's chosen, not only once/if the customer
-      // actually sends the WhatsApp message. Otherwise a customer who closes WhatsApp without
-      // sending leaves the calendar showing the slot as free while the shop owner never got
-      // anything, or two customers could race for the same slot in the gap.
-      const { data } = await publicApi.post(
-        '/reservations/',
-        {
-          module_key:     'barber',
-          customer_name:  WHATSAPP_PLACEHOLDER_NAME,
-          customer_phone: WHATSAPP_PLACEHOLDER_PHONE,
-          reserved_at:    selectedSlot.datetime,
-          duration_min:   durationMin,
-          metadata:       { barber_id: selectedBarber.id, service_id: selectedService.id },
-        },
-        { params: { client_slug: slug } }
-      )
+      const id = await createReservation(WHATSAPP_PLACEHOLDER_NAME, WHATSAPP_PLACEHOLDER_PHONE)
       if (!mountedRef.current) return
-      const id = data?.data?.id ?? null
       setReservationId(id)
+      setConfirmMethod('whatsapp')
 
       const message = [
         'مرحباً، أريد تأكيد الحجز.',
@@ -183,7 +220,33 @@ export default function useReservationBooking() {
       ].join('\n')
       const waNumber = String(config.whatsapp_number).replace(/\D/g, '')
       const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
-      window.open(waUrl, '_blank', 'noopener,noreferrer')
+      setWhatsappUrl(waUrl)
+
+      if (waTab) waTab.location.href = waUrl
+      else window.open(waUrl, '_blank') // fallback if the pre-open itself didn't return a handle
+    } catch (err) {
+      if (waTab) waTab.close()
+      if (!mountedRef.current) return
+      const detail = err?.response?.data?.detail
+      setSubmitError(
+        typeof detail === 'string' ? detail : 'حدث خطأ أثناء إنشاء الحجز. يرجى المحاولة مجدداً.'
+      )
+    } finally {
+      if (mountedRef.current) setSubmitting(false)
+    }
+  }, [canConfirm, config, createReservation, selectedService, selectedBarber, selectedSlot, selectedDate])
+
+  // Local (secondary) confirm path -- real name/phone, no WhatsApp.
+  const confirmLocally = useCallback(async (e) => {
+    e?.preventDefault?.()
+    if (!canConfirm || !customerName || !customerPhone) return
+    setSubmitError(null)
+    setSubmitting(true)
+    try {
+      const id = await createReservation(customerName, customerPhone)
+      if (!mountedRef.current) return
+      setReservationId(id)
+      setConfirmMethod('local')
     } catch (err) {
       if (!mountedRef.current) return
       const detail = err?.response?.data?.detail
@@ -193,15 +256,20 @@ export default function useReservationBooking() {
     } finally {
       if (mountedRef.current) setSubmitting(false)
     }
-  }, [selectedService, selectedBarber, selectedSlot, selectedDate, durationMin, slug, config])
+  }, [canConfirm, customerName, customerPhone, createReservation])
 
   return {
     config, configLoading, mode,
-    dayStrip, selectedDate, chooseDate,
+    monthGrid, goPrevMonth, goNextMonth, monthOffset,
+    weekdaysShort: AR_WEEKDAYS_SHORT,
+    selectedDate, chooseDate,
     services, servicesLoading, selectedServiceId, selectedService, chooseService,
     barbers, barbersLoading, selectedBarberId, selectedBarber, chooseBarber,
     slots, slotsLoading, selectedSlot, chooseSlot,
-    submitting, submitError, reservationId, confirmViaWhatsApp,
+    showLocalForm, toggleLocalForm,
+    customerName, setCustomerName, customerPhone, setCustomerPhone,
+    submitting, submitError, reservationId, confirmMethod, whatsappUrl,
+    canConfirm, confirmViaWhatsApp, confirmLocally,
     formatArabicDate,
   }
 }

@@ -8,7 +8,7 @@ import useReservationBooking  from '../../../hooks/useReservationBooking'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
 import { hasCapability }      from '../../../utils/capabilities'
 
-// ── Field atom (used only by the legacy generic form) ───────────────────────────────────────────
+// ── Field atom (legacy form + local secondary confirm) ──────────────────────────────────────────
 
 function Field({ label, type = 'text', value, onChange, required, placeholder, hint, as: Tag = 'input', rows }) {
   const shared = {
@@ -90,7 +90,7 @@ function SuccessScreen({ accent, reservationId, onBack }) {
 
 function LoadingDot({ accent }) {
   return (
-    <div style={{ textAlign: 'center', padding: '120px 0' }}>
+    <div style={{ textAlign: 'center', padding: '60px 0' }}>
       <div style={{
         width: 8, height: 8, borderRadius: '50%', background: accent,
         margin: '0 auto', boxShadow: `0 0 20px 4px ${accent}66`,
@@ -102,10 +102,10 @@ function LoadingDot({ accent }) {
 }
 
 // ── Single-screen booking page ───────────────────────────────────────────────────────────────────
-// One screen, nothing routed/stepped: service + staff pickers up top, a real day-strip calendar,
-// a time-slot grid, a running booking summary, and one "confirm via WhatsApp" action. Redesigned
-// 2026-08-02 per Salman's explicit product review of the original 4-step wizard (🟡 Improve --
-// the backend/logic was right, the presentation wasn't). Consumes only the existing backend
+// Redesigned 2026-08-03 per Salman's real product review of the first single-screen version
+// (🟡 Improve): the calendar becomes the visual centerpiece (a real month grid, not a 7-day strip),
+// WhatsApp confirmation becomes the PRIMARY action, and the local name/phone form is kept only as
+// a collapsed secondary option -- never removed. Consumes only the existing backend
 // (barbers/availability/create) -- no slot or conflict logic lives here.
 
 function Pill({ selected, accent, onClick, children }) {
@@ -137,13 +137,121 @@ function SectionLabel({ children }) {
   )
 }
 
+// ── Calendar — the visual centerpiece ────────────────────────────────────────────────────────────
+
+function CalendarBlock({ booking, accent }) {
+  const {
+    monthGrid, goPrevMonth, goNextMonth, monthOffset, weekdaysShort,
+    selectedDate, chooseDate,
+    slots, slotsLoading, selectedSlot, chooseSlot,
+  } = booking
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)', border: `1px solid ${accent}2a`,
+      borderRadius: 18, padding: '22px 20px',
+    }}>
+      {/* Month header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <button
+          onClick={goPrevMonth}
+          disabled={monthOffset === 0}
+          style={{
+            width: 32, height: 32, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 16,
+            cursor: monthOffset === 0 ? 'not-allowed' : 'pointer',
+            opacity: monthOffset === 0 ? 0.3 : 1,
+          }}
+        >
+          ›
+        </button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{monthGrid.label}</div>
+        <button
+          onClick={goNextMonth}
+          style={{
+            width: 32, height: 32, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 16, cursor: 'pointer',
+          }}
+        >
+          ‹
+        </button>
+      </div>
+
+      {/* Weekday header */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+        {weekdaysShort.map((w) => (
+          <div key={w} style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>
+            {w}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {monthGrid.cells.map((cell, i) => {
+          if (!cell) return <div key={`pad-${i}`} />
+          const active = cell.iso === selectedDate
+          return (
+            <button
+              key={cell.iso}
+              disabled={cell.isPast}
+              onClick={() => chooseDate(cell.iso)}
+              style={{
+                aspectRatio: '1', borderRadius: 10, cursor: cell.isPast ? 'not-allowed' : 'pointer',
+                background: active ? accent : 'rgba(255,255,255,0.03)',
+                border: cell.isToday && !active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.06)',
+                color: active ? '#0a0a0f' : cell.isPast ? 'rgba(255,255,255,0.2)' : '#fff',
+                fontSize: 13, fontWeight: active ? 800 : 500,
+                fontFamily: "'Cairo', sans-serif",
+              }}
+            >
+              {cell.dayNum}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Time slots for the selected day -- lives inside the same calendar block */}
+      <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        {slotsLoading && <LoadingDot accent={accent} />}
+        {!slotsLoading && slots.length === 0 && (
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: '10px 0' }}>
+            لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
+          </p>
+        )}
+        {!slotsLoading && slots.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
+            {slots.map((s) => (
+              <button
+                key={s.time}
+                onClick={() => chooseSlot(s)}
+                style={{
+                  padding: '10px 0', borderRadius: 8, cursor: 'pointer',
+                  background: selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.1)'}`,
+                  color: selectedSlot?.time === s.time ? '#0a0a0f' : '#fff',
+                  fontSize: 13, fontWeight: 600, fontFamily: "'Cairo', sans-serif",
+                }}
+              >
+                {s.time}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function BookingScreen({ booking, accent }) {
   const {
-    dayStrip, selectedDate, chooseDate,
     services, servicesLoading, selectedServiceId, selectedService, chooseService,
     barbers, barbersLoading, selectedBarberId, selectedBarber, chooseBarber,
-    slots, slotsLoading, selectedSlot, chooseSlot,
-    submitting, submitError, reservationId, confirmViaWhatsApp,
+    selectedDate, selectedSlot,
+    showLocalForm, toggleLocalForm,
+    customerName, setCustomerName, customerPhone, setCustomerPhone,
+    submitting, submitError, reservationId, confirmMethod, whatsappUrl,
+    canConfirm, confirmViaWhatsApp, confirmLocally,
     formatArabicDate,
   } = booking
 
@@ -164,9 +272,24 @@ function BookingScreen({ booking, accent }) {
           تم إنشاء حجزك
         </h2>
         <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.5)', maxWidth: 380, marginInline: 'auto' }}>
-          فتحنا لك واتساب برسالة جاهزة — أرسلها لصاحب المحل لتأكيد الحجز نهائياً.
-          رقم الحجز: <span style={{ color: accent }}>{reservationId.slice(0, 8)}</span>
+          {confirmMethod === 'whatsapp'
+            ? 'فتحنا لك واتساب برسالة جاهزة — أرسلها لصاحب المحل لتأكيد الحجز نهائياً.'
+            : 'تم تسجيل حجزك — سيتواصل معك صاحب المحل لتأكيد الموعد.'}
+          {' '}رقم الحجز: <span style={{ color: accent }}>{reservationId.slice(0, 8)}</span>
         </p>
+        {confirmMethod === 'whatsapp' && whatsappUrl && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block', marginTop: 16, fontSize: 13, color: '#25D366',
+              fontWeight: 700, fontFamily: "'Cairo', sans-serif",
+            }}
+          >
+            لم تفتح صفحة واتساب؟ اضغط هنا
+          </a>
+        )}
       </div>
     )
   }
@@ -176,20 +299,21 @@ function BookingScreen({ booking, accent }) {
       background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 16, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 28,
     }}>
-      {/* ── Service + Staff ─────────────────────────────────────────────────────────────── */}
+      {/* ── Service ──────────────────────────────────────────────────────────────────────── */}
       <div>
         <SectionLabel>الخدمة</SectionLabel>
         {servicesLoading ? <LoadingDot accent={accent} /> : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {services.map((s) => (
               <Pill key={s.id} accent={accent} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)}>
-                {s.name_ar} · {s.metadata?.duration_min}د · ${s.price}
+                {s.name_ar} · {s.metadata?.duration_min} دقيقة
               </Pill>
             ))}
           </div>
         )}
       </div>
 
+      {/* ── Staff ────────────────────────────────────────────────────────────────────────── */}
       <div>
         <SectionLabel>الحلاق</SectionLabel>
         {barbersLoading ? <LoadingDot accent={accent} /> : (
@@ -203,62 +327,13 @@ function BookingScreen({ booking, accent }) {
         )}
       </div>
 
-      {/* ── Calendar ─────────────────────────────────────────────────────────────────────── */}
+      {/* ── Calendar — the centerpiece ───────────────────────────────────────────────────── */}
       <div>
         <SectionLabel>التقويم</SectionLabel>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-          {dayStrip.map((d) => {
-            const active = d.iso === selectedDate
-            return (
-              <button
-                key={d.iso}
-                onClick={() => chooseDate(d.iso)}
-                style={{
-                  minWidth: 62, padding: '10px 6px', borderRadius: 12, cursor: 'pointer',
-                  background: active ? accent : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${active ? accent : 'rgba(255,255,255,0.1)'}`,
-                  color: active ? '#0a0a0f' : '#fff',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  fontFamily: "'Cairo', sans-serif",
-                }}
-              >
-                <span style={{ fontSize: 11, fontWeight: 600 }}>{d.weekday}</span>
-                <span style={{ fontSize: 16, fontWeight: 800 }}>{d.dayNum}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          {slotsLoading && <LoadingDot accent={accent} />}
-          {!slotsLoading && slots.length === 0 && (
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
-              لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
-            </p>
-          )}
-          {!slotsLoading && slots.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
-              {slots.map((s) => (
-                <button
-                  key={s.time}
-                  onClick={() => chooseSlot(s)}
-                  style={{
-                    padding: '10px 0', borderRadius: 8, cursor: 'pointer',
-                    background: selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${selectedSlot?.time === s.time ? accent : 'rgba(255,255,255,0.1)'}`,
-                    color: selectedSlot?.time === s.time ? '#0a0a0f' : '#fff',
-                    fontSize: 13, fontWeight: 600, fontFamily: "'Cairo', sans-serif",
-                  }}
-                >
-                  {s.time}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <CalendarBlock booking={booking} accent={accent} />
       </div>
 
-      {/* ── Booking summary + confirm ────────────────────────────────────────────────────── */}
+      {/* ── Confirmation ─────────────────────────────────────────────────────────────────── */}
       <div style={{
         borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20,
         display: 'flex', flexDirection: 'column', gap: 14,
@@ -285,23 +360,62 @@ function BookingScreen({ booking, accent }) {
           </div>
         )}
 
+        {/* Primary — WhatsApp */}
         <motion.button
           onClick={confirmViaWhatsApp}
-          disabled={submitting || !selectedService || !selectedBarber || !selectedSlot}
+          disabled={submitting || !canConfirm}
           whileTap={{ scale: 0.97 }}
           style={{
-            padding: '14px 0',
+            padding: '15px 0',
             background: submitting ? 'rgba(255,255,255,0.1)' : '#25D366',
             border: 'none', borderRadius: 12,
             color: '#0a0a0f', fontSize: 15, fontWeight: 700,
             cursor: submitting ? 'not-allowed' : 'pointer',
-            opacity: (!selectedService || !selectedBarber || !selectedSlot) ? 0.5 : 1,
+            opacity: !canConfirm ? 0.5 : 1,
             fontFamily: "'Cairo', sans-serif",
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
-          {submitting ? 'جارٍ التأكيد...' : 'تأكيد عبر واتساب'}
+          {submitting ? 'جارٍ التأكيد...' : 'متابعة الحجز عبر واتساب'}
         </motion.button>
+
+        {/* Secondary — local confirm, collapsed by default */}
+        {!showLocalForm ? (
+          <button
+            type="button"
+            onClick={toggleLocalForm}
+            disabled={!canConfirm}
+            style={{
+              background: 'transparent', border: 'none', textAlign: 'center',
+              color: 'rgba(255,255,255,0.4)', fontSize: 12.5, cursor: canConfirm ? 'pointer' : 'not-allowed',
+              fontFamily: "'Cairo', sans-serif", padding: '2px 0', textDecoration: 'underline',
+            }}
+          >
+            أو أكمل الحجز من الموقع
+          </button>
+        ) : (
+          <form onSubmit={confirmLocally} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+            <Field label="الاسم" required placeholder="اسمك الكريم"
+              value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <Field label="رقم الهاتف" type="tel" required placeholder="+961..."
+              value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <motion.button
+              type="submit"
+              disabled={submitting || !customerName || !customerPhone}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                padding: '13px 0',
+                background: submitting ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12,
+                color: '#fff', fontSize: 14, fontWeight: 700,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: (!customerName || !customerPhone) ? 0.5 : 1,
+                fontFamily: "'Cairo', sans-serif",
+              }}
+            >
+              تأكيد الحجز من الموقع
+            </motion.button>
+          </form>
+        )}
       </div>
     </div>
   )
