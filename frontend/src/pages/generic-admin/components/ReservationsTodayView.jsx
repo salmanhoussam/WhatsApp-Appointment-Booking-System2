@@ -583,8 +583,20 @@ function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReserved
 // computed directly from the drag's pixel delta in handleDragEnd, not from which tiny cell was
 // hit -- same verified-correct isoAtQuarter()/quarterIndexFromIso() math as before, just fed a
 // coordinate computed a more robust way.
-function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor, onOpen, pendingIds, onEmptySlotClick }) {
+function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor, onOpen, pendingIds, onEmptySlotClick, nowIndex }) {
   const { setNodeRef, isOver } = useDroppable({ id: barber.id })
+  const nowLineRef = useRef(null)
+
+  // Real-Time Calendar Awareness (Phase 3.3.1, 2026-08-05) -- bring "now" into the initial
+  // viewport once per mount. This component fully remounts whenever the parent reloads data
+  // (day-nav, drag reschedule, etc. -- see ReservationsTodayView's own doc comment), so this
+  // intentionally re-fires on those remounts too, matching "Today always opens near now" rather
+  // than treating it as a one-shot exception. `[]` on purpose -- must NOT re-fire on the once-a-
+  // minute nowIndex tick, or the view would yank back to "now" out from under a scrolled-away user.
+  useEffect(() => {
+    if (nowIndex != null) nowLineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div style={{ flex: 1, minWidth: 150 }}>
       <div style={{
@@ -599,6 +611,23 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
         style={{ position: 'relative', background: isOver ? `${color}0d` : 'transparent', cursor: 'copy' }}
       >
         {quarters.map((q) => <GridLine key={q} />)}
+        {nowIndex != null && (
+          <div
+            ref={nowLineRef}
+            style={{
+              position: 'absolute', top: nowIndex * QUARTER_PX, left: 0, right: 0,
+              borderTop: `2px solid ${T.danger}`, zIndex: 3, pointerEvents: 'none',
+            }}
+          >
+            <span style={{
+              position: 'absolute', right: 4, top: -9, fontSize: 9, fontWeight: 700,
+              color: '#fff', background: T.danger, padding: '1px 6px', borderRadius: 4,
+              fontFamily: FONT, whiteSpace: 'nowrap',
+            }}>
+              الآن
+            </span>
+          </div>
+        )}
         {items.map((item) => {
           const qIndex = quarterIndexFromIso(item.reserved_at, startHour)
           const top = qIndex * QUARTER_PX
@@ -720,6 +749,32 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
     () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
     [startHour, endHour]
   )
+
+  // Real-Time Calendar Awareness (Phase 3.3.1, 2026-08-05) -- current-time indicator position.
+  // Re-ticks once a minute so a long-open tab stays roughly accurate; does NOT drive the one-time
+  // auto-scroll in StaffColumn (that only runs on mount, see its own comment).
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNowTick(Date.now()), 60000)
+    return () => clearInterval(timer)
+  }, [])
+  const isToday = date === todayISODate()
+  const nowIndex = useMemo(() => {
+    if (!isToday) return null
+    // This grid's own `reserved_at` values, `fmtTimeUTC`, and `todayISODate` all use UTC-field
+    // accessors to represent the tenant's wall-clock time directly (no real timezone conversion
+    // anywhere in this file) -- "now" must be built the same way, from the browser's LOCAL
+    // hour/minute mapped into UTC fields, not `new Date().toISOString()`'s true UTC instant, or
+    // the indicator would silently disagree with every card on the same grid.
+    const now = new Date()
+    const fakeNowIso = new Date(Date.UTC(
+      now.getFullYear(), now.getMonth(), now.getDate(),
+      now.getHours(), now.getMinutes(), now.getSeconds()
+    )).toISOString()
+    const idx = quarterIndexFromIso(fakeNowIso, startHour)
+    const maxIndex = (endHour - startHour) * 4
+    return (idx >= 0 && idx <= maxIndex) ? idx : null
+  }, [isToday, startHour, endHour, nowTick])
 
   // Empty-slot click -> Quick Create (Phase 3.2). Reuses the exact isoAtQuarter()/QUARTER_PX math
   // handleDragEnd already uses -- not reinvented. getBoundingClientRect() is measured fresh on
@@ -912,6 +967,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
                   onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
                   pendingIds={pendingIds}
                   onEmptySlotClick={handleEmptySlotClick}
+                  nowIndex={nowIndex}
                 />
               </div>
             )}
