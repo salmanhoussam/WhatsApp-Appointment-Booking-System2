@@ -213,6 +213,49 @@
 
 ## 🟡 Upcoming (بالأولوية)
 
+### Permanent Demo Tenant (added 2026-08-02, not scheduled, not urgent)
+
+Idea from Salman, real motivating evidence not speculative: this session's Orders-tab review found a
+raw QA test note and 4 fake `Pilot Verify`-style orders sitting in `hr`'s real live data. One
+always-polished tenant (clean data, realistic bookings, organized products, full calendar) would
+prevent this class of problem and give future UX evaluation a stable reference instead of scattered
+test data. Most useful once Dashboard redesign (P3) and customer-page Product Readiness Review (P4)
+start — see the 2026-08-02 5-priority breakdown in memory (`project_foundation_phase_closed.md`).
+Not started.
+
+### After First Pilot — Engineering Cleanup Sprint (added 2026-08-02, explicitly gated)
+
+Not bugs — Technical Debt in the engineering system itself, surfaced as a side effect of the
+Capability Reference Extraction + Agent Collaboration Map work
+(`.claudedocs/architecture/AGENT_COLLABORATION_MAP.md`). Salman's explicit ruling: none of these are
+worth interrupting Phase 3 (Capability Decisions) or the Pilot for. **Do not touch any of this before
+the first real Pilot is done.**
+
+- [ ] **Sync `CLAUDE.md`'s Agents index** — lists 7 of 13 real agents; missing entries mean a future
+  agent works from incomplete information. Priority A (most important of the five).
+- [ ] **Fix `memory-keeper.md`'s Step 1 path** — currently points at a Windows path that doesn't
+  exist on this Ubuntu machine; a real invocation would look for memory in the wrong place. Priority
+  A, simple fix.
+- [ ] **Decide the `Frontend-Architect-Agent.md` vs `frontend-architect.md` duplication** — before
+  merging or deleting either, first answer *why both exist*: if one is v1 and the other v2, archive
+  the old one; if one is UX-focused and the other Architecture-focused, rename instead of merging.
+  Immediate merge is a premature decision. Priority B.
+- [ ] **Archive completed mission playbooks** — `dashboard-builder.md` and `generic-page-builder.md`
+  read as finished Phase-56/57 blueprints, not standing agents (same shape as `Capability
+  Extraction`'s own status). If confirmed unused going forward, move to `.claude/archive/` or
+  `.claudedocs/history/` — never delete. Priority B.
+- [ ] **Resolve `konaan-onboarding-schema.md` ownership** — `tenant-seeder.md` already enforces
+  schema v2.1; this separate file still documents v1.0 as if it were the reference. Either
+  `tenant-seeder` becomes the one official schema source, or `konaan-onboarding-schema.md` gets
+  updated — the two must not keep disagreeing. Priority B.
+
+**Also noted, deliberately not turned into anything**: Browser Verification Capability turned out to
+surface more than product bugs this session — it (indirectly) revealed Documentation Drift, Agent
+Drift, and Architecture Drift too. Salman's explicit call: this is a recognizable *task type* (call it
+"Project Health Investigation" informally) any agent can run when real evidence warrants it — **not**
+a new Capability, role, or layer. Nothing to build here, just a pattern worth recognizing next time it
+shows up.
+
 0. ✅ **Cross-tenant cart leak fix — Done 2026-07-25** — `useGenericStore.js` scoped by tenant
    slug + tenant-switch detection in `setConfig`; a real false-positive bug found while verifying
    it (loading-placeholder `slug: 'unknown'` looking like a tenant change) was also found and fixed
