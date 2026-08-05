@@ -379,6 +379,14 @@ same session as the review that recommends it.** The review and the decision to 
 separate moments, same as every other Recommendation/Decision split this project already applies
 (`investigation-protocol.md`). No code changed for this entry.
 
+### Escalation Watch (2026-08-05, Salman's addition)
+
+**The next real tenant implementation (Gym / Clinic / etc.) becomes the mandatory decision point.
+No further barber-specific capability should be added before re-evaluating this architecture.**
+Named explicitly so that two months from now, a new barber-only feature doesn't get quietly bolted
+on and this review doesn't get forgotten — the next real vertical build is the checkpoint, not an
+optional one.
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,
