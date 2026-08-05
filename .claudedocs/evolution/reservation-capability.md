@@ -234,6 +234,151 @@ merge — until one of the two triggers above is real, not anticipated.
 No — deliberately deferred, per the Decision above. Not "not decided yet" — decided not to,
 for a stated reason, with two concrete future triggers named instead of a vague "later."
 
+## 2026-08-05
+
+### Context
+
+Salman's framing, verbatim intent: "أنت فعليًا ما عم تبني Dashboard للحلاق. أنت عم تبني Reservation
+Engine" (you're not building a barber dashboard, you're building a Reservation Engine) — Calendar →
+Reservations → Staff → Availability → Notifications should all be generic, reusable by Barber,
+Clinic, Spa, Gym, Coworking, Car Service, and Consultant tenants alike, with only service names,
+staff-type labels, service durations, colors, and some rules varying per tenant. Requested before
+Staff/Customers/Notifications get built: a short architecture review identifying every
+barber-specific assumption still present in the UI or backend, and a migration-plan-shaped write-up
+— barber-specific naming, barber-specific assumptions, generic abstractions, what becomes tenant
+configuration, what remains universal. **Explicitly a review, not a refactor** — no code changed for
+this entry.
+
+### Discovery
+
+**Headline finding — not new, re-surfaced with fresh evidence.** `Resource`
+(`prisma/schema.prisma:739-764`, `module_key="clinic"`) and `Barber` (`prisma/schema.prisma:777-798`,
+`module_key="barber"`) remain two live, parallel models for the same "who/what gets booked" concept
+— `Barber` is `Resource` minus `type`/`specialty`, every other field identical. `Reservation` still
+carries both FKs simultaneously; the backend still duplicates the whole pipeline per model
+(`_resolve_resource`/`_resolve_barber`, `find_overlapping_by_resource`/`find_overlapping_by_barber`,
+separate repo files). This is the exact fork the 2026-07-31 entry above already found and
+deliberately deferred, with two named triggers for revisiting it (a 3rd real case, or repeated
+dual-file maintenance pain). **Neither trigger has fired yet** — this review does not discover the
+fork again, it asks whether "the next tenant type" (Clinic, Spa, Gym, ...) is itself the 3rd case,
+and finds: not yet, because Clinic — the one other module_key that could have been that 3rd case —
+has a complete backend but has never actually been exercised by a real frontend (see below).
+
+**1. Barber-specific naming** splits into two genuinely different things:
+- (a) Generic concepts merely *named* barber — the `Barber` model's actual fields (name, phone,
+  isActive, workingHours, sortOrder — all generic), `StaffColumn` (the component name is already
+  generic), the nav label `الموظفون` (Staff, already generic Arabic, not "الحلاقون").
+- (b) Real barber-only business logic baked into names — the public availability endpoint
+  (`app/api/v1/public/reservations.py:130-155`, `get_availability`) hardcodes `barber_id` as its
+  only query param with no resource-equivalent path; `ReservePage.jsx` hardcodes "الحلاق" as literal
+  UI copy, not a configurable label; `edit_reservation()` only re-runs conflict checks when
+  `moduleKey == "barber"` — a real, not cosmetic, conditional.
+
+**2. Barber-specific assumptions** — real behavioral bets baked into the current build:
+- One-staff-to-one-customer-per-slot, no capacity concept at all — breaks the moment a tenant type
+  needs a shared resource (a gym class with 15 seats, a shared coworking desk).
+- No buffer/turnover time between bookings — an explicit v1 scope-lock, not an oversight, but still
+  a real assumption that would need addressing for e.g. a car service bay needing cleanup time.
+- The single-visible-staff-column UI pattern (`StaffColumn`) is a small pill row today — works for
+  RK Barber Shop's 1 barber, explicitly not yet proven at higher staff counts (see the new
+  Performance section below).
+- `clinic` has a complete, real backend (Resource, resolve, conflict-check, working hours) but
+  **zero frontend anywhere** — confirmed: no file in `frontend/src/` references `resource_id` or
+  renders a resource-picker booking flow, and the tenant's own marketing page copy still says
+  "Coming soon" for Clinics. This is the concrete reason Clinic hasn't yet become the 3rd case that
+  would trigger extraction — it exists in the backend but has never been real-world exercised
+  end-to-end the way Barber has.
+
+**3. Already-generic abstractions** (the real, working part of the engine — don't undersell these):
+`module_key` dispatch end-to-end (routes, services, `MODULE_DEFAULTS`); `ClientService` gating
+(`require_service("reservations")`) reused verbatim by every reservation route regardless of
+module_key; `CatalogItem.metadata.requires_booking` + `duration_min` as a real, working generic
+bridge turning any catalog item into a bookable service with zero schema change; the `Reservation`
+model's own header comment already documents itself as cross-vertical by design; the admin
+nav/tab registry already keys off generic service strings, not module_key; `ReservationsWeekCalendar.jsx`
+already has zero barber references anywhere in it; the drag-and-drop mechanics are reused wholesale
+from `KanbanBoard.jsx` (not barber-specific to begin with — a generic board pattern applied here).
+
+**4. What becomes tenant configuration** (not code, not yet built as config, but the natural home
+once it is): the staff-type label (barber/doctor/trainer/consultant — currently hardcoded Arabic
+strings like "الحلاق"/"الموظفون"); module-level default durations (currently Python literals in
+`MODULE_DEFAULTS`, whereas real per-service durations already correctly live on
+`CatalogItem.metadata.duration_min` today — the config gap is only at the module-default fallback
+level); the still-open `Resource.type`/`specialty` question from the 2026-07-31 entry (deliberately
+unresolved, needs a 3rd real case per the existing Decision above — this review does not resolve it
+either); the staff-switcher pill-vs-dropdown UI threshold (how many staff before the pill row needs
+to become a dropdown/search — unmeasured, see Performance below); registration-time venue-type map
+entries for new verticals (additive, same pattern `"barbershop"` already uses today, so this one is
+already a solved, generic mechanism, just needs new entries per vertical, not new code).
+
+**5. What stays universal**, confirmed by re-reading the real code, not assumed: the calendar's
+quarter-hour pixel math (`QUARTER_PX`, `quarterIndexFromIso`/`isoAtQuarter`); the drag-and-drop
+mechanics; conflict-detection arithmetic; working-hours enforcement (`_check_working_hours`,
+already predates Clinic itself per the 2026-07-31 entry); the 6-stage reservation pipeline (Validate
+→ Resolve Resource → Working Hours → Conflict Check → Create Reservation → Post Actions, ratified
+across two independent real builds, Clinic and Barber); and the module_key/ClientService/
+requires_booking infrastructure as a whole.
+
+**6. Performance implications** (Salman's addition to this review's scope — documentation only, no
+fixes, no benchmarking harness built): real, checkable unknowns rather than a felt sense of
+scalability, since this becomes load-bearing the moment Clinics/Gyms bring more staff/resources per
+tenant than RK Barber Shop's single barber ever has:
+- **Staff-column rendering** (`ReservationsTodayView.jsx`'s `StaffColumn`): renders one column per
+  active barber/resource with no virtualization. Untested past 1 real staff member in production —
+  genuinely unknown whether 100 columns would stay smooth; this is a documented gap, not a measured
+  limit.
+- **Reservation list queries** (`reservation_service.list_reservations`,
+  `app/api/v1/admin/reservations.py`'s `GET /` and week-range endpoints): scoped by `clientId` +
+  date range per the multi-tenancy rule, `limit` capped at 500 — no pagination beyond that cap, and
+  no measured behavior at, say, 1,000+ reservations in a single week-view query. Not confirmed as an
+  N+1 pattern from this review's reading (the list endpoint issues one bounded query, not one per
+  reservation) — but the per-reservation service-name/barber-name lookups the frontend does
+  client-side (`serviceNameFor`) were not traced for an N+1 shape at scale and remain an open
+  question, not a confirmed finding either way.
+- **Week Calendar** (`ReservationsWeekCalendar.jsx`): fetches a 7-day range in one call
+  (`date_from`/`date_to`), which avoids a 7x per-day request pattern — a real, already-good design
+  choice — but the client-side rendering of that result at high reservation density per day is,
+  like the Today view, untested past today's real data volumes.
+- **Net honest statement**: no known performance failure has been observed (RK Barber Shop's real
+  data volumes today are small), and no virtualization or query-shape change is recommended by this
+  review — but "untested at 100 staff / 1,000 reservations / a dense week view" is a real, named gap
+  worth carrying forward rather than assuming away, precisely because Clinic/Gym-type tenants are
+  the ones most likely to actually hit these numbers first.
+
+### Current Understanding
+
+Nothing found here changes the 2026-07-31 Decision or its two named extraction triggers. The
+concrete addition this review makes: Clinic remaining frontend-less is itself evidence about *why*
+the 3rd-case trigger hasn't fired — it's not that three cases were tried and only two converged, it's
+that the second built case (Clinic) was never actually put in front of a real user end-to-end the
+way Barber was. A future Clinic (or Spa/Gym/Coworking) frontend build would be the real test of
+whether Barber-shaped assumptions (single-staff-per-slot, no capacity, no buffer time) survive
+contact with a genuinely different booking shape — this review flags where those assumptions live
+(§2 above) so that future build knows exactly what to check, without predicting the answer now.
+
+### Open Questions
+
+- Does a future Clinic/Gym/Coworking frontend build actually break the one-staff-one-slot/no-capacity
+  assumption, or does it turn out additive like Barber's own build did relative to Clinic's backend?
+  Not knowable without building it — named here so it's checked deliberately rather than discovered
+  as a surprise.
+- The staff-column UI's real scaling ceiling (pill row vs. a dropdown/search pattern) — unmeasured,
+  no number attached yet; whoever builds the first multi-staff-heavy tenant should measure this
+  rather than guess.
+- Whether the per-reservation client-side name-lookup pattern (`serviceNameFor` et al.) is a real
+  N+1 shape at scale — flagged as unconfirmed in §6, not resolved by this review.
+
+### Promoted?
+
+No — this review does not conclude that a generic Reservation Engine extraction is warranted yet.
+The headline finding (Resource/Barber fork) is unchanged from 2026-07-31: still deliberately
+deferred, still pending one of its two named triggers. **Per Salman's explicit Stop Condition for
+this review: even if a future review's evidence did conclude extraction was warranted, this session
+stops at naming that candidate and citing the evidence — no architectural refactor begins in the
+same session as the review that recommends it.** The review and the decision to act on it stay two
+separate moments, same as every other Recommendation/Decision split this project already applies
+(`investigation-protocol.md`). No code changed for this entry.
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,
