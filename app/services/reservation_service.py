@@ -314,7 +314,16 @@ async def get_available_slots(
         datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc),
     )
 
-    now = datetime.now(timezone.utc)
+    # Phase 1.x fix (2026-08-05, real bug found via Phase 3.3.1's Browser Verification): `day_start`/
+    # `day_end`/`candidate` are all naive-local wall-clock values labeled UTC via tzinfo=timezone.utc
+    # (no real conversion) -- the exact same convention `_check_working_hours()` already documents
+    # ("All times treated as UTC directly ... no timezone-conversion utility exists in this path").
+    # `now` must be built the same way. `datetime.now(timezone.utc)` is the TRUE UTC instant, which
+    # for any tenant with a real UTC offset made this comparison wrong by exactly that offset --
+    # confirmed live: at real local 17:37 (GMT+3), this endpoint returned slots as early as 15:00,
+    # all already in the past by local wall-clock time. `datetime.now()` (no arg) is the server's own
+    # naive local time; labeling it UTC without conversion matches every other datetime in this path.
+    now = datetime.now().replace(tzinfo=timezone.utc)
     slots: list[dict] = []
     candidate = day_start
     while candidate + timedelta(minutes=duration_min) <= day_end:
