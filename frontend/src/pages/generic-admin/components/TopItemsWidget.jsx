@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
+import { T } from '../theme'
+import Card from './ui/Card'
+import EmptyState from './ui/EmptyState'
 
 // ── Compute top 5 items — quantity + revenue ───────────────────────────────────
 function buildTopItems(orders) {
@@ -55,7 +58,7 @@ function ItemRow({ item, max, color, index }) {
           style={{
             width: 34, height: 34, borderRadius: 8,
             objectFit: 'cover', flexShrink: 0,
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: `1px solid ${T.border}`,
           }}
         />
       ) : (
@@ -74,7 +77,7 @@ function ItemRow({ item, max, color, index }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
           <span style={{
-            fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600,
+            fontSize: 12, color: T.textPrimary, fontWeight: 600,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {item.name_ar}
@@ -87,7 +90,7 @@ function ItemRow({ item, max, color, index }) {
         {/* Bar */}
         <div style={{
           height: 3, borderRadius: 2,
-          background: 'rgba(255,255,255,0.07)',
+          background: T.borderSoft,
           overflow: 'hidden',
         }}>
           <motion.div
@@ -100,7 +103,7 @@ function ItemRow({ item, max, color, index }) {
 
         {/* Revenue */}
         {revenue && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>
+          <div style={{ fontSize: 10, color: T.textMuted, lineHeight: 1 }}>
             {revenue}
           </div>
         )}
@@ -115,15 +118,10 @@ export default function TopItemsWidget({ orders = [], loading = false, color = '
   const max   = items[0]?.qty ?? 1
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: `1px solid ${color}22`,
-      borderRadius: 14,
-      padding: '18px 20px',
-    }}>
+    <Card style={{ border: `1px solid ${color}22`, minWidth: 0 }}>
       {/* Header */}
       <div style={{
-        fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+        fontSize: 13, fontWeight: 700, color: T.textSecond,
         marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block' }} />
@@ -136,7 +134,7 @@ export default function TopItemsWidget({ orders = [], loading = false, color = '
           {[...Array(5)].map((_, i) => (
             <div key={i} style={{
               height: 36, borderRadius: 6,
-              background: 'rgba(255,255,255,0.04)',
+              background: T.borderSoft,
               animation: 'ti-pulse 1.5s ease-in-out infinite',
               animationDelay: `${i * 0.1}s`,
             }} />
@@ -144,12 +142,7 @@ export default function TopItemsWidget({ orders = [], loading = false, color = '
           <style>{`@keyframes ti-pulse{0%,100%{opacity:.4}50%{opacity:.8}}`}</style>
         </div>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '28px 12px' }}>
-          <div style={{ fontSize: 22, marginBottom: 8 }}>📊</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
-            ما في مبيعات بعد
-          </div>
-        </div>
+        <EmptyState icon="📊" message="ما في مبيعات بعد" style={{ padding: '28px 12px' }} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {items.map((item, i) => (
@@ -157,6 +150,6 @@ export default function TopItemsWidget({ orders = [], loading = false, color = '
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

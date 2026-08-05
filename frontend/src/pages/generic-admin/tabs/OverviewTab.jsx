@@ -5,6 +5,9 @@ import { hasCapability, hasOrderCapability } from '../../../utils/capabilities'
 import StatCard         from '../components/StatCard'
 import ActivityFeed    from '../components/ActivityFeed'
 import TopItemsWidget  from '../components/TopItemsWidget'
+import { T, FONT } from '../theme'
+import Card from '../components/ui/Card'
+import EmptyState from '../components/ui/EmptyState'
 
 // ── ErrorBoundary ──────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -14,9 +17,9 @@ class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+          background: T.dangerSoft, border: `1px solid ${T.danger}33`,
           borderRadius: 12, padding: '18px 20px',
-          color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center',
+          color: T.danger, fontSize: 12, textAlign: 'center',
         }}>
           خطأ في تحميل المكوّن
         </div>
@@ -193,20 +196,20 @@ function RevenueTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null
   return (
     <div style={{
-      background: 'rgba(13,13,20,0.95)',
-      border: '1px solid rgba(255,255,255,0.1)',
+      background: T.cardBg,
+      border: `1px solid ${T.border}`,
       borderRadius: 10, padding: '10px 14px',
-      fontSize: 12, color: '#f0ebe3',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      fontSize: 12, color: T.textPrimary,
+      boxShadow: T.shadowLg,
     }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
-      <div style={{ color: 'rgba(255,255,255,0.5)' }}>
+      <div style={{ color: T.textSecond }}>
         الإيرادات: <span style={{ color: payload[0]?.color, fontWeight: 700 }}>
           {Number(payload[0]?.value || 0).toLocaleString('ar-SA')} {currency}
         </span>
       </div>
       {payload[0]?.payload?.count > 0 && (
-        <div style={{ color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+        <div style={{ color: T.textMuted, marginTop: 2 }}>
           {payload[0].payload.count} طلب
         </div>
       )}
@@ -218,11 +221,11 @@ function DonutTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   return (
     <div style={{
-      background: 'rgba(13,13,20,0.95)',
-      border: '1px solid rgba(255,255,255,0.1)',
+      background: T.cardBg,
+      border: `1px solid ${T.border}`,
       borderRadius: 10, padding: '9px 13px',
-      fontSize: 12, color: '#f0ebe3',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      fontSize: 12, color: T.textPrimary,
+      boxShadow: T.shadowLg,
     }}>
       <span style={{ color: payload[0]?.payload?.color, fontWeight: 700 }}>
         {payload[0]?.name}
@@ -243,27 +246,23 @@ function RevenueChart({ orders, color, currency }) {
     <motion.div
       variants={CARD_VARIANTS}
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: T.cardBg,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shadow,
         borderRadius: 14, padding: '18px 20px',
-        minHeight: 200,
+        minHeight: 200, minWidth: 0,
       }}
     >
       <div style={{
         fontSize: 13, fontWeight: 600,
-        color: 'rgba(255,255,255,0.55)',
+        color: T.textSecond,
         marginBottom: 16, direction: 'rtl',
       }}>
         الإيرادات — آخر 7 أيام
       </div>
 
       {!hasData ? (
-        <div style={{
-          height: 140, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
-        }}>
-          لا توجد طلبات بعد
-        </div>
+        <EmptyState message="لا توجد طلبات بعد" style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} />
       ) : (
         <ResponsiveContainer width="100%" height={140}>
           <LineChart data={data} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
@@ -274,25 +273,25 @@ function RevenueChart({ orders, color, currency }) {
               </linearGradient>
             </defs>
             <CartesianGrid
-              stroke="rgba(255,255,255,0.04)"
+              stroke={T.borderSoft}
               strokeDasharray="4 4"
               vertical={false}
             />
             <XAxis
               dataKey="label"
-              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+              tick={{ fill: T.textMuted, fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+              tick={{ fill: T.textMuted, fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={v => v === 0 ? '0' : `${Number(v).toLocaleString('ar-SA')}`}
             />
             <Tooltip
               content={<RevenueTooltip currency={currency} />}
-              cursor={{ stroke: 'rgba(255,255,255,0.08)', strokeWidth: 1 }}
+              cursor={{ stroke: T.border, strokeWidth: 1 }}
             />
             <Line
               type="monotone"
@@ -319,27 +318,23 @@ function StatusDonut({ orders, color }) {
     <motion.div
       variants={CARD_VARIANTS}
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: T.cardBg,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shadow,
         borderRadius: 14, padding: '18px 20px',
-        minHeight: 200,
+        minHeight: 200, minWidth: 0,
       }}
     >
       <div style={{
         fontSize: 13, fontWeight: 600,
-        color: 'rgba(255,255,255,0.55)',
+        color: T.textSecond,
         marginBottom: 16, direction: 'rtl',
       }}>
         توزيع الطلبات
       </div>
 
       {total === 0 ? (
-        <div style={{
-          height: 140, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
-        }}>
-          لا توجد طلبات بعد
-        </div>
+        <EmptyState message="لا توجد طلبات بعد" style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} />
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           {/* Donut */}
@@ -371,10 +366,10 @@ function StatusDonut({ orders, color }) {
               alignItems: 'center', justifyContent: 'center',
               pointerEvents: 'none',
             }}>
-              <span style={{ fontSize: 20, fontWeight: 800, color: '#f0ebe3', lineHeight: 1 }}>
+              <span style={{ fontSize: 20, fontWeight: 800, color: T.textPrimary, lineHeight: 1 }}>
                 {total}
               </span>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+              <span style={{ fontSize: 9, color: T.textMuted, marginTop: 2 }}>
                 إجمالي
               </span>
             </div>
@@ -388,7 +383,7 @@ function StatusDonut({ orders, color }) {
                   width: 8, height: 8, borderRadius: '50%',
                   background: entry.color, flexShrink: 0,
                 }} />
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                <span style={{ fontSize: 12, color: T.textSecond }}>
                   {entry.name}
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: entry.color }}>
@@ -412,17 +407,16 @@ function RecentOrders({ orders, color, currency }) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 14, padding: '18px 20px',
+      background: T.cardBg,
+      border: `1px solid ${T.border}`,
+      boxShadow: T.shadow,
+      borderRadius: 14, padding: '18px 20px', minWidth: 0,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: T.textSecond, marginBottom: 14 }}>
         آخر الطلبات
       </div>
       {recent.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>
-          لا توجد طلبات بعد
-        </div>
+        <EmptyState message="لا توجد طلبات بعد" style={{ padding: '24px 0' }} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           {recent.map(o => {
@@ -431,14 +425,14 @@ function RecentOrders({ orders, color, currency }) {
               <div key={o.id} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '9px 12px',
-                background: 'rgba(255,255,255,0.025)',
+                background: T.pageBg,
                 borderRadius: 9,
               }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>
                     {o.customer_name ?? `#${o.order_number ?? String(o.id).slice(-6)}`}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>
                     {timeAgo(o.created_at ?? o.createdAt)}
                   </div>
                 </div>
@@ -469,26 +463,25 @@ function RecentOrders({ orders, color, currency }) {
 function TopCatalogItems({ items, loading, color }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 14, padding: '18px 20px',
+      background: T.cardBg,
+      border: `1px solid ${T.border}`,
+      boxShadow: T.shadow,
+      borderRadius: 14, padding: '18px 20px', minWidth: 0,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: T.textSecond, marginBottom: 14 }}>
         من الكتالوج
       </div>
       {loading ? (
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, margin: 0 }}>جاري التحميل...</p>
+        <p style={{ color: T.textMuted, fontSize: 13, margin: 0 }}>جاري التحميل...</p>
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '24px 0' }}>
-          لا توجد منتجات بعد
-        </div>
+        <EmptyState message="لا توجد منتجات بعد" style={{ padding: '24px 0' }} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           {items.map(item => (
             <div key={item.id} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '9px 12px',
-              background: 'rgba(255,255,255,0.025)',
+              background: T.pageBg,
               borderRadius: 9,
             }}>
               {item.image_url
@@ -496,11 +489,11 @@ function TopCatalogItems({ items, loading, color }) {
                 : <div style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, flexShrink: 0 }} />
               }
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.name_ar}
                 </div>
                 {item.category_name && (
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{item.category_name}</div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>{item.category_name}</div>
                 )}
               </div>
               {item.price != null && (

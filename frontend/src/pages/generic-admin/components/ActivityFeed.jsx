@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import adminApi from '../../../utils/admin.config'
+import { T } from '../theme'
+import Card from './ui/Card'
+import EmptyState from './ui/EmptyState'
 
 const POLL_MS = 30_000
 
@@ -83,7 +86,7 @@ function Skeleton() {
       {[...Array(5)].map((_, i) => (
         <div key={i} style={{
           height: 44, borderRadius: 8,
-          background: 'rgba(255,255,255,0.04)',
+          background: T.borderSoft,
           animation: 'af-pulse 1.5s ease-in-out infinite',
           animationDelay: `${i * 0.1}s`,
         }} />
@@ -110,7 +113,7 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
   useEffect(() => {
     if (!hasReservations) { setLoading(false); return }
     setLoading(true)
-    adminApi.get('/reservations')
+    adminApi.get('/reservations/')
       .then(r => {
         const raw = r?.data?.data ?? r?.data ?? []
         if (mountedRef.current) setReservations(Array.isArray(raw) ? raw : [])
@@ -129,22 +132,17 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
   const feed = buildFeed(orders, reservations)
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: `1px solid ${color}22`,
-      borderRadius: 14,
-      padding: '18px 20px',
-    }}>
+    <Card style={{ border: `1px solid ${color}22`, minWidth: 0 }}>
       {/* Header */}
       <div style={{
-        fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+        fontSize: 13, fontWeight: 700, color: T.textSecond,
         marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block' }} />
           آخر النشاطات
         </div>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontWeight: 400 }}>
+        <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 400 }}>
           تحديث كل 30ث
         </span>
       </div>
@@ -153,16 +151,12 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
       {loading ? (
         <Skeleton />
       ) : feed.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '28px 12px' }}>
-          <div style={{ fontSize: 22, marginBottom: 8 }}>📭</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', lineHeight: 1.6 }}>
-            ما في نشاطات لهذا الأسبوع
-            <br />
-            <span style={{ fontSize: 11, color: `${color}88` }}>
-              ابدأ بإضافة عناصر للكتالوج!
-            </span>
-          </div>
-        </div>
+        <EmptyState
+          icon="📭"
+          message="ما في نشاطات لهذا الأسبوع"
+          subMessage="ابدأ بإضافة عناصر للكتالوج!"
+          style={{ padding: '28px 12px' }}
+        />
       ) : (
         <AnimatePresence initial={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -178,7 +172,7 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '9px 10px', borderRadius: 8,
                   }}
-                  whileHover={{ background: 'rgba(255,255,255,0.04)' }}
+                  whileHover={{ background: T.pageBg }}
                 >
                   {/* Icon badge */}
                   <div style={{
@@ -195,10 +189,10 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
 
                   {/* Text */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.textPrimary, lineHeight: 1.3 }}>
                       {event.label}
                       {event.count != null && (
-                        <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>
+                        <span style={{ color: T.textMuted, fontWeight: 400 }}>
                           {' · '}{event.count} عنصر
                         </span>
                       )}
@@ -210,7 +204,7 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
                     </div>
                     {event.customer && (
                       <div style={{
-                        fontSize: 11, color: 'rgba(255,255,255,0.3)',
+                        fontSize: 11, color: T.textMuted,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         marginTop: 1,
                       }}>
@@ -220,7 +214,7 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
                   </div>
 
                   {/* Time */}
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: T.textMuted, flexShrink: 0 }}>
                     {timeAgo(event.at)}
                   </div>
                 </motion.div>
@@ -229,6 +223,6 @@ export default function ActivityFeed({ orders = [], hasReservations = false, col
           </div>
         </AnimatePresence>
       )}
-    </div>
+    </Card>
   )
 }

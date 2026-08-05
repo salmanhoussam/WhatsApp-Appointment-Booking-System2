@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { motion }    from 'framer-motion'
+import { T, FONT }   from '../theme'
 
 const PULSE = `@keyframes sk-pulse { 0%,100%{opacity:.35} 50%{opacity:.75} }`
 let _pulseInjected = false
@@ -9,7 +10,7 @@ function Skel({ w, h, delay = 0 }) {
   return (
     <div style={{
       width: w, height: h, borderRadius: 6,
-      background: 'rgba(255,255,255,0.08)',
+      background: T.borderSoft,
       animation: `sk-pulse 1.5s ease-in-out ${delay}s infinite`,
     }} />
   )
@@ -49,8 +50,9 @@ export default function StatCard({
       transition={{ type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }}
       style={{
         position: 'relative',
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: T.cardBg,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shadow,
         borderRadius: 16,
         padding: '20px 22px',
         display: 'flex',
@@ -90,8 +92,8 @@ export default function StatCard({
         ? <Skel w={90} h={36} />
         : (
           <div style={{
-            fontSize: 30, fontWeight: 800, color: '#fff',
-            lineHeight: 1, fontFamily: "'Cairo', sans-serif",
+            fontSize: 30, fontWeight: 800, color: T.textPrimary,
+            lineHeight: 1, fontFamily: FONT,
             letterSpacing: '-0.02em',
           }}>
             {value ?? '—'}
@@ -103,8 +105,8 @@ export default function StatCard({
         ? <Skel w={110} h={14} delay={0.15} />
         : (
           <div style={{
-            fontSize: 13, color: 'rgba(255,255,255,0.4)',
-            fontFamily: "'Cairo', sans-serif",
+            fontSize: 13, color: T.textSecond,
+            fontFamily: FONT,
           }}>
             {label}
           </div>
