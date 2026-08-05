@@ -272,21 +272,26 @@ function getUsableViewportBottom() {
 
 // Used by both ReservationPopover and CreatePopover -- one positioning implementation, not two
 // independently-maintained ones (a fix applied to only one of a pair like this is exactly the kind
-// of drift that resurfaces as a bug a few months later).
-function usePopoverPosition(anchor, naturalHeight, width = 280) {
+// of drift that resurfaces as a bug a few months later). Deliberately domain-agnostic: takes an
+// anchor point, a height, and a padding, and knows nothing about reservations, calendars, or any
+// specific fixed UI element -- reusable by any future popover in this codebase, not just these two.
+//
+// `anchor` stays a point ({x, y}, e.g. a click event's clientX/clientY) rather than a full
+// getBoundingClientRect()-style rect -- every current call site opens from a click point, not an
+// anchored element, so a rect would add a shape this hook doesn't actually need yet.
+function usePopoverPosition({ anchor, popupHeight, width = 280, viewportPadding = 12 }) {
   return useMemo(() => {
-    const margin = 12
-    const usableBottom = getUsableViewportBottom() - margin
-    const usableTop = margin
+    const usableBottom = getUsableViewportBottom() - viewportPadding
+    const usableTop = viewportPadding
     const spaceBelow = usableBottom - anchor.y
     const spaceAbove = anchor.y - usableTop
-    const left = Math.min(Math.max(anchor.x - 260, margin), window.innerWidth - (width + margin))
+    const left = Math.min(Math.max(anchor.x - 260, viewportPadding), window.innerWidth - (width + viewportPadding))
 
-    if (spaceBelow >= naturalHeight) {
-      return { top: anchor.y, left, maxHeight: naturalHeight, scroll: false }
+    if (spaceBelow >= popupHeight) {
+      return { top: anchor.y, left, maxHeight: popupHeight, scroll: false }
     }
-    if (spaceAbove >= naturalHeight) {
-      return { top: anchor.y - naturalHeight, left, maxHeight: naturalHeight, scroll: false }
+    if (spaceAbove >= popupHeight) {
+      return { top: anchor.y - popupHeight, left, maxHeight: popupHeight, scroll: false }
     }
     // Neither direction fully fits -- open on whichever side has more room, constrain height to
     // that room, and let the popover's own body scroll internally (each popover's JSX pins its
@@ -296,7 +301,7 @@ function usePopoverPosition(anchor, naturalHeight, width = 280) {
       return { top: anchor.y, left, maxHeight: Math.max(spaceBelow, 160), scroll: true }
     }
     return { top: usableTop, left, maxHeight: Math.max(spaceAbove, 160), scroll: true }
-  }, [anchor.x, anchor.y, naturalHeight, width])
+  }, [anchor.x, anchor.y, popupHeight, width, viewportPadding])
 }
 
 function ReservationPopover({
@@ -400,7 +405,7 @@ function ReservationPopover({
   }
 
   const popoverHeight = mode === 'edit' ? 460 : mode === 'cancel-confirm' ? 220 : 380
-  const pos = usePopoverPosition(anchor, popoverHeight)
+  const pos = usePopoverPosition({ anchor, popupHeight: popoverHeight })
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
   const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
 
@@ -608,7 +613,7 @@ function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReserved
 
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
   const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
-  const pos = usePopoverPosition(anchor, 460)
+  const pos = usePopoverPosition({ anchor, popupHeight: 460 })
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
