@@ -6,6 +6,7 @@ Works for: restaurant tables, service appointments, property viewings, clinic ap
 
 from datetime import date, datetime, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -129,14 +130,20 @@ async def list_public_barbers(
 
 @router.get("/availability")
 async def get_availability(
-    barber_id:    str = Query(...),
+    barber_id:    UUID = Query(...),
     date_str:     str = Query(..., alias="date", description="YYYY-MM-DD"),
     duration_min: int = Query(...),
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("reservations")),
 ):
     """Reservation Pilot, Phase 1 — real open slots for a given barber/date/service duration.
-    Thin route per api-rules.md — all logic lives in reservation_service.get_available_slots()."""
+    Thin route per api-rules.md — all logic lives in reservation_service.get_available_slots().
+
+    barber_id typed as UUID (Phase 1.x fix, 2026-08-05): a malformed value (e.g. "1") used to
+    reach barber_repo.find_barber()'s Prisma query untouched and raise prisma.errors.DataError --
+    not a ValueError, so it wasn't caught below and surfaced as a raw 500. Typing it UUID here
+    makes FastAPI reject a malformed value with a clean 422 before the route body ever runs, same
+    pattern api-rules.md's own `unit_id: UUID` example already documents."""
     try:
         target_date = date.fromisoformat(date_str)
     except ValueError:
@@ -145,7 +152,7 @@ async def get_availability(
     try:
         slots = await reservation_service.get_available_slots(
             client_id     = tenant["id"],
-            barber_id     = barber_id,
+            barber_id     = str(barber_id),
             target_date   = target_date,
             duration_min  = duration_min,
         )
