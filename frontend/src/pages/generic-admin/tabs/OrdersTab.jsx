@@ -1,30 +1,31 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import adminApi from '../../../utils/admin.config'
 import { hasCapability } from '../../../utils/capabilities'
+import { T, FONT } from '../theme'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
+import EmptyState from '../components/ui/EmptyState'
+import Dropdown from '../components/Dropdown'
 
-// ── Design tokens (shared with CatalogTab pattern) ────────────────────────────
-const glass = {
-  background: 'rgba(255,255,255,0.04)',
-  border:     '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 12,
-}
+// ── Design tokens (Dashboard Design System Completion, 2026-08-05 -- re-themed
+// off the same T/FONT tokens shared with Calendar/Reservations/Overview/Catalog) ──
 const inputStyle = {
   padding: '8px 12px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#fff', fontSize: 13,
-  fontFamily: "'Cairo', sans-serif",
-  outline: 'none',
+  background: T.cardBg,
+  border: `1px solid ${T.border}`,
+  color: T.textPrimary, fontSize: 13,
+  fontFamily: FONT,
+  outline: 'none', colorScheme: 'light',
 }
 const thStyle = {
   padding: '10px 14px', textAlign: 'right',
-  fontSize: 12, color: 'rgba(255,255,255,0.4)',
+  fontSize: 12, color: T.textMuted,
   fontWeight: 600, letterSpacing: '0.04em',
   whiteSpace: 'nowrap', userSelect: 'none',
 }
 const tdStyle = {
   padding: '12px 14px', fontSize: 13,
-  borderBottom: '1px solid rgba(255,255,255,0.04)',
+  borderBottom: `1px solid ${T.borderSoft}`,
   verticalAlign: 'middle',
 }
 
@@ -69,7 +70,7 @@ function fmtPrice(val, currency) {
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status, clickable, onClick }) {
-  const m = STATUS_META[status] ?? { label: status, bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }
+  const m = STATUS_META[status] ?? { label: status, bg: T.pageBg, color: T.textSecond }
   return (
     <span
       onClick={onClick}
@@ -79,7 +80,7 @@ function StatusBadge({ status, clickable, onClick }) {
         background: m.bg, color: m.color,
         cursor: clickable ? 'pointer' : 'default',
         border: `1px solid ${m.color}44`,
-        whiteSpace: 'nowrap', fontFamily: "'Cairo', sans-serif",
+        whiteSpace: 'nowrap', fontFamily: FONT,
         transition: 'opacity 0.15s',
       }}
     >
@@ -88,7 +89,9 @@ function StatusBadge({ status, clickable, onClick }) {
   )
 }
 
-// ── StatusCell — badge that turns into a select on click ──────────────────────
+// ── StatusCell — badge that turns into a Dropdown on click (custom listbox, not
+// a native <select> -- same fix already applied to Calendar/Reservations, kept
+// consistent here rather than leaving a second native select behind) ───────────
 function StatusCell({ order, moduleKey, onUpdate }) {
   const [editing, setEditing] = useState(false)
   const [saving,  setSaving]  = useState(false)
@@ -105,25 +108,23 @@ function StatusCell({ order, moduleKey, onUpdate }) {
     )
   }
 
+  const options = [order.status, ...next].map(s => ({
+    value: s, label: STATUS_META[s]?.label ?? s,
+  }))
+
   return (
-    <select
-      autoFocus
-      defaultValue={order.status}
-      disabled={saving}
-      style={{ ...inputStyle, minWidth: 120 }}
-      onChange={async e => {
-        const s = e.target.value
-        if (s === order.status) { setEditing(false); return }
-        setSaving(true)
-        try { await onUpdate(order.id, s) } finally { setSaving(false); setEditing(false) }
-      }}
-      onBlur={() => setEditing(false)}
-    >
-      <option value={order.status}>{STATUS_META[order.status]?.label ?? order.status}</option>
-      {next.map(s => (
-        <option key={s} value={s}>{STATUS_META[s]?.label ?? s}</option>
-      ))}
-    </select>
+    <div style={{ minWidth: 130 }} onBlur={() => setEditing(false)}>
+      <Dropdown
+        value={order.status}
+        disabled={saving}
+        options={options}
+        onChange={async (s) => {
+          if (s === order.status) { setEditing(false); return }
+          setSaving(true)
+          try { await onUpdate(order.id, s) } finally { setSaving(false); setEditing(false) }
+        }}
+      />
+    </div>
   )
 }
 
@@ -133,7 +134,7 @@ function SortHeader({ col, label, sortCol, sortDir, onSort }) {
   const arrow  = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ⇅'
   return (
     <th
-      style={{ ...thStyle, cursor: 'pointer', color: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)' }}
+      style={{ ...thStyle, cursor: 'pointer', color: active ? T.textPrimary : T.textMuted }}
       onClick={() => onSort(col)}
     >
       {label}<span style={{ opacity: 0.5, fontSize: 10 }}>{arrow}</span>
@@ -148,19 +149,19 @@ function ExpandedRow({ order, colSpan, currency }) {
       <td colSpan={colSpan} style={{ padding: 0 }}>
         <div style={{
           padding: '14px 24px 18px',
-          background: 'rgba(255,255,255,0.02)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          direction: 'rtl', fontFamily: "'Cairo', sans-serif",
+          background: T.pageBg,
+          borderBottom: `1px solid ${T.borderSoft}`,
+          direction: 'rtl', fontFamily: FONT,
         }}>
           {/* Items list */}
           {order.items?.length > 0 && (
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8, letterSpacing: '0.05em' }}>العناصر المطلوبة</div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, letterSpacing: '0.05em' }}>العناصر المطلوبة</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {order.items.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: T.textPrimary }}>
                     <span>× {item.quantity} عنصر</span>
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>{fmtPrice(item.unit_price, currency)}</span>
+                    <span style={{ color: T.textSecond }}>{fmtPrice(item.unit_price, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -169,12 +170,12 @@ function ExpandedRow({ order, colSpan, currency }) {
 
           {/* Extra fields */}
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            {order.table_number   && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>طاولة: {order.table_number}</span>}
-            {order.payment_method && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>الدفع: {order.payment_method}</span>}
-            {order.customer_email && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>البريد: {order.customer_email}</span>}
-            {order.notes          && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>ملاحظة: {order.notes}</span>}
+            {order.table_number   && <span style={{ fontSize: 12, color: T.textSecond }}>طاولة: {order.table_number}</span>}
+            {order.payment_method && <span style={{ fontSize: 12, color: T.textSecond }}>الدفع: {order.payment_method}</span>}
+            {order.customer_email && <span style={{ fontSize: 12, color: T.textSecond }}>البريد: {order.customer_email}</span>}
+            {order.notes          && <span style={{ fontSize: 12, color: T.textSecond }}>ملاحظة: {order.notes}</span>}
             {order.shipping_address && (
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+              <span style={{ fontSize: 12, color: T.textSecond }}>
                 الشحن: {typeof order.shipping_address === 'object'
                   ? Object.values(order.shipping_address).filter(Boolean).join('، ')
                   : order.shipping_address}
@@ -195,36 +196,19 @@ function Pagination({ page, total, totalPages, onPage, color }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      marginTop: 16, direction: 'rtl', fontFamily: "'Cairo', sans-serif",
+      marginTop: 16, direction: 'rtl', fontFamily: FONT,
     }}>
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+      <span style={{ fontSize: 12, color: T.textMuted }}>
         عرض {from}–{to} من {total} نتيجة
       </span>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <PagBtn label="السابق" disabled={page === 1}          onClick={() => onPage(page - 1)} color={color} />
-        <span style={{ fontSize: 12, padding: '6px 12px', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <Button variant="secondary" size="sm" disabled={page === 1}          onClick={() => onPage(page - 1)}>السابق</Button>
+        <span style={{ fontSize: 12, padding: '6px 12px', color: T.textSecond, fontFamily: 'monospace' }}>
           {page} / {totalPages}
         </span>
-        <PagBtn label="التالي"  disabled={page === totalPages} onClick={() => onPage(page + 1)} color={color} />
+        <Button variant="secondary" size="sm" disabled={page === totalPages} onClick={() => onPage(page + 1)}>التالي</Button>
       </div>
     </div>
-  )
-}
-function PagBtn({ label, disabled, onClick, color }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        padding: '6px 14px', borderRadius: 7, cursor: disabled ? 'default' : 'pointer',
-        background: 'transparent', fontFamily: "'Cairo', sans-serif",
-        border: `1px solid ${disabled ? 'rgba(255,255,255,0.08)' : `${color}44`}`,
-        color: disabled ? 'rgba(255,255,255,0.2)' : color,
-        fontSize: 12, transition: 'background 0.15s',
-      }}
-    >
-      {label}
-    </button>
   )
 }
 
@@ -233,19 +217,19 @@ function MobileCardSkeleton({ rows = 5 }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} style={{ ...glass, padding: '14px 16px', marginBottom: 10 }}>
+        <Card key={i} padding="14px 16px" style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ height: 14, width: 120, borderRadius: 4, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
-              <div style={{ height: 11, width: 90,  borderRadius: 4, background: 'rgba(255,255,255,0.04)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+              <div style={{ height: 14, width: 120, borderRadius: 4, background: T.borderSoft, animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+              <div style={{ height: 11, width: 90,  borderRadius: 4, background: T.borderSoft, animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
             </div>
-            <div style={{ height: 22, width: 72, borderRadius: 20, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+            <div style={{ height: 22, width: 72, borderRadius: 20, background: T.borderSoft, animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ height: 12, width: 100, borderRadius: 4, background: 'rgba(255,255,255,0.04)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
-            <div style={{ height: 14, width: 60,  borderRadius: 4, background: 'rgba(255,255,255,0.06)', animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+            <div style={{ height: 12, width: 100, borderRadius: 4, background: T.borderSoft, animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
+            <div style={{ height: 14, width: 60,  borderRadius: 4, background: T.borderSoft, animation: `sk-pulse 1.5s ease-in-out ${i * 0.07}s infinite` }} />
           </div>
-        </div>
+        </Card>
       ))}
     </>
   )
@@ -254,15 +238,15 @@ function MobileCardSkeleton({ rows = 5 }) {
 // ── Mobile order card ─────────────────────────────────────────────────────────
 function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color, currency }) {
   return (
-    <div style={{ ...glass, padding: '14px 16px', marginBottom: 10 }}>
+    <Card padding="14px 16px" style={{ marginBottom: 10 }}>
       {/* Top: customer + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: T.textPrimary }}>
             {order.customer_name || '—'}
           </div>
           {order.customer_phone && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', direction: 'ltr', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: T.textMuted, direction: 'ltr', marginTop: 2 }}>
               {order.customer_phone}
             </div>
           )}
@@ -272,7 +256,7 @@ function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color
 
       {/* Bottom: date + total + expand */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+        <div style={{ fontSize: 11, color: T.textMuted }}>
           {fmtDate(order.created_at)}{order.created_at ? ` · ${fmtTime(order.created_at)}` : ''}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -283,9 +267,9 @@ function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color
             onClick={onExpand}
             style={{
               width: 28, height: 28, borderRadius: 7,
-              background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${expanded ? `${color}44` : 'rgba(255,255,255,0.1)'}`,
-              color: expanded ? color : 'rgba(255,255,255,0.4)',
+              background: expanded ? `${color}22` : T.pageBg,
+              border: `1px solid ${expanded ? `${color}44` : T.border}`,
+              color: expanded ? color : T.textMuted,
               cursor: 'pointer', fontSize: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
@@ -297,22 +281,22 @@ function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color
 
       {/* Expanded: items + extra fields */}
       {expanded && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.borderSoft}` }}>
           {order.items?.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               {order.items.map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.textSecond, marginBottom: 4 }}>
                   <span>× {item.quantity} عنصر</span>
                   <span>{fmtPrice(item.unit_price, currency)}</span>
                 </div>
               ))}
             </div>
           )}
-          {order.table_number    && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>طاولة: {order.table_number}</div>}
-          {order.payment_method  && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>الدفع: {order.payment_method}</div>}
-          {order.notes           && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>ملاحظة: {order.notes}</div>}
+          {order.table_number    && <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>طاولة: {order.table_number}</div>}
+          {order.payment_method  && <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>الدفع: {order.payment_method}</div>}
+          {order.notes           && <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>ملاحظة: {order.notes}</div>}
           {order.shipping_address && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>
               الشحن: {typeof order.shipping_address === 'object'
                 ? Object.values(order.shipping_address).filter(Boolean).join('، ')
                 : order.shipping_address}
@@ -320,7 +304,7 @@ function MobileOrderCard({ order, expanded, onExpand, moduleKey, onUpdate, color
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -332,7 +316,7 @@ function TableSkeleton({ rows = 5 }) {
         <tr key={i}>
           {[16, 120, 90, 70, 60, 30, 28].map((w, j) => (
             <td key={j} style={tdStyle}>
-              <div style={{ height: 14, width: w, borderRadius: 4, background: 'rgba(255,255,255,0.06)', animation: 'sk-pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
+              <div style={{ height: 14, width: w, borderRadius: 4, background: T.borderSoft, animation: 'sk-pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
             </td>
           ))}
         </tr>
@@ -450,7 +434,7 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ direction: 'rtl', fontFamily: "'Cairo', sans-serif" }}>
+    <div style={{ direction: 'rtl', fontFamily: FONT }}>
 
       {/* ── Filter bar ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -461,18 +445,9 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="بحث بالاسم أو الهاتف..."
-            style={{ ...inputStyle, flex: 1, maxWidth: isMobile ? '100%' : 280 }}
+            style={{ ...inputStyle, flex: 1, minWidth: 0, maxWidth: isMobile ? '100%' : 280 }}
           />
-          <button
-            onClick={loadOrders}
-            style={{
-              padding: '8px 14px', borderRadius: 8, fontSize: 12, flexShrink: 0,
-              background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
-              border: `1px solid ${color}44`, color,
-            }}
-          >
-            ↻
-          </button>
+          <Button variant="secondary" color={color} onClick={loadOrders} style={{ flexShrink: 0 }}>↻</Button>
         </div>
 
         {/* Status pills — scrollable on mobile */}
@@ -493,11 +468,11 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
                 onClick={() => setStatusFilter(s)}
                 style={{
                   padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
+                  cursor: 'pointer', fontFamily: FONT,
                   flexShrink: 0,
-                  background: active ? (m?.bg ?? `${color}22`) : 'rgba(255,255,255,0.04)',
-                  color:      active ? (m?.color ?? color)     : 'rgba(255,255,255,0.4)',
-                  border: `1px solid ${active ? (m?.color ?? color) + '55' : 'rgba(255,255,255,0.08)'}`,
+                  background: active ? (m?.bg ?? `${color}22`) : T.cardBg,
+                  color:      active ? (m?.color ?? color)     : T.textSecond,
+                  border: `1px solid ${active ? (m?.color ?? color) + '55' : T.border}`,
                   transition: 'all 0.15s', whiteSpace: 'nowrap',
                 }}
               >
@@ -514,22 +489,13 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
 
         {/* Refresh on desktop */}
         {!isMobile && (
-          <button
-            onClick={loadOrders}
-            style={{
-              marginRight: 'auto', padding: '6px 16px', borderRadius: 8, fontSize: 12,
-              background: 'transparent', cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
-              border: `1px solid ${color}44`, color,
-            }}
-          >
-            تحديث
-          </button>
+          <Button variant="secondary" color={color} onClick={loadOrders} style={{ marginRight: 'auto' }}>تحديث</Button>
         )}
       </div>
 
       {/* ── Results count ──────────────────────────────────────────── */}
       {!loading && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 12 }}>
           {filteredOrders.length} طلب{search || statusFilter !== 'all' ? ' (بعد الفلترة)' : ''}
         </div>
       )}
@@ -541,12 +507,9 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
           {loading ? (
             <MobileCardSkeleton rows={5} />
           ) : pagedOrders.length === 0 ? (
-            <div style={{
-              ...glass, padding: '48px 24px',
-              textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13,
-            }}>
-              {orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'}
-            </div>
+            <Card>
+              <EmptyState message={orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'} style={{ padding: 0 }} />
+            </Card>
           ) : (
             pagedOrders.map(order => (
               <MobileOrderCard
@@ -564,11 +527,11 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
         </div>
       ) : (
         /* Desktop: table */
-        <div style={{ ...glass, overflow: 'hidden' }}>
+        <Card padding={0} style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <tr style={{ borderBottom: `1px solid ${T.border}` }}>
                   <th style={{ ...thStyle, width: 36 }}>#</th>
                   <th style={thStyle}>العميل</th>
                   <SortHeader col="date"  label="التاريخ"  sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
@@ -584,7 +547,7 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
               ) : pagedOrders.length === 0 ? (
                 <tbody>
                   <tr>
-                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>
+                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: T.textMuted, fontSize: 13 }}>
                       {orders.length === 0 ? 'لا توجد طلبات بعد' : 'لا توجد نتائج تطابق الفلتر'}
                     </td>
                   </tr>
@@ -595,28 +558,27 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
                     const expanded = expandedId === order.id
                     const rowNum   = (page - 1) * PAGE_SIZE + idx + 1
                     return (
-                      <>
+                      <Fragment key={order.id}>
                         <tr
-                          key={order.id}
                           style={{
-                            background: expanded ? 'rgba(255,255,255,0.02)' : 'transparent',
+                            background: expanded ? T.pageBg : 'transparent',
                             transition: 'background 0.15s',
                           }}
                         >
-                          <td style={{ ...tdStyle, color: 'rgba(255,255,255,0.25)', fontSize: 11, width: 36 }}>{rowNum}</td>
+                          <td style={{ ...tdStyle, color: T.textMuted, fontSize: 11, width: 36 }}>{rowNum}</td>
 
                           <td style={tdStyle}>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{order.customer_name || '—'}</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: T.textPrimary }}>{order.customer_name || '—'}</div>
                             {order.customer_phone && (
-                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', direction: 'ltr', textAlign: 'right' }}>
+                              <div style={{ fontSize: 11, color: T.textMuted, direction: 'ltr', textAlign: 'right' }}>
                                 {order.customer_phone}
                               </div>
                             )}
                           </td>
 
                           <td style={tdStyle}>
-                            <div style={{ fontSize: 12 }}>{fmtDate(order.created_at)}</div>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{fmtTime(order.created_at)}</div>
+                            <div style={{ fontSize: 12, color: T.textSecond }}>{fmtDate(order.created_at)}</div>
+                            <div style={{ fontSize: 10, color: T.textMuted }}>{fmtTime(order.created_at)}</div>
                           </td>
 
                           <td style={tdStyle}>
@@ -631,8 +593,8 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
                             {order.items?.length > 0 && (
                               <span style={{
                                 fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                                background: 'rgba(255,255,255,0.07)',
-                                color: 'rgba(255,255,255,0.5)',
+                                background: T.pageBg,
+                                color: T.textSecond,
                               }}>
                                 {order.items.length}
                               </span>
@@ -644,9 +606,9 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
                               onClick={() => setExpandedId(expanded ? null : order.id)}
                               style={{
                                 width: 26, height: 26, borderRadius: 6,
-                                background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
-                                border: `1px solid ${expanded ? `${color}44` : 'rgba(255,255,255,0.08)'}`,
-                                color: expanded ? color : 'rgba(255,255,255,0.4)',
+                                background: expanded ? `${color}22` : T.pageBg,
+                                border: `1px solid ${expanded ? `${color}44` : T.border}`,
+                                color: expanded ? color : T.textMuted,
                                 cursor: 'pointer', fontSize: 12,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}
@@ -657,16 +619,16 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
                         </tr>
 
                         {expanded && (
-                          <ExpandedRow key={`${order.id}-exp`} order={order} colSpan={7} currency={currency} />
+                          <ExpandedRow order={order} colSpan={7} currency={currency} />
                         )}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </tbody>
               )}
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Pagination ─────────────────────────────────────────────── */}
