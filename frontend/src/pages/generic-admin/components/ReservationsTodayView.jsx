@@ -240,6 +240,65 @@ const popoverInputStyle = {
   color: T.textPrimary, fontSize: 13, colorScheme: 'light', fontFamily: FONT,
 }
 
+// ── Shared popover positioning (Phase 3.3.2, 2026-08-05) ─────────────────────────────────────────
+// Both popovers below previously clamped independently, always opened downward, and measured
+// against raw `window.innerHeight` -- near the last slots of the day this left the action buttons
+// rendered off-screen with no way to reach them short of scrolling the whole page (Browser
+// Verification: 20:00-21:00 slot, mobile). One shared implementation now: flips above the anchor
+// when there's no room below, and falls back to a height-constrained, internally-scrolling body
+// when neither direction fully fits -- the page itself never needs to scroll.
+//
+// Deliberately NOT written against "the mobile bottom nav's height" (Salman's explicit correction,
+// 2026-08-05): that would need updating the moment this layout changes. Instead this probes the
+// real DOM for whatever is actually occupying the bottom edge of the screen right now -- today's
+// bottom nav, tomorrow's browser chrome/safe-area inset, or anything else -- so it keeps working
+// unchanged regardless of what that turns out to be.
+function getUsableViewportBottom() {
+  const probeXs = [window.innerWidth / 2, window.innerWidth * 0.1, window.innerWidth * 0.9]
+  let usableBottom = window.innerHeight
+  for (const x of probeXs) {
+    let node = document.elementFromPoint(x, window.innerHeight - 2)
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (window.getComputedStyle(node).position === 'fixed') {
+        const rect = node.getBoundingClientRect()
+        if (rect.bottom >= window.innerHeight - 4) usableBottom = Math.min(usableBottom, rect.top)
+        break
+      }
+      node = node.parentElement
+    }
+  }
+  return usableBottom
+}
+
+// Used by both ReservationPopover and CreatePopover -- one positioning implementation, not two
+// independently-maintained ones (a fix applied to only one of a pair like this is exactly the kind
+// of drift that resurfaces as a bug a few months later).
+function usePopoverPosition(anchor, naturalHeight, width = 280) {
+  return useMemo(() => {
+    const margin = 12
+    const usableBottom = getUsableViewportBottom() - margin
+    const usableTop = margin
+    const spaceBelow = usableBottom - anchor.y
+    const spaceAbove = anchor.y - usableTop
+    const left = Math.min(Math.max(anchor.x - 260, margin), window.innerWidth - (width + margin))
+
+    if (spaceBelow >= naturalHeight) {
+      return { top: anchor.y, left, maxHeight: naturalHeight, scroll: false }
+    }
+    if (spaceAbove >= naturalHeight) {
+      return { top: anchor.y - naturalHeight, left, maxHeight: naturalHeight, scroll: false }
+    }
+    // Neither direction fully fits -- open on whichever side has more room, constrain height to
+    // that room, and let the popover's own body scroll internally (each popover's JSX pins its
+    // header and action buttons outside that scrollable region via flex layout). The page itself
+    // never needs to scroll to reach the action buttons.
+    if (spaceBelow >= spaceAbove) {
+      return { top: anchor.y, left, maxHeight: Math.max(spaceBelow, 160), scroll: true }
+    }
+    return { top: usableTop, left, maxHeight: Math.max(spaceAbove, 160), scroll: true }
+  }, [anchor.x, anchor.y, naturalHeight, width])
+}
+
 function ReservationPopover({
   item, serviceName, color, anchor, onClose,
   onStatusChange, onReschedule, onEdit,
@@ -341,6 +400,7 @@ function ReservationPopover({
   }
 
   const popoverHeight = mode === 'edit' ? 460 : mode === 'cancel-confirm' ? 220 : 380
+  const pos = usePopoverPosition(anchor, popoverHeight)
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
   const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
 
@@ -350,92 +410,119 @@ function ReservationPopover({
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
-          top: Math.min(anchor.y, window.innerHeight - popoverHeight),
-          left: Math.min(Math.max(anchor.x - 260, 12), window.innerWidth - 292),
-          width: 280, background: T.cardBg, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: 16, boxShadow: T.shadowPopover,
+          top: pos.top, left: pos.left,
+          width: 280, maxHeight: pos.maxHeight,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: T.cardBg, border: `1px solid ${T.border}`,
+          borderRadius: 14, boxShadow: T.shadowPopover,
           direction: 'rtl', fontFamily: FONT,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        {/* Header -- pinned, never scrolls */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0, padding: '16px 16px 10px' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary }}>{item.customer_name}</div>
           {mode === 'view' && <StatusCell reservation={item} onUpdate={onStatusChange} />}
         </div>
 
-        {mode === 'view' && (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: T.textSecond, marginBottom: 12 }}>
-              <div>📞 {item.customer_phone || '—'}</div>
-              <div>✂️ {serviceName || '—'} · {item.duration_min} دقيقة</div>
-            </div>
-
-            <div style={{ borderTop: `1px solid ${T.borderSoft}`, paddingTop: 12 }}>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>إعادة الجدولة</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
+        {/* Body -- the only region that scrolls when the popover is height-constrained */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
+          {mode === 'view' && (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: T.textSecond, marginBottom: 12 }}>
+                <div>📞 {item.customer_phone || '—'}</div>
+                <div>✂️ {serviceName || '—'} · {item.duration_min} دقيقة</div>
               </div>
+
+              <div style={{ borderTop: `1px solid ${T.borderSoft}`, paddingTop: 12, paddingBottom: 12 }}>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>إعادة الجدولة</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
+                  <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
+                </div>
+                {barbers?.length > 1 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <Dropdown value={moveBarberId} onChange={setMoveBarberId} options={barberOptions} />
+                  </div>
+                )}
+                {moveError && (
+                  <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>
+                    {moveError}
+                  </div>
+                )}
+                <button
+                  onClick={handleMove} disabled={moving || isPending}
+                  style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: `1px solid ${color}55`, background: `${color}18`, color, fontSize: 12, fontWeight: 700, cursor: (moving || isPending) ? 'not-allowed' : 'pointer', fontFamily: FONT }}
+                >
+                  {moving ? 'جارٍ النقل...' : 'نقل الموعد'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === 'edit' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
+              <input placeholder="اسم العميل" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
+              <input placeholder="رقم الهاتف" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
+              <Dropdown value={editServiceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
               {barbers?.length > 1 && (
-                <div style={{ marginBottom: 8 }}>
-                  <Dropdown value={moveBarberId} onChange={setMoveBarberId} options={barberOptions} />
-                </div>
+                <Dropdown value={editBarberId} onChange={setEditBarberId} options={barberOptions} />
               )}
-              {moveError && (
-                <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>
-                  {moveError}
-                </div>
-              )}
-              <button
-                onClick={handleMove} disabled={moving || isPending}
-                style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: `1px solid ${color}55`, background: `${color}18`, color, fontSize: 12, fontWeight: 700, cursor: (moving || isPending) ? 'not-allowed' : 'pointer', fontFamily: FONT }}
-              >
-                {moving ? 'جارٍ النقل...' : 'نقل الموعد'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-              <button
-                onClick={() => setMode('edit')} disabled={isPending}
-                style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textPrimary, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-              >
-                تعديل
-              </button>
-              <button
-                onClick={() => setMode('cancel-confirm')} disabled={isPending}
-                style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.25)', color: T.danger, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-              >
-                إلغاء الحجز
-              </button>
-            </div>
-
-            <button onClick={onClose} style={{ marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, background: 'transparent', border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}>
-              إغلاق
-            </button>
-          </>
-        )}
-
-        {mode === 'edit' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input placeholder="اسم العميل" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
-            <input placeholder="رقم الهاتف" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
-            <Dropdown value={editServiceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
-            {barbers?.length > 1 && (
-              <Dropdown value={editBarberId} onChange={setEditBarberId} options={barberOptions} />
-            )}
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={popoverInputStyle} />
-              <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
-              <input type="number" min={5} step={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
-            </div>
-            {editError && (
-              <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
-                {editError}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={popoverInputStyle} />
+                <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
+                <input type="number" min={5} step={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
+              </div>
+              {editError && (
+                <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+                  {editError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === 'cancel-confirm' && (
+            <div style={{ paddingBottom: 12 }}>
+              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 14, lineHeight: 1.6 }}>
+                متأكد من إلغاء هذا الحجز؟ سيختفي من الكالندر فوراً ويصبح الموعد متاحاً من جديد.
+              </div>
+              {cancelError && (
+                <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 10 }}>
+                  {cancelError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons -- pinned, always reachable without scrolling the page or the popover */}
+        <div style={{ flexShrink: 0, padding: '10px 16px 16px' }}>
+          {mode === 'view' && (
+            <>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => setMode('edit')} disabled={isPending}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textPrimary, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
+                >
+                  تعديل
+                </button>
+                <button
+                  onClick={() => setMode('cancel-confirm')} disabled={isPending}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.25)', color: T.danger, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
+                >
+                  إلغاء الحجز
+                </button>
+              </div>
+              <button onClick={onClose} style={{ marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, background: 'transparent', border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}>
+                إغلاق
+              </button>
+            </>
+          )}
+
+          {mode === 'edit' && (
+            <div style={{ display: 'flex', gap: 6 }}>
               <button
                 onClick={() => setMode('view')} disabled={saving}
                 style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textSecond, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
@@ -449,19 +536,9 @@ function ReservationPopover({
                 {saving ? 'جارٍ الحفظ...' : 'حفظ'}
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {mode === 'cancel-confirm' && (
-          <div>
-            <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 14, lineHeight: 1.6 }}>
-              متأكد من إلغاء هذا الحجز؟ سيختفي من الكالندر فوراً ويصبح الموعد متاحاً من جديد.
-            </div>
-            {cancelError && (
-              <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 10 }}>
-                {cancelError}
-              </div>
-            )}
+          {mode === 'cancel-confirm' && (
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 onClick={() => setMode('view')} disabled={cancelling}
@@ -476,8 +553,8 @@ function ReservationPopover({
                 {cancelling ? 'جارٍ الإلغاء...' : 'نعم، إلغاء الحجز'}
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
@@ -531,6 +608,7 @@ function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReserved
 
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
   const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
+  const pos = usePopoverPosition(anchor, 460)
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
@@ -538,33 +616,45 @@ function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReserved
         onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
-          top: Math.min(anchor.y, window.innerHeight - 460),
-          left: Math.min(Math.max(anchor.x - 260, 12), window.innerWidth - 292),
-          width: 280, background: T.cardBg, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: 16, boxShadow: T.shadowPopover,
+          top: pos.top, left: pos.left,
+          width: 280, maxHeight: pos.maxHeight,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: T.cardBg, border: `1px solid ${T.border}`,
+          borderRadius: 14, boxShadow: T.shadowPopover,
           direction: 'rtl', fontFamily: FONT,
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary, marginBottom: 12 }}>حجز سريع</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Dropdown value={barberId} onChange={setBarberId} options={barberOptions} />
-          <Dropdown value={serviceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
-          <input placeholder="اسم العميل" value={name} onChange={(e) => setName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
-          <input placeholder="رقم الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
-            <input type="number" min={5} step={5} value={duration} onChange={(e) => setDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
-          </div>
-          {error && (
-            <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
-              {error}
+        {/* Header -- pinned, never scrolls */}
+        <div style={{ flexShrink: 0, padding: '16px 16px 12px' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary }}>حجز سريع</div>
+        </div>
+
+        {/* Body -- the only region that scrolls when the popover is height-constrained */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+            <Dropdown value={barberId} onChange={setBarberId} options={barberOptions} />
+            <Dropdown value={serviceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
+            <input placeholder="اسم العميل" value={name} onChange={(e) => setName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
+            <input placeholder="رقم الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
             </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
+              <input type="number" min={5} step={5} value={duration} onChange={(e) => setDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
+            </div>
+            {error && (
+              <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons -- pinned, always reachable without scrolling the page or the popover */}
+        <div style={{ flexShrink: 0, padding: '8px 16px 16px' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button
               onClick={onClose} disabled={saving}
               style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textSecond, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
