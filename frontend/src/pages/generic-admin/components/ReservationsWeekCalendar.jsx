@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import adminApi from '../../../utils/admin.config'
 import { StatusBadge, StatusCell } from '../tabs/ReservationsTab'
+import { T, FONT } from '../theme'
 
 // Sunday-first, matching this codebase's one existing calendar precedent (UnitCalendar.jsx's
 // DAYS_AR) and standard Arabic/RTL calendar convention.
@@ -80,8 +82,8 @@ function NavBtn({ onClick, label, color }) {
       onMouseLeave={() => setHov(false)}
       style={{
         padding: '5px 14px', borderRadius: 7, cursor: 'pointer',
-        fontFamily: "'Cairo', sans-serif", fontSize: 13,
-        background: hov ? `${color}22` : 'transparent',
+        fontFamily: FONT, fontSize: 13,
+        background: hov ? `${color}18` : T.cardBg,
         border: `1px solid ${color}44`, color,
         transition: 'background 0.15s',
       }}
@@ -110,6 +112,26 @@ export default function ReservationsWeekCalendar({
   const [direction, setDirection] = useState(0)
   const [selected, setSelected] = useState(null)
   const [startHour, endHour] = hourRange
+  const [catalogItems, setCatalogItems] = useState([])
+
+  // Fetched here so the detail modal can show a labeled service name instead of a raw JSON dump
+  // (fixed 2026-08-05 -- see the guarded field below, was `<pre>{JSON.stringify(metadata)}</pre>`,
+  // a real violation of this feature's own "never show raw JSON to the owner" rule). Mount-only,
+  // no cache -- same accepted tradeoff ReservationsTodayView.jsx already makes for the same fetch.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  useEffect(() => {
+    adminApi.get('/catalog/items')
+      .then((r) => { if (mountedRef.current) setCatalogItems(r.data?.data ?? []) })
+      .catch(() => { if (mountedRef.current) setCatalogItems([]) })
+  }, [])
+  const serviceNameFor = (item) => {
+    const id = item?.metadata?.service_id
+    return catalogItems.find((c) => c.id === id)?.name_ar ?? null
+  }
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -149,7 +171,7 @@ export default function ReservationsWeekCalendar({
   }
 
   return (
-    <div style={{ direction: 'rtl', fontFamily: "'Cairo', sans-serif" }}>
+    <div style={{ direction: 'rtl', fontFamily: FONT }}>
       {/* Week nav header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <NavBtn label="‹ السابق" onClick={() => goWeek(-1)} color={color} />
@@ -159,7 +181,7 @@ export default function ReservationsWeekCalendar({
             custom={direction} variants={slideVariants}
             initial="enter" animate="center" exit="exit"
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            style={{ fontSize: 13, fontWeight: 700, color: '#fff', minWidth: 140, textAlign: 'center' }}
+            style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, minWidth: 140, textAlign: 'center' }}
           >
             {weekLabel}
           </motion.span>
@@ -171,11 +193,11 @@ export default function ReservationsWeekCalendar({
       </div>
 
       {/* Week grid — horizontally scrollable on narrow screens */}
-      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12 }}>
+      <div style={{ overflowX: 'auto', border: `1px solid ${T.border}`, borderRadius: 12, background: T.cardBg, boxShadow: T.shadow }}>
         <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, minmax(120px, 1fr))`, minWidth: 900 }}>
 
           {/* Header row */}
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} />
+          <div style={{ borderBottom: `1px solid ${T.border}` }} />
           {days.map(d => {
             const isToday = isSameDay(d, today)
             return (
@@ -183,13 +205,13 @@ export default function ReservationsWeekCalendar({
                 key={isoDateKey(d)}
                 style={{
                   padding: '10px 6px', textAlign: 'center',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  borderRight: '1px solid rgba(255,255,255,0.05)',
-                  background: isToday ? `${color}1a` : 'transparent',
+                  borderBottom: `1px solid ${T.border}`,
+                  borderRight: `1px solid ${T.borderSoft}`,
+                  background: isToday ? `${color}12` : 'transparent',
                 }}
               >
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? color : '#fff' }}>
+                <div style={{ fontSize: 11, color: T.textMuted }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? color : T.textPrimary }}>
                   {fmtDayLabel(d)}
                 </div>
               </div>
@@ -203,7 +225,7 @@ export default function ReservationsWeekCalendar({
                 key={h}
                 style={{
                   position: 'absolute', top: i * ROW_HEIGHT_PX - 7, left: 0, right: 4,
-                  fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'left',
+                  fontSize: 10, color: T.textMuted, textAlign: 'left',
                 }}
               >
                 {String(h).padStart(2, '0')}:00
@@ -221,8 +243,8 @@ export default function ReservationsWeekCalendar({
                 key={key}
                 style={{
                   position: 'relative', height: gridHeight,
-                  borderRight: '1px solid rgba(255,255,255,0.05)',
-                  background: isToday ? `${color}0d` : 'transparent',
+                  borderRight: `1px solid ${T.borderSoft}`,
+                  background: isToday ? `${color}08` : 'transparent',
                 }}
               >
                 {/* hour gridlines */}
@@ -231,7 +253,7 @@ export default function ReservationsWeekCalendar({
                     key={h}
                     style={{
                       position: 'absolute', top: i * ROW_HEIGHT_PX, left: 0, right: 0,
-                      borderTop: '1px solid rgba(255,255,255,0.04)', height: ROW_HEIGHT_PX,
+                      borderTop: `1px solid ${T.borderSoft}`, height: ROW_HEIGHT_PX,
                     }}
                   />
                 ))}
@@ -247,16 +269,16 @@ export default function ReservationsWeekCalendar({
                       style={{
                         position: 'absolute', top, height, left: 4, right: 4,
                         borderRadius: 6, padding: '3px 6px', textAlign: 'right',
-                        background: `${color}26`, border: `1px solid ${color}55`,
-                        color: '#fff', fontSize: 11, cursor: 'pointer', overflow: 'hidden',
-                        fontFamily: "'Cairo', sans-serif",
+                        background: `${color}14`, border: `1px solid ${color}55`,
+                        color: T.textPrimary, fontSize: 11, cursor: 'pointer', overflow: 'hidden',
+                        fontFamily: FONT,
                       }}
                       title={`${r.customer_name} — ${fmtTimeUTC(r.reserved_at)}${meta.service_name ? ` — ${meta.service_name}` : ''}`}
                     >
                       <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {r.customer_name}
                       </div>
-                      <div style={{ opacity: 0.75, whiteSpace: 'nowrap' }}>{fmtTimeUTC(r.reserved_at)}</div>
+                      <div style={{ color: T.textSecond, whiteSpace: 'nowrap' }}>{fmtTimeUTC(r.reserved_at)}</div>
                     </button>
                   )
                 })}
@@ -271,48 +293,43 @@ export default function ReservationsWeekCalendar({
         <div
           onClick={() => setSelected(null)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
           }}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: '#16181d', border: '1px solid rgba(255,255,255,0.1)',
+              background: T.cardBg, border: `1px solid ${T.border}`,
               borderRadius: 14, padding: 22, minWidth: 300, maxWidth: 420,
-              direction: 'rtl', fontFamily: "'Cairo', sans-serif",
+              direction: 'rtl', fontFamily: FONT, boxShadow: T.shadowPopover,
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{selected.customer_name}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary }}>{selected.customer_name}</div>
               <StatusCell reservation={selected} onUpdate={onStatusChange} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: T.textSecond }}>
               <div>📞 {selected.customer_phone || '—'}</div>
               {selected.customer_email && <div>✉️ {selected.customer_email}</div>}
               <div>🕐 {fmtTimeUTC(selected.reserved_at)} — {selected.duration_min} دقيقة</div>
               {selected.module_key && <div>🏷️ {selected.module_key}</div>}
               {selected.metadata?.service_name && <div>✂️ {selected.metadata.service_name}</div>}
+              {!selected.metadata?.service_name && serviceNameFor(selected) && (
+                <div>✂️ {serviceNameFor(selected)}</div>
+              )}
               {selected.notes && (
-                <div style={{ marginTop: 6, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: 12 }}>
+                <div style={{ marginTop: 6, paddingTop: 8, borderTop: `1px solid ${T.borderSoft}`, fontSize: 12 }}>
                   {selected.notes}
                 </div>
-              )}
-              {selected.metadata && Object.keys(selected.metadata).length > 0 && (
-                <pre style={{
-                  marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)',
-                  fontSize: 11, color: 'rgba(255,255,255,0.4)', overflow: 'auto', direction: 'ltr',
-                }}>
-                  {JSON.stringify(selected.metadata, null, 2)}
-                </pre>
               )}
             </div>
             <button
               onClick={() => setSelected(null)}
               style={{
                 marginTop: 16, width: '100%', padding: '8px 0', borderRadius: 8,
-                background: 'transparent', border: `1px solid ${color}44`, color,
-                cursor: 'pointer', fontFamily: "'Cairo', sans-serif", fontSize: 13,
+                background: T.pageBg, border: `1px solid ${T.border}`, color: T.textPrimary,
+                cursor: 'pointer', fontFamily: FONT, fontSize: 13,
               }}
             >
               إغلاق
