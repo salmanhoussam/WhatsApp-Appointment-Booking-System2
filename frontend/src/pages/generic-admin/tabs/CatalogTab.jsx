@@ -1,27 +1,26 @@
 import { useState, useEffect, useCallback } from 'react'
 import adminApi       from '../../../utils/admin.config'
 import useImageUpload from '../../../hooks/useImageUpload'
+import { T, FONT } from '../theme'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
+import EmptyState from '../components/ui/EmptyState'
 
-// ── Shared styles ─────────────────────────────────────────────────────────────
-
-const glass = {
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 12,
-}
+// ── Shared styles (Dashboard Design System Completion, 2026-08-05 -- re-themed
+// off the same T/FONT tokens already shipped for Calendar/Reservations/Overview) ──
 
 const inputStyle = {
   width: '100%', padding: '10px 14px', borderRadius: 8,
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#fff', fontSize: 14,
-  fontFamily: "'Cairo', sans-serif",
-  outline: 'none', boxSizing: 'border-box',
+  background: T.cardBg,
+  border: `1px solid ${T.border}`,
+  color: T.textPrimary, fontSize: 14,
+  fontFamily: FONT,
+  outline: 'none', boxSizing: 'border-box', colorScheme: 'light',
 }
 
 const labelStyle = {
   display: 'block', fontSize: 12,
-  color: 'rgba(255,255,255,0.5)',
+  color: T.textSecond,
   marginBottom: 6, letterSpacing: '0.05em',
 }
 
@@ -31,28 +30,29 @@ function Modal({ title, onClose, onSave, saving, children }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(15,23,42,0.5)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 20,
     }} onClick={onClose}>
       <div
         style={{
-          ...glass, background: '#181828',
+          background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: T.shadowPopover,
+          borderRadius: 12,
           width: '100%', maxWidth: 480,
-          padding: 28, fontFamily: "'Cairo', sans-serif",
+          padding: 28, fontFamily: FONT,
         }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer' }}>×</button>
+          <span style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.textMuted, fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
         {children}
         <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '9px 20px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>إلغاء</button>
-          <button onClick={onSave} disabled={saving} style={{ padding: '9px 24px', borderRadius: 8, background: '#6366f1', border: 'none', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontFamily: "'Cairo', sans-serif", opacity: saving ? 0.7 : 1 }}>
+          <Button variant="secondary" onClick={onClose}>إلغاء</Button>
+          <Button variant="primary" onClick={onSave} disabled={saving}>
             {saving ? 'جاري الحفظ...' : 'حفظ'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -252,22 +252,19 @@ export default function CatalogTab({ color }) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div style={{ fontFamily: FONT }}>
       {/* ── Categories ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>الأقسام</span>
-        <button onClick={openCreateCat} style={{ padding: '8px 18px', borderRadius: 8, background: color, border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: "'Cairo', sans-serif" }}>
-          + قسم جديد
-        </button>
+        <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>الأقسام</span>
+        <Button variant="primary" color={color} onClick={openCreateCat}>+ قسم جديد</Button>
       </div>
 
       {catLoading ? (
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>جاري التحميل...</p>
+        <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
       ) : categories.length === 0 ? (
-        <div style={{ ...glass, padding: 32, textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
-          <div style={{ fontSize: 13 }}>لا توجد أقسام بعد — أضف قسمًا للبدء</div>
-        </div>
+        <Card padding={0} style={{ textAlign: 'center' }}>
+          <EmptyState icon="📦" message="لا توجد أقسام بعد — أضف قسمًا للبدء" />
+        </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
           {categories.map(cat => {
@@ -277,15 +274,15 @@ export default function CatalogTab({ color }) {
                 key={cat.id}
                 onClick={() => setSelectedCat(selected ? null : cat)}
                 style={{
-                  ...glass,
+                  borderRadius: 12, border: `1px solid ${selected ? `${color}80` : T.border}`,
                   padding: 16, cursor: 'pointer',
-                  borderColor: selected ? `${color}80` : 'rgba(255,255,255,0.08)',
-                  background:  selected ? `${color}15` : 'rgba(255,255,255,0.04)',
+                  background: selected ? `${color}15` : T.cardBg,
+                  boxShadow: T.shadow,
                   transition: 'all 0.18s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{cat.name_ar}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary }}>{cat.name_ar}</div>
                   {(() => {
                     const meta = MODULE_KEY_META[cat.module_key] ?? MODULE_KEY_META.catalog
                     return (
@@ -295,10 +292,10 @@ export default function CatalogTab({ color }) {
                     )
                   })()}
                 </div>
-                {cat.name_en && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>{cat.name_en}</div>}
+                {cat.name_en && <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>{cat.name_en}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button onClick={e => openEditCat(cat, e)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>تعديل</button>
-                  <button onClick={e => deleteCat(cat, e)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', color: '#ff8080', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>حذف</button>
+                  <Button variant="secondary" size="sm" onClick={e => openEditCat(cat, e)}>تعديل</Button>
+                  <Button variant="danger" size="sm" onClick={e => deleteCat(cat, e)}>حذف</Button>
                 </div>
               </div>
             )
@@ -311,33 +308,31 @@ export default function CatalogTab({ color }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>
                 منتجات — {selectedCat.name_ar}
               </span>
-              <button onClick={() => setSelectedCat(null)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>إغلاق</button>
+              <Button variant="secondary" size="sm" onClick={() => setSelectedCat(null)}>إغلاق</Button>
             </div>
-            <button onClick={openCreateItem} style={{ padding: '8px 18px', borderRadius: 8, background: color, border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: "'Cairo', sans-serif" }}>
-              + منتج جديد
-            </button>
+            <Button variant="primary" color={color} onClick={openCreateItem}>+ منتج جديد</Button>
           </div>
 
           {itemsLoading ? (
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>جاري التحميل...</p>
+            <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
           ) : items.length === 0 ? (
-            <div style={{ ...glass, padding: 28, textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
-              <div style={{ fontSize: 13 }}>لا توجد منتجات في هذا القسم بعد</div>
-            </div>
+            <Card padding={0}>
+              <EmptyState message="لا توجد منتجات في هذا القسم بعد" />
+            </Card>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {items.map(item => (
-                <div key={item.id} style={{ ...glass, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <Card key={item.id} padding="14px 18px" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   {item.image_url && (
                     <img src={item.image_url} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                   )}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name_ar}</div>
-                    {item.name_en && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{item.name_en}</div>}
-                    {item.description_ar && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{item.description_ar}</div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary }}>{item.name_ar}</div>
+                    {item.name_en && <div style={{ fontSize: 11, color: T.textMuted }}>{item.name_en}</div>}
+                    {item.description_ar && <div style={{ fontSize: 12, color: T.textSecond, marginTop: 4 }}>{item.description_ar}</div>}
                   </div>
                   {item.price != null && (
                     <div style={{ fontSize: 14, fontWeight: 700, color, flexShrink: 0 }}>
@@ -345,10 +340,10 @@ export default function CatalogTab({ color }) {
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => openEditItem(item)} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>تعديل</button>
-                    <button onClick={() => deleteItem(item)} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', color: '#ff8080', cursor: 'pointer', fontFamily: "'Cairo', sans-serif" }}>حذف</button>
+                    <Button variant="secondary" size="sm" onClick={() => openEditItem(item)}>تعديل</Button>
+                    <Button variant="danger" size="sm" onClick={() => deleteItem(item)}>حذف</Button>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}
@@ -380,7 +375,7 @@ export default function CatalogTab({ color }) {
               <option value="store">متجر — منتجات حقيقية للبيع (سبراي، واكس...)</option>
             </select>
             {editingCat && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6 }}>
                 لا يمكن تغيير نوع القسم بعد إنشائه — أنشئ قسمًا جديدًا بدلاً من ذلك
               </div>
             )}
@@ -442,10 +437,10 @@ export default function CatalogTab({ color }) {
             <label style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '9px 14px', borderRadius: 8, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.06)',
-              border: `1px dashed ${imageFile ? color : 'rgba(255,255,255,0.15)'}`,
-              color: imageFile ? color : 'rgba(255,255,255,0.45)',
-              fontSize: 13, fontFamily: "'Cairo', sans-serif",
+              background: T.pageBg,
+              border: `1px dashed ${imageFile ? color : T.border}`,
+              color: imageFile ? color : T.textMuted,
+              fontSize: 13, fontFamily: FONT,
               transition: 'border-color .15s, color .15s',
             }}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none"
@@ -474,7 +469,7 @@ export default function CatalogTab({ color }) {
             )}
 
             {uploadError && (
-              <div style={{ fontSize: 12, color: '#ff8080', marginTop: 6 }}>{uploadError}</div>
+              <div style={{ fontSize: 12, color: T.danger, marginTop: 6 }}>{uploadError}</div>
             )}
           </Field>
         </Modal>
