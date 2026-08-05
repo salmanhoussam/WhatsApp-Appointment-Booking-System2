@@ -10,6 +10,7 @@ import ReservationsTab   from './tabs/ReservationsTab'
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
 import useImageUpload     from '../../hooks/useImageUpload'
+import { T, FONT }        from './theme'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icons
@@ -189,7 +190,7 @@ function buildNav(hasReservations) {
 function FullScreenSpinner({ color }) {
   return (
     <div style={{
-      width: '100vw', height: '100vh', background: '#0d0d14',
+      width: '100vw', height: '100vh', background: T.pageBg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
@@ -209,8 +210,8 @@ function ComingSoonTab({ label, color }) {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       minHeight: 400, gap: 14,
-      color: 'rgba(255,255,255,0.25)',
-      fontFamily: "'Cairo', sans-serif",
+      color: T.textMuted,
+      fontFamily: FONT,
     }}>
       <div style={{
         width: 52, height: 52, borderRadius: 14,
@@ -222,8 +223,8 @@ function ComingSoonTab({ label, color }) {
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
       </div>
-      <div style={{ fontSize: 15 }}>{label}</div>
-      <div style={{ fontSize: 12, opacity: 0.55 }}>سيُتاح قريباً</div>
+      <div style={{ fontSize: 15, color: T.textSecond }}>{label}</div>
+      <div style={{ fontSize: 12, color: T.textMuted }}>سيُتاح قريباً</div>
     </div>
   )
 }
@@ -242,16 +243,16 @@ function NavItem({ item, isActive, color, onClick }) {
         padding: '10px 14px', borderRadius: 10,
         border: 'none', cursor: 'pointer',
         // active highlight
-        background:   isActive ? `${color}16` : 'transparent',
+        background:   isActive ? `${color}14` : 'transparent',
         borderLeft:   isActive ? `3px solid ${color}` : '3px solid transparent',
-        color:        isActive ? color : 'rgba(255,255,255,0.42)',
-        fontFamily:   "'Cairo', sans-serif",
+        color:        isActive ? color : T.textSecond,
+        fontFamily:   FONT,
         fontSize:     14, fontWeight: isActive ? 600 : 400,
         direction:    'ltr', textAlign: 'left',
         transition:   'color .15s, background .15s',
       }}
     >
-      <item.Icon size={18} color={isActive ? color : 'rgba(255,255,255,0.32)'} />
+      <item.Icon size={18} color={isActive ? color : T.textMuted} />
       <span style={{ direction: 'rtl' }}>{item.labelAr}</span>
     </motion.button>
   )
@@ -452,8 +453,8 @@ export default function GenericAdminDashboard() {
   return (
     <div style={{
       display: 'flex', minHeight: '100vh',
-      background: '#0d0d14', color: '#fff',
-      fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+      background: T.pageBg, color: T.textPrimary,
+      fontFamily: FONT,
     }}>
 
       {/* Tenant OS Editing Engine — hidden real file input backing the ReplaceMedia Operation.
@@ -475,8 +476,8 @@ export default function GenericAdminDashboard() {
           position: 'fixed', top: 0, left: 0,
           height: '100vh',
           display: 'flex', flexDirection: 'column',
-          background: '#090910',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          background: T.cardBg,
+          borderRight: `1px solid ${T.border}`,
           zIndex: 100,
           padding: '28px 16px 24px',
           boxSizing: 'border-box',
@@ -491,7 +492,7 @@ export default function GenericAdminDashboard() {
             </div>
             <div style={{
               fontSize: 11, marginTop: 5,
-              color: 'rgba(255,255,255,0.24)',
+              color: T.textMuted,
               letterSpacing: '0.1em',
             }}>
               DASHBOARD
@@ -526,13 +527,13 @@ export default function GenericAdminDashboard() {
               padding: '10px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer',
               background: 'transparent',
-              color: 'rgba(255,255,255,0.28)',
-              fontFamily: "'Cairo', sans-serif",
+              color: T.textMuted,
+              fontFamily: FONT,
               fontSize: 14, direction: 'ltr', textAlign: 'left',
               marginTop: 8,
             }}
           >
-            <IconLogout size={17} color="rgba(255,255,255,0.25)" />
+            <IconLogout size={17} color={T.textMuted} />
             <span style={{ direction: 'rtl' }}>خروج</span>
           </motion.button>
 
@@ -564,8 +565,8 @@ export default function GenericAdminDashboard() {
         {isMobile && (
           <header style={{
             padding: '14px 20px',
-            background: '#090910',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: T.cardBg,
+            borderBottom: `1px solid ${T.border}`,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             position: 'sticky', top: 0, zIndex: 50,
             direction: 'rtl',
@@ -575,8 +576,8 @@ export default function GenericAdminDashboard() {
               onClick={handleLogout}
               style={{
                 background: 'transparent', border: 'none',
-                cursor: 'pointer', color: 'rgba(255,255,255,0.35)',
-                fontFamily: "'Cairo', sans-serif", fontSize: 13,
+                cursor: 'pointer', color: T.textMuted,
+                fontFamily: FONT, fontSize: 13,
               }}
             >
               خروج
@@ -588,14 +589,15 @@ export default function GenericAdminDashboard() {
         {!isMobile && (
           <div style={{
             padding: '16px 32px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            borderBottom: `1px solid ${T.border}`,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             direction: 'rtl',
+            background: T.cardBg,
           }}>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
+            <div style={{ fontSize: 13, color: T.textMuted }}>
               {tenantName}
-              <span style={{ margin: '0 8px', opacity: 0.4 }}>›</span>
-              <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <span style={{ margin: '0 8px', opacity: 0.5 }}>›</span>
+              <span style={{ color: T.textPrimary }}>
                 {NAV.find(n => n.id === activeTab)?.labelAr ?? ''}
               </span>
             </div>
@@ -722,11 +724,12 @@ export default function GenericAdminDashboard() {
       {isMobile && (
         <nav style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#090910',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
+          background: T.cardBg,
+          borderTop: `1px solid ${T.border}`,
           display: 'flex',
           zIndex: 100,
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          boxShadow: '0 -2px 12px rgba(15,23,42,0.06)',
         }}>
           {NAV.map(item => {
             const active = activeTab === item.id
@@ -740,14 +743,14 @@ export default function GenericAdminDashboard() {
                   background: 'transparent',
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', gap: 4,
-                  color: active ? color : 'rgba(255,255,255,0.3)',
+                  color: active ? color : T.textMuted,
                   borderTop: active ? `2px solid ${color}` : '2px solid transparent',
                   transition: 'color .15s, border-color .15s',
                 }}
               >
-                <item.Icon size={20} color={active ? color : 'rgba(255,255,255,0.3)'} />
+                <item.Icon size={20} color={active ? color : T.textMuted} />
                 <span style={{
-                  fontSize: 10, fontFamily: "'Cairo', sans-serif",
+                  fontSize: 10, fontFamily: FONT,
                   fontWeight: active ? 600 : 400,
                 }}>
                   {item.labelAr}
