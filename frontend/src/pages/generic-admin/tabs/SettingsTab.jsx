@@ -1,31 +1,28 @@
 import { useState, useEffect, useCallback } from 'react'
 import adminApi from '../../../utils/admin.config'
+import { T, FONT } from '../theme'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
 
 const inputStyle = {
   width: '100%', padding: '11px 14px', borderRadius: 8, boxSizing: 'border-box',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#fff', fontSize: 14,
-  fontFamily: "'Cairo', sans-serif",
-  outline: 'none',
+  background: T.cardBg,
+  border: `1px solid ${T.border}`,
+  color: T.textPrimary, fontSize: 14,
+  fontFamily: FONT,
+  outline: 'none', colorScheme: 'light',
 }
 
 const labelStyle = {
   display: 'block', fontSize: 12,
-  color: 'rgba(255,255,255,0.5)',
+  color: T.textSecond,
   marginBottom: 6, letterSpacing: '0.04em',
 }
 
-const glass = {
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 14, padding: 24,
-}
-
 const sectionTitle = {
-  fontSize: 15, fontWeight: 600,
-  color: 'rgba(255,255,255,0.8)',
-  marginBottom: 14,
+  fontSize: 15, fontWeight: 700,
+  color: T.textPrimary,
+  marginBottom: 18,
 }
 
 function Field({ label, children, hint }) {
@@ -33,7 +30,7 @@ function Field({ label, children, hint }) {
     <div style={{ marginBottom: 20 }}>
       <label style={labelStyle}>{label}</label>
       {children}
-      {hint && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: T.textMuted, marginTop: 5 }}>{hint}</div>}
     </div>
   )
 }
@@ -53,11 +50,11 @@ function OptionGroup({ options, value, onChange, color }) {
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
               padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-              border: `1.5px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
-              background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
-              color: active ? color : 'rgba(255,255,255,0.45)',
+              border: `1.5px solid ${active ? color : T.border}`,
+              background: active ? `${color}18` : T.pageBg,
+              color: active ? color : T.textMuted,
               fontSize: 11, fontWeight: active ? 700 : 400,
-              fontFamily: "'Cairo', sans-serif",
+              fontFamily: FONT,
               transition: 'all 0.18s',
               minWidth: 64,
             }}
@@ -119,45 +116,38 @@ function StoreQRSection({ color }) {
   }
 
   return (
-    <>
-      <div style={{ ...sectionTitle, marginBottom: 14 }}>رابط متجرك ورمز QR</div>
-      <div style={{ ...glass, marginBottom: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        {loading && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>جاري التوليد...</div>}
-        {error && <div style={{ fontSize: 13, color: '#ff8080' }}>{error}</div>}
-        {qr && (
-          <>
-            <img
-              src={`data:image/png;base64,${qr.image_b64}`}
-              alt="QR code لمتجرك"
-              style={{ width: 140, height: 140, borderRadius: 10, background: '#fff', padding: 8 }}
-            />
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                اطبع هذا الرمز واعرضه في متجرك — يفتح الزبون المتجر مباشرة من هاتفه
-              </div>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '8px 12px',
-              }}>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', direction: 'ltr', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {qr.url}
-                </span>
-                <button
-                  onClick={copyLink}
-                  style={{
-                    padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                    border: `1px solid ${color}55`, background: 'transparent', color,
-                    cursor: 'pointer', fontFamily: "'Cairo', sans-serif", flexShrink: 0,
-                  }}
-                >
-                  {copied ? '✓ تم النسخ' : 'نسخ الرابط'}
-                </button>
-              </div>
+    <Card style={{ marginBottom: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ ...sectionTitle, marginBottom: 0, width: '100%' }}>رابط متجرك ورمز QR</div>
+      {loading && <div style={{ fontSize: 13, color: T.textMuted }}>جاري التوليد...</div>}
+      {error && <div style={{ fontSize: 13, color: T.danger }}>{error}</div>}
+      {qr && (
+        <>
+          {/* QR quiet-zone background stays literal white regardless of theme -- required for
+              the code to scan correctly, not a dark-theme leftover. */}
+          <img
+            src={`data:image/png;base64,${qr.image_b64}`}
+            alt="QR code لمتجرك"
+            style={{ width: 140, height: 140, borderRadius: 10, background: '#fff', padding: 8, border: `1px solid ${T.border}` }}
+          />
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 12, color: T.textSecond, marginBottom: 8 }}>
+              اطبع هذا الرمز واعرضه في متجرك — يفتح الزبون المتجر مباشرة من هاتفه
             </div>
-          </>
-        )}
-      </div>
-    </>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: T.pageBg, borderRadius: 8, padding: '8px 12px',
+            }}>
+              <span style={{ fontSize: 12, color: T.textPrimary, direction: 'ltr', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {qr.url}
+              </span>
+              <Button variant="secondary" size="sm" color={color} onClick={copyLink} style={{ flexShrink: 0 }}>
+                {copied ? '✓ تم النسخ' : 'نسخ الرابط'}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
 
@@ -229,11 +219,11 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
   }
 
   return (
-    <div style={{ maxWidth: 580 }}>
+    <div style={{ maxWidth: 580, fontFamily: FONT }}>
 
       {/* ── Branding ──────────────────────────────────────────────────── */}
-      <div style={{ ...sectionTitle, marginBottom: 14 }}>معلومات المتجر</div>
-      <div style={{ ...glass, marginBottom: 20 }}>
+      <Card style={{ marginBottom: 20 }}>
+        <div style={sectionTitle}>معلومات المتجر</div>
         <Field label="الاسم بالعربي">
           <input style={inputStyle} value={form.name_ar} onChange={set('name_ar')} placeholder="مثال: صالون روز" />
         </Field>
@@ -254,7 +244,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
               onChange={set('primary_color')}
               style={{
                 width: 52, height: 44, borderRadius: 8, cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.15)',
+                border: `1px solid ${T.border}`,
                 background: 'none', padding: 4,
               }}
             />
@@ -268,18 +258,18 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
             <div style={{
               width: 44, height: 44, borderRadius: 8, flexShrink: 0,
               background: form.primary_color,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: `1px solid ${T.border}`,
             }} />
           </div>
         </Field>
-      </div>
+      </Card>
 
       {/* ── Store QR ──────────────────────────────────────────────────── */}
       <StoreQRSection color={form.primary_color} />
 
       {/* ── Design & Templates ────────────────────────────────────────── */}
-      <div style={{ ...sectionTitle, marginBottom: 14 }}>التصميم والمظهر</div>
-      <div style={{ ...glass, marginBottom: 20 }}>
+      <Card style={{ marginBottom: 20 }}>
+        <div style={sectionTitle}>التصميم والمظهر</div>
 
         <Field label="نمط الصفحة الرئيسية" hint="يتغير تصميم قسم الـ Hero">
           <OptionGroup
@@ -316,18 +306,18 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           direction: 'rtl',
         }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>معاينة اللون</span>
+          <span style={{ fontSize: 12, color: T.textSecond }}>معاينة اللون</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: form.primary_color }} />
             <div style={{ width: 28, height: 28, borderRadius: 6, background: `${form.primary_color}44` }} />
             <div style={{ width: 28, height: 28, borderRadius: 6, background: `${form.primary_color}18` }} />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* ── Hero Text ─────────────────────────────────────────────────── */}
-      <div style={{ ...sectionTitle, marginBottom: 14 }}>نصوص الصفحة الرئيسية</div>
-      <div style={{ ...glass, marginBottom: 20 }}>
+      <Card style={{ marginBottom: 20 }}>
+        <div style={sectionTitle}>نصوص الصفحة الرئيسية</div>
         <Field label="العنوان الرئيسي" hint="يظهر بدلاً من اسم المتجر">
           <input style={inputStyle} value={form.hero_title_ar} onChange={set('hero_title_ar')} placeholder="مثال: اكتشفي عالم الجمال" />
         </Field>
@@ -339,14 +329,14 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
         <Field label="نص زر التواصل">
           <input style={inputStyle} value={form.hero_cta_ar} onChange={set('hero_cta_ar')} placeholder="تواصل معنا" />
         </Field>
-      </div>
+      </Card>
 
       {/* ── Feedback + Save ───────────────────────────────────────────── */}
       {error && (
         <div style={{
           padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)',
-          color: '#ff8080', fontSize: 13, marginBottom: 16,
+          background: T.dangerSoft, border: `1px solid ${T.danger}33`,
+          color: T.danger, fontSize: 13, marginBottom: 16,
         }}>
           {error}
         </div>
@@ -354,28 +344,22 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
       {success && (
         <div style={{
           padding: '10px 14px', borderRadius: 8,
-          background: 'rgba(80,200,120,0.1)', border: '1px solid rgba(80,200,120,0.2)',
-          color: '#60d080', fontSize: 13, marginBottom: 16,
+          background: T.greenSoft, border: `1px solid ${T.green}33`,
+          color: T.green, fontSize: 13, marginBottom: 16,
         }}>
           ✓ تم حفظ الإعدادات بنجاح — الصفحة العامة ستتحدث خلال ثوانٍ
         </div>
       )}
 
-      <button
+      <Button
+        variant="primary"
+        color={color}
         onClick={handleSave}
         disabled={saving}
-        style={{
-          width: '100%', padding: '12px 0', borderRadius: 10,
-          background: saving ? 'rgba(255,255,255,0.08)' : color,
-          border: 'none',
-          color: '#fff', fontSize: 14, fontWeight: 600,
-          fontFamily: "'Cairo', sans-serif",
-          cursor: saving ? 'wait' : 'pointer',
-          transition: 'background 0.2s',
-        }}
+        style={{ width: '100%', padding: '12px 0' }}
       >
         {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
-      </button>
+      </Button>
     </div>
   )
 }

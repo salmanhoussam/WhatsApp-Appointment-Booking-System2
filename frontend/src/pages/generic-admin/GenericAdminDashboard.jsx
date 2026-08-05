@@ -621,13 +621,13 @@ export default function GenericAdminDashboard() {
               {/* Left: live iframe preview */}
               <div style={{
                 flex: 1, display: 'flex', flexDirection: 'column',
-                background: '#060609', borderRight: '1px solid rgba(255,255,255,0.06)',
+                background: T.pageBg, borderRight: `1px solid ${T.border}`,
                 minWidth: 0,
               }}>
                 {/* Fake browser chrome */}
                 <div style={{
                   padding: '10px 16px',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  borderBottom: `1px solid ${T.border}`,
                   display: 'flex', alignItems: 'center', gap: 6,
                   flexShrink: 0,
                 }}>
@@ -636,16 +636,16 @@ export default function GenericAdminDashboard() {
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
                   <div style={{
                     marginRight: 10, flex: 1, padding: '4px 12px', borderRadius: 6,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                    fontSize: 11, color: 'rgba(255,255,255,0.2)',
+                    background: T.cardBg,
+                    border: `1px solid ${T.border}`,
+                    fontSize: 11, color: T.textMuted,
                     fontFamily: 'monospace', direction: 'ltr',
                     overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                   }}>
                     /demo/{settings?.slug}
                   </div>
                   <div style={{
-                    fontSize: 10, color: 'rgba(255,255,255,0.2)',
+                    fontSize: 10, color: T.textMuted,
                     letterSpacing: '0.06em',
                   }}>
                     LIVE
@@ -670,7 +670,7 @@ export default function GenericAdminDashboard() {
                 ) : (
                   <div style={{
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'rgba(255,255,255,0.15)', fontSize: 13,
+                    color: T.textMuted, fontSize: 13,
                   }}>
                     جاري التحميل...
                   </div>
