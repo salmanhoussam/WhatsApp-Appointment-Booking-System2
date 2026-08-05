@@ -153,9 +153,10 @@ class ReservationRepository:
         return await self.find_by_id(reservation_id, client_id)
 
     async def update_fields(self, reservation_id: str, client_id: str, data: dict):
-        """Generic tenant-scoped patch -- used by reschedule_reservation() (time/barber change).
-        Same update_many()-then-refetch shape as update_status()/cancel() above, for the same
-        reason (this prisma-client-py version's update_many() returns a row count, not a row)."""
+        """Generic tenant-scoped patch -- used by edit_reservation() (time/barber/duration/name/
+        phone/service change, Phase 3.1 reschedule + Phase 3.2 full Edit, one function). Same
+        update_many()-then-refetch shape as update_status()/cancel() above, for the same reason
+        (this prisma-client-py version's update_many() returns a row count, not a row)."""
         updated_count = await self.db.reservation.update_many(
             where={"id": reservation_id, "clientId": client_id},
             data=data,
