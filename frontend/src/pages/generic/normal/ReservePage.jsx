@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate }           from 'react-router-dom'
 import { motion }                from 'framer-motion'
 import {
@@ -228,11 +228,31 @@ function StaffCarousel({ barbers, selectedBarberId, onChoose }) {
   )
 }
 
+// Real-Time Calendar Awareness (Phase 3.3.1, 2026-08-05) -- local date-only "today" check, matching
+// useReservationBooking.js's own todayUTC()/isoOf() convention (Date.UTC from local Y/M/D, then
+// sliced to YYYY-MM-DD) without needing to change that hook -- it's read-only for this feature.
+function isTodayIso(iso) {
+  const now = new Date()
+  const todayIso = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10)
+  return iso === todayIso
+}
+
 function CalendarPanel({ booking }) {
   const {
     monthGrid, goPrevMonth, goNextMonth, monthOffset, weekdaysShort,
     selectedDate, chooseDate, slots, slotsLoading, selectedSlot, chooseSlot, formatArabicDate,
   } = booking
+
+  // Bring the earliest (first) slot into view when viewing today -- no "find slot near now" search
+  // of our own: the backend already returns slots past-filtered and chronologically ordered, so the
+  // first slot in the array is already the correct one. Runs once slots finish loading for today;
+  // does nothing when slots is empty (Scenario 4) or when a non-today date is selected.
+  const firstSlotRef = useRef(null)
+  useEffect(() => {
+    if (!slotsLoading && slots.length > 0 && isTodayIso(selectedDate)) {
+      firstSlotRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [slotsLoading, slots, selectedDate])
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
@@ -311,11 +331,12 @@ function CalendarPanel({ booking }) {
         )}
         {!slotsLoading && slots.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
-            {slots.map((s) => {
+            {slots.map((s, i) => {
               const active = selectedSlot?.time === s.time
               return (
                 <button
                   key={s.time}
+                  ref={i === 0 ? firstSlotRef : undefined}
                   onClick={() => chooseSlot(s)}
                   style={{
                     padding: '10px 0', borderRadius: 10, cursor: 'pointer',
