@@ -380,52 +380,91 @@ async def cancel_by_customer(client_id: str, reservation_id: str, customer_phone
     return await repo.cancel(reservation_id, client_id, customer_phone)
 
 
-async def reschedule_reservation(
-    client_id:       str,
-    reservation_id:  str,
-    new_reserved_at: datetime,
-    new_barber_id:   str | None = None,
+async def edit_reservation(
+    client_id:           str,
+    reservation_id:      str,
+    new_reserved_at:      datetime | None = None,
+    new_barber_id:         str | None = None,
+    new_duration_min:      int | None = None,
+    new_customer_name:     str | None = None,
+    new_customer_phone:    str | None = None,
+    new_service_id:        str | None = None,
 ) -> dict | None:
     """
-    Admin Dashboard Calendar drag-and-drop reschedule (Phase 3.1, 2026-08-03). Deliberately NOT a
-    new conflict/availability engine -- reuses the exact same Working Hours (_check_working_hours)
-    and Conflict Check (_has_conflict / find_overlapping_by_barber) stages create_reservation()
-    already uses, applied to an existing row instead of a new one. React never decides whether a
-    slot is free; it only calls this and reacts to success/409.
+    Admin Dashboard Calendar mutation for an EXISTING reservation -- covers drag-and-drop reschedule
+    (Phase 3.1, 2026-08-03), the popover's non-drag mini-reschedule form, and full Edit (service/
+    duration/name/phone, Phase 3.2, 2026-08-05), all through one function per the "One Capability,
+    One Contract, One Service" rule (rules/backend/architecture.md §9) -- deliberately NOT a second,
+    divergent conflict-checking path. Renamed from reschedule_reservation() (Phase 3.1); the drag and
+    mini-reschedule callers are unchanged in behavior -- they simply never populate the new optional
+    duration/name/phone/service params. React never decides whether a slot is free; it only calls
+    this and reacts to success/409.
+
+    Working Hours + Conflict Check only run when the SCHEDULE actually changes (time, duration, or
+    barber) -- a name/phone/service-only edit must not be blocked by a check that has nothing to do
+    with what's actually changing, and must not be blocked by the reservation's OWN existing time
+    already being in the past.
     """
     repo = ReservationRepository(prisma_client)
     existing = await repo.find_by_id(reservation_id, client_id)
     if not existing:
         return None
 
-    if new_reserved_at < datetime.now(timezone.utc):
+    if new_reserved_at is not None and new_reserved_at < datetime.now(timezone.utc):
         raise ValueError("Cannot reschedule to a past time slot.")
 
-    target_barber_id = new_barber_id or getattr(existing, "barberId", None)
+    effective_reserved_at = new_reserved_at if new_reserved_at is not None else existing.reservedAt
+    effective_duration    = new_duration_min if new_duration_min is not None else existing.durationMin
+    target_barber_id      = new_barber_id if new_barber_id is not None else getattr(existing, "barberId", None)
 
-    patch: dict = {"reservedAt": new_reserved_at}
+    schedule_changed = (
+        (new_reserved_at is not None and new_reserved_at != existing.reservedAt) or
+        (new_duration_min is not None and new_duration_min != existing.durationMin) or
+        (new_barber_id is not None and new_barber_id != existing.barberId)
+    )
 
-    if existing.moduleKey == "barber" and target_barber_id:
+    patch: dict = {}
+    if new_reserved_at is not None:
+        patch["reservedAt"] = new_reserved_at
+    if new_duration_min is not None:
+        patch["durationMin"] = new_duration_min
+    if new_customer_name is not None:
+        patch["customerName"] = new_customer_name
+    if new_customer_phone is not None:
+        patch["customerPhone"] = new_customer_phone
+
+    if existing.moduleKey == "barber" and target_barber_id and schedule_changed:
         barber = await barber_repo.find_barber(client_id, target_barber_id)
         if not barber:
             raise ValueError("Barber not found for this tenant.")
         if not barber.isActive:
             raise ValueError("This barber is not currently accepting reservations.")
 
-        _check_working_hours(new_reserved_at, barber.workingHours or {})
+        _check_working_hours(effective_reserved_at, barber.workingHours or {})
 
         conflicts = await repo.find_overlapping_by_barber(
-            client_id, target_barber_id, new_reserved_at, existing.durationMin,
+            client_id, target_barber_id, effective_reserved_at, effective_duration,
             exclude_id=reservation_id,
         )
-        if _has_conflict(conflicts, new_reserved_at, existing.durationMin):
+        if _has_conflict(conflicts, effective_reserved_at, effective_duration):
             raise ValueError("This time slot conflicts with an existing reservation.")
 
         if target_barber_id != existing.barberId:
             patch["barberId"] = target_barber_id
-            meta = dict(existing.metadata or {})
-            meta["barber_id"] = target_barber_id
-            patch["metadata"] = Json(meta)
+
+    # metadata.barber_id / metadata.service_id merged independently of the schedule_changed gate --
+    # a service-only edit still needs metadata.service_id to update even though no conflict-check
+    # runs for it. "barberId" in patch is only ever set inside the conflict-checked block above.
+    if new_service_id is not None or "barberId" in patch:
+        meta = dict(existing.metadata or {})
+        if new_service_id is not None:
+            meta["service_id"] = new_service_id
+        if "barberId" in patch:
+            meta["barber_id"] = patch["barberId"]
+        patch["metadata"] = Json(meta)
+
+    if not patch:
+        return _fmt(existing)
 
     updated = await repo.update_fields(reservation_id, client_id, patch)
     return _fmt(updated) if updated else None
