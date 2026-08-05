@@ -233,7 +233,11 @@ async def create_reservation(
             status_code=400,
             detail=f"Invalid module_key. Use: {CREATE_VALID_MODULE_KEYS}",
         )
-    if body.reserved_at < datetime.now(timezone.utc):
+    # Phase 1.x fix (2026-08-05, same root cause as get_available_slots()'s past-slot filter):
+    # body.reserved_at is a naive-local wall-clock value labeled UTC (no real conversion) -- `now`
+    # must be built the same way, not the TRUE UTC instant, or this guard is wrong by the tenant's
+    # real UTC offset.
+    if body.reserved_at < datetime.now().replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="Cannot reserve a past time slot.")
 
     try:

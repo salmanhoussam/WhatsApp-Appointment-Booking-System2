@@ -410,7 +410,12 @@ async def edit_reservation(
     if not existing:
         return None
 
-    if new_reserved_at is not None and new_reserved_at < datetime.now(timezone.utc):
+    # Phase 1.x fix (2026-08-05, same root cause as get_available_slots()'s past-slot filter):
+    # new_reserved_at is a naive-local wall-clock value labeled UTC (no real conversion, the
+    # convention _check_working_hours() documents) -- comparing it against the TRUE UTC instant
+    # made this guard wrong by the tenant's real UTC offset. `now` built the same naive-local way.
+    now = datetime.now().replace(tzinfo=timezone.utc)
+    if new_reserved_at is not None and new_reserved_at < now:
         raise ValueError("Cannot reschedule to a past time slot.")
 
     effective_reserved_at = new_reserved_at if new_reserved_at is not None else existing.reservedAt
