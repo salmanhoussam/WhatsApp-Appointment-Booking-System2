@@ -56,6 +56,18 @@ function todayISODate() {
   const now = new Date()
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10)
 }
+// This grid's own `reserved_at` values, `fmtTimeUTC`, and `todayISODate` all use UTC-field
+// accessors to represent the tenant's wall-clock time directly (no real timezone conversion
+// anywhere in this file) -- any "now" built for this grid must be built the same way, from the
+// browser's LOCAL hour/minute mapped into UTC fields, not `new Date().toISOString()`'s true UTC
+// instant, or it silently disagrees with every card on the same grid.
+function fakeNowIso() {
+  const now = new Date()
+  return new Date(Date.UTC(
+    now.getFullYear(), now.getMonth(), now.getDate(),
+    now.getHours(), now.getMinutes(), now.getSeconds()
+  )).toISOString()
+}
 const AR_WEEKDAYS_FULL = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 function fmtDayNav(dateISO) {
   const d = new Date(`${dateISO}T00:00:00Z`)
@@ -481,8 +493,8 @@ function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReserved
   const [serviceId, setServiceId] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [date, setDate] = useState((defaultReservedAt || new Date().toISOString()).slice(0, 10))
-  const [time, setTime] = useState(fmtTimeUTC(defaultReservedAt || new Date().toISOString()))
+  const [date, setDate] = useState((defaultReservedAt || fakeNowIso()).slice(0, 10))
+  const [time, setTime] = useState(fmtTimeUTC(defaultReservedAt || fakeNowIso()))
   const [duration, setDuration] = useState(30)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -761,17 +773,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
   const isToday = date === todayISODate()
   const nowIndex = useMemo(() => {
     if (!isToday) return null
-    // This grid's own `reserved_at` values, `fmtTimeUTC`, and `todayISODate` all use UTC-field
-    // accessors to represent the tenant's wall-clock time directly (no real timezone conversion
-    // anywhere in this file) -- "now" must be built the same way, from the browser's LOCAL
-    // hour/minute mapped into UTC fields, not `new Date().toISOString()`'s true UTC instant, or
-    // the indicator would silently disagree with every card on the same grid.
-    const now = new Date()
-    const fakeNowIso = new Date(Date.UTC(
-      now.getFullYear(), now.getMonth(), now.getDate(),
-      now.getHours(), now.getMinutes(), now.getSeconds()
-    )).toISOString()
-    const idx = quarterIndexFromIso(fakeNowIso, startHour)
+    const idx = quarterIndexFromIso(fakeNowIso(), startHour)
     const maxIndex = (endHour - startHour) * 4
     return (idx >= 0 && idx <= maxIndex) ? idx : null
   }, [isToday, startHour, endHour, nowTick])
