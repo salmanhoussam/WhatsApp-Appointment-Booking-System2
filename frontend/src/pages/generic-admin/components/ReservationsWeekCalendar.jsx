@@ -1,7 +1,13 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  fmtTimeUTC, isoAtQuarter, VISIBLE_STATUSES, ReservationPopover, CreatePopover,
+  DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
+  useDroppable, useDraggable, closestCorners,
+} from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
+import {
+  fmtTimeUTC, isoAtQuarter, quarterIndexFromIso, VISIBLE_STATUSES,
+  ReservationPopover, CreatePopover,
 } from './reservationInteractions'
 import { T, FONT } from '../theme'
 
@@ -70,6 +76,101 @@ const slideVariants = {
   exit: d => ({ x: d * -30, opacity: 0 }),
 }
 
+// ── Draggable reservation card (Phase 3.4 Item 4, 2026-08-06) ──────────────────────────────────
+// Same split Today uses (ReservationCard/ReservationCardBody): the outer node carries
+// useDraggable's positioning/listeners, the inner button is pure presentation, reused unstyled by
+// DragOverlay's floating copy. Extracted into real components (not inlined in a .map()) because
+// hooks -- useDraggable here, useDroppable on WeekDayColumn below -- cannot be called inside a
+// render-time loop callback.
+function WeekReservationCardBody({ item, color, pending, onOpen, isOverlay }) {
+  const meta = item.metadata || {}
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); if (!pending) onOpen?.(item, e) }}
+      style={{
+        width: '100%', height: '100%', boxSizing: 'border-box',
+        borderRadius: 6, padding: '3px 6px', textAlign: 'right',
+        background: `${color}14`, border: `1px solid ${color}55`,
+        color: T.textPrimary, fontSize: 11, overflow: 'hidden', fontFamily: FONT,
+        cursor: isOverlay ? 'grabbing' : (pending ? 'wait' : 'grab'),
+        boxShadow: isOverlay ? T.shadowLg : 'none',
+        opacity: pending ? 0.5 : 1,
+      }}
+      title={`${item.customer_name} — ${fmtTimeUTC(item.reserved_at)}${meta.service_name ? ` — ${meta.service_name}` : ''}`}
+    >
+      <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {item.customer_name}
+      </div>
+      <div style={{ color: T.textSecond, whiteSpace: 'nowrap' }}>{fmtTimeUTC(item.reserved_at)}</div>
+    </button>
+  )
+}
+
+function WeekReservationCard({ item, top, height, color, pending, onOpen }) {
+  const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({ id: item.id, disabled: pending })
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        position: 'absolute', top, height, left: 4, right: 4,
+        transform: CSS.Translate.toString(transform),
+        opacity: isDragging ? 0 : 1,
+        zIndex: isDragging ? 5 : 1,
+        pointerEvents: isDragging ? 'none' : 'auto',
+        touchAction: 'none',
+      }}
+    >
+      <WeekReservationCardBody item={item} color={color} pending={pending} onOpen={onOpen} />
+    </div>
+  )
+}
+
+// One droppable per day column -- 7 real droppables, unlike Today's single-visible-column case
+// (Today's `over.id` is never actually read since only one column ever renders at a time; this is
+// the first real exercise of dnd-kit's collision resolution in this feature).
+function WeekDayColumn({
+  day, dayKey, dayReservations, gridHeight, hours, startHour, color, isToday,
+  pendingIds, onEmptySlotClick, onOpen,
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dayKey })
+  return (
+    <div
+      ref={setNodeRef}
+      onClick={(e) => onEmptySlotClick(day, e)}
+      style={{
+        position: 'relative', height: gridHeight, cursor: 'copy',
+        borderRight: `1px solid ${T.borderSoft}`,
+        background: isOver ? `${color}12` : (isToday ? `${color}08` : 'transparent'),
+      }}
+    >
+      {/* hour gridlines */}
+      {hours.map((h, i) => (
+        <div
+          key={h}
+          style={{
+            position: 'absolute', top: i * ROW_HEIGHT_PX, left: 0, right: 0,
+            borderTop: `1px solid ${T.borderSoft}`, height: ROW_HEIGHT_PX,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+
+      {dayReservations.map(r => {
+        const top = Math.max(0, Math.min(topPx(r.reserved_at, startHour), gridHeight - 22))
+        const height = Math.min(heightPx(r.duration_min), gridHeight - top)
+        return (
+          <WeekReservationCard
+            key={r.id} item={r} top={top} height={height} color={color}
+            pending={pendingIds.has(r.id)} onOpen={onOpen}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 function NavBtn({ onClick, label, color }) {
   const [hov, setHov] = useState(false)
   return (
@@ -117,9 +218,19 @@ export default function ReservationsWeekCalendar({
   const [createSlot, setCreateSlot] = useState(null) // { reservedAt, anchor } -- Phase 3.4 Item 2
   const [startHour, endHour] = hourRange
 
+  // Local, optimistically-updated copy of `reservations` (Phase 3.4 Item 4) -- same pattern
+  // ReservationsTodayView.jsx already uses for its own drag path: the parent's `reservations`
+  // prop is the source of truth, `items` lets a drag show the new position instantly while the
+  // PATCH is in flight, then either the parent's next real fetch confirms it or a 409 reverts it.
+  const [items, setItems] = useState(reservations)
+  useEffect(() => { setItems(reservations) }, [reservations])
+  const [activeId, setActiveId] = useState(null)
+  const [conflictMsg, setConflictMsg] = useState(null)
+  const snapshotRef = useRef(items)
+
   // In-flight-mutation guard, same pattern ReservationsTodayView.jsx already uses locally -- a
-  // Set of reservation ids currently mid-mutation via the popover, so a second action can't race
-  // the first on the same row. Small local UI state, not business logic, so it's written fresh
+  // Set of reservation ids currently mid-mutation via the popover OR a drag, so neither can race
+  // the other on the same row. Small local UI state, not business logic, so it's written fresh
   // here rather than extracted (Phase 3.4 Step 0's own evaluation of what's worth sharing).
   const [pendingIds, setPendingIds] = useState(() => new Set())
   const markPending = useCallback((id) => {
@@ -149,7 +260,7 @@ export default function ReservationsWeekCalendar({
 
   const byDay = useMemo(() => {
     const map = new Map(days.map(d => [isoDateKey(d), []]))
-    for (const r of reservations) {
+    for (const r of items) {
       if (!r.reserved_at) continue
       if (!VISIBLE_STATUSES.includes(r.status)) continue
       const key = isoDateKey(new Date(r.reserved_at))
@@ -159,7 +270,7 @@ export default function ReservationsWeekCalendar({
       arr.sort((a, b) => new Date(a.reserved_at) - new Date(b.reserved_at))
     }
     return map
-  }, [days, reservations])
+  }, [days, items])
 
   const hours = useMemo(
     () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
@@ -185,6 +296,64 @@ export default function ReservationsWeekCalendar({
     const reservedAt = isoAtQuarter(isoDateKey(day), startHour, quarterIndex)
     setCreateSlot({ reservedAt, anchor: { x: e.clientX, y: e.clientY } })
   }, [hours.length, startHour])
+
+  // Drag-and-drop (Phase 3.4 Item 4) -- same technique Today's own handleDragEnd uses (origin
+  // quarter-index + delta.y, not a fine-grained per-cell droppable), extended with one real new
+  // piece: `over.id` now identifies which DAY column the card was dropped into, since Week's grid
+  // is genuinely 2D (day x time) where Today's is 1D (a single visible staff column, time only).
+  // Day columns are all vertically aligned siblings at the same baseline, so `delta.y` (raw pointer
+  // movement) is valid for the time computation regardless of which column it lands in
+  // horizontally -- this is geometry translation, not new business logic; the actual conflict/
+  // working-hours validation still happens entirely server-side, same PATCH .../reschedule route
+  // Today's own drag already calls.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor,   { activationConstraint: { delay: 200, tolerance: 6 } }),
+  )
+  const activeItem = activeId ? items.find((i) => i.id === activeId) : null
+
+  const handleDragStart = useCallback(({ active }) => {
+    setActiveId(active.id)
+    snapshotRef.current = items
+  }, [items])
+
+  const handleDragEnd = useCallback(async ({ active, over, delta }) => {
+    setActiveId(null)
+    if (!over) return
+
+    const current = items.find((i) => i.id === active.id)
+    if (!current) return
+
+    const targetDayKey = over.id // WeekDayColumn's droppable id -- the isoDateKey() string of the day dropped into
+    const originIndex = quarterIndexFromIso(current.reserved_at, startHour)
+    const originTop = originIndex * WEEK_QUARTER_PX
+    const newTop = originTop + delta.y
+    const maxIndex = hours.length * 4 - Math.round(current.duration_min / 15)
+    const newIndex = Math.max(0, Math.min(Math.round(newTop / WEEK_QUARTER_PX), maxIndex))
+    const newReservedAt = isoAtQuarter(targetDayKey, startHour, newIndex)
+
+    // Same instant-comparison guard Today uses -- .getTime(), not string comparison (the API
+    // returns a "+00:00"-suffixed ISO string, isoAtQuarter()/toISOString() produce a "Z"-suffixed
+    // one; those never string-match for the same instant).
+    const sameTime = new Date(current.reserved_at).getTime() === new Date(newReservedAt).getTime()
+    if (sameTime) return
+
+    const snapshot = items
+    markPending(active.id)
+    setItems((prev) => prev.map((i) => (
+      i.id === active.id ? { ...i, reserved_at: newReservedAt } : i
+    )))
+
+    try {
+      await onReschedule(active.id, { reserved_at: newReservedAt })
+    } catch (err) {
+      setItems(snapshot)
+      setConflictMsg(err?.response?.data?.error?.message || 'تعذر نقل الحجز إلى هذا الموعد.')
+      setTimeout(() => setConflictMsg(null), 4000)
+    } finally {
+      clearPending(active.id)
+    }
+  }, [items, startHour, hours.length, onReschedule, markPending, clearPending])
 
   const goWeek = (delta) => {
     setDirection(delta)
@@ -218,103 +387,90 @@ export default function ReservationsWeekCalendar({
         </div>
       </div>
 
-      {/* Week grid — horizontally scrollable on narrow screens */}
-      <div style={{ overflowX: 'auto', border: `1px solid ${T.border}`, borderRadius: 12, background: T.cardBg, boxShadow: T.shadow }}>
-        <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, minmax(120px, 1fr))`, minWidth: 900 }}>
-
-          {/* Header row */}
-          <div style={{ borderBottom: `1px solid ${T.border}` }} />
-          {days.map(d => {
-            const isToday = isSameDay(d, today)
-            return (
-              <div
-                key={isoDateKey(d)}
-                style={{
-                  padding: '10px 6px', textAlign: 'center',
-                  borderBottom: `1px solid ${T.border}`,
-                  borderRight: `1px solid ${T.borderSoft}`,
-                  background: isToday ? `${color}12` : 'transparent',
-                }}
-              >
-                <div style={{ fontSize: 11, color: T.textMuted }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? color : T.textPrimary }}>
-                  {fmtDayLabel(d)}
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Time gutter */}
-          <div style={{ position: 'relative', height: gridHeight }}>
-            {hours.map((h, i) => (
-              <div
-                key={h}
-                style={{
-                  position: 'absolute', top: i * ROW_HEIGHT_PX - 7, left: 0, right: 4,
-                  fontSize: 10, color: T.textMuted, textAlign: 'left',
-                }}
-              >
-                {String(h).padStart(2, '0')}:00
-              </div>
-            ))}
-          </div>
-
-          {/* Day columns */}
-          {days.map(d => {
-            const key = isoDateKey(d)
-            const dayReservations = byDay.get(key) ?? []
-            const isToday = isSameDay(d, today)
-            return (
-              <div
-                key={key}
-                onClick={(e) => handleEmptySlotClick(d, e)}
-                style={{
-                  position: 'relative', height: gridHeight, cursor: 'copy',
-                  borderRight: `1px solid ${T.borderSoft}`,
-                  background: isToday ? `${color}08` : 'transparent',
-                }}
-              >
-                {/* hour gridlines */}
-                {hours.map((h, i) => (
-                  <div
-                    key={h}
-                    style={{
-                      position: 'absolute', top: i * ROW_HEIGHT_PX, left: 0, right: 0,
-                      borderTop: `1px solid ${T.borderSoft}`, height: ROW_HEIGHT_PX,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                ))}
-
-                {dayReservations.map(r => {
-                  const top = Math.max(0, Math.min(topPx(r.reserved_at, startHour), gridHeight - 22))
-                  const height = Math.min(heightPx(r.duration_min), gridHeight - top)
-                  const meta = r.metadata || {}
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={(e) => { e.stopPropagation(); setPopover({ item: r, anchor: { x: e.clientX, y: e.clientY } }) }}
-                      style={{
-                        position: 'absolute', top, height, left: 4, right: 4,
-                        borderRadius: 6, padding: '3px 6px', textAlign: 'right',
-                        background: `${color}14`, border: `1px solid ${color}55`,
-                        color: T.textPrimary, fontSize: 11, cursor: 'pointer', overflow: 'hidden',
-                        fontFamily: FONT, opacity: pendingIds.has(r.id) ? 0.5 : 1,
-                      }}
-                      title={`${r.customer_name} — ${fmtTimeUTC(r.reserved_at)}${meta.service_name ? ` — ${meta.service_name}` : ''}`}
-                    >
-                      <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {r.customer_name}
-                      </div>
-                      <div style={{ color: T.textSecond, whiteSpace: 'nowrap' }}>{fmtTimeUTC(r.reserved_at)}</div>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
+      {conflictMsg && (
+        <div style={{
+          marginBottom: 12, padding: '10px 14px', borderRadius: 10,
+          background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.25)',
+          color: T.danger, fontSize: 13,
+        }}>
+          {conflictMsg}
         </div>
-      </div>
+      )}
+
+      {/* Week grid — horizontally scrollable on narrow screens */}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div style={{ overflowX: 'auto', border: `1px solid ${T.border}`, borderRadius: 12, background: T.cardBg, boxShadow: T.shadow }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, minmax(120px, 1fr))`, minWidth: 900 }}>
+
+            {/* Header row */}
+            <div style={{ borderBottom: `1px solid ${T.border}` }} />
+            {days.map(d => {
+              const isToday = isSameDay(d, today)
+              return (
+                <div
+                  key={isoDateKey(d)}
+                  style={{
+                    padding: '10px 6px', textAlign: 'center',
+                    borderBottom: `1px solid ${T.border}`,
+                    borderRight: `1px solid ${T.borderSoft}`,
+                    background: isToday ? `${color}12` : 'transparent',
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: T.textMuted }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? color : T.textPrimary }}>
+                    {fmtDayLabel(d)}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Time gutter */}
+            <div style={{ position: 'relative', height: gridHeight }}>
+              {hours.map((h, i) => (
+                <div
+                  key={h}
+                  style={{
+                    position: 'absolute', top: i * ROW_HEIGHT_PX - 7, left: 0, right: 4,
+                    fontSize: 10, color: T.textMuted, textAlign: 'left',
+                  }}
+                >
+                  {String(h).padStart(2, '0')}:00
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns */}
+            {days.map(d => {
+              const key = isoDateKey(d)
+              const isToday = isSameDay(d, today)
+              return (
+                <WeekDayColumn
+                  key={key}
+                  day={d}
+                  dayKey={key}
+                  dayReservations={byDay.get(key) ?? []}
+                  gridHeight={gridHeight}
+                  hours={hours}
+                  startHour={startHour}
+                  color={color}
+                  isToday={isToday}
+                  pendingIds={pendingIds}
+                  onEmptySlotClick={handleEmptySlotClick}
+                  onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+          {activeItem ? (
+            <div style={{ width: 140, height: heightPx(activeItem.duration_min) }}>
+              <WeekReservationCardBody item={activeItem} color={color} isOverlay />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Reservation popover (Phase 3.4 Item 3) -- replaces the old bespoke read-mostly modal
           with the exact same shared ReservationPopover Today uses: Edit, Cancel, Status Change
