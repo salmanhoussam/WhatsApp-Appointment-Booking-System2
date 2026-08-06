@@ -135,6 +135,18 @@
   No new cache/abstraction needed — React Query is already wired app-wide (`App.jsx`) and already
   proven in `useTenantConfig.js`/`useCatalog.js`; this is a consistency retrofit, not new
   architecture. See `.claudedocs/evolution/frontend-data-layer.md`.
+- [ ] **Dashboard Workload / API Audit (2026-08-06) — concrete migration targets for the same Store
+  phase pass above:** full report
+  `.claudedocs/work/dashboard-workload-api-audit/2026-08-06/summary.md`. Three real duplicate-request
+  patterns found, all rooted in `GenericAdminDashboard.jsx`'s tab-remount-on-switch behavior:
+  - Toggling "التقويم"/"الحجوزات" nav items refetches `/reservations/`, `/barbers/`, `/catalog/items`
+    every time — both nav items render the same `ReservationsTab` component.
+  - `GET /{restaurant|store}/orders` is independently fetched by both Overview and Orders tabs with
+    identical params.
+  - `GET /catalog/items` (full list) is independently fetched by Overview and by
+    `reservationInteractions.jsx`'s `useCatalogItems()`.
+  - Side item, not urgent: `ActivityFeed`'s 30s poll only refreshes orders, never reservations — the
+    reservation half of "Recent Activity" silently goes stale after mount.
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 

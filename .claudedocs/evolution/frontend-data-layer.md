@@ -86,3 +86,13 @@ migrating them now — that stays deferred per the Escalation Watch above. It ap
 new hook written with `useEffect`+fetch after 2026-08-06 should carry a short comment stating why
 `useQuery` wasn't used, the same way this project already expects a stated reason for any other
 deliberate exception to an established pattern.
+
+### Related Evidence
+
+Same day, a follow-up Dashboard Workload / API Audit
+(`.claudedocs/work/dashboard-workload-api-audit/2026-08-06/summary.md`) quantified the cost this
+entry describes qualitatively: at least 3 confirmed duplicate/near-duplicate request patterns across
+the generic-admin dashboard, all rooted in the same structural cause (`GenericAdminDashboard.jsx`
+unmounting/remounting each tab on every navigation, with no cache surviving the remount except the
+one hook already on `useQuery`). Doesn't change the decision above — still deferred to the Store
+phase — but replaces "this will probably cause duplicate fetches" with real, cited numbers.
