@@ -4,6 +4,7 @@ import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
 import ReservationsTodayView from '../components/ReservationsTodayView'
+import { useBarbers, useCatalogItems } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
 import { T, FONT } from '../theme'
 
@@ -47,8 +48,10 @@ export const STATUS_META = {
   no_show:   { label: 'لم يحضر',   bg: 'rgba(251,146,60,.12)', color: '#c2410c' },
 }
 
-// Only valid forward transitions
-const TRANSITIONS = {
+// Only valid forward transitions -- exported so the shared ReservationPopover
+// (reservationInteractions.jsx) can render one-click quick-status buttons using the same rules
+// StatusCell already enforces, not a second copy of this table.
+export const TRANSITIONS = {
   pending:   ['confirmed', 'cancelled'],
   confirmed: ['arrived',   'cancelled', 'no_show'],
   arrived:   [],
@@ -316,6 +319,14 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   // to the first barber on every single ▶/◀ day-navigation click. ReservationsTab itself never
   // unmounts across those, so state lives here instead, same reasoning as todayViewDate above.
   const [visibleBarberId, setVisibleBarberId] = useState(null)
+  // Barbers/catalog items (Phase 3.4, 2026-08-06) -- fetched once here via the shared hooks and
+  // passed down to both Today and Week, instead of each view independently re-fetching the same
+  // data on every mount/toggle (a real, confirmed duplicate network call before this). Each view
+  // still derives its own bookable-only subset locally (a one-line filter, not worth lifting) --
+  // Today also needs the FULL list for serviceNameFor (labeling historical/non-bookable items on
+  // existing reservations), a different concern from "what's offered when booking new".
+  const { barbers, barbersLoading } = useBarbers()
+  const catalogItems = useCatalogItems()
   const mountedRef = useRef(true)
 
   const { config } = useTenantConfig()
@@ -627,6 +638,9 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             onEdit={handleEdit}
             visibleBarberId={visibleBarberId}
             onVisibleBarberChange={setVisibleBarberId}
+            barbers={barbers}
+            barbersLoading={barbersLoading}
+            catalogItems={catalogItems}
           />
         )
       ) : isMobile ? (

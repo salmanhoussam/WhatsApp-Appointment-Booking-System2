@@ -4,9 +4,11 @@ import {
   useDroppable, useDraggable, closestCorners,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import adminApi from '../../../utils/admin.config'
-import { StatusBadge, StatusCell } from '../tabs/ReservationsTab'
-import Dropdown from './Dropdown'
+import { StatusBadge } from '../tabs/ReservationsTab'
+import {
+  fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso,
+  ReservationPopover, CreatePopover,
+} from './reservationInteractions'
 import { T, FONT } from '../theme'
 
 // ── Today View — Phase 3.1 Calendar UX Redesign (2026-08-03) ─────────────────────────────────────
@@ -20,6 +22,11 @@ import { T, FONT } from '../theme'
 // Light visual theme (Phase 3.1 UX Iteration, 2026-08-05, Salman's own explicit request) -- reuses
 // the same `T` tokens as the customer-facing booking page (ReservePage.jsx), his own already-approved
 // reference. Purely visual: no reservation/drag/conflict logic in this file changed for this pass.
+//
+// Shared popovers/positioning/date-math/data-hooks moved to reservationInteractions.jsx (Phase 3.4,
+// 2026-08-06) so ReservationsWeekCalendar.jsx can reuse the exact same components instead of a
+// second, standalone implementation -- see that file for ReservationPopover/CreatePopover/
+// usePopoverPosition/useBarbers/useCatalogItems.
 
 const QUARTER_PX = 22
 const SERVICE_ICON_FALLBACK = '✂️'
@@ -28,22 +35,6 @@ const SERVICE_ICON_FALLBACK = '✂️'
 // visually read as free, matching what the backend's own conflict check already treats as free.
 const VISIBLE_STATUSES = ['pending', 'confirmed', 'arrived']
 
-function fmtTimeUTC(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-function quarterIndexFromIso(iso, startHour) {
-  const d = new Date(iso)
-  const mins = (d.getUTCHours() * 60 + d.getUTCMinutes()) - startHour * 60
-  return Math.round(mins / 15)
-}
-function isoAtQuarter(dateISO, startHour, quarterIndex) {
-  const d = new Date(`${dateISO}T00:00:00Z`)
-  const totalMin = startHour * 60 + quarterIndex * 15
-  d.setUTCMinutes(d.getUTCMinutes() + totalMin)
-  return d.toISOString()
-}
 function fmtHourLabel(h) {
   return `${String(h).padStart(2, '0')}:00`
 }
@@ -51,22 +42,6 @@ function addDaysISO(dateISO, n) {
   const d = new Date(`${dateISO}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
-}
-function todayISODate() {
-  const now = new Date()
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10)
-}
-// This grid's own `reserved_at` values, `fmtTimeUTC`, and `todayISODate` all use UTC-field
-// accessors to represent the tenant's wall-clock time directly (no real timezone conversion
-// anywhere in this file) -- any "now" built for this grid must be built the same way, from the
-// browser's LOCAL hour/minute mapped into UTC fields, not `new Date().toISOString()`'s true UTC
-// instant, or it silently disagrees with every card on the same grid.
-function fakeNowIso() {
-  const now = new Date()
-  return new Date(Date.UTC(
-    now.getFullYear(), now.getMonth(), now.getDate(),
-    now.getHours(), now.getMinutes(), now.getSeconds()
-  )).toISOString()
 }
 const AR_WEEKDAYS_FULL = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 function fmtDayNav(dateISO) {
@@ -222,463 +197,6 @@ function GridLine() {
   return <div style={{ height: QUARTER_PX, borderTop: `1px solid ${T.borderSoft}` }} />
 }
 
-// ── Quick-actions popover ─────────────────────────────────────────────────────────────────────────
-//
-// Optimistic-vs-pessimistic split (Phase 3.2, 2026-08-05, resolving Reservation Capability Review
-// Finding 3 by an explicit, documented choice rather than forcing uniform optimism): the DRAG path
-// in the main component below stays optimistic -- a physical gesture needs instant visual feedback.
-// Every action in THIS popover (the pre-existing mini-reschedule "نقل الموعد", the new Edit save,
-// the new Cancel confirm) is deliberately pessimistic instead -- button disabled + inline spinner
-// text while the request is in flight, local state only changes once the server's own response
-// comes back. A deliberate click-and-wait interaction doesn't need the same instant-feedback
-// affordance a drag gesture does, and staying pessimistic here means these three actions never need
-// their own revert/snapshot logic the way the optimistic drag path does.
-
-const popoverInputStyle = {
-  flex: 1, minWidth: 0, padding: '9px 12px', borderRadius: 10,
-  background: T.cardBg, border: `1px solid ${T.border}`,
-  color: T.textPrimary, fontSize: 13, colorScheme: 'light', fontFamily: FONT,
-}
-
-// ── Shared popover positioning (Phase 3.3.2, 2026-08-05) ─────────────────────────────────────────
-// Both popovers below previously clamped independently, always opened downward, and measured
-// against raw `window.innerHeight` -- near the last slots of the day this left the action buttons
-// rendered off-screen with no way to reach them short of scrolling the whole page (Browser
-// Verification: 20:00-21:00 slot, mobile). One shared implementation now: flips above the anchor
-// when there's no room below, and falls back to a height-constrained, internally-scrolling body
-// when neither direction fully fits -- the page itself never needs to scroll.
-//
-// Deliberately NOT written against "the mobile bottom nav's height" (Salman's explicit correction,
-// 2026-08-05): that would need updating the moment this layout changes. Instead this probes the
-// real DOM for whatever is actually occupying the bottom edge of the screen right now -- today's
-// bottom nav, tomorrow's browser chrome/safe-area inset, or anything else -- so it keeps working
-// unchanged regardless of what that turns out to be.
-function getUsableViewportBottom() {
-  const probeXs = [window.innerWidth / 2, window.innerWidth * 0.1, window.innerWidth * 0.9]
-  let usableBottom = window.innerHeight
-  for (const x of probeXs) {
-    let node = document.elementFromPoint(x, window.innerHeight - 2)
-    while (node && node !== document.body && node !== document.documentElement) {
-      if (window.getComputedStyle(node).position === 'fixed') {
-        const rect = node.getBoundingClientRect()
-        if (rect.bottom >= window.innerHeight - 4) usableBottom = Math.min(usableBottom, rect.top)
-        break
-      }
-      node = node.parentElement
-    }
-  }
-  return usableBottom
-}
-
-// Used by both ReservationPopover and CreatePopover -- one positioning implementation, not two
-// independently-maintained ones (a fix applied to only one of a pair like this is exactly the kind
-// of drift that resurfaces as a bug a few months later). Deliberately domain-agnostic: takes an
-// anchor point, a height, and a padding, and knows nothing about reservations, calendars, or any
-// specific fixed UI element -- reusable by any future popover in this codebase, not just these two.
-//
-// `anchor` stays a point ({x, y}, e.g. a click event's clientX/clientY) rather than a full
-// getBoundingClientRect()-style rect -- every current call site opens from a click point, not an
-// anchored element, so a rect would add a shape this hook doesn't actually need yet.
-function usePopoverPosition({ anchor, popupHeight, width = 280, viewportPadding = 12 }) {
-  return useMemo(() => {
-    const usableBottom = getUsableViewportBottom() - viewportPadding
-    const usableTop = viewportPadding
-    const spaceBelow = usableBottom - anchor.y
-    const spaceAbove = anchor.y - usableTop
-    const left = Math.min(Math.max(anchor.x - 260, viewportPadding), window.innerWidth - (width + viewportPadding))
-
-    if (spaceBelow >= popupHeight) {
-      return { top: anchor.y, left, maxHeight: popupHeight, scroll: false }
-    }
-    if (spaceAbove >= popupHeight) {
-      return { top: anchor.y - popupHeight, left, maxHeight: popupHeight, scroll: false }
-    }
-    // Neither direction fully fits -- open on whichever side has more room, constrain height to
-    // that room, and let the popover's own body scroll internally (each popover's JSX pins its
-    // header and action buttons outside that scrollable region via flex layout). The page itself
-    // never needs to scroll to reach the action buttons.
-    if (spaceBelow >= spaceAbove) {
-      return { top: anchor.y, left, maxHeight: Math.max(spaceBelow, 160), scroll: true }
-    }
-    return { top: usableTop, left, maxHeight: Math.max(spaceAbove, 160), scroll: true }
-  }, [anchor.x, anchor.y, popupHeight, width, viewportPadding])
-}
-
-function ReservationPopover({
-  item, serviceName, color, anchor, onClose,
-  onStatusChange, onReschedule, onEdit,
-  barbers, catalogItems, isPending, markPending, clearPending,
-}) {
-  const [mode, setMode] = useState('view') // 'view' | 'edit' | 'cancel-confirm'
-
-  // -- view mode: mini-reschedule form (pre-existing) + staff selector (new, Phase 3.2 -- closes
-  // the gap where the non-drag reschedule path could never move staff, only drag could) ----------
-  const [date, setDate] = useState(item.reserved_at.slice(0, 10))
-  const [time, setTime] = useState(fmtTimeUTC(item.reserved_at))
-  const [moveBarberId, setMoveBarberId] = useState(item.barber_id || '')
-  const [moving, setMoving] = useState(false)
-  const [moveError, setMoveError] = useState(null)
-
-  const handleMove = async () => {
-    setMoveError(null)
-    setMoving(true)
-    markPending(item.id)
-    try {
-      const payload = { reserved_at: `${date}T${time}:00Z` }
-      if (moveBarberId && moveBarberId !== item.barber_id) payload.barber_id = moveBarberId
-      await onReschedule(item.id, payload)
-      onClose()
-    } catch (err) {
-      setMoveError(err?.response?.data?.error?.message || 'تعذر نقل الحجز.')
-    } finally {
-      setMoving(false)
-      clearPending(item.id)
-    }
-  }
-
-  // -- edit mode: name/phone/service/staff/time/duration, any subset -- backed by the new
-  // PATCH /reservations/{id} full-edit route (edit_reservation(), Phase 3.2) ----------------------
-  const [editName, setEditName] = useState(item.customer_name || '')
-  const [editPhone, setEditPhone] = useState(item.customer_phone || '')
-  const [editServiceId, setEditServiceId] = useState(item.metadata?.service_id || '')
-  const [editBarberId, setEditBarberId] = useState(item.barber_id || '')
-  const [editDate, setEditDate] = useState(item.reserved_at.slice(0, 10))
-  const [editTime, setEditTime] = useState(fmtTimeUTC(item.reserved_at))
-  const [editDuration, setEditDuration] = useState(item.duration_min)
-  const [saving, setSaving] = useState(false)
-  const [editError, setEditError] = useState(null)
-
-  // Duration auto-fills from the newly selected service's own metadata.duration_min when present
-  // (hr's real catalog items all carry this -- scripts/update_hr_barber_and_services.py) -- the
-  // manual number input stays an override for services that don't have it, never removed.
-  const handleServiceChange = (id) => {
-    setEditServiceId(id)
-    const svc = catalogItems.find((c) => c.id === id)
-    if (svc?.metadata?.duration_min) setEditDuration(svc.metadata.duration_min)
-  }
-
-  const handleEditSave = async () => {
-    setEditError(null)
-    setSaving(true)
-    markPending(item.id)
-    try {
-      const patch = {}
-      if (editName !== item.customer_name) patch.customer_name = editName
-      if (editPhone !== item.customer_phone) patch.customer_phone = editPhone
-      if (editServiceId && editServiceId !== item.metadata?.service_id) patch.service_id = editServiceId
-      if (editBarberId && editBarberId !== item.barber_id) patch.barber_id = editBarberId
-      if (Number(editDuration) !== item.duration_min) patch.duration_min = Number(editDuration)
-      const newReservedAt = `${editDate}T${editTime}:00Z`
-      if (new Date(newReservedAt).getTime() !== new Date(item.reserved_at).getTime()) {
-        patch.reserved_at = newReservedAt
-      }
-      if (Object.keys(patch).length === 0) { setMode('view'); return }
-      await onEdit(item.id, patch)
-      onClose()
-    } catch (err) {
-      setEditError(err?.response?.data?.error?.message || 'تعذر حفظ التعديل.')
-    } finally {
-      setSaving(false)
-      clearPending(item.id)
-    }
-  }
-
-  // -- cancel-confirm mode -- reuses the existing generic status-update path (update_status()
-  // already supports "cancelled", no new endpoint needed); the card disappears immediately via
-  // StaffColumn's VISIBLE_STATUSES filter once the parent's `reservations` state reflects it. ------
-  const [cancelling, setCancelling] = useState(false)
-  const [cancelError, setCancelError] = useState(null)
-
-  const handleCancelConfirm = async () => {
-    setCancelError(null)
-    setCancelling(true)
-    markPending(item.id)
-    try {
-      await onStatusChange(item.id, 'cancelled')
-      onClose()
-    } catch (err) {
-      setCancelError(err?.response?.data?.error?.message || 'تعذر إلغاء الحجز.')
-    } finally {
-      setCancelling(false)
-      clearPending(item.id)
-    }
-  }
-
-  const popoverHeight = mode === 'edit' ? 460 : mode === 'cancel-confirm' ? 220 : 380
-  const pos = usePopoverPosition({ anchor, popupHeight: popoverHeight })
-  const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
-  const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
-
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: pos.top, left: pos.left,
-          width: 280, maxHeight: pos.maxHeight,
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          background: T.cardBg, border: `1px solid ${T.border}`,
-          borderRadius: 14, boxShadow: T.shadowPopover,
-          direction: 'rtl', fontFamily: FONT,
-        }}
-      >
-        {/* Header -- pinned, never scrolls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0, padding: '16px 16px 10px' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary }}>{item.customer_name}</div>
-          {mode === 'view' && <StatusCell reservation={item} onUpdate={onStatusChange} />}
-        </div>
-
-        {/* Body -- the only region that scrolls when the popover is height-constrained */}
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
-          {mode === 'view' && (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: T.textSecond, marginBottom: 12 }}>
-                <div>📞 {item.customer_phone || '—'}</div>
-                <div>✂️ {serviceName || '—'} · {item.duration_min} دقيقة</div>
-              </div>
-
-              <div style={{ borderTop: `1px solid ${T.borderSoft}`, paddingTop: 12, paddingBottom: 12 }}>
-                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>إعادة الجدولة</div>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
-                  <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
-                </div>
-                {barbers?.length > 1 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <Dropdown value={moveBarberId} onChange={setMoveBarberId} options={barberOptions} />
-                  </div>
-                )}
-                {moveError && (
-                  <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>
-                    {moveError}
-                  </div>
-                )}
-                <button
-                  onClick={handleMove} disabled={moving || isPending}
-                  style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: `1px solid ${color}55`, background: `${color}18`, color, fontSize: 12, fontWeight: 700, cursor: (moving || isPending) ? 'not-allowed' : 'pointer', fontFamily: FONT }}
-                >
-                  {moving ? 'جارٍ النقل...' : 'نقل الموعد'}
-                </button>
-              </div>
-            </>
-          )}
-
-          {mode === 'edit' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
-              <input placeholder="اسم العميل" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
-              <input placeholder="رقم الهاتف" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
-              <Dropdown value={editServiceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
-              {barbers?.length > 1 && (
-                <Dropdown value={editBarberId} onChange={setEditBarberId} options={barberOptions} />
-              )}
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={popoverInputStyle} />
-                <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
-                <input type="number" min={5} step={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
-              </div>
-              {editError && (
-                <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
-                  {editError}
-                </div>
-              )}
-            </div>
-          )}
-
-          {mode === 'cancel-confirm' && (
-            <div style={{ paddingBottom: 12 }}>
-              <div style={{ fontSize: 13, color: T.textPrimary, marginBottom: 14, lineHeight: 1.6 }}>
-                متأكد من إلغاء هذا الحجز؟ سيختفي من الكالندر فوراً ويصبح الموعد متاحاً من جديد.
-              </div>
-              {cancelError && (
-                <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px', marginBottom: 10 }}>
-                  {cancelError}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Action buttons -- pinned, always reachable without scrolling the page or the popover */}
-        <div style={{ flexShrink: 0, padding: '10px 16px 16px' }}>
-          {mode === 'view' && (
-            <>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  onClick={() => setMode('edit')} disabled={isPending}
-                  style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textPrimary, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-                >
-                  تعديل
-                </button>
-                <button
-                  onClick={() => setMode('cancel-confirm')} disabled={isPending}
-                  style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.25)', color: T.danger, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-                >
-                  إلغاء الحجز
-                </button>
-              </div>
-              <button onClick={onClose} style={{ marginTop: 8, width: '100%', padding: '8px 0', borderRadius: 10, background: 'transparent', border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}>
-                إغلاق
-              </button>
-            </>
-          )}
-
-          {mode === 'edit' && (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => setMode('view')} disabled={saving}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textSecond, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-              >
-                رجوع
-              </button>
-              <button
-                onClick={handleEditSave} disabled={saving}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${color}55`, background: `${color}18`, color, fontSize: 12, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: FONT }}
-              >
-                {saving ? 'جارٍ الحفظ...' : 'حفظ'}
-              </button>
-            </div>
-          )}
-
-          {mode === 'cancel-confirm' && (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => setMode('view')} disabled={cancelling}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textSecond, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-              >
-                لا، تراجع
-              </button>
-              <button
-                onClick={handleCancelConfirm} disabled={cancelling}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: '1px solid rgba(220,38,38,0.4)', background: T.dangerSoft, color: T.danger, fontSize: 12, fontWeight: 700, cursor: cancelling ? 'not-allowed' : 'pointer', fontFamily: FONT }}
-              >
-                {cancelling ? 'جارٍ الإلغاء...' : 'نعم، إلغاء الحجز'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Quick Create popover (Phase 3.2, 2026-08-05) ────────────────────────────────────────────────
-// Same anchored-panel, non-modal shell as ReservationPopover -- this feature's established
-// "Popover not Modal" rule (Phase 3.1) applies to Create exactly as it does to Quick Actions, not
-// a separate pattern. Two entry points render this: an empty-slot click on a StaffColumn (pre-fills
-// barber + time) and a floating "+" button (no pre-fill, owner picks everything).
-function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReservedAt, color, anchor, onClose, onCreate }) {
-  const [barberId, setBarberId] = useState(defaultBarberId || barbers[0]?.id || '')
-  const [serviceId, setServiceId] = useState('')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [date, setDate] = useState((defaultReservedAt || fakeNowIso()).slice(0, 10))
-  const [time, setTime] = useState(fmtTimeUTC(defaultReservedAt || fakeNowIso()))
-  const [duration, setDuration] = useState(30)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-
-  const handleServiceChange = (id) => {
-    setServiceId(id)
-    const svc = catalogItems.find((c) => c.id === id)
-    if (svc?.metadata?.duration_min) setDuration(svc.metadata.duration_min)
-  }
-
-  const handleCreate = async () => {
-    setError(null)
-    if (!barberId || !serviceId || !name || !phone) {
-      setError('يرجى تعبئة كل الحقول.')
-      return
-    }
-    setSaving(true)
-    try {
-      await onCreate({
-        module_key: 'barber',
-        customer_name: name,
-        customer_phone: phone,
-        reserved_at: `${date}T${time}:00Z`,
-        duration_min: Number(duration),
-        metadata: { barber_id: barberId, service_id: serviceId },
-      })
-      onClose()
-    } catch (err) {
-      setError(err?.response?.data?.error?.message || 'تعذر إنشاء الحجز.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
-  const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
-  const pos = usePopoverPosition({ anchor, popupHeight: 460 })
-
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'fixed',
-          top: pos.top, left: pos.left,
-          width: 280, maxHeight: pos.maxHeight,
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          background: T.cardBg, border: `1px solid ${T.border}`,
-          borderRadius: 14, boxShadow: T.shadowPopover,
-          direction: 'rtl', fontFamily: FONT,
-        }}
-      >
-        {/* Header -- pinned, never scrolls */}
-        <div style={{ flexShrink: 0, padding: '16px 16px 12px' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary }}>حجز سريع</div>
-        </div>
-
-        {/* Body -- the only region that scrolls when the popover is height-constrained */}
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
-            <Dropdown value={barberId} onChange={setBarberId} options={barberOptions} />
-            <Dropdown value={serviceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
-            <input placeholder="اسم العميل" value={name} onChange={(e) => setName(e.target.value)} style={{ ...popoverInputStyle, width: '100%' }} />
-            <input placeholder="رقم الهاتف" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...popoverInputStyle, width: '100%', direction: 'ltr', textAlign: 'right' }} />
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={popoverInputStyle} />
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ ...popoverInputStyle, width: 90, flex: 'none' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: T.textSecond }}>المدة (دقيقة)</span>
-              <input type="number" min={5} step={5} value={duration} onChange={(e) => setDuration(e.target.value)} style={{ ...popoverInputStyle, width: 70, flex: 'none' }} />
-            </div>
-            {error && (
-              <div style={{ fontSize: 11, color: T.danger, background: T.dangerSoft, border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '6px 8px' }}>
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action buttons -- pinned, always reachable without scrolling the page or the popover */}
-        <div style={{ flexShrink: 0, padding: '8px 16px 16px' }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={onClose} disabled={saving}
-              style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: T.pageBg, border: `1px solid ${T.border}`, color: T.textSecond, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
-            >
-              إلغاء
-            </button>
-            <button
-              onClick={handleCreate} disabled={saving}
-              style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${color}55`, background: `${color}18`, color, fontSize: 12, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: FONT }}
-            >
-              {saving ? 'جارٍ الحجز...' : 'إنشاء الحجز'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Staff column ──────────────────────────────────────────────────────────────────────────────────
 
 // ONE droppable for the whole column (2026-08-03 redesign) -- not 48 tiny per-quarter-hour
@@ -762,12 +280,12 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
  *   onReschedule   async (id, { reserved_at, barber_id? }) -- throws on 409/error
  *   onCreate       async (payload) -- POST /reservations/, Phase 3.2 Quick Create
  *   onEdit         async (id, patch) -- PATCH /reservations/{id}, Phase 3.2 full Edit
+ *   barbers/barbersLoading/catalogItems -- lifted to ReservationsTab.jsx (Phase 3.4, 2026-08-06)
+ *     via useBarbers()/useCatalogItems() in reservationInteractions.jsx, passed down so this view
+ *     and ReservationsWeekCalendar.jsx share one fetch each instead of two independent ones.
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange }) {
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, catalogItems }) {
   const [startHour, endHour] = hourRange
-  const [barbers, setBarbers] = useState([])
-  const [barbersLoading, setBarbersLoading] = useState(true)
-  const [catalogItems, setCatalogItems] = useState([])
   // Which barber's schedule is currently VISIBLE -- owned by ReservationsTab.jsx (props
   // `visibleBarberId`/`onVisibleBarberChange`), not local state here. This component fully
   // unmounts/remounts on every load() in the parent (day-nav, filters, etc.), so local state would
@@ -791,36 +309,12 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
     setPendingIds((prev) => { const next = new Set(prev); next.delete(id); return next })
   }, [])
 
-  // mountedRef reset in the effect body itself, not just useRef(true)'s initializer -- same
-  // StrictMode double-invoke guard used throughout this codebase (see useCatalog.js's own
-  // writeup). Also fixes a real bug found via Browser Verification, 2026-08-03: this view had no
-  // `barbersLoading` state at all, so "لا يوجد موظفون نشطون" (no active staff) and "still
-  // fetching" rendered identically -- a real Week->Today round-trip looked permanently broken
-  // (empty staff column) when it was actually still loading, with no visual difference between
-  // the two states to tell them apart.
-  const mountedRef = useRef(true)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
-
   useEffect(() => { setItems(reservations) }, [reservations])
 
-  useEffect(() => {
-    // Trailing slash required -- the real route is `/barbers/` (@router.get("/") under
-    // prefix="/barbers"). Omitting it triggers a 307 redirect that the Vite dev proxy resolves
-    // cross-origin (127.0.0.1:8000), which strips the Authorization header per fetch/XHR redirect
-    // semantics -> a real 401 that force-logs-out the whole session. Confirmed via Browser
-    // Verification, 2026-08-03 -- a real, reproducible bug, not a hypothetical.
-    setBarbersLoading(true)
-    adminApi.get('/barbers/')
-      .then((r) => { if (mountedRef.current) setBarbers(r.data?.data ?? []) })
-      .catch(() => { if (mountedRef.current) setBarbers([]) })
-      .finally(() => { if (mountedRef.current) setBarbersLoading(false) })
-    adminApi.get('/catalog/items')
-      .then((r) => { if (mountedRef.current) setCatalogItems(r.data?.data ?? []) })
-      .catch(() => { if (mountedRef.current) setCatalogItems([]) })
-  }, [])
+  // barbers/barbersLoading/catalogItems now come from ReservationsTab.jsx via useBarbers()/
+  // useCatalogItems() (reservationInteractions.jsx) -- no self-fetch here anymore (Phase 3.4,
+  // 2026-08-06). The real 307-redirect/401 bug the old fetch's own comment documented lives in
+  // useBarbers() now, fixed once, not per-view.
 
   // Default the visible barber exactly once, the moment barbers first load and nothing is selected
   // yet -- `visibleBarberId === null` (owned by the parent, see the prop comment above) is itself
