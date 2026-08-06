@@ -451,44 +451,54 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
         flexWrap: isMobile ? 'nowrap' : 'wrap',
       }}>
 
-        {/* Date input row */}
+        {/* Date input row — the date picker / "اليوم" / "الكل" controls only apply to List mode
+            (load()'s param-builder only reads dateFilter/showAllDates in the List branch --
+            Today/Week already have their own date navigation, DayNav and week-nav respectively).
+            Rendering them unconditionally made them look interactive but do nothing while in
+            Calendar (Today/Week) view -- a real, confirmed bug (Dashboard filter checkup,
+            2026-08-07). "↻" stays unconditional -- it's the only manual refresh affordance for
+            Today/Week on both mobile and desktop (the separate "تحديث" button below is List-only). */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap' }}>
-          <input
-            type="date"
-            value={showAllDates ? '' : dateFilter}
-            onChange={e => { setDateFilter(e.target.value); setShowAllDates(false) }}
-            disabled={showAllDates}
-            style={{
-              ...inputStyle, flex: 1, minWidth: 0, opacity: showAllDates ? 0.5 : 1,
-              // Native date inputs have their own UA-defined content width, which a flex item
-              // won't shrink below without an explicit min-width:0 -- a second, independent real
-              // cause of the same mobile horizontal-overflow bug (this row is flex-wrap:nowrap).
-            }}
-          />
-          <button
-            onClick={() => { setDateFilter(todayISO()); setShowAllDates(false) }}
-            style={{
-              padding: '7px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-              fontFamily: FONT, flexShrink: 0,
-              background: T.cardBg,
-              border: `1px solid ${T.border}`,
-              color: T.textSecond,
-            }}
-          >
-            اليوم
-          </button>
-          <button
-            onClick={() => { setShowAllDates(p => !p); setPage(1) }}
-            style={{
-              padding: '7px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-              fontFamily: FONT, flexShrink: 0,
-              background: showAllDates ? `${color}14` : T.cardBg,
-              border: `1px solid ${showAllDates ? `${color}55` : T.border}`,
-              color: showAllDates ? color : T.textSecond,
-            }}
-          >
-            الكل
-          </button>
+          {viewMode === 'list' && (
+            <>
+              <input
+                type="date"
+                value={showAllDates ? '' : dateFilter}
+                onChange={e => { setDateFilter(e.target.value); setShowAllDates(false) }}
+                disabled={showAllDates}
+                style={{
+                  ...inputStyle, flex: 1, minWidth: 0, opacity: showAllDates ? 0.5 : 1,
+                  // Native date inputs have their own UA-defined content width, which a flex item
+                  // won't shrink below without an explicit min-width:0 -- a second, independent real
+                  // cause of the same mobile horizontal-overflow bug (this row is flex-wrap:nowrap).
+                }}
+              />
+              <button
+                onClick={() => { setDateFilter(todayISO()); setShowAllDates(false) }}
+                style={{
+                  padding: '7px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  fontFamily: FONT, flexShrink: 0,
+                  background: T.cardBg,
+                  border: `1px solid ${T.border}`,
+                  color: T.textSecond,
+                }}
+              >
+                اليوم
+              </button>
+              <button
+                onClick={() => { setShowAllDates(p => !p); setPage(1) }}
+                style={{
+                  padding: '7px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+                  fontFamily: FONT, flexShrink: 0,
+                  background: showAllDates ? `${color}14` : T.cardBg,
+                  border: `1px solid ${showAllDates ? `${color}55` : T.border}`,
+                  color: showAllDates ? color : T.textSecond,
+                }}
+              >
+                الكل
+              </button>
+            </>
+          )}
           <button
             onClick={load}
             style={{
