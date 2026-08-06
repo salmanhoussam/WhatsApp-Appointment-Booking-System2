@@ -4,7 +4,7 @@ import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
 import ReservationsTodayView from '../components/ReservationsTodayView'
-import { useBarbers, useCatalogItems } from '../components/reservationInteractions'
+import { useBarbers, useCatalogItems, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
 import { T, FONT } from '../theme'
 
@@ -117,6 +117,11 @@ export function StatusBadge({ status, clickable, onClick }) {
 // Salman flagged for the service selector: a native select's open list is positioned by the OS/
 // browser, not by this app's CSS. Used in the table, mobile cards, week-calendar modal, and both
 // Today View popovers -- worth fixing once here rather than leaving one native select behind.
+//
+// stopPropagation on both branches (Phase 3.5, 2026-08-07): List's table row / mobile card now
+// opens ReservationPopover on click -- without this, opening or using StatusCell's own dropdown
+// would also bubble up and trigger that row-level open, same technique cards already use for empty-
+// slot clicks (ReservationCardBody's pattern), applied here in the opposite direction.
 export function StatusCell({ reservation, onUpdate }) {
   const [editing, setEditing] = useState(false)
   const [saving,  setSaving]  = useState(false)
@@ -127,7 +132,7 @@ export function StatusCell({ reservation, onUpdate }) {
       <StatusBadge
         status={reservation.status}
         clickable={next.length > 0}
-        onClick={() => next.length > 0 && setEditing(true)}
+        onClick={(e) => { e.stopPropagation(); next.length > 0 && setEditing(true) }}
       />
     )
   }
@@ -137,7 +142,7 @@ export function StatusCell({ reservation, onUpdate }) {
   }))
 
   return (
-    <div style={{ minWidth: 130 }} onBlur={() => setEditing(false)}>
+    <div style={{ minWidth: 130 }} onClick={(e) => e.stopPropagation()} onBlur={() => setEditing(false)}>
       <Dropdown
         value={reservation.status}
         disabled={saving}
@@ -228,14 +233,17 @@ function MobileCardSkeleton({ rows = 5 }) {
 }
 
 // ── Mobile reservation card ────────────────────────────────────────────────────
-function MobileReservationCard({ reservation, idx, color, onUpdate }) {
+// onOpen (Phase 3.5, 2026-08-07) -- clicking anywhere on the card opens the shared
+// ReservationPopover, same click-anchored pattern Today/Week's cards already use.
+function MobileReservationCard({ reservation, idx, color, onUpdate, onOpen }) {
   const dateAt = reservation.reserved_at ?? reservation.created_at
   return (
     <motion.div
+      onClick={(e) => onOpen?.(reservation, e)}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.04, type: 'spring', stiffness: 260, damping: 22 }}
-      style={{ ...card, padding: '14px 16px', marginBottom: 10 }}
+      style={{ ...card, padding: '14px 16px', marginBottom: 10, cursor: onOpen ? 'pointer' : 'default' }}
     >
       {/* Top: customer + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -327,6 +335,35 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   // existing reservations), a different concern from "what's offered when booking new".
   const { barbers, barbersLoading } = useBarbers()
   const catalogItems = useCatalogItems()
+
+  // List's own ReservationPopover/CreatePopover state (Phase 3.5, 2026-08-07) -- same shape
+  // Today/Week already carry locally, not extracted (Abstraction Rule: local UI state stays local
+  // until a third real case needs it shared -- List is that third case, and it's small enough to
+  // just write fresh here, same call Phase 3.4 made for Week).
+  const [popover, setPopover] = useState(null) // { item, anchor } | null
+  const openPopover = useCallback((item, e) => {
+    setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })
+  }, [])
+  const closePopover = useCallback(() => setPopover(null), [])
+  const [pendingIds, setPendingIds] = useState(() => new Set())
+  const markPending = useCallback((id) => {
+    setPendingIds((prev) => new Set(prev).add(id))
+  }, [])
+  const clearPending = useCallback((id) => {
+    setPendingIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+  }, [])
+  // Same split ReservationsWeekCalendar.jsx already makes: serviceNameFor stays on the FULL list
+  // (labels whatever a reservation actually references, including non-bookable items on historical
+  // data), bookableCatalogItems is the filtered subset offered when picking a NEW/changed service.
+  const serviceNameFor = useCallback((item) => {
+    const id = item?.metadata?.service_id
+    return catalogItems.find((c) => c.id === id)?.name_ar ?? null
+  }, [catalogItems])
+  const bookableCatalogItems = useMemo(
+    () => catalogItems.filter((item) => item?.metadata?.requires_booking === true),
+    [catalogItems]
+  )
+
   const mountedRef = useRef(true)
 
   const { config } = useTenantConfig()
@@ -680,6 +717,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
                 idx={idx}
                 color={color}
                 onUpdate={handleStatusChange}
+                onOpen={openPopover}
               />
             ))
           )}
@@ -717,7 +755,8 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
                   {paged.map((res, idx) => (
                     <tr
                       key={res.id}
-                      style={{ transition: 'background 0.1s' }}
+                      onClick={(e) => openPopover(res, e)}
+                      style={{ transition: 'background 0.1s', cursor: 'pointer' }}
                       onMouseEnter={e => e.currentTarget.style.background = T.pageBg}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
@@ -775,6 +814,27 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
           totalPages={totalPages}
           onPage={setPage}
           color={color}
+        />
+      )}
+
+      {/* ── Reservation detail/edit/cancel/reschedule popover (Phase 3.5, 2026-08-07) ──────────
+          Same shared component Today/Week already render -- List becomes the third proven case of
+          this exact extraction, not a new one. */}
+      {popover && (
+        <ReservationPopover
+          item={popover.item}
+          serviceName={serviceNameFor(popover.item)}
+          color={color}
+          anchor={popover.anchor}
+          onClose={closePopover}
+          onStatusChange={handleStatusChange}
+          onReschedule={handleReschedule}
+          onEdit={handleEdit}
+          barbers={barbers}
+          catalogItems={bookableCatalogItems}
+          isPending={pendingIds.has(popover.item.id)}
+          markPending={markPending}
+          clearPending={clearPending}
         />
       )}
     </div>
