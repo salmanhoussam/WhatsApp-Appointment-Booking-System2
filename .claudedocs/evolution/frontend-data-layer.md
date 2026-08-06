@@ -68,3 +68,21 @@ bespoke `useEffect` fetch hook appears in the Store admin surface — that is th
 of the same drift from the established pattern. At that point this stops being a one-off left for
 "later" and becomes worth raising to Salman directly as a real, repeating pattern, not deferred
 again.
+
+### Standing Rule
+
+Added same day, per Salman's explicit request — not a new decision, a small rule closing exactly the
+gap this entry describes:
+
+**Any new frontend data hook introduced after this point must use the project's existing React Query
+pattern (`useQuery`, per `.claude/skills/frontend/tanstack-query/SKILL.md`) unless there is a
+documented reason not to.**
+
+The point isn't to force it mechanically — it's to make skipping it a conscious, stated decision
+instead of an oversight. `reservationInteractions.jsx`'s `useBarbers()`/`useCatalogItems()` are the
+reason this rule exists: they were written with `useEffect`+fetch not because React Query was
+unsuitable, but because it was simply not reached for. This rule does not retroactively require
+migrating them now — that stays deferred per the Escalation Watch above. It applies going forward: a
+new hook written with `useEffect`+fetch after 2026-08-06 should carry a short comment stating why
+`useQuery` wasn't used, the same way this project already expects a stated reason for any other
+deliberate exception to an established pattern.
