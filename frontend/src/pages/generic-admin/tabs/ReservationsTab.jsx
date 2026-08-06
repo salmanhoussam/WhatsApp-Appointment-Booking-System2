@@ -314,6 +314,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFilter,   setDateFilter]   = useState(todayISO())
   const [showAllDates, setShowAllDates] = useState(false)
+  const [search,       setSearch]       = useState('') // Item 3, Phase 3.5 -- List-specific, client-side
   const [page,         setPage]         = useState(1)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const [viewMode,     setViewMode]     = useState(defaultView) // 'list' | 'today' | 'week'
@@ -471,11 +472,27 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
     return updated
   }, [])
 
-  // ── Pagination ─────────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(reservations.length / PAGE_SIZE))
-  const paged      = reservations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  // ── Search (Item 3, Phase 3.5, 2026-08-07) ──────────────────────────────────
+  // List-specific capability, not a Calendar-parity gap -- same client-side pattern OrdersTab.jsx
+  // already uses (filters the already-fetched array by name/phone, zero new backend request).
+  // Deliberately independent of Items 1-2's popover work -- no shared state, no shared handler.
+  const filteredReservations = useMemo(() => {
+    if (!search.trim()) return reservations
+    const s = search.toLowerCase()
+    return reservations.filter(r =>
+      (r.customer_name  ?? '').toLowerCase().includes(s) ||
+      (r.customer_phone ?? '').toLowerCase().includes(s)
+    )
+  }, [reservations, search])
 
-  // ── Status counts (for pills) ─────────────────────────────────────────────
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredReservations.length / PAGE_SIZE))
+  const paged      = filteredReservations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // ── Status counts (for pills) ────────────────────────────────────────────────
+  // Intentionally computed from the raw `reservations`, not `filteredReservations` -- matches
+  // OrdersTab.jsx's own precedent (its status pills also count against unsearched `orders`), so
+  // search narrows the visible list without making the pill counts lie about the full picture.
   const countByStatus = useMemo(() => {
     const m = {}
     for (const r of reservations) m[r.status] = (m[r.status] ?? 0) + 1
@@ -493,6 +510,19 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
         alignItems: isMobile ? 'stretch' : 'center',
         flexWrap: isMobile ? 'nowrap' : 'wrap',
       }}>
+
+        {/* Search (Item 3, Phase 3.5, 2026-08-07) — List-specific, not a Calendar-parity capability,
+            same reasoning as the date row below: only meaningful where a flat, scrollable list of
+            reservations exists to search through. Client-side only (filteredReservations), same
+            pattern OrdersTab.jsx already uses for its own search bar. */}
+        {viewMode === 'list' && (
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="بحث بالاسم أو الهاتف..."
+            style={{ ...inputStyle, flex: isMobile ? 'none' : 1, minWidth: 0, maxWidth: isMobile ? '100%' : 220 }}
+          />
+        )}
 
         {/* Date input row — the date picker / "اليوم" / "الكل" controls only apply to List mode
             (load()'s param-builder only reads dateFilter/showAllDates in the List branch --
@@ -666,7 +696,8 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
       {/* ── Results count ──────────────────────────────────────────── */}
       {!loading && (
         <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 12 }}>
-          {reservations.length} حجز
+          {viewMode === 'list' ? filteredReservations.length : reservations.length} حجز
+          {viewMode === 'list' && search.trim() ? ' (بعد البحث)' : ''}
           {viewMode === 'week'
             ? ` — أسبوع ${dateISO(weekStart)} إلى ${dateISO(addDaysLocal(weekStart, 6))}`
             : viewMode === 'today'
