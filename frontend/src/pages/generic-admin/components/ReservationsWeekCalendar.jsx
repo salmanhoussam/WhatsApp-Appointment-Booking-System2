@@ -6,7 +6,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  fmtTimeUTC, isoAtQuarter, quarterIndexFromIso, VISIBLE_STATUSES,
+  fmtTimeUTC, isoAtQuarter, quarterIndexFromIso, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
 } from './reservationInteractions'
 import { T, FONT } from '../theme'
@@ -130,11 +130,25 @@ function WeekReservationCard({ item, top, height, color, pending, onOpen }) {
 // One droppable per day column -- 7 real droppables, unlike Today's single-visible-column case
 // (Today's `over.id` is never actually read since only one column ever renders at a time; this is
 // the first real exercise of dnd-kit's collision resolution in this feature).
+//
+// `nowIndex` (Phase 3.4 Item 5) is only ever passed non-null for the ONE column where isToday is
+// true (see the parent's render loop) -- same gating Today's own StaffColumn already proves
+// correct, applied here per-column instead of per-page since Week can show today alongside six
+// other days that must never get a line or an auto-scroll.
 function WeekDayColumn({
   day, dayKey, dayReservations, gridHeight, hours, startHour, color, isToday,
-  pendingIds, onEmptySlotClick, onOpen,
+  pendingIds, onEmptySlotClick, onOpen, nowIndex,
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey })
+  const nowLineRef = useRef(null)
+
+  // Bring "now" into the initial viewport once per mount -- same one-time-effect pattern as
+  // Today's StaffColumn (`[]` deps on purpose, must NOT re-fire on the once-a-minute nowIndex
+  // tick, or the view would yank back to "now" out from under a scrolled-away user).
+  useEffect(() => {
+    if (nowIndex != null) nowLineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div
       ref={setNodeRef}
@@ -156,6 +170,24 @@ function WeekDayColumn({
           }}
         />
       ))}
+
+      {nowIndex != null && (
+        <div
+          ref={nowLineRef}
+          style={{
+            position: 'absolute', top: nowIndex * WEEK_QUARTER_PX, left: 0, right: 0,
+            borderTop: `2px solid ${T.danger}`, zIndex: 3, pointerEvents: 'none',
+          }}
+        >
+          <span style={{
+            position: 'absolute', right: 4, top: -9, fontSize: 9, fontWeight: 700,
+            color: '#fff', background: T.danger, padding: '1px 6px', borderRadius: 4,
+            fontFamily: FONT, whiteSpace: 'nowrap',
+          }}>
+            الآن
+          </span>
+        </div>
+      )}
 
       {dayReservations.map(r => {
         const top = Math.max(0, Math.min(topPx(r.reserved_at, startHour), gridHeight - 22))
@@ -278,7 +310,26 @@ export default function ReservationsWeekCalendar({
   )
   const gridHeight = hours.length * ROW_HEIGHT_PX
 
-  const today = new Date()
+  // Real bug fixed here (Phase 3.4 Item 5, found during this item's own investigation, 2026-08-06):
+  // `new Date()` read TRUE UTC calendar fields to decide "is this column today", but every other
+  // "now" in this feature (todayISODate()/fakeNowIso() in reservationInteractions.jsx) deliberately
+  // maps the browser's LOCAL wall-clock into fake-UTC fields, since reserved_at values themselves
+  // are naive-local-labeled-UTC. A real Date's true UTC date disagrees with the tenant's local
+  // calendar date for a 2-4 hour window around local midnight (e.g. Beirut, UTC+3: local 01:00
+  // Aug 6 = UTC 22:00 Aug 5) -- this silently mis-highlighted "today" during that window every
+  // single day. Re-ticks once a minute so a long-open tab stays roughly accurate, same as Today's
+  // own current-time indicator; does NOT drive the one-time auto-scroll in WeekDayColumn (mount-only).
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNowTick(Date.now()), 60000)
+    return () => clearInterval(timer)
+  }, [])
+  const today = useMemo(() => new Date(fakeNowIso()), [nowTick])
+  const nowIndex = useMemo(() => {
+    const idx = quarterIndexFromIso(fakeNowIso(), startHour)
+    const maxIndex = hours.length * 4
+    return (idx >= 0 && idx <= maxIndex) ? idx : null
+  }, [startHour, hours.length, nowTick])
   const weekLabel = `${fmtDayLabel(days[0])} – ${fmtDayLabel(days[6])}`
 
   // Empty-slot click -> Quick Create (Phase 3.4 Item 2). Same technique as Today's
@@ -457,6 +508,7 @@ export default function ReservationsWeekCalendar({
                   pendingIds={pendingIds}
                   onEmptySlotClick={handleEmptySlotClick}
                   onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+                  nowIndex={isToday ? nowIndex : null}
                 />
               )
             })}
