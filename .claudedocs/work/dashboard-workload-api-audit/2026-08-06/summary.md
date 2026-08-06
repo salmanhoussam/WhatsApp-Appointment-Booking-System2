@@ -222,6 +222,25 @@ request, not just which backend prefix owns it.
 
 ---
 
+## Priority Matrix
+
+Added per Salman's explicit request — not a schedule, not an approval to build any of this now. Its
+only job is to let someone reopen this report in a month and see where the real return sits within
+30 seconds, instead of re-reading all seven sections.
+
+| Opportunity | Expected Impact | Priority |
+|---|---|---|
+| `ReservationsTab` cache sharing (Calendar↔Reservations remount waste, §3.2) | Very High | P1 |
+| Orders cache sharing (Overview↔Orders duplicate, §3.1) | High | P1 |
+| Catalog cache sharing (Overview↔`reservationInteractions.jsx` duplicate, §3.3) | Medium | P2 |
+| `ActivityFeed` reservation refresh (§3.4, §6) | Medium | P2 |
+
+All four are still governed by the same deferral already on record in
+`.claudedocs/evolution/frontend-data-layer.md` — none scheduled, all timed to whenever the Store
+Dashboard / data-layer work actually starts.
+
+---
+
 ## Confirmed Findings
 
 - `GenericAdminDashboard.jsx:416-446,698-714` unmounts/remounts the active tab's component on every
