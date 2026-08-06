@@ -617,7 +617,10 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             onWeekChange={setWeekStart}
             color={color}
             onStatusChange={handleStatusChange}
+            onCreate={handleCreate}
             hourRange={hourRange}
+            barbers={barbers}
+            catalogItems={catalogItems}
           />
         )
       ) : viewMode === 'today' ? (

@@ -1,26 +1,22 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import adminApi from '../../../utils/admin.config'
 import { StatusBadge, StatusCell } from '../tabs/ReservationsTab'
+import { fmtTimeUTC, isoAtQuarter, CreatePopover } from './reservationInteractions'
 import { T, FONT } from '../theme'
 
 // Sunday-first, matching this codebase's one existing calendar precedent (UnitCalendar.jsx's
 // DAYS_AR) and standard Arabic/RTL calendar convention.
 const DAYS_AR = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت']
 const ROW_HEIGHT_PX = 56
+// Pixels per 15-minute quarter at this grid's density -- used with the shared isoAtQuarter()/
+// quarterIndexFromIso() (Phase 3.4, 2026-08-06) for slot-click/drag math, same functions Today
+// uses at its own QUARTER_PX=22 density. Hour gridlines stay visually hourly; the underlying time
+// resolution is still 15 minutes, matching Today's create/drag precision -- a click or drag just
+// resolves to the nearest quarter-hour within whichever hour row it lands in.
+const WEEK_QUARTER_PX = ROW_HEIGHT_PX / 4
 
-// A UTC-aware time label, deliberately NOT the shared fmtTime() from ReservationsTab.jsx --
-// that one formats in the browser's local timezone, which would visually contradict this
-// calendar's UTC-based card positioning (see the comment on the date helpers below). The
-// List view keeps using the shared fmtTime as-is; that's a separate, pre-existing display
-// choice this feature doesn't change.
-function fmtTimeUTC(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const h = String(d.getUTCHours()).padStart(2, '0')
-  const m = String(d.getUTCMinutes()).padStart(2, '0')
-  return `${h}:${m}`
-}
+// fmtTimeUTC/isoAtQuarter/quarterIndexFromIso/fakeNowIso now come from reservationInteractions.jsx
+// (Phase 3.4, 2026-08-06) -- this file no longer keeps its own duplicate copy of fmtTimeUTC.
 
 // Every helper below reads/writes UTC fields consistently -- matching this feature's own
 // stated convention (reservation_service.py's working-hours check reads reserved_at's UTC
@@ -103,35 +99,33 @@ function NavBtn({ onClick, label, color }) {
  *   weekStart      — Date, normalized to a Sunday
  *   onWeekChange   — (nextWeekStart: Date) => void
  *   color          — tenant primary_color
- *   onStatusChange — (id, newStatus) => Promise, reused for the detail modal
+ *   onStatusChange — (id, newStatus) => Promise
+ *   onCreate       — async (payload) -- POST /reservations/, Phase 3.4 Item 2
  *   hourRange      — [startHour, endHour]
+ *   barbers/catalogItems — lifted to ReservationsTab.jsx (Phase 3.4, useBarbers()/useCatalogItems()
+ *     in reservationInteractions.jsx) -- this view no longer self-fetches catalog items.
  */
 export default function ReservationsWeekCalendar({
-  reservations, weekStart, onWeekChange, color, onStatusChange, hourRange,
+  reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, hourRange,
+  barbers, catalogItems,
 }) {
   const [direction, setDirection] = useState(0)
   const [selected, setSelected] = useState(null)
+  const [createSlot, setCreateSlot] = useState(null) // { reservedAt, anchor } -- Phase 3.4 Item 2
   const [startHour, endHour] = hourRange
-  const [catalogItems, setCatalogItems] = useState([])
 
-  // Fetched here so the detail modal can show a labeled service name instead of a raw JSON dump
-  // (fixed 2026-08-05 -- see the guarded field below, was `<pre>{JSON.stringify(metadata)}</pre>`,
-  // a real violation of this feature's own "never show raw JSON to the owner" rule). Mount-only,
-  // no cache -- same accepted tradeoff ReservationsTodayView.jsx already makes for the same fetch.
-  const mountedRef = useRef(true)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
-  useEffect(() => {
-    adminApi.get('/catalog/items')
-      .then((r) => { if (mountedRef.current) setCatalogItems(r.data?.data ?? []) })
-      .catch(() => { if (mountedRef.current) setCatalogItems([]) })
-  }, [])
   const serviceNameFor = (item) => {
     const id = item?.metadata?.service_id
     return catalogItems.find((c) => c.id === id)?.name_ar ?? null
   }
+  // Bookable-only subset for the Create/Edit service pickers -- same split ReservationsTodayView.jsx
+  // already makes: serviceNameFor above stays on the FULL list (labeling whatever a reservation
+  // actually references, including retail/non-bookable items on historical data), while offering
+  // NEW bookings only ever lists real services (metadata.requires_booking === true).
+  const bookableCatalogItems = useMemo(
+    () => catalogItems.filter((item) => item?.metadata?.requires_booking === true),
+    [catalogItems]
+  )
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -159,6 +153,22 @@ export default function ReservationsWeekCalendar({
 
   const today = new Date()
   const weekLabel = `${fmtDayLabel(days[0])} – ${fmtDayLabel(days[6])}`
+
+  // Empty-slot click -> Quick Create (Phase 3.4 Item 2). Same technique as Today's
+  // handleEmptySlotClick: fresh getBoundingClientRect() on every click (never cached, correct
+  // under any scroll position), reservation cards call e.stopPropagation() in their own onClick
+  // so a card click never reaches this column-level handler underneath it. No barber pre-fill --
+  // unlike Today, Week has no per-staff column (a real, structural difference, not an oversight),
+  // so CreatePopover's own barber dropdown (already handles no defaultBarberId gracefully) is the
+  // answer, same path Today's own floating "+" button already uses.
+  const handleEmptySlotClick = useCallback((day, e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetY = e.clientY - rect.top
+    const maxIndex = hours.length * 4 - 1
+    const quarterIndex = Math.max(0, Math.min(Math.round(offsetY / WEEK_QUARTER_PX), maxIndex))
+    const reservedAt = isoAtQuarter(isoDateKey(day), startHour, quarterIndex)
+    setCreateSlot({ reservedAt, anchor: { x: e.clientX, y: e.clientY } })
+  }, [hours.length, startHour])
 
   const goWeek = (delta) => {
     setDirection(delta)
@@ -241,8 +251,9 @@ export default function ReservationsWeekCalendar({
             return (
               <div
                 key={key}
+                onClick={(e) => handleEmptySlotClick(d, e)}
                 style={{
-                  position: 'relative', height: gridHeight,
+                  position: 'relative', height: gridHeight, cursor: 'copy',
                   borderRight: `1px solid ${T.borderSoft}`,
                   background: isToday ? `${color}08` : 'transparent',
                 }}
@@ -254,6 +265,7 @@ export default function ReservationsWeekCalendar({
                     style={{
                       position: 'absolute', top: i * ROW_HEIGHT_PX, left: 0, right: 0,
                       borderTop: `1px solid ${T.borderSoft}`, height: ROW_HEIGHT_PX,
+                      pointerEvents: 'none',
                     }}
                   />
                 ))}
@@ -265,7 +277,7 @@ export default function ReservationsWeekCalendar({
                   return (
                     <button
                       key={r.id}
-                      onClick={() => setSelected(r)}
+                      onClick={(e) => { e.stopPropagation(); setSelected(r) }}
                       style={{
                         position: 'absolute', top, height, left: 4, right: 4,
                         borderRadius: 6, padding: '3px 6px', textAlign: 'right',
@@ -336,6 +348,19 @@ export default function ReservationsWeekCalendar({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Quick Create (Phase 3.4 Item 2) -- same shared CreatePopover Today uses */}
+      {createSlot && (
+        <CreatePopover
+          barbers={barbers}
+          catalogItems={bookableCatalogItems}
+          defaultReservedAt={createSlot.reservedAt}
+          color={color}
+          anchor={createSlot.anchor}
+          onClose={() => setCreateSlot(null)}
+          onCreate={onCreate}
+        />
       )}
     </div>
   )
