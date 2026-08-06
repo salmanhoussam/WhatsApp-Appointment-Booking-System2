@@ -109,6 +109,15 @@
   - Same-day hardening: 3 more instances of the same past-slot timezone bug fixed (reschedule + both create paths), a real dead-code file removed (`app/api/v1/public.py`), and a real input-validation gap fixed (`barber_id` now UUID-typed on the availability route, clean 422 instead of a raw 500)
   - Architecture review delivered (not a refactor): `.claudedocs/evolution/reservation-capability.md`'s 2026-08-05 entry — Reservation Engine vs. Barber Dashboard, no extraction warranted yet, Escalation Watch set for the next real tenant type (Gym/Clinic/etc.) as the mandatory re-evaluation checkpoint
   - Per Salman's explicit Phase Closure (2026-08-06): **any further change to this Calendar/Dashboard screen is a new Feature request, not a continuation of this milestone.** — ✅ Done 2026-08-06
+- **Phase 3.4 — Weekly Calendar Feature Parity — v1 CLOSED, tagged `reservation-calendar-v1`** — Week View reached full feature parity with Today View, closing the last real gap in the Calendar screen:
+  - Step 0 — extracted `reservationInteractions.jsx`: shared `ReservationPopover`/`CreatePopover`/`usePopoverPosition`/date-math/`useBarbers()`/`useCatalogItems()`, replacing Week's fully standalone implementation; added a one-click "✅ تأكيد الحجز" quick-confirm button (both views get it for free)
+  - Item 2 — Week empty-slot click → Quick Create (previously Week had zero Create capability)
+  - Item 3 — Week's bespoke read-mostly modal replaced with the shared popover: real Edit/Cancel/Status-Change/mini-reschedule for the first time; found+fixed a real bug (cancelled cards weren't disappearing from Week's grid — `VISIBLE_STATUSES` filter moved to the shared module)
+  - Item 4 — Week drag-and-drop, genuinely new capability (cross-day AND time, vs. Today's time-only): dnd-kit droppable-per-day-column, verified via real trusted pointer sequences with zero ghost/duplicate cards on a round-trip
+  - Item 5 — real bug fixed: Week's `today = new Date()` used true UTC instead of the shared local-wall-clock convention, silently mis-highlighting "today" for 2-4 hours around local midnight every day; added the current-time line + auto-scroll
+  - Item 6 — mobile Browser Verification pass + one more real bug found+fixed: the shared popover's body needed `overflowY:auto` unconditionally (a fixed height estimate couldn't account for the new quick-confirm button's variable height, causing content to overlap the footer on mobile)
+  - New standing rule (Salman, 2026-08-06): **any future Calendar capability must ship in both Today View and Week View before it's considered complete** — see `.claudedocs/evolution/reservation-capability.md`'s 2026-08-06 entry
+  - Per Salman's explicit Phase Closure: **the Calendar is now a stable platform to build on, not an area under continuous development — no further Calendar work planned unless a bug surfaces.** Next: Staff Management → Customers → Notifications — ✅ Done 2026-08-06
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 

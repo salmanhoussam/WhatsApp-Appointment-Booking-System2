@@ -387,6 +387,89 @@ Named explicitly so that two months from now, a new barber-only feature doesn't 
 on and this review doesn't get forgotten — the next real vertical build is the checkpoint, not an
 optional one.
 
+## 2026-08-06
+
+### Context
+
+Phase Closure for the Reservation Calendar UI specifically (Today View + Week View), requested by
+Salman right after Phase 3.4 (Weekly Calendar Feature Parity) landed — the same discipline already
+applied once this week to the broader Dashboard/Calendar arc (`reservation-dashboard-v1`, closed
+2026-08-06 earlier the same day). This entry is narrower and later: it closes the one real gap that
+closure didn't yet cover — Week View lacked Create/Edit/Cancel/Drag/Time-Awareness entirely, Today
+View had all of them.
+
+### Discovery
+
+Phase 3.4 (7 commits, `0e53a08`..`45dd83a`) took Week View from "view + status-change only" to full
+parity with Today View, via one deliberate prerequisite (Step 0) rather than duplicating each
+capability:
+
+- **Step 0** extracted `frontend/src/pages/generic-admin/components/reservationInteractions.jsx` —
+  `ReservationPopover`, `CreatePopover`, `usePopoverPosition`, the date-math helpers, and new
+  `useBarbers()`/`useCatalogItems()` hooks — out of `ReservationsTodayView.jsx`, which previously
+  defined all of it privately with `ReservationsWeekCalendar.jsx` having zero reuse (a fully
+  standalone implementation). Both views now import the same components; a real duplicate-fetch
+  (barbers/catalog items independently re-fetched by each view) was eliminated as a direct
+  consequence, not a separate optimization pass.
+- **Items 2-5** each shipped one capability (Create, the popover-based Edit/Cancel/Status/
+  quick-confirm/mini-reschedule, drag-and-drop, current-time awareness), each its own commit,
+  each independently Browser-Verified before the next started — same discipline as every other
+  multi-item plan this project has run.
+- **Three real bugs found and fixed along the way, not predicted in advance:**
+  1. Week's cancelled reservations weren't disappearing from the grid (`VISIBLE_STATUSES` filter
+     existed in Today, was missing in Week — moved into the shared module so both apply the
+     identical rule).
+  2. Week's `today = new Date()` read true UTC calendar fields instead of the shared
+     local-wall-clock convention every other "now" in this feature uses — silently mis-highlighted
+     "today" for 2-4 hours around local midnight, every day, confirmed via exact pixel-math
+     evidence during the fix's own verification.
+  3. The shared popover's body used conditional `overflowY` based on a fixed per-mode height
+     estimate that couldn't account for the new quick-confirm button's variable height (only
+     renders for pending reservations) — caused real content-overlap on mobile, fixed by making
+     the scroll behavior unconditional rather than tuning the estimate.
+- **Drag-and-drop's one genuinely new piece**, not just a mirror of Today: Week's grid is 2D
+  (day × time) where Today's is 1D (a single visible staff column, time only) — dropping now
+  resolves both a target day (from dnd-kit's `over.id`, the first real exercise of its collision
+  resolution in this feature — Today's own `over.id` is never actually read since only one column
+  ever renders) and a new time (reusing the identical origin-quarter-index + `delta.y` math Today
+  already uses, since day columns are vertically aligned siblings).
+
+### Current Understanding
+
+The Reservation Calendar UI (Today + Week) is now a single coherent surface with one shared
+interaction layer, not two independently-evolving screens. Every capability in the original gap
+review's table (Create, Edit, Cancel, Status Change, Drag time+day, Current-time line, Auto-scroll,
+Empty-slot click) is ✅ on both views, confirmed via real Browser Verification including desktop and
+mobile passes and a round-trip ghost-card check on drag. This closes cleanly under the same
+Escalation Watch this file already set on 2026-08-05: the Resource/Barber architectural question
+remains untouched by this phase (no extraction, no schema change) — Phase 3.4 was UI-layer parity
+work, not a Reservation Strategy decision, and doesn't move that question either direction.
+
+### Open Questions
+
+None new. The existing 2026-08-05 Escalation Watch (next real tenant type = mandatory
+re-evaluation checkpoint for Resource/Barber) still stands, untouched by this UI-layer closure.
+
+### Promoted?
+
+No extraction, no ADR — not applicable to this entry (UI feature-parity work, not an architecture
+decision). Tagged `reservation-calendar-v1` at `45dd83a`.
+
+### Standing Rule (2026-08-06, Salman's explicit addition — binding going forward)
+
+**Any future Calendar capability must ship in both Today View and Week View before it can be
+considered complete.** Named explicitly so a future addition doesn't quietly land in one view and
+get forgotten in the other, repeating the exact gap this phase just closed. Applies to the Calendar
+screen specifically (Today/Week), distinct from — and additive to — the 2026-08-05 Escalation Watch
+above, which governs the separate Resource/Barber backend question.
+
+### Phase Closure note
+
+Per Salman's explicit instruction: the Reservation Calendar (Today + Week) is now considered a
+**stable platform other features get built on, not an area under continuous development.** No
+further Calendar work is planned unless a real bug surfaces. Next priority order: Staff Management
+→ Customers → Notifications.
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,
