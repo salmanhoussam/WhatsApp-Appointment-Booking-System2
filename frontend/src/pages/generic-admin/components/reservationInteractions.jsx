@@ -110,6 +110,18 @@ export const popoverInputStyle = {
 // scroll. Deliberately NOT written against any specific fixed element (e.g. a mobile bottom nav):
 // probes the real DOM for whatever is actually occupying the bottom edge of the screen right now,
 // so it keeps working unchanged regardless of what that turns out to be.
+//
+// Height guard (Phase 3.5, 2026-08-07): a real, previously-latent bug -- GenericAdminDashboard's
+// desktop sidebar (`<aside>`, position:fixed, top:0, height:100vh) also happens to reach the bottom
+// of the viewport, so the original bottom-bar detection below (checking only `rect.bottom`) treated
+// it as a bottom-docked overlay and returned ~0 for the usable viewport height on every desktop
+// call. Every popover trigger before this phase opened far enough down the page (empty-slot clicks,
+// table rows) that `spaceAbove` alone happened to be large enough to mostly cover the needed height
+// anyway, masking the bug -- Item 2's "+ حجز جديد" button, anchored near the TOP of the screen, was
+// the first trigger point where that coincidence didn't hold, squeezing the whole CreatePopover into
+// a ~160px sliver pinned to the viewport's top-left corner. Fix: only treat a fixed element as a
+// bottom bar if it's actually bar-shaped (short), not merely touching the bottom edge -- a full-
+// height sidebar's `rect.height` is close to `window.innerHeight`; a real bottom nav's is not.
 function getUsableViewportBottom() {
   const probeXs = [window.innerWidth / 2, window.innerWidth * 0.1, window.innerWidth * 0.9]
   let usableBottom = window.innerHeight
@@ -118,7 +130,8 @@ function getUsableViewportBottom() {
     while (node && node !== document.body && node !== document.documentElement) {
       if (window.getComputedStyle(node).position === 'fixed') {
         const rect = node.getBoundingClientRect()
-        if (rect.bottom >= window.innerHeight - 4) usableBottom = Math.min(usableBottom, rect.top)
+        const isBottomBar = rect.bottom >= window.innerHeight - 4 && rect.height < window.innerHeight * 0.5
+        if (isBottomBar) usableBottom = Math.min(usableBottom, rect.top)
         break
       }
       node = node.parentElement

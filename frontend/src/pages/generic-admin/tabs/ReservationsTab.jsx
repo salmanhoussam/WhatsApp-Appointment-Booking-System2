@@ -345,6 +345,12 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
     setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })
   }, [])
   const closePopover = useCallback(() => setPopover(null), [])
+  // Create (Item 2, Phase 3.5) -- List has no empty-slot/grid concept to click, so this is a plain
+  // button anchored at its own click point, same anchor shape as every other Create trigger already
+  // uses (Today's empty-slot click, Week's empty-slot click).
+  const [createAnchor, setCreateAnchor] = useState(null) // { x, y } | null
+  const openCreate = useCallback((e) => setCreateAnchor({ x: e.clientX, y: e.clientY }), [])
+  const closeCreate = useCallback(() => setCreateAnchor(null), [])
   const [pendingIds, setPendingIds] = useState(() => new Set())
   const markPending = useCallback((id) => {
     setPendingIds((prev) => new Set(prev).add(id))
@@ -624,6 +630,24 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
           </div>
         </div>
 
+        {/* Create (Item 2, Phase 3.5) — List-only, since Today/Week trigger Create via an
+            empty-slot click and List has no grid to click into. Opens the same shared CreatePopover
+            anchored at the click point, defaultBarberId omitted (falls back to barbers[0]?.id, the
+            exact path Week's own Create button already uses). */}
+        {viewMode === 'list' && (
+          <button
+            onClick={openCreate}
+            style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', fontFamily: FONT,
+              background: `${color}18`,
+              border: `1px solid ${color}55`, color,
+            }}
+          >
+            + حجز جديد
+          </button>
+        )}
+
         {/* Refresh — desktop only (mobile has it in date row) */}
         {!isMobile && viewMode === 'list' && (
           <button
@@ -835,6 +859,19 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
           isPending={pendingIds.has(popover.item.id)}
           markPending={markPending}
           clearPending={clearPending}
+        />
+      )}
+
+      {/* ── Quick Create popover (Item 2, Phase 3.5, 2026-08-07) ── */}
+      {createAnchor && (
+        <CreatePopover
+          barbers={barbers}
+          catalogItems={bookableCatalogItems}
+          defaultReservedAt={undefined}
+          color={color}
+          anchor={createAnchor}
+          onClose={closeCreate}
+          onCreate={handleCreate}
         />
       )}
     </div>
