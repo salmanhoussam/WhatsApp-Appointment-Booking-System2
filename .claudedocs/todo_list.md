@@ -118,6 +118,23 @@
   - Item 6 — mobile Browser Verification pass + one more real bug found+fixed: the shared popover's body needed `overflowY:auto` unconditionally (a fixed height estimate couldn't account for the new quick-confirm button's variable height, causing content to overlap the footer on mobile)
   - New standing rule (Salman, 2026-08-06): **any future Calendar capability must ship in both Today View and Week View before it's considered complete** — see `.claudedocs/evolution/reservation-capability.md`'s 2026-08-06 entry
   - Per Salman's explicit Phase Closure: **the Calendar is now a stable platform to build on, not an area under continuous development — no further Calendar work planned unless a bug surfaces.** Next: Staff Management → Customers → Notifications — ✅ Done 2026-08-06
+- [ ] **API Boundary Review (2026-08-06) — carry-forward items before/during Staff Management &
+  Customers:** full report `.claudedocs/work/api-boundary-review/2026-08-06/summary.md`, evolution
+  entry `.claudedocs/evolution/api-boundaries.md`. Two real items to resolve, not urgent but
+  load-bearing for those phases:
+  - `admin/customers.py` exists but is unmounted (not in `admin/__init__.py`) and uses a stale
+    auth/tenancy pattern (no JWT dependency, raw `client_id` query param) — rebuild fresh for the
+    Customers phase, don't wire up as-is.
+  - `Reservation` has no relation to `Customer` at the schema level — decide phone-string matching
+    vs. a real `Reservation.customerId` FK before building Customers for `hr`.
+- [ ] **Shared data-fetching / React Query — Store Dashboard carry-forward (2026-08-06):** migrate
+  `reservationInteractions.jsx`'s `useBarbers()`/`useCatalogItems()` (currently bespoke
+  `useState`+`useEffect`) to `useQuery`, per the already-established `tanstack-query` skill's PART 9
+  migration checklist — do this at the same time Store's own admin-dashboard data hooks are built,
+  so Store starts on `useQuery` from day one instead of repeating the bespoke pattern a third time.
+  No new cache/abstraction needed — React Query is already wired app-wide (`App.jsx`) and already
+  proven in `useTenantConfig.js`/`useCatalog.js`; this is a consistency retrofit, not new
+  architecture. See `.claudedocs/evolution/frontend-data-layer.md`.
 
 ## 🔴 عاجل — يحتاج تنفيذ يدوي
 
