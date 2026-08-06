@@ -118,6 +118,28 @@
   - Item 6 — mobile Browser Verification pass + one more real bug found+fixed: the shared popover's body needed `overflowY:auto` unconditionally (a fixed height estimate couldn't account for the new quick-confirm button's variable height, causing content to overlap the footer on mobile)
   - New standing rule (Salman, 2026-08-06): **any future Calendar capability must ship in both Today View and Week View before it's considered complete** — see `.claudedocs/evolution/reservation-capability.md`'s 2026-08-06 entry
   - Per Salman's explicit Phase Closure: **the Calendar is now a stable platform to build on, not an area under continuous development — no further Calendar work planned unless a bug surfaces.** Next: Staff Management → Customers → Notifications — ✅ Done 2026-08-06
+- **Reservations filter-button checkup (2026-08-07) — real bug fixed** (`5321764`): the List-only
+  date picker/اليوم/الكل buttons stayed visible and interactive during Today/Week Calendar view
+  despite doing nothing there — now correctly hidden outside List mode, verified via real Browser
+  Verification across all 3 view modes.
+- **Phase 3.5 — Reservations List v1 Completion — CLOSED** — List reached full capability parity
+  with Calendar on the shared Reservation Engine, closing the last real gap across all three views:
+  - Item 1 — row/card click → shared `ReservationPopover`, closing View/Edit/Cancel(with the
+    confirm-safety step)/Quick-Confirm/Reschedule at once; `StatusCell`'s badge click got
+    `e.stopPropagation()` so it doesn't also open the row popover
+  - Item 2 — "+ حجز جديد" button → shared `CreatePopover` (List has no empty-slot/grid to click, so
+    a plain button instead); found+fixed a real, previously-latent bug in this same commit —
+    `getUsableViewportBottom()` mistook the desktop sidebar (full-height `position:fixed`) for a
+    bottom-docked bar, collapsing usable viewport height to ~0 on desktop; every earlier popover
+    trigger opened far enough down the page to mask it, this button (near the top) was the first to
+    expose it
+  - Item 3 — client-side Search (name/phone substring), reusing `OrdersTab.jsx`'s exact pattern,
+    zero new backend request; explicitly scoped as List-specific, not a Calendar-parity capability
+  - New standing rule (Salman, 2026-08-07, supersedes the 2026-08-06 one): **any Reservation
+    capability must work across Today, Week, AND List before it's considered complete, unless
+    explicitly declared view-specific** — see `.claudedocs/evolution/reservation-capability.md`'s
+    2026-08-07 entry
+  - ✅ Done 2026-08-07
 - [ ] **API Boundary Review (2026-08-06) — carry-forward items before/during Staff Management &
   Customers:** full report `.claudedocs/work/api-boundary-review/2026-08-06/summary.md`, evolution
   entry `.claudedocs/evolution/api-boundaries.md`. Two real items to resolve, not urgent but

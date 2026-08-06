@@ -470,6 +470,78 @@ Per Salman's explicit instruction: the Reservation Calendar (Today + Week) is no
 further Calendar work is planned unless a real bug surfaces. Next priority order: Staff Management
 → Customers → Notifications.
 
+## 2026-08-07
+
+### Context
+
+A Salman-requested checkup on the Calendar's filter buttons (اليوم/الكل) found and fixed a real bug
+the same day — those List-only date controls stayed visible and interactive during Today/Week view
+despite doing nothing there (`5321764`). That fix, plus the fact that "Reservations" and "Calendar"
+already render the exact same `ReservationsTab.jsx` component, prompted Phase 3.5 — Reservations
+List v1 Completion: bringing the List view to the same capability level as Today/Week, reusing the
+one Reservation Engine, not building a second one.
+
+### Discovery
+
+Item 0's Capability Matrix (investigated directly, not assumed) found List had real gaps: no way to
+View/Edit/Reschedule a reservation at all, Cancel only reachable via `StatusCell`'s dropdown with no
+confirm-safety-step (Calendar's cancel path has one), Quick Confirm not reachable except via a
+2-click status dropdown. Root cause matched Week's own pre-Phase-3.4 shape exactly: List's render
+path never imported `ReservationPopover`/`CreatePopover` from `reservationInteractions.jsx`. All
+mutation handlers List needed already existed in `ReservationsTab.jsx`, already passed to Week/Today
+— the gap was pure UI wiring, zero new backend calls.
+
+One real, previously-latent bug surfaced during Item 2 (the new "+ حجز جديد" Create button):
+`getUsableViewportBottom()` (the shared popover-positioning probe) mistook
+`GenericAdminDashboard.jsx`'s full-height desktop sidebar for a bottom-docked overlay, collapsing the
+computed usable viewport height to ~0 on every desktop call. Every earlier popover trigger (empty-
+slot clicks, table rows) opened far enough down the page that this stayed masked; a button near the
+top of the screen was the first trigger point to expose it, squeezing `CreatePopover` into a ~160px
+sliver pinned to the top-left corner. Fixed by requiring a fixed element be bar-shaped (height under
+half the viewport) before treating it as a bottom bar, not merely touching the bottom edge.
+
+Search, which Salman's own review correctly reclassified as a List-specific capability rather than a
+Calendar-parity gap, turned out to have a zero-cost implementation already proven in this codebase —
+`OrdersTab.jsx`'s own search bar filters its already-fetched array client-side, no backend param.
+Applied unchanged to Reservations.
+
+### Current Understanding
+
+List, Today, and Week are now three Views over one Reservation Engine, not three independently
+maintained UIs — every capability in Item 0's Shared table (View, Edit, Cancel, Quick Confirm,
+Status, Reschedule, Create) reads ✅ on all three, confirmed via real Browser Verification at every
+step (4 separate passes: Item 1, Item 2, the bundled positioning-fix re-verification, and the final
+Search + full-regression pass). `ReservationPopover`/`CreatePopover` needed zero layout-specific
+branching to support List (the Stop Condition Salman required was never triggered) — List is the
+third proven case of the same extraction Phase 3.4 already validated twice.
+
+### Open Questions
+
+None new. The 2026-08-05 Escalation Watch (Resource/Barber, next real tenant type) and the
+2026-08-06 Standing Rule (superseded below) both stand; this phase didn't touch either question.
+
+### Promoted?
+
+No extraction, no ADR — UI feature-completion work, not an architecture decision, same classification
+as Phase 3.4.
+
+### Standing Rule (2026-08-07 — supersedes the 2026-08-06 rule above)
+
+**Any Reservation capability is considered complete only when it works across Today View, Week
+View, and List View — unless explicitly declared view-specific** (e.g. Search, Pagination, Date
+filter, each genuinely List-only by design, not gaps). The 2026-08-06 rule ("ships in Today + Week")
+is now subsumed by this one — List was the one view it didn't yet cover, and this phase closes that
+permanently, not just for this feature set.
+
+### Phase Closure note
+
+Per Salman's own framing: this phase is named "Completion," not "Feature Parity" — List isn't
+copying Calendar, it's reaching its own v1 state on the same engine, exactly as Today and Week each
+did. With this closed, the Reservation Engine has three feature-complete, non-duplicated interfaces
+sharing one backend, one set of mutation handlers, and one shared interaction layer
+(`reservationInteractions.jsx`). Next priority order unchanged: Staff Management → Customers →
+Notifications.
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,
