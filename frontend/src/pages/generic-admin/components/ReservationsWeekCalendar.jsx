@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { StatusBadge, StatusCell } from '../tabs/ReservationsTab'
-import { fmtTimeUTC, isoAtQuarter, CreatePopover } from './reservationInteractions'
+import {
+  fmtTimeUTC, isoAtQuarter, VISIBLE_STATUSES, ReservationPopover, CreatePopover,
+} from './reservationInteractions'
 import { T, FONT } from '../theme'
 
 // Sunday-first, matching this codebase's one existing calendar precedent (UnitCalendar.jsx's
@@ -101,18 +102,32 @@ function NavBtn({ onClick, label, color }) {
  *   color          — tenant primary_color
  *   onStatusChange — (id, newStatus) => Promise
  *   onCreate       — async (payload) -- POST /reservations/, Phase 3.4 Item 2
+ *   onEdit         — async (id, patch) -- PATCH /reservations/{id}, Phase 3.4 Item 3
+ *   onReschedule   — async (id, { reserved_at, barber_id? }) -- throws on 409/error, Phase 3.4 Item 3
  *   hourRange      — [startHour, endHour]
  *   barbers/catalogItems — lifted to ReservationsTab.jsx (Phase 3.4, useBarbers()/useCatalogItems()
  *     in reservationInteractions.jsx) -- this view no longer self-fetches catalog items.
  */
 export default function ReservationsWeekCalendar({
-  reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, hourRange,
+  reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, onEdit, onReschedule, hourRange,
   barbers, catalogItems,
 }) {
   const [direction, setDirection] = useState(0)
-  const [selected, setSelected] = useState(null)
+  const [popover, setPopover] = useState(null) // { item, anchor } -- Phase 3.4 Item 3
   const [createSlot, setCreateSlot] = useState(null) // { reservedAt, anchor } -- Phase 3.4 Item 2
   const [startHour, endHour] = hourRange
+
+  // In-flight-mutation guard, same pattern ReservationsTodayView.jsx already uses locally -- a
+  // Set of reservation ids currently mid-mutation via the popover, so a second action can't race
+  // the first on the same row. Small local UI state, not business logic, so it's written fresh
+  // here rather than extracted (Phase 3.4 Step 0's own evaluation of what's worth sharing).
+  const [pendingIds, setPendingIds] = useState(() => new Set())
+  const markPending = useCallback((id) => {
+    setPendingIds((prev) => new Set(prev).add(id))
+  }, [])
+  const clearPending = useCallback((id) => {
+    setPendingIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+  }, [])
 
   const serviceNameFor = (item) => {
     const id = item?.metadata?.service_id
@@ -136,6 +151,7 @@ export default function ReservationsWeekCalendar({
     const map = new Map(days.map(d => [isoDateKey(d), []]))
     for (const r of reservations) {
       if (!r.reserved_at) continue
+      if (!VISIBLE_STATUSES.includes(r.status)) continue
       const key = isoDateKey(new Date(r.reserved_at))
       if (map.has(key)) map.get(key).push(r)
     }
@@ -277,13 +293,13 @@ export default function ReservationsWeekCalendar({
                   return (
                     <button
                       key={r.id}
-                      onClick={(e) => { e.stopPropagation(); setSelected(r) }}
+                      onClick={(e) => { e.stopPropagation(); setPopover({ item: r, anchor: { x: e.clientX, y: e.clientY } }) }}
                       style={{
                         position: 'absolute', top, height, left: 4, right: 4,
                         borderRadius: 6, padding: '3px 6px', textAlign: 'right',
                         background: `${color}14`, border: `1px solid ${color}55`,
                         color: T.textPrimary, fontSize: 11, cursor: 'pointer', overflow: 'hidden',
-                        fontFamily: FONT,
+                        fontFamily: FONT, opacity: pendingIds.has(r.id) ? 0.5 : 1,
                       }}
                       title={`${r.customer_name} — ${fmtTimeUTC(r.reserved_at)}${meta.service_name ? ` — ${meta.service_name}` : ''}`}
                     >
@@ -300,54 +316,26 @@ export default function ReservationsWeekCalendar({
         </div>
       </div>
 
-      {/* Detail modal */}
-      {selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: T.cardBg, border: `1px solid ${T.border}`,
-              borderRadius: 14, padding: 22, minWidth: 300, maxWidth: 420,
-              direction: 'rtl', fontFamily: FONT, boxShadow: T.shadowPopover,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: T.textPrimary }}>{selected.customer_name}</div>
-              <StatusCell reservation={selected} onUpdate={onStatusChange} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: T.textSecond }}>
-              <div>📞 {selected.customer_phone || '—'}</div>
-              {selected.customer_email && <div>✉️ {selected.customer_email}</div>}
-              <div>🕐 {fmtTimeUTC(selected.reserved_at)} — {selected.duration_min} دقيقة</div>
-              {selected.module_key && <div>🏷️ {selected.module_key}</div>}
-              {selected.metadata?.service_name && <div>✂️ {selected.metadata.service_name}</div>}
-              {!selected.metadata?.service_name && serviceNameFor(selected) && (
-                <div>✂️ {serviceNameFor(selected)}</div>
-              )}
-              {selected.notes && (
-                <div style={{ marginTop: 6, paddingTop: 8, borderTop: `1px solid ${T.borderSoft}`, fontSize: 12 }}>
-                  {selected.notes}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setSelected(null)}
-              style={{
-                marginTop: 16, width: '100%', padding: '8px 0', borderRadius: 8,
-                background: T.pageBg, border: `1px solid ${T.border}`, color: T.textPrimary,
-                cursor: 'pointer', fontFamily: FONT, fontSize: 13,
-              }}
-            >
-              إغلاق
-            </button>
-          </div>
-        </div>
+      {/* Reservation popover (Phase 3.4 Item 3) -- replaces the old bespoke read-mostly modal
+          with the exact same shared ReservationPopover Today uses: Edit, Cancel, Status Change
+          (incl. the one-click quick-confirm button), and the mini-reschedule form, all inherited
+          for free from Step 0's extraction -- not rebuilt here. */}
+      {popover && (
+        <ReservationPopover
+          item={popover.item}
+          serviceName={serviceNameFor(popover.item)}
+          color={color}
+          anchor={popover.anchor}
+          onClose={() => setPopover(null)}
+          onStatusChange={onStatusChange}
+          onReschedule={onReschedule}
+          onEdit={onEdit}
+          barbers={barbers}
+          catalogItems={bookableCatalogItems}
+          isPending={pendingIds.has(popover.item.id)}
+          markPending={markPending}
+          clearPending={clearPending}
+        />
       )}
 
       {/* Quick Create (Phase 3.4 Item 2) -- same shared CreatePopover Today uses */}

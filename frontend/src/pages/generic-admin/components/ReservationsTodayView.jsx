@@ -6,7 +6,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { StatusBadge } from '../tabs/ReservationsTab'
 import {
-  fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso,
+  fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
 } from './reservationInteractions'
 import { T, FONT } from '../theme'
@@ -30,10 +30,9 @@ import { T, FONT } from '../theme'
 
 const QUARTER_PX = 22
 const SERVICE_ICON_FALLBACK = '✂️'
-// Mirrors the backend's ACTIVE_STATUSES (reservation_service.py:26-28) -- a cancelled/no_show
-// reservation must disappear from the grid immediately (Phase 3.2 Cancel spec) and its slot must
-// visually read as free, matching what the backend's own conflict check already treats as free.
-const VISIBLE_STATUSES = ['pending', 'confirmed', 'arrived']
+// VISIBLE_STATUSES now comes from reservationInteractions.jsx (Phase 3.4, 2026-08-06) -- shared
+// with ReservationsWeekCalendar.jsx so a cancelled/no_show reservation disappears from both grids
+// the same way, not two independently-maintained filters.
 
 function fmtHourLabel(h) {
   return `${String(h).padStart(2, '0')}:00`

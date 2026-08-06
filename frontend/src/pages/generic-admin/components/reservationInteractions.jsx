@@ -12,6 +12,14 @@ import { T, FONT } from '../theme'
 // ReservationPopover/CreatePopover, so a new action added here appears in both views automatically,
 // with no second file to remember to update.
 
+// Mirrors the backend's ACTIVE_STATUSES (reservation_service.py:26-28) -- a cancelled/no_show
+// reservation must disappear from the grid immediately (Phase 3.2 Cancel spec) and its slot must
+// visually read as free, matching what the backend's own conflict check already treats as free.
+// Found missing from Week's own grouping during Item 3's Browser Verification (2026-08-06) -- a
+// cancelled card stayed visible, indistinguishable from a live one. Shared here so both Today and
+// Week apply the identical rule, not two copies that can drift.
+export const VISIBLE_STATUSES = ['pending', 'confirmed', 'arrived']
+
 // ── Pure date helpers ─────────────────────────────────────────────────────────────────────────────
 // All UTC-field accessors, deliberately -- `reserved_at` values represent the tenant's wall-clock
 // time directly with no real timezone conversion anywhere in this feature (documented once in
