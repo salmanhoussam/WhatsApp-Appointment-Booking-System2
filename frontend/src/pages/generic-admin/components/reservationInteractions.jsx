@@ -303,8 +303,16 @@ export function ReservationPopover({
           {mode === 'view' && <StatusCell reservation={item} onUpdate={onStatusChange} />}
         </div>
 
-        {/* Body -- the only region that scrolls when the popover is height-constrained */}
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
+        {/* Body -- always overflowY:auto, not conditional on pos.scroll (Phase 3.4 Item 6 fix,
+            2026-08-06). usePopoverPosition's `popupHeight` is a fixed per-mode estimate that can't
+            account for content whose real height varies with the reservation's own status (e.g.
+            the quick-confirm button only rendering for pending reservations) -- found via mobile
+            Browser Verification: content taller than the estimate silently overlapped the pinned
+            footer with `visible`. `auto` is a strictly safe default: shows no scrollbar when
+            content already fits (identical to `visible` in that case), and falls back to scrolling
+            instead of overlapping when it doesn't -- without needing the height estimate to be
+            exactly right. */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '0 16px' }}>
           {mode === 'view' && (
             <>
               {canQuickConfirm && (
@@ -529,8 +537,16 @@ export function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultR
           <div style={{ fontSize: 15, fontWeight: 700, color: T.textPrimary }}>حجز سريع</div>
         </div>
 
-        {/* Body -- the only region that scrolls when the popover is height-constrained */}
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: pos.scroll ? 'auto' : 'visible', padding: '0 16px' }}>
+        {/* Body -- always overflowY:auto, not conditional on pos.scroll (Phase 3.4 Item 6 fix,
+            2026-08-06). usePopoverPosition's `popupHeight` is a fixed per-mode estimate that can't
+            account for content whose real height varies with the reservation's own status (e.g.
+            the quick-confirm button only rendering for pending reservations) -- found via mobile
+            Browser Verification: content taller than the estimate silently overlapped the pinned
+            footer with `visible`. `auto` is a strictly safe default: shows no scrollbar when
+            content already fits (identical to `visible` in that case), and falls back to scrolling
+            instead of overlapping when it doesn't -- without needing the height estimate to be
+            exactly right. */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '0 16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
             <Dropdown value={barberId} onChange={setBarberId} options={barberOptions} />
             <Dropdown value={serviceId} onChange={handleServiceChange} options={serviceOptions} placeholder="— اختر الخدمة —" />
