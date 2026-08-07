@@ -39,6 +39,8 @@ router = APIRouter(prefix="/barbers", tags=["Admin Barbers"])
 class BarberCreate(BaseModel):
     name:          str
     phone:         Optional[str] = None
+    description:   Optional[str] = None
+    image_url:     Optional[str] = None
     working_hours: Optional[dict] = None
     sort_order:    Optional[int] = 0
 
@@ -46,6 +48,8 @@ class BarberCreate(BaseModel):
 class BarberUpdate(BaseModel):
     name:          Optional[str] = None
     phone:         Optional[str] = None
+    description:   Optional[str] = None
+    image_url:     Optional[str] = None
     working_hours: Optional[dict] = None
     sort_order:    Optional[int] = None
     is_active:     Optional[bool] = None
@@ -58,6 +62,8 @@ def _fmt(b) -> dict:
         "id":            b.id,
         "name":          b.name,
         "phone":         b.phone,
+        "description":   b.description,
+        "image_url":     b.imageUrl,
         "is_active":     b.isActive,
         "working_hours": b.workingHours or {},
         "sort_order":    b.sortOrder,
@@ -87,10 +93,12 @@ async def create_barber(
     from prisma import Json
 
     data = {
-        "clientId":  tenant["id"],  # CRITICAL: always the current tenant
-        "name":      body.name,
-        "phone":     body.phone,
-        "sortOrder": body.sort_order or 0,
+        "clientId":    tenant["id"],  # CRITICAL: always the current tenant
+        "name":        body.name,
+        "phone":       body.phone,
+        "description": body.description,
+        "imageUrl":    body.image_url,
+        "sortOrder":   body.sort_order or 0,
     }
     if body.working_hours:
         data["workingHours"] = Json(body.working_hours)
@@ -118,6 +126,10 @@ async def update_barber(
         patch["name"] = body.name
     if body.phone is not None:
         patch["phone"] = body.phone
+    if body.description is not None:
+        patch["description"] = body.description
+    if body.image_url is not None:
+        patch["imageUrl"] = body.image_url
     if body.working_hours is not None:
         patch["workingHours"] = Json(body.working_hours)
     if body.sort_order is not None:

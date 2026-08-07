@@ -12,6 +12,9 @@ Context-based path routing (matches storage-tenant.md FOLDER_MAP):
   page_demo     → pages/demo/
   unit_cover    → units/{unit_id}/cover/
   unit_gallery  → units/{unit_id}/gallery/
+  barber        → staff/{barber_id}/ (Phase 3.7A, 2026-08-07) -- Barber.imageUrl is a plain field,
+                   not a GalleryImage relation (one photo per barber, not a gallery), so this
+                   context falls through the if/elif below unchanged, same as page_hero/page_logo.
 
 Authorization (Authorization Hardening, 2026-07-31): SUPER_ADMIN, TENANT_ADMIN only.
 
@@ -46,6 +49,7 @@ FOLDER_MAP = {
     "page_demo":      "pages/demo",
     "unit_cover":     "units/{unit_id}/cover",
     "unit_gallery":   "units/{unit_id}/gallery",
+    "barber":         "staff/{barber_id}",
 }
 
 IMAGE_TYPE_MAP = {
@@ -56,15 +60,17 @@ IMAGE_TYPE_MAP = {
     "page_demo":      "gallery",
     "unit_cover":     "cover",
     "unit_gallery":   "gallery",
+    "barber":         "barber",
 }
 
 
-def _build_folder(context: str, category_id: str | None, item_id: str | None, unit_id: str | None) -> str:
+def _build_folder(context: str, category_id: str | None, item_id: str | None, unit_id: str | None, barber_id: str | None = None) -> str:
     template = FOLDER_MAP[context]
     return template.format(
         category_id=category_id or "",
         item_id=item_id or "",
         unit_id=unit_id or "",
+        barber_id=barber_id or "",
     )
 
 
@@ -75,6 +81,7 @@ async def upload_image(
     category_id: Optional[str]  = Form(None),
     item_id:     Optional[str]  = Form(None),
     unit_id:     Optional[str]  = Form(None),
+    barber_id:   Optional[str]  = Form(None),
     caption_ar:  Optional[str]  = Form(None),
     caption_en:  Optional[str]  = Form(None),
     tenant:      dict            = Depends(get_current_tenant),
@@ -91,8 +98,10 @@ async def upload_image(
         raise HTTPException(status_code=400, detail="catalog_item context requires category_id and item_id")
     if context in ("unit_cover", "unit_gallery") and not unit_id:
         raise HTTPException(status_code=400, detail=f"{context} context requires unit_id")
+    if context == "barber" and not barber_id:
+        raise HTTPException(status_code=400, detail="barber context requires barber_id")
 
-    folder     = _build_folder(context, category_id, item_id, unit_id)
+    folder     = _build_folder(context, category_id, item_id, unit_id, barber_id)
     file_bytes = await file.read()
 
     public_url = await upload_to_gallery_path(

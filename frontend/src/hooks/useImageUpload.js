@@ -23,6 +23,9 @@
  *   const { url, image_id } = await upload(file, { context: 'unit_cover', unit_id: 'uuid' })
  *   const { url, image_id } = await upload(file, { context: 'unit_gallery', unit_id: 'uuid' })
  *
+ *   // Staff (barber) photo — Phase 3.7A
+ *   const { url } = await upload(file, { context: 'barber', barber_id: 'uuid' })
+ *
  * ── Valid contexts ─────────────────────────────────────────────────────────────
  *   catalog_item  → requires category_id + item_id
  *   page_hero     → no extra ids
@@ -31,6 +34,7 @@
  *   page_demo     → no extra ids
  *   unit_cover    → requires unit_id
  *   unit_gallery  → requires unit_id
+ *   barber        → requires barber_id
  *
  * ── Returns from upload() ──────────────────────────────────────────────────────
  *   { url: string, image_id: string|null }
@@ -44,6 +48,7 @@ const VALID_CONTEXTS = [
   'catalog_item',
   'page_hero', 'page_logo', 'page_story', 'page_demo',
   'unit_cover', 'unit_gallery',
+  'barber',
 ]
 
 export default function useImageUpload() {
@@ -58,6 +63,7 @@ export default function useImageUpload() {
       category_id = null,
       item_id     = null,
       unit_id     = null,
+      barber_id   = null,
       caption_ar  = null,
       caption_en  = null,
     } = options
@@ -77,6 +83,7 @@ export default function useImageUpload() {
       if (category_id) form.append('category_id', category_id)
       if (item_id)     form.append('item_id',     item_id)
       if (unit_id)     form.append('unit_id',     unit_id)
+      if (barber_id)   form.append('barber_id',   barber_id)
       if (caption_ar)  form.append('caption_ar',  caption_ar)
       if (caption_en)  form.append('caption_en',  caption_en)
 
