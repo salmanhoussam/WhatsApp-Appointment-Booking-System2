@@ -107,6 +107,66 @@ None of these were fabricated or assumed away — they are named explicitly as u
 project's own Evidence Interrogation standard, rather than silently resolved in the optimistic
 direction.
 
+## Round 3 — Real Device Emulation (2026-08-08, after Salman confirmed via a genuine hard refresh)
+
+Salman explicitly asked for real device-emulation tooling — not another `browser_resize` — since
+Round 1/2 both used the Playwright MCP's viewport-only resize, which cannot set `isMobile`,
+`hasTouch`, or a real `deviceScaleFactor`, all of which Chrome DevTools' Device Toolbar (the actual
+source of the reported screenshot) does set.
+
+**Tooling built**: a standalone Node.js script (not routed through the MCP or a nested `claude -p`
+session — a deterministic navigate+screenshot+evaluate script needs no LLM interpretation),
+`require()`-ing the real `playwright` npm package already cached locally as a dependency of
+`@playwright/mcp` (`~/.npm/_npx/9833c18b2d85bc59/node_modules/playwright`, v1.63.0-alpha, confirmed
+to export a real `devices` map), driving a real, fully-installed Chromium binary already cached at
+`~/.cache/ms-playwright/chromium-1234`. No network access was needed or used.
+
+For each of **two real devices** — `devices['iPhone 14 Pro Max']` (matching the human's exact
+reported device: 430×932 CSS, DPR 3, `isMobile: true`, `hasTouch: true`, real mobile Safari
+`userAgent`) and `devices['iPhone 12 Pro']` (390×844, same real-device profile) — the script launched
+a fresh, non-persistent browser context (naturally a cold profile, closing Round 2's "warm fonts"
+Unknown for free), navigated to `/login`, waited for `document.fonts.ready`, took a full-page
+screenshot, dumped the same DOM-rect/computed-style evidence as before, then did a real
+`page.reload()` (the programmatic equivalent of Salman's hard refresh) and repeated the screenshot +
+dump.
+
+**Result — still not reproduced, on either device, before or after reload:**
+```
+iPhone-14-Pro-Max preReload  viewportW=430 htmlScrollWidth=430 htmlClientWidth=430 dpr=3
+iPhone-14-Pro-Max postReload viewportW=430 htmlScrollWidth=430 htmlClientWidth=430 dpr=3
+iPhone-12-Pro     preReload  viewportW=390 htmlScrollWidth=390 htmlClientWidth=390 dpr=3
+iPhone-12-Pro     postReload viewportW=390 htmlScrollWidth=390 htmlClientWidth=390 dpr=3
+```
+`userAgent` on both was confirmed as a real mobile Safari string (e.g. `Mozilla/5.0 (iPhone; CPU
+iPhone OS 16_0 like Mac OS X) ... Mobile/15E148 Safari/604.1`), `maxTouchPoints: 1` — genuine mobile
+device emulation, not a plain resize. All 4 screenshots (2 devices × pre/post-reload) were read and
+visually inspected directly: every one shows the identical clean layout — white card, full
+un-clipped Arabic H1 "تسجيل الدخول للإدارة", full label text, both inputs, the blue button, the
+signup link — centered on a plain light-gray background. **No gray box, no clipped text, on any of
+the 4 screenshots.**
+
+### Confirmed (Round 3)
+
+- The bug does not reproduce even under real `isMobile`/`hasTouch`/`deviceScaleFactor: 3`/mobile-UA
+  emulation, on two independent real device profiles, across a genuine reload — the single largest
+  fidelity gap named in Round 1/2 is now closed, and the result is unchanged.
+
+### The remaining Unknown — named precisely, not resolved by assumption
+
+Chrome DevTools' own **50% zoom** control (visible in the original screenshot's toolbar) is a
+**DevTools-frontend-only display magnification** applied by the inspector UI to an already-rendered
+page — it is not a real CSS effect and has no Playwright equivalent, because Playwright drives the
+page directly via CDP and never renders through the DevTools inspector frontend at all. This is the
+one variable that three full rounds of automated testing — CSS-viewport-only, then multi-size +
+hard-reload, then real full device emulation — structurally cannot touch. It remains the single
+most likely explanation left standing, and only a cheap human-side check (switch that same DevTools
+tab's zoom dropdown to 100% and look again) can close it.
+
+### Decision (per the gate Salman set)
+
+**Not reproduced** → returning to Catalog 3.7B now, per the agreed ordering. The 100%-zoom check
+stays open as a cheap, optional follow-up whenever convenient — not a blocker, not scheduled.
+
 ## Recommendation (not a decision — Salman's to make)
 
 Before committing to a full Login UX Rebuild phase, one cheap, fast, human-side test would close the
