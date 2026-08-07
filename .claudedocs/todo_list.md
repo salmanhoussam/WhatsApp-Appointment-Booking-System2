@@ -140,6 +140,47 @@
     explicitly declared view-specific** — see `.claudedocs/evolution/reservation-capability.md`'s
     2026-08-07 entry
   - ✅ Done 2026-08-07
+- **Registration Routing — fixed, tag n/a (docs-only + 1 code fix)** — real "old dashboard after
+  registration" bug traced and fixed: `/register` renders `TenantRegisterPage.jsx` (confirmed via
+  real inbound-link + git-history investigation, not `RegistrationPage.jsx` which is legacy/dead
+  code at `/showcase/register`, left as-is). Canonical Admin URL Rule now documented in
+  `.claude/rules/frontend/routing.md` §0b/§0c. — ✅ Done 2026-08-07
+- **Phase 3.6.1 — Reservation Platform API Boundary Cleanup — CLOSED** — documentation only, full
+  report `.claudedocs/work/reservation-api-boundary-cleanup/2026-08-07/summary.md`. Real open
+  finding (not fixed): Barber/Resource roster CRUD lives entirely inside files classified as
+  "Reservation" — the entry point for Staff Management. — ✅ Done 2026-08-07
+- **Staff Capability Investigation — CLOSED** — `.claudedocs/work/staff-capability-investigation/
+  2026-08-07/summary.md`, evolution log `evolution/staff-capability.md`. Answer: `Barber`/`Resource`
+  pass this project's own independent-lifecycle Capability test; no `Barber`↔`CatalogItem`
+  relationship exists in any form — the real gap Phase 3.7C will need to design, not migrate.
+  — ✅ Done 2026-08-07
+- **Phase 3.7A — Staff Foundation — CLOSED** — real `StaffTab.jsx` shipped (`Barber`-only CRUD +
+  photo + description + working hours), full Browser Verification incl. a negative test (zero
+  Services/Categories/Skills/Pricing UI anywhere) and a Reservations regression check. Commits
+  `d4ab023`, `61733be`. — ✅ Done 2026-08-07
+  - [ ] Two real Side Findings, not yet decided: no UI path to reactivate a deactivated staff
+    member (backend already supports it via `is_active`); a deactivated staff member still shows up
+    as bookable in the reservation/reschedule barber picker and Calendar day columns.
+  - [ ] Two disposable test records exist in `hr`'s real dev DB (`Test Staff 1786124916`, `Test
+    Staff NetCheck 1786131600`), deactivated but not deleted — clean up if/when convenient, not
+    urgent.
+  - [ ] Phase 3.7B (Catalog UX — category tree/reorder, deliberately independent of Staff) and
+    3.7C (Staff↔Service relationship) — named, not started.
+- [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
+  left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
+  The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed
+  the 7-column grid, scroll, and font sizes all correct at 390×844). What IS real: 10 genuine `500`
+  errors on core admin endpoints during that same check, matching the same unrooted Supabase pooler
+  flakiness that separately hit this session's own backend restarts during Phase 3.7A — recurring,
+  never root-caused, only ever worked around by retrying. Worth a real investigation next time it
+  blocks something, not another silent retry.
+- [ ] **SSO login routing bug (found during the Registration Routing Item 3 investigation, 2026-08-07)
+  — independent follow-up ticket, explicitly not folded into any other phase:** `SSOLoginPage.jsx`'s
+  `resolveRedirect()` branches on `status === 'trial'`, but the login API now always returns
+  `Client.status` (permanently `"active"` post-ADR-0002's lifecycle_state split) — so any *returning*
+  SSO login (not the immediate post-registration auto-login, which hardcodes the right value)
+  misroutes to the legacy `SmarAdminDashboard` for any tenant. Full writeup:
+  `.claudedocs/work/legacy-admin-route-investigation/2026-08-07/summary.md`.
 - [ ] **API Boundary Review (2026-08-06) — carry-forward items before/during Staff Management &
   Customers:** full report `.claudedocs/work/api-boundary-review/2026-08-06/summary.md`, evolution
   entry `.claudedocs/evolution/api-boundaries.md`. Two real items to resolve, not urgent but
