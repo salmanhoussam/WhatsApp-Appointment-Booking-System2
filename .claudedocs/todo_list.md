@@ -164,8 +164,19 @@
   - [ ] Two disposable test records exist in `hr`'s real dev DB (`Test Staff 1786124916`, `Test
     Staff NetCheck 1786131600`), deactivated but not deleted — clean up if/when convenient, not
     urgent.
-  - [ ] Phase 3.7B (Catalog UX — category tree/reorder, deliberately independent of Staff) and
-    3.7C (Staff↔Service relationship) — named, not started.
+  - [ ] Phase 3.7B (Catalog UX) and 3.7C (Staff↔Service relationship) — named, not started.
+    **Catalog UX Gap Investigation done 2026-08-07** (`.claudedocs/work/catalog-ux-gap-investigation/
+    2026-08-07/summary.md`, code + real browser evidence against `hr`'s live catalog — 2 categories,
+    6 items, all $5 placeholder pricing, 0/6 have images). Confirmed: no Search/Filters-in-UI/Bulk/
+    Inline-Edit/multi-image gallery anywhere; category tree (`parentId`) and both-level reorder
+    (`sortOrder`) are fully schema+backend-ready but have zero UI; `is_active`/`is_featured` toggles
+    exist in the backend but not the UI (only hard delete). Real side finding: `sortOrder` ordering
+    has no secondary tiebreaker, so display order is silently unstable while every row sits at the
+    default `0`. Recommended first slice (not yet decided/started): ↑/↓ reorder (categories + items,
+    bundling the tiebreaker fix), a simple Parent-Category dropdown (not a tree component — no real
+    tenant has nested categories yet), and an `is_active` soft-hide toggle — all zero backend work.
+    Search/Bulk/multi-image deferred — no backend support exists yet and no real tenant has hit the
+    scale that would justify them.
 - [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
   left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
   The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed
