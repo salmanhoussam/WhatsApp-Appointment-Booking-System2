@@ -27,7 +27,7 @@ async def list_categories(
         where["parentId"] = parent_id if parent_id else None
     return await prisma_client.catalogcategory.find_many(
         where=where,
-        order={"sortOrder": "asc"},
+        order=[{"sortOrder": "asc"}, {"createdAt": "asc"}],
         include={"children": {"order_by": {"sortOrder": "asc"}}},
     )
 
@@ -108,7 +108,7 @@ async def list_items(
         where["category"] = {"moduleKey": module_key}
     return await prisma_client.catalogitem.find_many(
         where=where,
-        order={"sortOrder": "asc"},
+        order=[{"sortOrder": "asc"}, {"createdAt": "asc"}],
         include={"category": True},
         take=limit,
     )
