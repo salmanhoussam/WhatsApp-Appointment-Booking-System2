@@ -7,6 +7,7 @@ import SettingsTab       from './tabs/SettingsTab'
 import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
+import StaffTab          from './tabs/StaffTab'
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
 import useImageUpload     from '../../hooks/useImageUpload'
@@ -433,7 +434,7 @@ export default function GenericAdminDashboard() {
       case 'catalog':
         return <CatalogTab color={color} />
       case 'staff':
-        return <ComingSoonTab label="إدارة الموظفين" color={color} />
+        return <StaffTab color={color} />
       case 'customers':
         return <ComingSoonTab label="العملاء" color={color} />
       case 'notifications':
