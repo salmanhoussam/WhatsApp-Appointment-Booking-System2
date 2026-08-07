@@ -110,7 +110,7 @@ export default function CatalogTab({ color }) {
 
   const loadCategories = useCallback(() => {
     setCatLoading(true)
-    adminApi.get('/catalog/categories')
+    adminApi.get('/catalog/categories?include_inactive=true')
       .then(r => setCategories(r.data.data ?? []))
       .catch(() => setCategories([]))
       .finally(() => setCatLoading(false))
@@ -123,7 +123,7 @@ export default function CatalogTab({ color }) {
   useEffect(() => {
     if (!selectedCat) { setItems([]); return }
     setItemsLoading(true)
-    adminApi.get(`/catalog/items?category_id=${selectedCat.id}`)
+    adminApi.get(`/catalog/items?category_id=${selectedCat.id}&include_inactive=true`)
       .then(r => setItems(r.data.data ?? []))
       .catch(() => setItems([]))
       .finally(() => setItemsLoading(false))
@@ -157,11 +157,17 @@ export default function CatalogTab({ color }) {
     }
   }
 
-  const deleteCat = async (cat, e) => {
+  const hideCat = async (cat, e) => {
     e.stopPropagation()
-    if (!confirm(`حذف قسم "${cat.name_ar}"؟`)) return
+    if (!confirm(`إخفاء قسم "${cat.name_ar}"؟ يمكن إعادة إظهاره لاحقاً.`)) return
     await adminApi.delete(`/catalog/categories/${cat.id}`)
     if (selectedCat?.id === cat.id) setSelectedCat(null)
+    loadCategories()
+  }
+
+  const showCat = async (cat, e) => {
+    e.stopPropagation()
+    await adminApi.patch(`/catalog/categories/${cat.id}`, { is_active: true })
     loadCategories()
   }
 
@@ -233,7 +239,7 @@ export default function CatalogTab({ color }) {
         await adminApi.patch(`/catalog/items/${savedId}`, { image_url: url })
       }
 
-      const r = await adminApi.get(`/catalog/items?category_id=${selectedCat.id}`)
+      const r = await adminApi.get(`/catalog/items?category_id=${selectedCat.id}&include_inactive=true`)
       setItems(r.data.data ?? [])
       setShowItemModal(false)
     } catch (err) {
@@ -243,10 +249,15 @@ export default function CatalogTab({ color }) {
     }
   }
 
-  const deleteItem = async (item) => {
-    if (!confirm(`حذف "${item.name_ar}"؟`)) return
+  const hideItem = async (item) => {
+    if (!confirm(`إخفاء "${item.name_ar}"؟ يمكن إعادة إظهاره لاحقاً.`)) return
     await adminApi.delete(`/catalog/items/${item.id}`)
-    setItems(prev => prev.filter(i => i.id !== item.id))
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: false } : i))
+  }
+
+  const showItem = async (item) => {
+    await adminApi.patch(`/catalog/items/${item.id}`, { is_active: true })
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: true } : i))
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -269,6 +280,7 @@ export default function CatalogTab({ color }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
           {categories.map(cat => {
             const selected = selectedCat?.id === cat.id
+            const inactive = cat.is_active === false
             return (
               <div
                 key={cat.id}
@@ -277,7 +289,7 @@ export default function CatalogTab({ color }) {
                   borderRadius: 12, border: `1px solid ${selected ? `${color}80` : T.border}`,
                   padding: 16, cursor: 'pointer',
                   background: selected ? `${color}15` : T.cardBg,
-                  boxShadow: T.shadow,
+                  boxShadow: T.shadow, opacity: inactive ? 0.55 : 1,
                   transition: 'all 0.18s',
                 }}
               >
@@ -291,11 +303,18 @@ export default function CatalogTab({ color }) {
                       </span>
                     )
                   })()}
+                  {inactive && (
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${T.textMuted}22`, color: T.textMuted, fontWeight: 600 }}>
+                      مخفي
+                    </span>
+                  )}
                 </div>
                 {cat.name_en && <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>{cat.name_en}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <Button variant="secondary" size="sm" onClick={e => openEditCat(cat, e)}>تعديل</Button>
-                  <Button variant="danger" size="sm" onClick={e => deleteCat(cat, e)}>حذف</Button>
+                  {inactive
+                    ? <Button variant="secondary" size="sm" onClick={e => showCat(cat, e)}>إظهار</Button>
+                    : <Button variant="danger" size="sm" onClick={e => hideCat(cat, e)}>إخفاء</Button>}
                 </div>
               </div>
             )
@@ -324,13 +343,22 @@ export default function CatalogTab({ color }) {
             </Card>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {items.map(item => (
-                <Card key={item.id} padding="14px 18px" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              {items.map(item => {
+                const inactive = item.is_active === false
+                return (
+                <Card key={item.id} padding="14px 18px" style={{ display: 'flex', alignItems: 'center', gap: 16, opacity: inactive ? 0.55 : 1 }}>
                   {item.image_url && (
                     <img src={item.image_url} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary }}>{item.name_ar}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary }}>{item.name_ar}</div>
+                      {inactive && (
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${T.textMuted}22`, color: T.textMuted, fontWeight: 600, flexShrink: 0 }}>
+                          مخفي
+                        </span>
+                      )}
+                    </div>
                     {item.name_en && <div style={{ fontSize: 11, color: T.textMuted }}>{item.name_en}</div>}
                     {item.description_ar && <div style={{ fontSize: 12, color: T.textSecond, marginTop: 4 }}>{item.description_ar}</div>}
                   </div>
@@ -341,10 +369,13 @@ export default function CatalogTab({ color }) {
                   )}
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <Button variant="secondary" size="sm" onClick={() => openEditItem(item)}>تعديل</Button>
-                    <Button variant="danger" size="sm" onClick={() => deleteItem(item)}>حذف</Button>
+                    {inactive
+                      ? <Button variant="secondary" size="sm" onClick={() => showItem(item)}>إظهار</Button>
+                      : <Button variant="danger" size="sm" onClick={() => hideItem(item)}>إخفاء</Button>}
                   </div>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
