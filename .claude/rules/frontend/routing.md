@@ -86,6 +86,23 @@ Any future admin-facing link/redirect must point at `/{slug}/dashboard` (dev) or
 any new hostname/environment check should reuse the same local-detection logic `useTenantSlug.js`
 already centralizes, rather than writing a fourth independent copy.
 
+## 0c. Canonical Registration Flow (resolved 2026-08-07)
+
+Item 1's own fix initially targeted the wrong file — a real gap in the Item 0 review that hadn't
+verified which component `/register` actually renders before proposing a fix target. Corrected by
+checking real inbound traffic, not assumptions:
+
+| Route | Component | Real inbound links | Last real commit |
+|---|---|---|---|
+| `/register` | `TenantRegisterPage.jsx` | **Yes** — `DemoLandingPage.jsx` (3 CTAs), `Login.jsx`'s signup link, `SSOLoginPage.jsx`'s own register toggle, `showcase/config.js`'s `REGISTER_URL` constant | 2026-07-31, a real bug fix |
+| `/showcase/register` | `RegistrationPage.jsx` | **None found** — no `href`, no `navigate()`, no CTA anywhere links here; only reachable via direct URL or `ShowcaseRoutes`'s own route table | 2026-06-29 (initial rebuild) — untouched since, while its sibling kept receiving real fixes |
+
+**Resolved: `/register` → `TenantRegisterPage.jsx` is the one canonical registration flow.**
+`/showcase/register` → `RegistrationPage.jsx` is **Legacy** — a real Repository Hygiene "Forgotten"
+case (`repository-hygiene.md`), not actively linked from anywhere, left as-is until an explicit
+decision to delete it. Its own redirect fix (Item 1's first, mistaken pass) is harmless and stays —
+correct code, just not the code that matters — but no further work is scheduled on this file.
+
 ## 1. The Registry Pattern
 
 NEVER add tenant-specific routes directly to App.jsx.
