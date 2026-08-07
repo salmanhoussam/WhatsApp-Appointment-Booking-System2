@@ -52,11 +52,25 @@ self-registered tenant, regardless of type, into the wrong admin surface.
 | `/admin/*` (subdomain mode) | real tenant subdomain | `SmarAdminDashboard` | Legacy, same investigation scope as above |
 | `/dashboard/*` (subdomain mode) | real tenant subdomain | `SmarAdminDashboard` | Marked **"Subdomain mode legacy"** in the code's own comment; same investigation scope |
 
-**Open gap, not yet resolved:** on a real tenant subdomain (`{slug}.salmansaas.com`, `IS_SUBDOMAIN_MODE
-&& !IS_DEMO_SUBDOMAIN`), no route currently serves `GenericAdminDashboard` at all — every
-subdomain-mode admin route goes to the legacy `SmarAdminDashboard`. The canonical rule above is
-proven and working for localhost/LAN and `demo.salmansaas.com`; real-tenant-subdomain admin access
-is an unresolved question, not silently assumed solved by this rule.
+**Resolved 2026-08-07, Salman's explicit decision — the Admin URL Strategy, current vs. future:**
+on a real tenant subdomain (`{slug}.salmansaas.com`), no route currently serves
+`GenericAdminDashboard` at all — every subdomain-mode admin route goes to the legacy
+`SmarAdminDashboard`. Rather than treat this as a gap to close now, it's a deliberate, deferred
+stage:
+
+| Stage | Admin URL | Status |
+|---|---|---|
+| **Development** | `localhost/{slug}/dashboard` (or LAN IP, same pattern) | ✅ Live now |
+| **Current Production Strategy** | `https://demo.salmansaas.com/{slug}/dashboard` | ✅ Live now — the real canonical target for every tenant today, regardless of whether that tenant also has its own public subdomain |
+| **Future Strategy (deferred)** | `https://{slug}.salmansaas.com/dashboard` | Not built — intentionally deferred until the paid multi-subdomain deployment phase has a real economic justification, not built speculatively ahead of it |
+
+**Binding rule going forward:** no new code couples itself directly to the tenant subdomain for
+admin access until multi-subdomain deployment is officially adopted. Every redirect/link uses the
+current canonical path (`demo.salmansaas.com/{slug}/...` in production, `/{slug}/...` in dev) —
+when subdomains are eventually turned on, the change happens **only in the routing layer**
+(`App.jsx`, adding a real subdomain-mode `GenericAdminDashboard` route), never by hunting down every
+call site that hardcoded `{slug}.salmansaas.com` in the meantime. This is the whole point of naming
+the strategy explicitly here — one migration point later, not dozens.
 
 **Second open finding — hostname/environment detection is duplicated three ways, only two in
 sync:** `App.jsx`'s `_IS_LOCAL_HOST`/`IS_SUBDOMAIN_MODE` constants, `useTenantSlug.js`'s private
@@ -64,10 +78,13 @@ sync:** `App.jsx`'s `_IS_LOCAL_HOST`/`IS_SUBDOMAIN_MODE` constants, `useTenantSl
 `RegistrationPage.jsx`'s own inline `isProd` check — the third one, independently written, does
 **not** treat `192.168.*` LAN IPs as local (the other two do), meaning a tenant registered from a
 LAN dev/test setup gets redirected to a real production domain that isn't running the dev build.
+Fixed as part of Item 1 (`RegistrationPage.jsx` now uses the same local-detection check the other
+two files already share).
 
-Any future admin-facing link/redirect must point at `/{slug}/dashboard` only, and any new
-hostname/environment check should reuse `useTenantSlug.js`'s logic rather than writing a fourth
-independent copy.
+Any future admin-facing link/redirect must point at `/{slug}/dashboard` (dev) or
+`demo.salmansaas.com/{slug}/dashboard` (current production) only — never a tenant subdomain — and
+any new hostname/environment check should reuse the same local-detection logic `useTenantSlug.js`
+already centralizes, rather than writing a fourth independent copy.
 
 ## 1. The Registry Pattern
 
