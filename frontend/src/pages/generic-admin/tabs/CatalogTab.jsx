@@ -171,6 +171,23 @@ export default function CatalogTab({ color }) {
     loadCategories()
   }
 
+  // ── Category reorder — renumbers the whole list to sequential sort_order,
+  // since every real row starts at the untouched default (0) and a naive
+  // adjacent-swap would be a no-op until the first reorder ever happens ──
+  const moveCat = async (index, direction, e) => {
+    e.stopPropagation()
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= categories.length) return
+    const reordered = [...categories]
+    ;[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]]
+    setCategories(reordered)
+    try {
+      await Promise.all(reordered.map((cat, i) => adminApi.patch(`/catalog/categories/${cat.id}`, { sort_order: i })))
+    } finally {
+      loadCategories()
+    }
+  }
+
   // ── Item modal helpers ─────────────────────────────────────────────────────
 
   const resetImageState = () => {
@@ -260,6 +277,22 @@ export default function CatalogTab({ color }) {
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: true } : i))
   }
 
+  // ── Item reorder (within the selected category) — same whole-list
+  // renumbering approach as moveCat, for the same reason ──
+  const moveItem = async (index, direction) => {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= items.length) return
+    const reordered = [...items]
+    ;[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]]
+    setItems(reordered)
+    try {
+      await Promise.all(reordered.map((item, i) => adminApi.patch(`/catalog/items/${item.id}`, { sort_order: i })))
+    } finally {
+      const r = await adminApi.get(`/catalog/items?category_id=${selectedCat.id}&include_inactive=true`)
+      setItems(r.data.data ?? [])
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -278,7 +311,7 @@ export default function CatalogTab({ color }) {
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
-          {categories.map(cat => {
+          {categories.map((cat, catIndex) => {
             const selected = selectedCat?.id === cat.id
             const inactive = cat.is_active === false
             return (
@@ -315,6 +348,8 @@ export default function CatalogTab({ color }) {
                   {inactive
                     ? <Button variant="secondary" size="sm" onClick={e => showCat(cat, e)}>إظهار</Button>
                     : <Button variant="danger" size="sm" onClick={e => hideCat(cat, e)}>إخفاء</Button>}
+                  <Button variant="secondary" size="sm" disabled={catIndex === 0} onClick={e => moveCat(catIndex, -1, e)}>↑</Button>
+                  <Button variant="secondary" size="sm" disabled={catIndex === categories.length - 1} onClick={e => moveCat(catIndex, 1, e)}>↓</Button>
                 </div>
               </div>
             )
@@ -343,7 +378,7 @@ export default function CatalogTab({ color }) {
             </Card>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {items.map(item => {
+              {items.map((item, itemIndex) => {
                 const inactive = item.is_active === false
                 return (
                 <Card key={item.id} padding="14px 18px" style={{ display: 'flex', alignItems: 'center', gap: 16, opacity: inactive ? 0.55 : 1 }}>
@@ -372,6 +407,8 @@ export default function CatalogTab({ color }) {
                     {inactive
                       ? <Button variant="secondary" size="sm" onClick={() => showItem(item)}>إظهار</Button>
                       : <Button variant="danger" size="sm" onClick={() => hideItem(item)}>إخفاء</Button>}
+                    <Button variant="secondary" size="sm" disabled={itemIndex === 0} onClick={() => moveItem(itemIndex, -1)}>↑</Button>
+                    <Button variant="secondary" size="sm" disabled={itemIndex === items.length - 1} onClick={() => moveItem(itemIndex, 1)}>↓</Button>
                   </div>
                 </Card>
                 )
