@@ -72,6 +72,7 @@ model Client {
   // -- Generic Catalog module --------------------------------------------------
   catalogCategories CatalogCategory[]
   catalogItems      CatalogItem[]
+  catalogServices   CatalogService[]
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations      Reservation[]
   resources         Resource[]
@@ -420,6 +421,7 @@ model CatalogCategory {
   parent   CatalogCategory?  @relation("CatalogCategoryTree", fields: [parentId], references: [id])
   children CatalogCategory[] @relation("CatalogCategoryTree")
   items    CatalogItem[]
+  services CatalogService[]
 
   @@index([clientId])
   @@index([clientId, moduleKey])
@@ -456,6 +458,53 @@ model CatalogItem {
   @@index([clientId])
   @@index([categoryId])
   @@map("catalog_items")
+  @@schema("public")
+}
+
+// ================================================================================
+// CATALOG SERVICE -- something a customer books a Reservation for, distinct from CatalogItem
+// (something a customer orders/buys). Split out of CatalogItem in Phase 3.7C (2026-08-08) --
+// CatalogItem already had zero schema relation to Reservation and three real relations to
+// order-side concepts (restaurantOrderItems/storeCartItems/storeOrderItems); this was being
+// bolted on via metadata.requires_booking only. Shares CatalogCategory with CatalogItem (the
+// existing moduleKey: "catalog" vs "store"/"restaurant" distinction already organizes both) --
+// no separate ServiceCategory table. Named "CatalogService" (not the shorter "Service") because
+// a completely unrelated `Service` model already exists for smar's property booking add-ons
+// (propertyId/BookingService/per-night pricing) -- same naming-collision class this project has
+// hit before ("four meanings of service"), caught here by schema validation before it became a
+// real table-name collision (both would have mapped to "services"). See .claudedocs/work/
+// staff-service-relationship-investigation/2026-08-08/summary.md and evolution/
+// staff-capability.md for the full reasoning.
+// ================================================================================
+
+model CatalogService {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  categoryId    String   @map("category_id") @db.Uuid
+  nameAr        String   @map("name_ar")
+  nameEn        String?  @map("name_en")
+  descriptionAr String?  @map("description_ar")
+  descriptionEn String?  @map("description_en")
+  imageUrl      String?  @map("image_url")
+  price         Decimal? @map("price") @db.Decimal(10, 2)
+  currency      String   @default("USD") @map("currency")
+  // Promoted to a real column (not buried in metadata like CatalogItem's duration_min was) --
+  // reservation_service.py's slot-generation math needs a hard int, not a JSON dig.
+  durationMin   Int      @default(30) @map("duration_min")
+  isActive      Boolean  @default(true) @map("is_active")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  sortOrder     Int      @default(0) @map("sort_order")
+  metadata      Json?    @map("metadata")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category     CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([clientId])
+  @@index([categoryId])
+  @@map("catalog_services")
   @@schema("public")
 }
 
@@ -714,6 +763,14 @@ model Reservation {
   // per the same independent-build instruction above. onDelete: SetNull for the same reason.
   barberId String? @map("barber_id") @db.Uuid
   barber   Barber? @relation(fields: [barberId], references: [id], onDelete: SetNull)
+
+  // Real FK, added Phase 3.7C (2026-08-08) alongside the Service model itself -- replaces the old
+  // metadata.service_id JSON-only convention as the source of truth going forward (metadata keeps
+  // it for backward-compatible reads of pre-3.7C rows). Same nullable + onDelete: SetNull shape as
+  // barberId/resourceId -- a Service being deactivated/removed must never cascade-delete historical
+  // Reservation rows.
+  serviceId String?         @map("service_id") @db.Uuid
+  service   CatalogService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

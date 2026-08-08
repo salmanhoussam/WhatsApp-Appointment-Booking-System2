@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.core.tenant import get_authenticated_tenant
-from . import properties, bookings, dashboard, units, settings, team, services, gallery, restaurant, store, catalog, upload, reservations, resources, barbers, client_services, fleet, content, media
+from . import properties, bookings, dashboard, units, settings, team, services, gallery, restaurant, store, catalog, upload, reservations, resources, barbers, client_services, fleet, content, media, catalog_services
 
 router = APIRouter()
 
@@ -39,6 +39,7 @@ _protected.include_router(catalog.router,          prefix="/catalog",         ta
 _protected.include_router(reservations.router,     prefix="/reservations",    tags=["Admin Reservations"])
 _protected.include_router(resources.router)        # mounts /api/v1/admin/resources       (prefix in router)
 _protected.include_router(barbers.router)          # mounts /api/v1/admin/barbers         (prefix in router)
+_protected.include_router(catalog_services.router) # mounts /api/v1/admin/catalog-services (prefix in router)
 _protected.include_router(client_services.router)  # mounts /api/v1/admin/client-services (prefix in router)
 _protected.include_router(fleet.router)            # mounts /api/v1/admin/fleet           (prefix in router)
 

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
-from app.services import reservation_service
+from app.services import reservation_service, catalog_service_service
 from app.repositories import resource_repo, barber_repo
 
 router = APIRouter()
@@ -126,6 +126,26 @@ async def list_public_barbers(
         "success": True,
         "data": [{"id": b.id, "name": b.name} for b in barbers],
     }
+
+
+@router.get("/catalog-services")
+async def list_public_services(
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """List active CatalogServices for this tenant -- the "what am I booking" picker on the public
+    booking page. Phase 3.7C (2026-08-08) -- replaces the old client-side pattern of walking every
+    Category, fetching every CatalogItem, and filtering by metadata.requires_booking.
+
+    Named "/catalog-services", not "/services" -- a real routing collision, not just a naming one:
+    public/__init__.py already registers GET /{slug}/services (smar's unrelated property add-on
+    Service model) directly on the root public router, BEFORE this router's own include_router()
+    call. Starlette matches routes in registration order, so a request to
+    /reservations/services would have matched that wildcard first, with "reservations" captured as
+    {slug} -- confirmed live: it returned a 422 demanding unit_id, that route's own required param,
+    not this one's. Found via real Browser Verification, not assumed."""
+    data = await catalog_service_service.public_list_services(tenant["id"])
+    return {"success": True, "data": data}
 
 
 @router.get("/availability")
