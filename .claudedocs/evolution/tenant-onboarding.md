@@ -51,3 +51,64 @@ No — a real, single confirmed instance, not yet a second independent case. Per
 Abstraction Rule, stays as an Evolution entry (a real, logged gap awaiting a decision) rather than
 being promoted to an ADR or ticketed for immediate work. Explicitly not fixed this session per
 Salman's own staged process (Audit → compare → decide → build).
+
+## 2026-08-08
+
+### Context
+
+Following the dashboard-routing fix (`.claudedocs/work/dashboard-flash-investigation/2026-08-08/`)
+and the `ali` customer-readiness comparison against `rk`
+(`.claudedocs/work/ali-customer-readiness/2026-08-08/summary.md` — which found `ali` was built as a
+backend-only isolation test fixture, not a real onboarded customer), Salman stated the governing
+rollout decision for `ali` as RK's follow-on customer, and for tenant rollout generally.
+
+### Discovery
+
+Not a new architectural insight so much as an explicit confirmation, at the rollout-sequencing
+level, of a principle already stated platform-wide (`backend/architecture.md §9`, "One Capability,
+One Contract, One Service, One Source of Truth, Many Interfaces"):
+
+- **RK and Ali run the same system — no per-tenant architecture branch.** Catalog and Store are
+  shared capabilities available to any tenant; whether a given tenant activates them
+  (`client_services`) is configuration/business data, not a different codepath. This directly
+  answers the earlier dashboard-flash investigation's open "two page-scaffolding systems" finding
+  for new tenants going forward: new tenants use the shared capability system, not a bespoke branch.
+- **Rollout order, stated explicitly**: finish backend + dashboard capabilities first (Services,
+  Staff↔Services, Orders, Catalog/Store) → only then build the tenant's initial Home/Public Page.
+  Building the page is downstream of the capabilities being real, not built in parallel or first.
+- **A future experiment, explicitly deferred, not part of current work**: once Services and Orders
+  are finished (platform-wide, not just for `ali`), try building/configuring the Home Page *from the
+  dashboard itself* — a dashboard-driven page builder — as the next tenant/page cycle's approach,
+  rather than the current hardcoded-registry (System B) or template-JSON-seeded (System A) patterns
+  found in the dashboard-flash investigation. Named here so it isn't lost, but explicitly not
+  something to reopen inside the current Services/Orders work.
+- **Ali is not a special implementation.** It's the same system as `rk`; it only needs its own real
+  tenant data/configuration filled in (branding, WhatsApp number, page copy, the catalog/store
+  activation decision) — none of which should be copied from `rk`'s actual data, per the same
+  instruction that shaped the dashboard-flash fix's own commit-scope discipline.
+
+### Current Understanding
+
+The Ali customer-readiness recommendation written earlier the same day (`ali-customer-readiness/
+2026-08-08/summary.md`, step 1: "run the page-content pipeline") is superseded in ordering, not in
+content — page/content work for `ali` now explicitly waits until the backend/dashboard capabilities
+(Services, Staff↔Services, Orders, Catalog/Store) are actually finished, not attempted first. The
+dashboard-driven page-builder idea is a real future direction for the *next* tenant/page cycle after
+that, not a near-term deliverable.
+
+### Open Questions
+
+- What exactly does "finish Services/Orders" mean as a concrete, scoped deliverable — a defined set
+  of Implementation Contracts, or an open-ended capability maturity bar? Not defined in this
+  conversation.
+- Whether the dashboard-driven page-builder experiment gets its own Capability Investigation (same
+  discipline as Staff↔Service got) once its turn comes, or starts more informally as a prototype —
+  not decided, and explicitly not urgent right now.
+
+### Promoted?
+
+No — this is a rollout/sequencing decision, not itself a new Capability or ADR candidate. The
+underlying "one system, shared capabilities" part reinforces an already-ratified platform Principle
+(`backend/architecture.md §9`) rather than introducing a new one. The dashboard-driven page-builder
+idea stays here as a named future direction until it's actually attempted once, per this project's
+own Abstraction Rule (extract/promote only after real evidence, not a stated intention).

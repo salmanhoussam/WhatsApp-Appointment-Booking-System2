@@ -94,3 +94,14 @@ Media → Public Page renders → Dashboard renders`):
 
 None of this executed yet — this is the comparison pass Salman asked for, reported back before any
 onboarding work starts.
+
+## Superseded ordering (2026-08-08, same day, later)
+
+The step order above is superseded by Salman's explicit rollout-sequencing decision recorded in
+`.claudedocs/evolution/tenant-onboarding.md`'s 2026-08-08 entry — recorded here rather than rewriting
+the list above, per this project's evidence-immutability convention. The content of steps 1-4 stays
+correct; the order does not: **backend + dashboard capabilities (Services, Staff↔Services, Orders,
+Catalog/Store — steps 2-3 above) finish first; the Home/Public Page (step 1 above) is built only
+after that**, not first. Step 4 (verification) still comes last either way. Also confirmed
+platform-wide, not `ali`-specific: RK and Ali run the same system — Catalog/Store are shared
+capabilities, and whether a tenant activates them is configuration, not a different architecture.
