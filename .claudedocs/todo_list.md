@@ -193,6 +193,19 @@
     question, not resolved here:** how long had this been orphaned, and did any earlier session's
     "Browser-Verified" backend claim actually run against stale code as a result? Not investigated
     — flagged as a real risk to be aware of, not assumed clean.
+- [x] **Public `/hr/reserve` mobile report (2026-08-08) — real bug found+fixed, reported layout bug
+  not reproduced** (`9a630c9`). Built real Playwright device-emulation tooling (same approach as the
+  Login investigation — the `playwright` npm package + cached Chromium, `devices['iPhone 14 Pro
+  Max']`, real `isMobile`/`hasTouch`/`deviceScaleFactor: 3`) to test the exact reported conditions.
+  **Real bug found along the way**: `ReservePage.jsx` checked `hasReservations` (derived from
+  `config?.active_services`) *before* `configLoading` — while config is in flight, `active_services`
+  defaults to `[]`, so any reservations-enabled tenant could flash a permanent-looking "خدمة الحجز
+  غير متاحة حالياً" dead end instead of a loading state on a cold load. Reproduced reliably on a
+  fresh, uncached context; fixed by reordering the two checks. **The specific gray-box/cut-off-card
+  layout bug from the screenshot did not reproduce** even under full real device emulation — same
+  non-reproduction outcome as Login. Made a defensive `ServiceCard` sizing tightening anyway (smaller
+  minWidth/padding/icon/font, kept natural flex-wrap — no forced column count, to avoid a desktop
+  regression) since it was explicitly requested regardless of root-cause confirmation.
 - [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
   left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
   The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed
