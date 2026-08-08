@@ -140,26 +140,27 @@ function ServiceCard({ item, selected, onClick }) {
     <button
       onClick={onClick}
       style={{
-        position: 'relative', cursor: 'pointer', minWidth: 128,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-        padding: '18px 14px', borderRadius: 16,
+        position: 'relative', cursor: 'pointer', minWidth: 100,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        padding: '14px 10px', borderRadius: 14,
         background: selected ? T.greenSoft : T.cardBg,
         border: `1.5px solid ${selected ? T.green : T.border}`,
         boxShadow: selected ? 'none' : T.shadow,
         fontFamily: FONT,
+        boxSizing: 'border-box',
       }}
     >
       {selected && (
         <span style={{
-          position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: '50%',
+          position: 'absolute', top: 6, left: 6, width: 18, height: 18, borderRadius: '50%',
           background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Check size={12} color="#fff" strokeWidth={3} />
+          <Check size={11} color="#fff" strokeWidth={3} />
         </span>
       )}
-      <Icon size={26} color={selected ? T.green : T.textPrimary} strokeWidth={1.75} />
-      <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary }}>{item.name_ar}</span>
-      <span style={{ fontSize: 11, color: T.textSecond }}>{item.metadata?.duration_min} دقيقة</span>
+      <Icon size={22} color={selected ? T.green : T.textPrimary} strokeWidth={1.75} />
+      <span style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, textAlign: 'center' }}>{item.name_ar}</span>
+      <span style={{ fontSize: 10.5, color: T.textSecond }}>{item.metadata?.duration_min} دقيقة</span>
     </button>
   )
 }
@@ -746,6 +747,21 @@ export default function ReservePage() {
   const booking  = useReservationBooking()
   const { config, configLoading, mode } = booking
 
+  // Loading must be checked BEFORE the "unavailable" branch below -- config is undefined while
+  // the fetch is in flight, so active_services defaults to [] and hasReservations reads false
+  // for any tenant, including ones that DO have it active. Checking loading first was the real
+  // bug: on a cold load (no cached config yet), every reservations-enabled tenant would flash a
+  // permanent-looking "service not available" dead end instead of a loading state -- found via
+  // real device-emulated Browser Verification hitting it reliably on a fresh, uncached session.
+  if (configLoading || mode === 'loading') {
+    return (
+      <div style={{ minHeight: '100vh', background: T.pageBg }}>
+        <TenantModuleNav />
+        <div style={{ paddingTop: 160 }}><LightLoadingDot /></div>
+      </div>
+    )
+  }
+
   const activeServices = config?.active_services ?? []
   const hasReservations = activeServices.includes('reservations')
 
@@ -759,15 +775,6 @@ export default function ReservePage() {
         }}>
           خدمة الحجز غير متاحة حالياً.
         </div>
-      </div>
-    )
-  }
-
-  if (configLoading || mode === 'loading') {
-    return (
-      <div style={{ minHeight: '100vh', background: T.pageBg }}>
-        <TenantModuleNav />
-        <div style={{ paddingTop: 160 }}><LightLoadingDot /></div>
       </div>
     )
   }
