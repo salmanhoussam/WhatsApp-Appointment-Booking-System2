@@ -72,7 +72,7 @@ function Field({ label, children }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid', module_key: 'catalog' }
+const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid', module_key: 'catalog', parent_id: '' }
 const EMPTY_ITEM = { name_ar: '', name_en: '', price: '', currency: 'USD', description_ar: '', image_url: '' }
 
 const MODULE_KEY_META = {
@@ -135,7 +135,7 @@ export default function CatalogTab({ color }) {
   const openEditCat   = (cat, e) => {
     e.stopPropagation()
     setEditingCat(cat)
-    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid', module_key: cat.module_key ?? 'catalog' })
+    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid', module_key: cat.module_key ?? 'catalog', parent_id: cat.parent_id ?? '' })
     setShowCatModal(true)
   }
 
@@ -453,6 +453,14 @@ export default function CatalogTab({ color }) {
               <option value="grid">شبكة (Grid)</option>
               <option value="list">قائمة (List)</option>
               <option value="showcase">عرض (Showcase)</option>
+            </select>
+          </Field>
+          <Field label="القسم الرئيسي (اختياري)">
+            <select style={inputStyle} value={catForm.parent_id} onChange={e => setCatForm(p => ({ ...p, parent_id: e.target.value }))}>
+              <option value="">بدون (قسم رئيسي)</option>
+              {categories.filter(c => c.id !== editingCat?.id).map(c => (
+                <option key={c.id} value={c.id}>{c.name_ar}</option>
+              ))}
             </select>
           </Field>
         </Modal>

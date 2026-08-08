@@ -160,7 +160,7 @@ async def admin_create_category(
         "nameEn":          name_en,
         "imageUrl":        image_url,
         "sortOrder":       sort_order,
-        "parentId":        parent_id,
+        "parentId":        parent_id if parent_id else None,
         "moduleKey":       module_key,
         "displayTemplate": display_template,
         "isActive":        True,
@@ -189,10 +189,16 @@ async def admin_update_category(
         "nameEn":          name_en,
         "imageUrl":        image_url,
         "sortOrder":       sort_order,
-        "parentId":        parent_id,
         "isActive":        is_active,
         "displayTemplate": display_template,
     }.items() if v is not None}
+    # parent_id is handled separately from the generic filter above: an empty string means
+    # "clear the parent," which the generic "skip None values" filter can't express (None is
+    # also what an omitted field parses to). Prisma's generated CatalogCategoryUpdateInput
+    # doesn't expose parentId as a directly-settable scalar (unlike CreateInput) -- it's modeled
+    # as the `parent` relation, requiring connect/disconnect rather than a raw FK assignment.
+    if parent_id is not None:
+        patch["parent"] = {"connect": {"id": parent_id}} if parent_id else {"disconnect": True}
     updated = await admin_catalog_repo.update_category(category_id, patch)
     return {"id": updated.id}
 
