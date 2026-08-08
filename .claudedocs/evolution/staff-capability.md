@@ -52,3 +52,50 @@ No — investigation only, no ADR, no Capability file created yet (per the same 
 `architecture-review-loop.md` already applies elsewhere: a `capabilities/*.md` file requires a real
 built Implementation first; Staff has none yet). Revisit once Staff Management's first real
 Implementation Contract exists.
+
+## 2026-08-08
+
+### Context
+
+Phase 3.7B (Catalog UX) closed; Salman's explicit next step was not to jump into 3.7C's code, but
+to run a Staff↔Service Capability Investigation first — the exact gap the 2026-08-07 entry above
+named but didn't trace. Full investigation:
+`.claudedocs/work/staff-service-relationship-investigation/2026-08-08/summary.md`.
+
+### Discovery
+
+- `Reservation.barberId` is a real FK today (`onDelete: SetNull`) — but `Reservation` has no
+  equivalent FK to `CatalogItem`/service at all, only an informal `metadata.service_id`.
+- Confirmed at the public API surface, not just the schema: `GET /availability` takes `barber_id` +
+  raw `duration_min`, no service identifier at all; `GET /barbers` returns every active barber
+  unconditionally, no service filter. A real customer booking a specialized service sees the exact
+  same barber picker as booking anything else — live behavior on `hr` today, not hypothetical.
+- A directly-reusable bridge-table shape already exists in this codebase: `ClientService`
+  (`client_id` + `service_key`, unique pair) — the same shape a future `BarberService` join table
+  would take. Not a new architectural idea.
+- `resourceId`/`barberId`'s existing `onDelete: SetNull` is the already-established precedent for
+  "historical reservations survive a roster change" — directly answers what removing a service from
+  a staff member does to existing reservations (nothing, since no FK path connects them either way
+  today).
+
+### Current Understanding
+
+The relationship is a plain many-to-many join table, owned by whichever Capability's write path
+touches it (most naturally Staff's own admin surface), read by Catalog/Staff/Reservation alike —
+same "ownership ≠ exclusive read access" pattern already used for Reservation's read of
+`Barber.workingHours`. Fully additive to both existing public routes (`availability`/`barbers` gain
+an optional filter param, no behavior change when omitted). The one real product call this doesn't
+resolve: whether availability should *enforce* the relationship (hard reject) or only *soften* the
+picker (pre-filter, allow override) — a decision, not a technical fact.
+
+### Open Questions
+
+- Enforce vs. soften (above) — Salman's call, not yet made.
+- Same two Unknowns from 2026-08-07 remain open (per-barber restriction as a real product need;
+  whether `Resource`/clinic gets the equivalent join table now or later) — not re-resolved here.
+
+### Promoted?
+
+No — investigation only, same Mechanical Gate as the 2026-08-07 entry. This closes the "what would
+the relationship look like" question the last entry left open; whether it gets built is a separate,
+later decision.
