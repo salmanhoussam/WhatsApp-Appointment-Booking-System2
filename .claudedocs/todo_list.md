@@ -206,6 +206,16 @@
   non-reproduction outcome as Login. Made a defensive `ServiceCard` sizing tightening anyway (smaller
   minWidth/padding/icon/font, kept natural flex-wrap — no forced column count, to avoid a desktop
   regression) since it was explicitly requested regardless of root-cause confirmation.
+- [x] **Phase 3.7C — Staff↔Service Capability Investigation — ✅ Done 2026-08-08** (`bdca1bb`),
+  `.claudedocs/work/staff-service-relationship-investigation/2026-08-08/summary.md` +
+  `evolution/staff-capability.md`'s 2026-08-08 entry. Investigation only, no code. Confirmed with
+  real evidence: `Reservation.barberId` is a real FK, but there's no service-side equivalent
+  anywhere — `GET /availability`/`GET /barbers` both have zero service awareness today, confirmed
+  live on `hr`. Recommended shape: a `BarberService` join table mirroring `ClientService`'s already-
+  proven bridge-table pattern, additive to both existing public routes. One real product decision
+  surfaced, not made: enforce the relationship (hard reject) vs. soften it (pre-filter, allow
+  override). **3.7C's actual code is not started** — this investigation is the prerequisite, not
+  the phase itself.
 - [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
   left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
   The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed
