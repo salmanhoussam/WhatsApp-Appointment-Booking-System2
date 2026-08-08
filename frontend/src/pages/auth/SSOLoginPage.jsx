@@ -5,7 +5,12 @@
  *   /login    → existing tenant login (email/phone/slug + password)
  *   /register → new tenant self-onboarding (trial creation)
  *
- * On success: trial → salmansaas.com/dashboard/{slug}, active → {slug}.salmansaas.com/admin
+ * On success: every tenant → /{slug}/dashboard (canonical URL, routing.md §0b) — regardless of
+ * status. Previously branched trial vs. active, sending active tenants to the legacy
+ * {slug}.salmansaas.com/admin (SmarAdminDashboard) route; that branch never got updated when the
+ * canonical URL was ratified (2026-08-07) and was confirmed via real browser verification
+ * (2026-08-08, .claudedocs/work/dashboard-flash-investigation/2026-08-08/summary.md) to land an
+ * active tenant on the wrong dashboard component permanently, not transiently.
  */
 
 import { useState, useEffect } from 'react';
@@ -38,23 +43,17 @@ function _isSuperAdmin(token) {
   } catch { return false; }
 }
 
-function resolveRedirect(slug, token, status) {
+function resolveRedirect(slug, token) {
   if (_isSuperAdmin(token)) {
     return import.meta.env.PROD
       ? 'https://demo.salmansaas.com/super/clients'
       : '/super/clients';
   }
-  // Trial tenants → salmansaas.com/dashboard/{slug} (path-based, no per-tenant DNS)
-  if (status === 'trial') {
-    return import.meta.env.PROD
-      ? `https://salmansaas.com/dashboard/${slug}?token=${token}`
-      : `http://localhost:5173/dashboard/${slug}?token=${token}`;
-  }
-  // Active / demo tenants → their own subdomain admin dashboard
-  // ProtectedRoute handles the ?token= handoff to that subdomain's localStorage
+  // Canonical admin URL for every tenant, regardless of status (routing.md §0b) —
+  // GenericAdminDashboard via /{slug}/dashboard. No per-status branching.
   return import.meta.env.PROD
-    ? `https://${slug}.salmansaas.com/admin?token=${token}`
-    : `http://localhost:5173/${slug}/admin?token=${token}`;
+    ? `https://demo.salmansaas.com/${slug}/dashboard?token=${token}`
+    : `http://localhost:5173/${slug}/dashboard?token=${token}`;
 }
 
 function storeTrialData(token, status, trial_ends_at) {
@@ -260,7 +259,7 @@ export default function SSOLoginPage() {
     }
     const { token, slug: s, status, trial_ends_at } = data;
     storeTrialData(token, status, trial_ends_at);
-    window.location.href = resolveRedirect(s, token, status);
+    window.location.href = resolveRedirect(s, token);
     setLoading(false);
   }
 
@@ -280,7 +279,7 @@ export default function SSOLoginPage() {
       );
       const { token, slug: s, status, trial_ends_at } = data.data;
       storeTrialData(token, status, trial_ends_at);
-      window.location.href = resolveRedirect(s, token, status);
+      window.location.href = resolveRedirect(s, token);
     } catch (err) {
       const msg = err?.response?.data?.error?.message || err?.response?.data?.detail;
       setError(msg || 'حدث خطأ ما. يرجى المحاولة لاحقاً.');
