@@ -206,16 +206,46 @@
   non-reproduction outcome as Login. Made a defensive `ServiceCard` sizing tightening anyway (smaller
   minWidth/padding/icon/font, kept natural flex-wrap — no forced column count, to avoid a desktop
   regression) since it was explicitly requested regardless of root-cause confirmation.
-- [x] **Phase 3.7C — Staff↔Service Capability Investigation — ✅ Done 2026-08-08** (`bdca1bb`),
-  `.claudedocs/work/staff-service-relationship-investigation/2026-08-08/summary.md` +
-  `evolution/staff-capability.md`'s 2026-08-08 entry. Investigation only, no code. Confirmed with
-  real evidence: `Reservation.barberId` is a real FK, but there's no service-side equivalent
-  anywhere — `GET /availability`/`GET /barbers` both have zero service awareness today, confirmed
-  live on `hr`. Recommended shape: a `BarberService` join table mirroring `ClientService`'s already-
-  proven bridge-table pattern, additive to both existing public routes. One real product decision
-  surfaced, not made: enforce the relationship (hard reject) vs. soften it (pre-filter, allow
-  override). **3.7C's actual code is not started** — this investigation is the prerequisite, not
-  the phase itself.
+- [x] **Phase 3.7C — Service Capability Extraction + Staff↔Service Assignment — ✅ Done 2026-08-08**,
+  5 commits (`3d9f926`, `c8d6e40`, `5ec93dd`, `76dbf47`, `7f05698`), each independently
+  Browser/API-verified. Started from the Capability Investigation (`bdca1bb`,
+  `.claudedocs/work/staff-service-relationship-investigation/2026-08-08/summary.md`), but Salman
+  stopped before Commit 1 to correct a real domain-model conflation the original plan assumed
+  (`Service = CatalogItem where requires_booking = true`) — real evidence backed the correction:
+  `CatalogItem` had zero schema relation to `Reservation` but three real relations to order-side
+  concepts. Ended up two pieces in one phase:
+  - **(A) `CatalogService` extracted as its own real Prisma model** — shares `CatalogCategory` with
+    `CatalogItem` (no new category table), `duration_min` promoted to a real column. Conservative
+    migration per Salman's explicit correction: `hr`'s 6 real services **copied** into the new
+    table (same id reused, not moved) — **originals stay in `catalog_items`, untouched**; deleting
+    them is an explicit, separate, later decision, not scheduled. Every existing consumer
+    (admin Reservations Quick-Create/Edit/Today/Week, the public booking page) rewired onto the
+    real model. `Reservation.serviceId` added as a real FK (mirrors `barberId`, `onDelete:
+    SetNull`), set on both create and edit — not just the legacy `metadata.service_id` mirror.
+  - **(B) `BarberService` join table** — the actual Staff↔Service relationship, mirrors
+    `ClientService`'s bridge-table shape. `GET`/`PATCH /admin/barbers/{id}/services` (full
+    replace-set) + a `Staff` edit-modal checklist. `GET /public/reservations/barbers` gains an
+    optional `service_id` filter with a fallback-to-all-when-unassigned rule — Salman's explicit
+    "soft filter, not hard enforcement" decision for v1, kept fully backward compatible.
+  - **Two real naming/routing collisions caught before they became bugs** (both mid-Commit-1):
+    an unrelated `Service` model already existed (smar's property add-ons) — every new file/route
+    uses `CatalogService`/`catalog_service_repo.py`/`catalog_services.py` throughout, never the
+    shorter name; a wildcard public route (`GET /{slug}/services`, also smar's) silently intercepted
+    the first attempt at `/reservations/services` — renamed to `/reservations/catalog-services`.
+  - **One real bug found via Browser Verification and fixed before Commit 5 closed**:
+    `StaffCarousel`'s local pagination `offset` never reset when `barbers` changed at runtime
+    (previously it only ever changed once, on mount) — switching services could silently render an
+    empty picker. Fixed via `key={selectedServiceId}` (a remount, React's own recommended pattern),
+    re-verified with 4 repeated back-and-forth switches, confirmed robust.
+  - **Explicitly deferred, named so it isn't lost**: Phase 3.7D — Services Management UX (a real
+    admin CRUD tab for `CatalogService` — name/price/duration/image/category/hide-show/reorder;
+    this phase only built the data model + relationship, not a management UI). Also: whether to
+    delete/archive the original 6 `catalog_items` rows (gated on this phase's own regression pass,
+    which passed); hard-enforcing Staff↔Service (a later, separate product decision);
+    `Resource`/clinic's equivalent join table (no real clinic tenant yet).
+  - **Full regression pass, 7/7 checks clean**: Overview/Calendar(Today+Week)/Reservations(List)/
+    Catalog/Staff all render real data, zero console errors — confirmed Catalog's own Item
+    management (untouched by this phase) still shows all 6 real items correctly.
 - [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
   left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
   The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed

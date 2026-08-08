@@ -99,3 +99,65 @@ picker (pre-filter, allow override) — a decision, not a technical fact.
 No — investigation only, same Mechanical Gate as the 2026-08-07 entry. This closes the "what would
 the relationship look like" question the last entry left open; whether it gets built is a separate,
 later decision.
+
+## 2026-08-08 (implementation — Phase 3.7C)
+
+### Context
+
+Same day, later: Salman reviewed the plan built from the entry above and stopped it before Commit 1
+— it assumed `Service = CatalogItem where requires_booking = true`, a real domain-model conflation
+he'd been describing independently (Category = organization, Service = bookable, Item = sellable,
+Staff = provides Services, Reservation = Service+Staff+Time, Order = Items). Investigated fresh
+(this planning pass, not re-litigating the morning's investigation): `requires_booking` was read in
+exactly 4 frontend files via the same one-line filter, only 2 seed scripts ever set it — a small
+blast radius — and `CatalogItem` already had zero `Reservation` relation but three real order-side
+ones. Decision: `CatalogService` as its own real Prisma model, not a flag. Full write-up:
+`.claudedocs/todo_list.md`'s Phase 3.7C entry (2026-08-08) has the complete implementation account;
+this entry records the architectural discovery, not the mechanics.
+
+### Discovery
+
+- The Service/Item conflation was already half-visible in the schema before this phase touched
+  anything: `CatalogCategory.moduleKey` already distinguished `"catalog"` from `"store"`/
+  `"restaurant"` at the category level, and `hr`'s real live data already split cleanly along that
+  line (all 6 "الخدمات" items `requires_booking: true`, all "منتجات العناية" items without it) —
+  the conceptual split existed in practice, just not enforced structurally.
+- A real, second-order naming collision surfaced immediately on writing the schema: an unrelated
+  `Service` model already existed (smar's property-booking add-ons), colliding both as a Prisma
+  model name and as the physical table name (`@@map("services")`). Caught by `prisma validate`
+  before any migration ran — not by careful reading, by the tool itself. A second collision (a
+  wildcard public route intercepting a URL path) was caught only via live Browser Verification,
+  after the naming one was already fixed — two independent instances of the same underlying
+  lesson (grep for existing names/routes before choosing new ones, in this specific codebase,
+  isn't optional).
+- The conservative-migration correction (copy the 6 real rows with the same id reused, never
+  delete/move) is now this project's own concrete instance of a general principle worth naming: a
+  migration that only adds is a fundamentally different risk class than one that also deletes, even
+  when the "obviously correct" end state looks identical either way.
+
+### Current Understanding
+
+The Service/Item split is real and now structural, not just a naming convention. `CatalogService`
+and `CatalogItem` are permanently separate tables sharing one category taxonomy. `Reservation` is
+now resolvable through a real `serviceId` FK exactly the way it already was through `barberId` —
+`metadata.service_id` is legacy-only going forward. The Staff↔Service relationship
+(`BarberService`) is real, live, and already exercised with real data on `hr` (`حسين` → `شعر`).
+
+### Open Questions
+
+- Enforce vs. soften (carried over from the earlier entry) — still not decided; the soft
+  fallback-to-all behavior is what actually shipped.
+- Whether/when the original 6 `catalog_items` rows get deleted or archived — explicitly deferred,
+  gated on real usage of the new model holding up (this phase's own regression pass already passed,
+  but that's a necessary condition, not sufficient justification on its own to delete real rows).
+- Phase 3.7D (Services Management UX — a real admin CRUD for `CatalogService`) is named but not
+  scoped in detail; `CatalogService` rows are currently editable only via direct API calls.
+
+### Promoted?
+
+Yes, in effect — `CatalogService` and `BarberService` are now real, shipped, Browser-Verified
+Capabilities, not a proposal. No formal ADR written for this split specifically (the Abstraction
+Rule's evidence bar — multiple independent real cases — isn't really the right test for "correcting
+a conflation that already existed," which is what this was); revisit if a second, independent
+tenant's real data later stresses this same Service/Item boundary in a way this entry didn't
+anticipate.
