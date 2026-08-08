@@ -61,6 +61,7 @@ def _fmt(r) -> dict:
         "metadata":       r.metadata or {},
         "resource_id":    getattr(r, "resourceId", None),
         "barber_id":      getattr(r, "barberId", None),
+        "service_id":     getattr(r, "serviceId", None),
         "created_at":     r.createdAt.isoformat(),
     }
 

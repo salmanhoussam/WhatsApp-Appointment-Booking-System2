@@ -4,7 +4,7 @@ import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
 import ReservationsTodayView from '../components/ReservationsTodayView'
-import { useBarbers, useCatalogItems, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
+import { useBarbers, useServices, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
 import { T, FONT } from '../theme'
 
@@ -328,14 +328,15 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   // to the first barber on every single ▶/◀ day-navigation click. ReservationsTab itself never
   // unmounts across those, so state lives here instead, same reasoning as todayViewDate above.
   const [visibleBarberId, setVisibleBarberId] = useState(null)
-  // Barbers/catalog items (Phase 3.4, 2026-08-06) -- fetched once here via the shared hooks and
-  // passed down to both Today and Week, instead of each view independently re-fetching the same
-  // data on every mount/toggle (a real, confirmed duplicate network call before this). Each view
-  // still derives its own bookable-only subset locally (a one-line filter, not worth lifting) --
-  // Today also needs the FULL list for serviceNameFor (labeling historical/non-bookable items on
-  // existing reservations), a different concern from "what's offered when booking new".
+  // Barbers/services (Phase 3.4, 2026-08-06) -- fetched once here via the shared hooks and passed
+  // down to both Today and Week, instead of each view independently re-fetching the same data on
+  // every mount/toggle (a real, confirmed duplicate network call before this). Phase 3.7C
+  // (2026-08-08): useServices() now fetches the real CatalogService model directly -- everything
+  // it returns is already bookable, so the old local requires_booking filter/two-list split
+  // (full catalogItems for labeling vs. a filtered bookableCatalogItems for the picker) is gone;
+  // one list serves both purposes now.
   const { barbers, barbersLoading } = useBarbers()
-  const catalogItems = useCatalogItems()
+  const services = useServices()
 
   // List's own ReservationPopover/CreatePopover state (Phase 3.5, 2026-08-07) -- same shape
   // Today/Week already carry locally, not extracted (Abstraction Rule: local UI state stays local
@@ -359,17 +360,10 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   const clearPending = useCallback((id) => {
     setPendingIds((prev) => { const next = new Set(prev); next.delete(id); return next })
   }, [])
-  // Same split ReservationsWeekCalendar.jsx already makes: serviceNameFor stays on the FULL list
-  // (labels whatever a reservation actually references, including non-bookable items on historical
-  // data), bookableCatalogItems is the filtered subset offered when picking a NEW/changed service.
   const serviceNameFor = useCallback((item) => {
-    const id = item?.metadata?.service_id
-    return catalogItems.find((c) => c.id === id)?.name_ar ?? null
-  }, [catalogItems])
-  const bookableCatalogItems = useMemo(
-    () => catalogItems.filter((item) => item?.metadata?.requires_booking === true),
-    [catalogItems]
-  )
+    const id = item?.service_id ?? item?.metadata?.service_id
+    return services.find((c) => c.id === id)?.name_ar ?? null
+  }, [services])
 
   const mountedRef = useRef(true)
 
@@ -724,7 +718,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             onReschedule={handleReschedule}
             hourRange={hourRange}
             barbers={barbers}
-            catalogItems={catalogItems}
+            services={services}
           />
         )
       ) : viewMode === 'today' ? (
@@ -747,7 +741,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             onVisibleBarberChange={setVisibleBarberId}
             barbers={barbers}
             barbersLoading={barbersLoading}
-            catalogItems={catalogItems}
+            services={services}
           />
         )
       ) : isMobile ? (
@@ -886,7 +880,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
           onReschedule={handleReschedule}
           onEdit={handleEdit}
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           isPending={pendingIds.has(popover.item.id)}
           markPending={markPending}
           clearPending={clearPending}
@@ -897,7 +891,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
       {createAnchor && (
         <CreatePopover
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           defaultReservedAt={undefined}
           color={color}
           anchor={createAnchor}

@@ -26,7 +26,7 @@ import { T, FONT } from '../theme'
 // Shared popovers/positioning/date-math/data-hooks moved to reservationInteractions.jsx (Phase 3.4,
 // 2026-08-06) so ReservationsWeekCalendar.jsx can reuse the exact same components instead of a
 // second, standalone implementation -- see that file for ReservationPopover/CreatePopover/
-// usePopoverPosition/useBarbers/useCatalogItems.
+// usePopoverPosition/useBarbers/useServices.
 
 const QUARTER_PX = 22
 const SERVICE_ICON_FALLBACK = '✂️'
@@ -279,11 +279,11 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
  *   onReschedule   async (id, { reserved_at, barber_id? }) -- throws on 409/error
  *   onCreate       async (payload) -- POST /reservations/, Phase 3.2 Quick Create
  *   onEdit         async (id, patch) -- PATCH /reservations/{id}, Phase 3.2 full Edit
- *   barbers/barbersLoading/catalogItems -- lifted to ReservationsTab.jsx (Phase 3.4, 2026-08-06)
- *     via useBarbers()/useCatalogItems() in reservationInteractions.jsx, passed down so this view
+ *   barbers/barbersLoading/services -- lifted to ReservationsTab.jsx (Phase 3.4, 2026-08-06)
+ *     via useBarbers()/useServices() in reservationInteractions.jsx, passed down so this view
  *     and ReservationsWeekCalendar.jsx share one fetch each instead of two independent ones.
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, catalogItems }) {
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, services }) {
   const [startHour, endHour] = hourRange
   // Which barber's schedule is currently VISIBLE -- owned by ReservationsTab.jsx (props
   // `visibleBarberId`/`onVisibleBarberChange`), not local state here. This component fully
@@ -310,8 +310,8 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
 
   useEffect(() => { setItems(reservations) }, [reservations])
 
-  // barbers/barbersLoading/catalogItems now come from ReservationsTab.jsx via useBarbers()/
-  // useCatalogItems() (reservationInteractions.jsx) -- no self-fetch here anymore (Phase 3.4,
+  // barbers/barbersLoading/services now come from ReservationsTab.jsx via useBarbers()/
+  // useServices() (reservationInteractions.jsx) -- no self-fetch here anymore (Phase 3.4,
   // 2026-08-06). The real 307-redirect/401 bug the old fetch's own comment documented lives in
   // useBarbers() now, fixed once, not per-view.
 
@@ -327,19 +327,9 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
   }, [barbersLoading, barbers, visibleBarberId, onVisibleBarberChange])
 
   const serviceNameFor = useCallback((item) => {
-    const id = item.metadata?.service_id
-    return catalogItems.find((c) => c.id === id)?.name_ar ?? null
-  }, [catalogItems])
-
-  // Bookable-only filter for the two service pickers (Quick Create + Edit) -- catalog items without
-  // metadata.requires_booking===true are retail products (hair spray, wax, gel, cologne for hr),
-  // never meant to be "booked" as an appointment. serviceNameFor above deliberately stays on the
-  // FULL catalogItems list -- a different concern (labeling whatever a reservation actually
-  // references, including any historical data) from "what's offered when booking new" (this).
-  const bookableCatalogItems = useMemo(
-    () => catalogItems.filter((item) => item?.metadata?.requires_booking === true),
-    [catalogItems]
-  )
+    const id = item.service_id ?? item.metadata?.service_id
+    return services.find((c) => c.id === id)?.name_ar ?? null
+  }, [services])
 
   const quarters = useMemo(
     () => Array.from({ length: (endHour - startHour) * 4 }, (_, i) => i),
@@ -584,7 +574,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
           onReschedule={onReschedule}
           onEdit={onEdit}
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           isPending={pendingIds.has(popover.item.id)}
           markPending={markPending}
           clearPending={clearPending}
@@ -594,7 +584,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
       {createSlot && (
         <CreatePopover
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           defaultBarberId={createSlot.barberId}
           defaultReservedAt={createSlot.reservedAt}
           color={color}

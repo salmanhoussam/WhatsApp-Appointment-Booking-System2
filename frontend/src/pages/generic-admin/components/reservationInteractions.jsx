@@ -82,19 +82,23 @@ export function useBarbers() {
   return { barbers, barbersLoading }
 }
 
-export function useCatalogItems() {
-  const [catalogItems, setCatalogItems] = useState([])
+// Phase 3.7C (2026-08-08) -- was useCatalogItems(), fetching /catalog/items and relying on every
+// consumer to locally filter by metadata.requires_booking. Now fetches the real CatalogService
+// model directly (/catalog-services/, admin/catalog_services.py) -- everything this returns is
+// already a real bookable service, no local filter needed anywhere downstream.
+export function useServices() {
+  const [services, setServices] = useState([])
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
   useEffect(() => {
-    adminApi.get('/catalog/items')
-      .then((r) => { if (mountedRef.current) setCatalogItems(r.data?.data ?? []) })
-      .catch(() => { if (mountedRef.current) setCatalogItems([]) })
+    adminApi.get('/catalog-services/')
+      .then((r) => { if (mountedRef.current) setServices(r.data?.data ?? []) })
+      .catch(() => { if (mountedRef.current) setServices([]) })
   }, [])
-  return catalogItems
+  return services
 }
 
 // ── Shared input style ───────────────────────────────────────────────────────────────────────────
@@ -177,7 +181,7 @@ export function usePopoverPosition({ anchor, popupHeight, width = 280, viewportP
 export function ReservationPopover({
   item, serviceName, color, anchor, onClose,
   onStatusChange, onReschedule, onEdit,
-  barbers, catalogItems, isPending, markPending, clearPending,
+  barbers, services, isPending, markPending, clearPending,
 }) {
   const [mode, setMode] = useState('view') // 'view' | 'edit' | 'cancel-confirm'
 
@@ -243,8 +247,8 @@ export function ReservationPopover({
 
   const handleServiceChange = (id) => {
     setEditServiceId(id)
-    const svc = catalogItems.find((c) => c.id === id)
-    if (svc?.metadata?.duration_min) setEditDuration(svc.metadata.duration_min)
+    const svc = services.find((c) => c.id === id)
+    if (svc?.duration_min) setEditDuration(svc.duration_min)
   }
 
   const handleEditSave = async () => {
@@ -294,7 +298,7 @@ export function ReservationPopover({
   const popoverHeight = mode === 'edit' ? 460 : mode === 'cancel-confirm' ? 220 : 380
   const pos = usePopoverPosition({ anchor, popupHeight: popoverHeight })
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
-  const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
+  const serviceOptions = (services || []).map((c) => ({ value: c.id, label: c.name_ar }))
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
@@ -486,7 +490,7 @@ export function ReservationPopover({
 // applies to Create exactly as it does to Quick Actions. Entry points: an empty-slot click (pre-fills
 // time, and barber where the calling view has a staff dimension) or a floating "+" button (no
 // pre-fill, owner picks everything).
-export function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultReservedAt, color, anchor, onClose, onCreate }) {
+export function CreatePopover({ barbers, services, defaultBarberId, defaultReservedAt, color, anchor, onClose, onCreate }) {
   const [barberId, setBarberId] = useState(defaultBarberId || barbers[0]?.id || '')
   const [serviceId, setServiceId] = useState('')
   const [name, setName] = useState('')
@@ -499,8 +503,8 @@ export function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultR
 
   const handleServiceChange = (id) => {
     setServiceId(id)
-    const svc = catalogItems.find((c) => c.id === id)
-    if (svc?.metadata?.duration_min) setDuration(svc.metadata.duration_min)
+    const svc = services.find((c) => c.id === id)
+    if (svc?.duration_min) setDuration(svc.duration_min)
   }
 
   const handleCreate = async () => {
@@ -528,7 +532,7 @@ export function CreatePopover({ barbers, catalogItems, defaultBarberId, defaultR
   }
 
   const barberOptions = (barbers || []).map((b) => ({ value: b.id, label: b.name }))
-  const serviceOptions = (catalogItems || []).map((c) => ({ value: c.id, label: c.name_ar }))
+  const serviceOptions = (services || []).map((c) => ({ value: c.id, label: c.name_ar }))
   const pos = usePopoverPosition({ anchor, popupHeight: 460 })
 
   return (

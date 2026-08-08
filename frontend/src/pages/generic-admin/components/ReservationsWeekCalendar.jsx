@@ -238,12 +238,12 @@ function NavBtn({ onClick, label, color }) {
  *   onEdit         — async (id, patch) -- PATCH /reservations/{id}, Phase 3.4 Item 3
  *   onReschedule   — async (id, { reserved_at, barber_id? }) -- throws on 409/error, Phase 3.4 Item 3
  *   hourRange      — [startHour, endHour]
- *   barbers/catalogItems — lifted to ReservationsTab.jsx (Phase 3.4, useBarbers()/useCatalogItems()
+ *   barbers/services — lifted to ReservationsTab.jsx (Phase 3.4, useBarbers()/useServices()
  *     in reservationInteractions.jsx) -- this view no longer self-fetches catalog items.
  */
 export default function ReservationsWeekCalendar({
   reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, onEdit, onReschedule, hourRange,
-  barbers, catalogItems,
+  barbers, services,
 }) {
   const [direction, setDirection] = useState(0)
   const [popover, setPopover] = useState(null) // { item, anchor } -- Phase 3.4 Item 3
@@ -273,17 +273,9 @@ export default function ReservationsWeekCalendar({
   }, [])
 
   const serviceNameFor = (item) => {
-    const id = item?.metadata?.service_id
-    return catalogItems.find((c) => c.id === id)?.name_ar ?? null
+    const id = item?.service_id ?? item?.metadata?.service_id
+    return services.find((c) => c.id === id)?.name_ar ?? null
   }
-  // Bookable-only subset for the Create/Edit service pickers -- same split ReservationsTodayView.jsx
-  // already makes: serviceNameFor above stays on the FULL list (labeling whatever a reservation
-  // actually references, including retail/non-bookable items on historical data), while offering
-  // NEW bookings only ever lists real services (metadata.requires_booking === true).
-  const bookableCatalogItems = useMemo(
-    () => catalogItems.filter((item) => item?.metadata?.requires_booking === true),
-    [catalogItems]
-  )
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -539,7 +531,7 @@ export default function ReservationsWeekCalendar({
           onReschedule={onReschedule}
           onEdit={onEdit}
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           isPending={pendingIds.has(popover.item.id)}
           markPending={markPending}
           clearPending={clearPending}
@@ -550,7 +542,7 @@ export default function ReservationsWeekCalendar({
       {createSlot && (
         <CreatePopover
           barbers={barbers}
-          catalogItems={bookableCatalogItems}
+          services={services}
           defaultReservedAt={createSlot.reservedAt}
           color={color}
           anchor={createSlot.anchor}
