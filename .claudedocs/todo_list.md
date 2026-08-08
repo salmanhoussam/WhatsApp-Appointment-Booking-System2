@@ -164,19 +164,35 @@
   - [ ] Two disposable test records exist in `hr`'s real dev DB (`Test Staff 1786124916`, `Test
     Staff NetCheck 1786131600`), deactivated but not deleted — clean up if/when convenient, not
     urgent.
-  - [ ] Phase 3.7B (Catalog UX) and 3.7C (Staff↔Service relationship) — named, not started.
-    **Catalog UX Gap Investigation done 2026-08-07** (`.claudedocs/work/catalog-ux-gap-investigation/
-    2026-08-07/summary.md`, code + real browser evidence against `hr`'s live catalog — 2 categories,
-    6 items, all $5 placeholder pricing, 0/6 have images). Confirmed: no Search/Filters-in-UI/Bulk/
-    Inline-Edit/multi-image gallery anywhere; category tree (`parentId`) and both-level reorder
-    (`sortOrder`) are fully schema+backend-ready but have zero UI; `is_active`/`is_featured` toggles
-    exist in the backend but not the UI (only hard delete). Real side finding: `sortOrder` ordering
-    has no secondary tiebreaker, so display order is silently unstable while every row sits at the
-    default `0`. Recommended first slice (not yet decided/started): ↑/↓ reorder (categories + items,
-    bundling the tiebreaker fix), a simple Parent-Category dropdown (not a tree component — no real
-    tenant has nested categories yet), and an `is_active` soft-hide toggle — all zero backend work.
-    Search/Bulk/multi-image deferred — no backend support exists yet and no real tenant has hit the
-    scale that would justify them.
+  - [x] **Phase 3.7B (Catalog UX, first slice) — ✅ Done 2026-08-08**, 4 commits
+    (`6e7ac01`, `cc95dea`, `4a9677d`, `b8eb3f6`), each real-Browser-Verified against `hr`'s live
+    catalog. Followed the Catalog UX Gap Investigation's (`.claudedocs/work/catalog-ux-gap-
+    investigation/2026-08-07/summary.md`) recommended first slice: (1) `sortOrder` tiebreaker
+    (`createdAt` secondary key, matching the already-proven `barber_repo.py`/`resource_repo.py`/
+    `service_repo.py` pattern); (2) corrected a real mislabeling bug found while implementing —
+    "حذف" already only soft-deleted under the hood (`catalog_service.py`'s `admin_delete_*` always
+    called `soft_delete_*`), relabeled to "إخفاء" + added the missing "إظهار" reactivate button,
+    closing the same gap Staff's own deactivate flow still has open; (3) ↑/↓ reorder for both
+    categories and items, renumbering the whole list to sequential `sort_order` on each move (every
+    real row started at the untouched default `0`, so a naive adjacent-swap would've been a no-op);
+    (4) an optional Parent Category `<select>` (not a tree — no real tenant has nested categories).
+    **A real backend bug found and fixed while wiring (4):** Prisma's generated
+    `CatalogCategoryUpdateInput` doesn't expose `parentId` as a directly-settable scalar on
+    `update` (unlike `create`) — it's modeled as the `parent` relation, so a raw `parentId: None`
+    assignment threw a real `DataError` ("Error creating UUID... found 0") trying to parse an empty
+    string as a UUID. Fixed via `parent: {connect/disconnect}`.
+  - [x] **Real infra bug found and fixed mid-phase: the backend dev server had silently orphaned**
+    — its `uvicorn --reload` reloader-supervisor process had died at some point (before this
+    session), leaving a bare worker process reparented to `systemd --user`, still serving requests
+    on :8000 but **never picking up file changes again**. This is exactly what made the parent-
+    dropdown bug look unfixable on the first two attempts — the fix was correct the whole time, but
+    curl/Browser Verification kept hitting stale, pre-fix code. Caught by noticing a debug `print()`
+    never appeared in the log despite repeated edits; confirmed via `ps -ef` showing the worker's
+    `PPID` was `systemd --user`, not a live reloader. Fixed by killing the orphan and restarting a
+    supervised `uvicorn --reload` process; all 4 commits re-verified clean afterward. **Real open
+    question, not resolved here:** how long had this been orphaned, and did any earlier session's
+    "Browser-Verified" backend claim actually run against stale code as a result? Not investigated
+    — flagged as a real risk to be aware of, not assumed clean.
 - [ ] **Week Calendar mobile-bug report (2026-08-07) — investigated, ruled out, real side finding
   left open:** `.claudedocs/work/week-calendar-mobile-report-investigation/2026-08-07/summary.md`.
   The reported "grid collapsed to one column" bug is not real (real Browser Verification confirmed
