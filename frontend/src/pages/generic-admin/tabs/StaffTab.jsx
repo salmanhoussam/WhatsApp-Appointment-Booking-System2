@@ -88,7 +88,7 @@ function Field({ label, children }) {
 
 const EMPTY_STAFF = {
   name: '', phone: '', description: '', image_url: '',
-  open_time: '09:00', close_time: '18:00', closed_days: [],
+  open_time: '09:00', close_time: '18:00', closed_days: [], service_ids: [],
 }
 
 export default function StaffTab({ color }) {
@@ -104,6 +104,11 @@ export default function StaffTab({ color }) {
   const [imagePreview, setImagePreview] = useState(null)
   const { upload, error: uploadError, reset: resetUpload } = useImageUpload()
 
+  // Phase 3.7C (2026-08-08) -- the real Staff<->Service relationship. All real CatalogServices for
+  // this tenant, fetched once for the checklist -- reuses the same admin endpoint Reservations'
+  // pickers already fetch from (GET /catalog-services/), no new backend surface for this list.
+  const [services, setServices] = useState([])
+
   // ── Load ───────────────────────────────────────────────────────────────────
 
   const loadStaff = useCallback(() => {
@@ -115,6 +120,11 @@ export default function StaffTab({ color }) {
   }, [])
 
   useEffect(() => { loadStaff() }, [loadStaff])
+  useEffect(() => {
+    adminApi.get('/catalog-services/')
+      .then(r => setServices(r.data.data ?? []))
+      .catch(() => setServices([]))
+  }, [])
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
 
@@ -138,11 +148,14 @@ export default function StaffTab({ color }) {
       name: member.name, phone: member.phone ?? '',
       description: member.description ?? '', image_url: member.image_url ?? '',
       open_time: wh.open_time ?? '09:00', close_time: wh.close_time ?? '18:00',
-      closed_days: wh.closed_days ?? [],
+      closed_days: wh.closed_days ?? [], service_ids: [],
     })
     resetImageState()
     setImagePreview(member.image_url || null)
     setShowModal(true)
+    adminApi.get(`/barbers/${member.id}/services`)
+      .then(r => setForm(p => ({ ...p, service_ids: r.data.data ?? [] })))
+      .catch(() => {})
   }
 
   const handleFileChange = (e) => {
@@ -160,6 +173,15 @@ export default function StaffTab({ color }) {
       closed_days: p.closed_days.includes(dayKey)
         ? p.closed_days.filter(d => d !== dayKey)
         : [...p.closed_days, dayKey],
+    }))
+  }
+
+  const toggleService = (serviceId) => {
+    setForm(p => ({
+      ...p,
+      service_ids: p.service_ids.includes(serviceId)
+        ? p.service_ids.filter(id => id !== serviceId)
+        : [...p.service_ids, serviceId],
     }))
   }
 
@@ -193,6 +215,10 @@ export default function StaffTab({ color }) {
       if (imageFile && savedId) {
         const { url } = await upload(imageFile, { context: 'barber', barber_id: savedId })
         await adminApi.patch(`/barbers/${savedId}`, { image_url: url })
+      }
+
+      if (savedId) {
+        await adminApi.patch(`/barbers/${savedId}/services`, { service_ids: form.service_ids })
       }
 
       loadStaff()
@@ -330,6 +356,37 @@ export default function StaffTab({ color }) {
                   </button>
                 )
               })}
+            </div>
+          </Field>
+
+          <Field label="الخدمات التي يقدمها">
+            {services.length === 0 ? (
+              <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد خدمات بعد — أضف خدمات أولاً</div>
+            ) : (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {services.map(s => {
+                  const active = form.service_ids.includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleService(s.id)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: FONT,
+                        background: active ? `${color}18` : T.cardBg,
+                        color: active ? color : T.textSecond,
+                        border: `1px solid ${active ? color + '44' : T.border}`,
+                      }}
+                    >
+                      {s.name_ar}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6 }}>
+              اختياري — إذا لم تُحدَّد أي خدمة، يظهر هذا الموظف عند حجز أي خدمة
             </div>
           </Field>
         </Modal>
