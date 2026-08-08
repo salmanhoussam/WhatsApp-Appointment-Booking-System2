@@ -11,6 +11,8 @@ from resources.py's own answer, and landed on the same shape:
   POST /barbers                -> SUPER_ADMIN, TENANT_ADMIN
   PATCH /barbers/{id}          -> SUPER_ADMIN, TENANT_ADMIN
   PATCH /barbers/{id}/deactivate -> SUPER_ADMIN, TENANT_ADMIN
+  GET /barbers/{id}/services    -> SUPER_ADMIN, TENANT_ADMIN, MANAGER_RESERVATIONS  (Phase 3.7C)
+  PATCH /barbers/{id}/services  -> SUPER_ADMIN, TENANT_ADMIN                        (Phase 3.7C)
   No DELETE exposed — same reasoning as resources.py: a hard delete would orphan historical
   Reservation.barberId rows (onDelete: SetNull); deactivate is the supported path.
 
@@ -29,7 +31,7 @@ from pydantic import BaseModel
 from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.db.dependencies import get_current_tenant
-from app.repositories import barber_repo
+from app.repositories import barber_repo, barber_service_repo
 
 router = APIRouter(prefix="/barbers", tags=["Admin Barbers"])
 
@@ -53,6 +55,11 @@ class BarberUpdate(BaseModel):
     working_hours: Optional[dict] = None
     sort_order:    Optional[int] = None
     is_active:     Optional[bool] = None
+
+
+class BarberServicesSet(BaseModel):
+    service_ids: list[str]  # CatalogService ids -- deliberately NOT catalog_item_ids, the exact
+                             # naming confusion Phase 3.7C exists to eliminate
 
 
 # ── Serializer ────────────────────────────────────────────────────────────────
@@ -157,3 +164,35 @@ async def deactivate_barber(
 
     updated = await barber_repo.update_barber(barber_id, {"isActive": False})
     return {"success": True, "data": _fmt(updated)}
+
+
+# ── Staff <-> Service assignment (Phase 3.7C, 2026-08-08) ──────────────────────
+
+@router.get("/{barber_id}/services")
+async def get_barber_services(
+    barber_id: str,
+    tenant: dict = Depends(get_current_tenant),
+    _svc: dict   = Depends(require_service("reservations")),
+    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
+):
+    existing = await barber_repo.find_barber(tenant["id"], barber_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Barber not found.")
+    service_ids = await barber_service_repo.list_service_ids_for_barber(tenant["id"], barber_id)
+    return {"success": True, "data": service_ids}
+
+
+@router.patch("/{barber_id}/services")
+async def set_barber_services(
+    barber_id: str,
+    body: BarberServicesSet,
+    tenant: dict = Depends(get_current_tenant),
+    _svc: dict   = Depends(require_service("reservations")),
+    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    existing = await barber_repo.find_barber(tenant["id"], barber_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Barber not found.")
+    await barber_service_repo.set_services_for_barber(tenant["id"], barber_id, body.service_ids)
+    service_ids = await barber_service_repo.list_service_ids_for_barber(tenant["id"], barber_id)
+    return {"success": True, "data": service_ids}

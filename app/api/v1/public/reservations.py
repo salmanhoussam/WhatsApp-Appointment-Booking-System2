@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 from app.services import reservation_service, catalog_service_service
-from app.repositories import resource_repo, barber_repo
+from app.repositories import resource_repo, barber_repo, barber_service_repo
 
 router = APIRouter()
 
@@ -114,14 +114,30 @@ async def list_public_resources(
 
 @router.get("/barbers")
 async def list_public_barbers(
+    service_id: Optional[UUID] = Query(None),
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("reservations")),
 ):
     """List active Barbers for this tenant — e.g. a 'choose your barber' picker for barber
     bookings. Written as its own endpoint rather than folded into /resources above, per the
     independent-build instruction (2026-07-31) — there's no module_key/resource_type mapping to
-    look up here, since barber isn't a Resource.type value at all."""
+    look up here, since barber isn't a Resource.type value at all.
+
+    service_id (Phase 3.7C, 2026-08-08, soft filter per Salman's explicit decision): when given,
+    narrows the list to Barbers qualified for that CatalogService via BarberService. Deliberately
+    NOT hard-enforced -- if the filtered result is empty (true for every existing service today,
+    since no assignments exist yet), falls back to the full unfiltered list. This one rule is what
+    keeps the endpoint backward-compatible with zero migration step for existing tenants -- a
+    service with no assignments behaves exactly as it did before this filter existed."""
     barbers = await barber_repo.list_barbers(tenant["id"], active_only=True)
+
+    if service_id is not None:
+        qualified_ids = set(await barber_service_repo.list_barber_ids_for_service(tenant["id"], str(service_id)))
+        filtered = [b for b in barbers if b.id in qualified_ids]
+        if filtered:
+            barbers = filtered
+        # else: no assignments for this service yet -- fall back to the full list, unfiltered.
+
     return {
         "success": True,
         "data": [{"id": b.id, "name": b.name} for b in barbers],

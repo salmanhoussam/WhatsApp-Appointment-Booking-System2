@@ -498,9 +498,10 @@ model CatalogService {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category     CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  reservations Reservation[]
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category       CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  reservations   Reservation[]
+  barberServices BarberService[]
 
   @@index([clientId])
   @@index([categoryId])
@@ -852,11 +853,37 @@ model Barber {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  reservations Reservation[]
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reservations   Reservation[]
+  barberServices BarberService[]
 
   @@index([clientId, isActive])
   @@map("barbers")
+  @@schema("public")
+}
+
+// ================================================================================
+// BARBER SERVICE -- which CatalogServices a Barber is qualified to perform. Phase 3.7C
+// (2026-08-08), the actual Staff<->Service relationship the Capability Investigation named.
+// Mirrors ClientService's already-proven bridge-table shape (schema.prisma:473-487) -- a plain
+// many-to-many, not a new pattern. onDelete: Cascade both sides (unlike Reservation's FKs, which
+// use SetNull to preserve historical rows) -- this table only records a *current* qualification
+// fact; if either side is hard-deleted there's nothing left for the assignment to mean.
+// ================================================================================
+
+model BarberService {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  barberId  String   @map("barber_id") @db.Uuid
+  serviceId String   @map("service_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  barber  Barber         @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  service CatalogService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([barberId, serviceId])
+  @@index([clientId])
+  @@map("barber_services")
   @@schema("public")
 }
 
