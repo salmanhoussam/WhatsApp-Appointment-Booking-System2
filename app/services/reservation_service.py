@@ -22,7 +22,7 @@ from prisma import Json
 
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
-from app.repositories import resource_repo, barber_repo
+from app.repositories import resource_repo, barber_repo, catalog_service_repo
 
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
@@ -139,6 +139,19 @@ async def _resolve_barber(client_id: str, module_key: str, metadata: dict | None
     return barber
 
 
+async def _resolve_catalog_service(client_id: str, metadata: dict | None):
+    """Pipeline stage, Phase 3.7C (2026-08-08) -- resolves metadata.service_id to a real
+    CatalogService row so create_reservation can set the real Reservation.serviceId FK, not just
+    leave it inside metadata. Deliberately tolerant, unlike _resolve_barber/_resolve_resource
+    above: service_id isn't required for every module_key (restaurant/real_estate reservations
+    never set it), and an invalid/stale id shouldn't block reservation creation over a labeling
+    concern -- it just means serviceId stays null, same as it always has been until now."""
+    service_id = (metadata or {}).get("service_id")
+    if not service_id:
+        return None
+    return await catalog_service_repo.find_catalog_service(client_id, service_id)
+
+
 async def create_reservation(
     client_id:      str,
     module_key:     str,
@@ -171,6 +184,12 @@ async def create_reservation(
     # 2nd real Reservation Strategy case, built independently of the Resource path above
     # (2026-07-31) — its own function, its own column, no shared dispatch set.
     barber = await _resolve_barber(client_id, module_key, metadata)
+
+    # -- Resolve [CatalogService] -----------------------------------------------------------------
+    # Phase 3.7C (2026-08-08) -- unlike Resource/Barber above, this never gates working-hours or
+    # conflict-checking (a Service has no calendar of its own); it only sets the real serviceId FK
+    # so this reservation is fully resolvable through Service without relying on metadata alone.
+    catalog_service = await _resolve_catalog_service(client_id, metadata)
 
     # -- Working Hours ---------------------------------------------------------------------------
     # Resource's own working_hours takes priority when set; falls back to the tenant-wide
@@ -251,6 +270,8 @@ async def create_reservation(
         create_data["resourceId"] = resource.id
     if barber:
         create_data["barberId"] = barber.id
+    if catalog_service:
+        create_data["serviceId"] = catalog_service.id
 
     reservation = await repo.create(create_data)
 
@@ -465,6 +486,10 @@ async def edit_reservation(
         meta = dict(existing.metadata or {})
         if new_service_id is not None:
             meta["service_id"] = new_service_id
+            # Phase 3.7C (2026-08-08) -- also set the real FK, not just the metadata mirror, same
+            # as barberId already does below. Keeps "resolvable through serviceId alone" true for
+            # edits, not just new reservations (create_reservation's own _resolve_catalog_service).
+            patch["serviceId"] = new_service_id
         if "barberId" in patch:
             meta["barber_id"] = patch["barberId"]
         patch["metadata"] = Json(meta)

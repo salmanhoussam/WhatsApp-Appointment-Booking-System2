@@ -160,7 +160,7 @@ function ServiceCard({ item, selected, onClick }) {
       )}
       <Icon size={22} color={selected ? T.green : T.textPrimary} strokeWidth={1.75} />
       <span style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, textAlign: 'center' }}>{item.name_ar}</span>
-      <span style={{ fontSize: 10.5, color: T.textSecond }}>{item.metadata?.duration_min} دقيقة</span>
+      <span style={{ fontSize: 10.5, color: T.textSecond }}>{item.duration_min} دقيقة</span>
     </button>
   )
 }
@@ -370,7 +370,7 @@ function SummaryCard({ booking }) {
     { icon: UserRound, label: 'الحلاق', value: selectedBarber?.name },
     { icon: CalendarDays, label: 'اليوم', value: selectedSlot ? formatArabicDate(selectedDate) : null },
     { icon: Clock, label: 'الوقت', value: selectedSlot?.time },
-    { icon: Timer, label: 'المدة', value: selectedService?.metadata?.duration_min ? `${selectedService.metadata.duration_min} دقيقة` : null },
+    { icon: Timer, label: 'المدة', value: selectedService?.duration_min ? `${selectedService.duration_min} دقيقة` : null },
   ]
   return (
     <div style={{
@@ -563,9 +563,18 @@ function BookingPage({ booking, config }) {
 
               <div style={{ borderTop: `1px solid ${T.borderSoft}` }} />
 
+              {/* key={selectedServiceId} on StaffCarousel below -- Phase 3.7C (2026-08-08):
+                  `barbers` now legitimately changes at runtime (re-filtered by selected service,
+                  useReservationBooking.js), not just once on mount. Found via real Browser
+                  Verification: without a remount, StaffCarousel's local pagination `offset` stayed
+                  at a stale index after switching from a longer filtered list to a shorter one,
+                  silently rendering nothing (barbers[staleOffset] === undefined), no error anywhere.
+                  Forcing a fresh mount per service is the idiomatic React fix for "reset local state
+                  when an external input changes" (react.dev/learn/you-might-not-need-an-effect),
+                  not a manual useEffect(() => setOffset(0), [barbers]). */}
               <NumberedSection index={2} title="اختر الحلاق">
                 {barbersLoading ? <LightLoadingDot /> : (
-                  <StaffCarousel barbers={barbers} selectedBarberId={selectedBarberId} onChoose={chooseBarber} />
+                  <StaffCarousel key={selectedServiceId} barbers={barbers} selectedBarberId={selectedBarberId} onChoose={chooseBarber} />
                 )}
               </NumberedSection>
 

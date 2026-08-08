@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import useTenantConfig from './useTenantConfig'
 import useTenantSlug from './useTenantSlug'
-import { fetchAllCategories, fetchItems } from '../services/catalogApi'
 import publicApi from '../utils/publicApi'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -120,33 +119,44 @@ export default function useReservationBooking() {
 
   const mode = barbersLoading ? 'loading' : (barbers.length > 0 ? 'booking' : 'legacy')
 
+  // Phase 3.7C (2026-08-08) -- was a category-walk (fetchAllCategories -> fetchItems per category
+  // -> filter by metadata.requires_booking); now a single call against the real CatalogService
+  // model (GET /reservations/catalog-services), which only ever returns real bookable services.
   useEffect(() => {
     if (mode !== 'booking' || !slug) return
     setServicesLoading(true)
-    fetchAllCategories(slug)
+    publicApi.get('/reservations/catalog-services', { params: { client_slug: slug } })
       .then(({ data }) => {
-        const cats = data?.data ?? []
-        return Promise.all(
-          cats.map((cat) =>
-            fetchItems(cat.module_key, slug, cat.id)
-              .then(({ data }) => data?.data ?? [])
-              .catch(() => [])
-          )
-        )
-      })
-      .then((perCategory) => {
         if (!mountedRef.current) return
-        const bookable = perCategory.flat().filter((item) => item?.metadata?.requires_booking)
-        setServices(bookable)
-        if (bookable.length) setSelectedServiceId(bookable[0].id)
+        const list = data?.data ?? []
+        setServices(list)
+        if (list.length) setSelectedServiceId(list[0].id)
       })
       .catch(() => { if (mountedRef.current) setServices([]) })
       .finally(() => { if (mountedRef.current) setServicesLoading(false) })
   }, [mode, slug])
 
+  // Staff<->Service filtering (Phase 3.7C, Commit 5) -- once a service is selected, re-fetch the
+  // barber list scoped to that service (soft filter: the backend falls back to the full list when
+  // no assignments exist for it yet). Separate from the initial unfiltered fetch above, which
+  // exists only to establish `mode` and a safe default before any service is known. Re-validates
+  // the current selection against the new list -- if it's no longer present, falls back to the
+  // new list's first entry, same auto-select-first pattern used everywhere else in this hook.
+  useEffect(() => {
+    if (!slug || mode !== 'booking' || !selectedServiceId) return
+    publicApi.get('/reservations/barbers', { params: { client_slug: slug, service_id: selectedServiceId } })
+      .then(({ data }) => {
+        if (!mountedRef.current) return
+        const list = data?.data ?? []
+        setBarbers(list)
+        setSelectedBarberId((prev) => (list.some((b) => b.id === prev) ? prev : (list[0]?.id ?? null)))
+      })
+      .catch(() => {})
+  }, [slug, mode, selectedServiceId])
+
   const selectedService = services.find((s) => s.id === selectedServiceId) ?? null
   const selectedBarber  = barbers.find((b) => b.id === selectedBarberId) ?? null
-  const durationMin     = selectedService?.metadata?.duration_min ?? null
+  const durationMin     = selectedService?.duration_min ?? null
 
   useEffect(() => {
     if (!slug || !selectedBarberId || !durationMin || !selectedDate) return
