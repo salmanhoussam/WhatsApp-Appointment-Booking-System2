@@ -1,15 +1,20 @@
 """
 scripts/reset_hr_admin_password.py
-One-off: reset the TENANT_ADMIN password for the `hr` (RK Barber Shop) tenant only.
+One-off: reset a tenant's TENANT_ADMIN password, by slug (default: `rk`, RK Barber Shop).
 
-Scoped deliberately narrow -- looks up the User via Client.slug == "hr", never touches any
-SUPER_ADMIN row. Written for the Reservations Calendar end-to-end verification (real admin
-dashboard login needed for a real headless-Chrome screenshot); `hr`'s real password was never
-recorded anywhere in this repo (only its email, rkbarber@dev.invalid, was).
+Scoped deliberately narrow -- looks up the User via Client.slug, never touches any SUPER_ADMIN
+row. Written for the Reservations Calendar end-to-end verification (real admin dashboard login
+needed for a real headless-Chrome screenshot); the real password was never recorded anywhere in
+this repo (only the email, rkbarber@dev.invalid, was).
+
+Note (2026-08-08): RK Barber Shop's slug was changed from `hr` to `rk` directly in the `Client`
+table at some point -- the default here now reflects the current real slug. Pass --slug explicitly
+for any other tenant.
 
 Usage:
     python -m scripts.reset_hr_admin_password
     python -m scripts.reset_hr_admin_password --password password123
+    python -m scripts.reset_hr_admin_password --slug ali --password password123
 """
 
 import argparse
@@ -30,33 +35,34 @@ from prisma import Prisma
 from app.core.security import get_password_hash
 
 
-async def main(password: str):
+async def main(slug: str, password: str):
     db = Prisma()
     await db.connect()
     try:
-        client = await db.client.find_unique(where={"slug": "hr"})
+        client = await db.client.find_unique(where={"slug": slug})
         if not client:
-            print("[ERROR] Client with slug 'hr' not found.")
+            print(f"[ERROR] Client with slug '{slug}' not found.")
             return
 
         user = await db.user.find_first(
             where={"clientId": client.id, "role": "TENANT_ADMIN"},
         )
         if not user:
-            print(f"[ERROR] No TENANT_ADMIN user found for client 'hr' ({client.id}).")
+            print(f"[ERROR] No TENANT_ADMIN user found for client '{slug}' ({client.id}).")
             return
 
         await db.user.update(
             where={"id": user.id},
             data={"password_hash": get_password_hash(password)},
         )
-        print(f"[OK] Password reset for {user.email} (hr / {client.id})")
+        print(f"[OK] Password reset for {user.email} ({slug} / {client.id})")
     finally:
         await db.disconnect()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Reset hr tenant's admin password")
+    parser = argparse.ArgumentParser(description="Reset a tenant's admin password")
+    parser.add_argument("--slug", default="rk")
     parser.add_argument("--password", default="password123")
     args = parser.parse_args()
-    asyncio.run(main(args.password))
+    asyncio.run(main(args.slug, args.password))
