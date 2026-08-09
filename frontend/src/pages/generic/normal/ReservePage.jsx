@@ -134,35 +134,58 @@ function NumberedSection({ index, title, children }) {
   )
 }
 
-function ServiceCard({ item, selected, onClick }) {
+// ServiceCircle -- horizontal-carousel presentation for service selection (2026-08-09, UI-only
+// change per Salman's explicit spec: circular photo/icon, name + duration below, ring + small
+// check badge for selected state, no size jump on select). Same selection semantics as the prior
+// ServiceCard (selected/onClick), only the visual presentation changed -- chooseService/
+// selectedServiceId, the API shape, and every other part of the booking flow are untouched.
+function ServiceCircle({ item, selected, onClick }) {
   const Icon = serviceIconFor(item.name_ar)
+  const size = 72
   return (
     <button
       onClick={onClick}
       style={{
-        position: 'relative', cursor: 'pointer', minWidth: 100,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-        padding: '14px 10px', borderRadius: 14,
-        background: selected ? T.greenSoft : T.cardBg,
-        border: `1.5px solid ${selected ? T.green : T.border}`,
-        boxShadow: selected ? 'none' : T.shadow,
-        fontFamily: FONT,
-        boxSizing: 'border-box',
+        cursor: 'pointer', border: 'none', background: 'transparent', padding: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        flexShrink: 0, width: 84, scrollSnapAlign: 'start', fontFamily: FONT,
       }}
     >
-      {selected && (
-        <span style={{
-          position: 'absolute', top: 6, left: 6, width: 18, height: 18, borderRadius: '50%',
-          background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <div style={{
+          width: size, height: size, borderRadius: '50%', overflow: 'hidden',
+          background: T.greenSoft, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: selected ? `0 0 0 3px ${T.green}` : `0 0 0 1px ${T.border}`,
+          transition: 'box-shadow 0.15s ease',
         }}>
-          <Check size={11} color="#fff" strokeWidth={3} />
-        </span>
-      )}
-      <Icon size={22} color={selected ? T.green : T.textPrimary} strokeWidth={1.75} />
-      <span style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, textAlign: 'center' }}>{item.name_ar}</span>
+          {item.image_url
+            ? <img src={item.image_url} alt={item.name_ar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <Icon size={26} color={T.green} strokeWidth={1.75} />}
+        </div>
+        {selected && (
+          <span style={{
+            position: 'absolute', top: -2, insetInlineStart: -2, width: 20, height: 20, borderRadius: '50%',
+            background: T.green, border: '2px solid #fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Check size={10} color="#fff" strokeWidth={3} />
+          </span>
+        )}
+      </div>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: T.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>
+        {item.name_ar}
+      </span>
       <span style={{ fontSize: 10.5, color: T.textSecond }}>{item.duration_min} دقيقة</span>
     </button>
   )
+}
+
+// Hides the native scrollbar on the services carousel while keeping real touch/mouse-wheel
+// scroll intact -- scrollbarWidth (Firefox) is inline-settable, but ::-webkit-scrollbar needs a
+// real stylesheet rule, so it's injected once via the same scoped <style> pattern LightLoadingDot
+// already uses in this file.
+function ServicesScrollStyle() {
+  return <style>{`.rw-services-scroll::-webkit-scrollbar{display:none}`}</style>
 }
 
 function StaffCarousel({ barbers, selectedBarberId, onChoose }) {
@@ -553,11 +576,23 @@ function BookingPage({ booking, config }) {
             }}>
               <NumberedSection index={1} title="اختر الخدمة">
                 {servicesLoading ? <LightLoadingDot /> : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
-                    {services.map((s) => (
-                      <ServiceCard key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} />
-                    ))}
-                  </div>
+                  <>
+                    <ServicesScrollStyle />
+                    <div
+                      className="rw-services-scroll"
+                      style={{
+                        display: 'flex', gap: 18, overflowX: 'auto',
+                        scrollSnapType: 'x proximity', WebkitOverflowScrolling: 'touch',
+                        paddingBottom: 4, paddingInlineEnd: 8, scrollbarWidth: 'none',
+                        WebkitMaskImage: 'linear-gradient(to left, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)',
+                        maskImage: 'linear-gradient(to left, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)',
+                      }}
+                    >
+                      {services.map((s) => (
+                        <ServiceCircle key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} />
+                      ))}
+                    </div>
+                  </>
                 )}
               </NumberedSection>
 
