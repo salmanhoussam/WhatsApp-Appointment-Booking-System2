@@ -408,6 +408,30 @@ async def list_reservations(
     return [_fmt(r) for r in rows]
 
 
+async def list_my_clients(client_id: str, barber_id: str) -> list[dict]:
+    """Staff Scoped Access Phase C (2026-08-09,
+    .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md) -- "my clients" derived from the
+    barber's own reservations, no separate Customer entity (Salman's explicit choice: simplest
+    option the current business model allows). Always scoped by clientId + barberId together --
+    never client-supplied. Distinct on (customerName, customerPhone); a customer appearing across
+    multiple reservations for the same barber is returned once."""
+    repo = ReservationRepository(prisma_client)
+    rows = await repo.list_customer_identities_for_barber(client_id, barber_id)
+    seen: set[tuple] = set()
+    clients: list[dict] = []
+    for r in rows:
+        key = (r.customerName, r.customerPhone)
+        if key in seen:
+            continue
+        seen.add(key)
+        clients.append({
+            "customer_name":  r.customerName,
+            "customer_phone": r.customerPhone,
+            "customer_email": r.customerEmail,
+        })
+    return clients
+
+
 async def update_status(
     client_id: str,
     reservation_id: str,

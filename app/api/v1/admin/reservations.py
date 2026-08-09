@@ -167,6 +167,27 @@ async def reservations_stats(
     }
 
 
+@router.get("/my-clients")
+async def my_clients(
+    barber_id: Optional[str] = Query(None, description="Non-STAFF only -- inspect a specific barber's clients; ignored/overridden for STAFF"),
+    user=Depends(require_roles(*RESERVATION_ROLES)),
+    _svc=Depends(require_service("reservations")),
+):
+    """Staff Scoped Access Phase C (2026-08-09) -- "my clients" = customers who appear in the
+    caller's own reservations, derived server-side, never from client input. Must be registered
+    before GET /{reservation_id} below, or FastAPI would match "my-clients" as a reservation_id."""
+    staff_barber_id = _require_staff_barber_id(user)
+    effective_barber_id = staff_barber_id if staff_barber_id is not None else barber_id
+    if not effective_barber_id:
+        return {"success": True, "data": []}
+
+    results = await reservation_service.list_my_clients(
+        client_id = str(user.clientId),
+        barber_id = effective_barber_id,
+    )
+    return {"success": True, "data": results}
+
+
 @router.get("/{reservation_id}")
 async def get_reservation(
     reservation_id: str,

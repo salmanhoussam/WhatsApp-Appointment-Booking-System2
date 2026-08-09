@@ -58,6 +58,14 @@ class ReservationRepository:
             take=limit,
         )
 
+    async def list_customer_identities_for_barber(self, client_id: str, barber_id: str) -> list:
+        """Staff Scoped Access Phase C (2026-08-09) -- every reservation for one barber, no take
+        limit, used only to derive distinct client identity (name/phone/email). Not a paginated
+        list view -- see reservation_service.list_my_clients() for the dedup step."""
+        return await self.db.reservation.find_many(
+            where={"clientId": client_id, "barberId": barber_id},
+        )
+
     async def find_overlapping(
         self,
         client_id: str,
