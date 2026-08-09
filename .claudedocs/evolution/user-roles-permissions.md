@@ -56,3 +56,54 @@ config change — unlike Hussein's case.
 No — investigation only, same Mechanical Gate as every other Capability Investigation in this
 project (`architecture-review-loop.md`): no Implementation Contract or build exists yet for this
 topic. Revisit once Salman decides scope and a real Implementation Contract is written.
+
+## 2026-08-09 (implementation — Staff Scoped Access, Phases A-D)
+
+### Context
+
+Same day, later: Salman approved the build. Full Implementation Contract written
+(`.claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md`) and executed as four phases, each
+independently real-API/browser-verified before the next started, matching this project's Git
+Discipline.
+
+### Discovery
+
+- Every Open Question from the investigation above got resolved with evidence, not assumption:
+  "own clients" was built as a derived query (Salman's explicit choice — simplest option, no new
+  Customer entity); the missing `require_roles()` gating on `reservations.py`/`catalog.py` was
+  closed as part of Phase B (not deferred), independent of Jaafar specifically.
+- A real, unplanned Phase D finding: the literal instruction "add STAFF to ROLE_TABS" turned out to
+  target dead code — `useAdminRole.js`'s `ROLE_TABS`/`canAccessTab` mechanism is wired only into the
+  legacy `SmarAdminDashboard.jsx`, never `GenericAdminDashboard.jsx` (what `rk` actually uses).
+  Built an equivalent, parallel nav filter for the real dashboard instead of silently adding to an
+  unused object.
+- Required Browser Verification caught a real bug Phase D's own code review missed: `barbers.py`/
+  `catalog_services.py` had no `STAFF` in their read allow-lists, so Jaafar's Calendar couldn't even
+  resolve its own rendering data ("لا يوجد موظفون نشطون" despite 3 real reservations existing).
+  Fixed with a narrow read-only grant (write routes untouched), re-verified 11/11.
+- The `customers.py`/`prices.py`/`booking_services.py` unauthenticated-routes finding from the
+  investigation was flagged again here as explicitly out of scope, never touched — stays open,
+  independent of this capability.
+
+### Current Understanding
+
+The 3-tier authorization model (Super Admin / Tenant Owner / Staff-scoped-to-self) is now real,
+shipped, and browser-verified end-to-end — not a proposal. `STAFF` is a real `UserRole`, `User.
+barberId` is a real link, every reservation/calendar/client-list route enforces ownership
+server-side (never trusting a client-supplied `barber_id`), and the dashboard correctly reflects
+it. This closes the "real build" half of the investigation's Current Understanding above.
+
+### Open Questions
+
+- `customers.py`/`prices.py`/`booking_services.py`'s missing auth — still open, still not this
+  capability's scope.
+- Whether "own clients" should ever become a real Customer entity (vs. the derived-query approach
+  shipped) — not reopened, no new evidence pushing toward it.
+
+### Promoted?
+
+Yes, in effect — same as Phase 3.7C's own precedent: a real, shipped, browser-verified Capability,
+not a proposal. No formal ADR (per this project's Abstraction Rule, correcting/building a real gap
+from an investigation isn't automatically ADR-worthy on a first instance). Revisit if a second
+independent tenant's real use of `STAFF` roles stresses this model in a way this entry didn't
+anticipate.

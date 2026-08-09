@@ -1,5 +1,12 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-07-31
+# Last updated: 2026-08-09
+
+## 2026-08-09 — see full session report
+
+Staff Scoped Access (3-tier authorization) and Staff/Store IA Separation both shipped end-to-end
+this session — see `.claudedocs/sessions/2026-08-09.md` for the full account, and its own
+"🚧 Unfinished / Carry Forward" section for real open items (order status-change control gap,
+`store.py`/`catalog_service.py` dual-write-path, `StoreCustomer` dead code, Ali's real onboarding).
 
 ## Completed Phases
 

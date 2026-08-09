@@ -161,3 +161,43 @@ Rule's evidence bar — multiple independent real cases — isn't really the rig
 a conflation that already existed," which is what this was); revisit if a second, independent
 tenant's real data later stresses this same Service/Item boundary in a way this entry didn't
 anticipate.
+
+## 2026-08-09 (Phase 3.7D, resolved in a different shape — Staff/Store IA Separation)
+
+### Context
+
+The Phase 3.7D question left open above ("Services Management UX... named but not scoped in
+detail") got resolved this session, but not as a standalone "Phase 3.7D" — it became one half of a
+larger Staff/Store Information Architecture Separation
+(`.claudedocs/implementation/STAFF_STORE_IA_SEPARATION_CONTRACT.md`), triggered by Salman noticing
+the admin Store area showed Services mixed with Store Items with no real separation.
+
+### Discovery
+
+- The real CatalogService CRUD this entry's own Open Questions named ("editable only via direct API
+  calls") now exists — built inside `StaffTab.jsx` as an الموظفون/الخدمات internal toggle, exactly
+  matching an earlier abandoned Phase 3.7D design pass from 2026-08-08 (never executed, but directly
+  reused as prior art once picked back up).
+- A real bug found via required Browser Verification: the existing "الخدمات التي يقدمها"
+  assignment checklist (this file's own 2026-08-08 entry) didn't refresh after a new service was
+  created in the sibling sub-view — a mount-only fetch, `StaffTab.jsx` never unmounting on sub-view
+  switch. Fixed, whole verification pass restarted on the corrected code.
+- Confirms this entry's own prior claim: `CatalogService`/`BarberService` held up under real UI
+  construction with zero backend/schema change needed — the Service/Item boundary this file already
+  established was correct as built.
+
+### Current Understanding
+
+Phase 3.7D's original scope (Services Management UX) is now fully shipped, just under a different
+name and combined with a second, related IA problem (Store showing Items). The
+"editable only via direct API calls" gap named in the 2026-08-08 entry above is closed.
+
+### Open Questions
+
+- Enforce vs. soften (Staff↔Service) — still not decided, unaffected by this session's work.
+- Whether/when the original 6 legacy `catalog_items` rows get deleted — still deferred, unaffected.
+
+### Promoted?
+
+Already promoted (see above) — this entry just records that the one real open item from that
+promotion (Services Management UX) is now closed too.
