@@ -8,8 +8,9 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 "Execution Order — ratified 2026-08-10" section for the full rationale:
 
 ```
-1. 🔴 Availability reliability (backend/pooler root-cause + independent frontend error-state fix)
-2. 🔴 Production Data Hygiene (parallel workstream with #1 — separate concern, can run alongside)
+1. ✅ Availability reliability -- DONE 2026-08-10, 10/10 load-test success post-fix
+2. 🔴 Production Data Hygiene -- investigation done, 0 real StoreOrders / 0 real Reservations
+        found (worse than expected), deletion awaiting Salman's go-ahead + his read on 7 uncertain rows
 3. 🔴 STAFF /admin/barbers/ roster scoping
 4. 🔴 Overview redesign (NOT started before #2 closes -- no designing on top of dirty data)
 5. 🟡 Calendar/Reservations/Staff/Store polish
@@ -17,6 +18,10 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 7. Final production regression
 8. 2026-08-31 LIVE
 ```
+
+Next-session priority: get Salman's decision on Production Data Hygiene (42 rows confirmed safe to
+delete, 7 need his judgment — `.claudedocs/work/production-data-hygiene/2026-08-10/inventory.md`),
+then execute it, then move to #3 (STAFF roster scoping).
 
 Immediate next-session priority: **#1 and #2 in parallel**, as two separate workstreams.
 

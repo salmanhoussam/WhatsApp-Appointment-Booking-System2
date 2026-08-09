@@ -27,9 +27,9 @@ remaining work by real Production impact after the three-sided Product Review cl
 order work actually happens in, regardless of each item's phase number:
 
 ```
-1. 🔴 Availability reliability      (Phase "Customer" blocker, see Phase 3.5's Pass 1 evidence)
-       ↓  — can run in parallel with #2 as a separate workstream (backend/reliability vs. data cleanup)
-2. 🔴 Production Data Hygiene       (Phase 3.6)
+1. ✅ Availability reliability      DONE 2026-08-10 — see below
+       ↓  — ran in parallel with #2 as a separate workstream (backend/reliability vs. data cleanup)
+2. 🔴 Production Data Hygiene       (Phase 3.6) — investigation done, deletion awaiting Salman's go-ahead
        ↓
 3. 🔴 STAFF barbers-roster scoping  (Phase 4's new item)
        ↓
@@ -50,6 +50,27 @@ data known to contain "REAL E2E TEST — Store products..." and QA staff names w
 dashboard on top of not-production-ready data — real wasted work, not caution for its own sake. #3
 is a real security/privacy issue independent of both, sequenced after data hygiene only because
 it's lower urgency than #1/#2, not because it depends on them.
+
+### #1 — Availability Reliability: ✅ DONE 2026-08-10
+
+Three distinct, confirmed root causes (`httpx.ReadTimeout`, Prisma `DataError` P1001 under real
+concurrent load, and — the highest-leverage one — `app/core/tenant.py`'s tenant-resolution call
+being completely unwrapped despite running before every other dependency on every route). Fixed
+via a shared `with_db_resilience()` helper at all three chokepoints, plus an independent frontend
+fix distinguishing a real failure from a real empty result. Real load-test evidence: 10/10
+sequential and 10/10 concurrent requests succeeded post-fix, vs. ~50% failure before. Full account:
+`.claudedocs/work/availability-reliability/2026-08-10/summary.md` +
+`frontend-verification.md`. Commits: `693c558`, `2cfdf40`, `b80cbab`.
+
+### #2 — Production Data Hygiene: investigation done, awaiting Salman's go-ahead on deletion
+
+Full inventory: `.claudedocs/work/production-data-hygiene/2026-08-10/inventory.md`. Worse than the
+original Product Review's "scattered noise" framing: `rk` currently has **zero** confidently-real
+`StoreOrder` rows (0/5) and **zero** confidently-real `Reservation` rows (0/39) — the entire order/
+booking history is test data. 42 rows across 4 tables are confirmed-safe to delete (cascading
+effects checked clean, no real row depends on any of them); 7 `Reservation` rows are genuinely
+uncertain and need Salman's own knowledge of RK's real August bookings, not a database read. Not
+executed yet — deletion of production-bound data needs explicit confirmation first.
 
 **Still open, not yet decided** — assumed non-blocking for 2026-08-31 unless corrected:
 - Super Admin Dashboard — not part of "best booking web app" framing above; treated as deferred
