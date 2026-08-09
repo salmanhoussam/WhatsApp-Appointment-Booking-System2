@@ -542,6 +542,58 @@ sharing one backend, one set of mutation handlers, and one shared interaction la
 (`reservationInteractions.jsx`). Next priority order unchanged: Staff Management → Customers →
 Notifications.
 
+## 2026-08-10 — Reserve Page visual redesign idea, captured only
+
+### Context
+
+Salman sent a generic "Act as an expert React developer" prompt (Tailwind, single self-contained
+component, dark full-screen photo background with glassmorphism, no section labels, bottom-sheet
+time picker, floating confirm bar) targeting `/rk/reserve` — the same page whose Steps 1-3
+(service/staff/date) this session's own real Product Review had just rated ✅ Keep as-is. Asked
+three clarifying questions before writing any plan, per this project's "no redesign before
+verdict" rule and the real tech-stack/theme conflicts the prompt raised
+(`.claude/plans/we-moved-on-new-hazy-barto.md` has the full reasoning).
+
+### Discovery
+
+- The literal prompt (Tailwind, dark glassmorphism, Unsplash photo, `useState`-only self-contained
+  component) is **not** the real ask. Salman's own clarification: "أنا طلبت ألوان فاتحة مش شاشة
+  بيضة بس... بدنا نجيب صور للخلفية أو فيديو... أو شي يكون مثل Play Store style" — he wants
+  ideas/inspiration, a modern image-forward aesthetic, not a literal spec to implement verbatim.
+- **Real, load-bearing new requirement surfaced along the way**: whatever visual redesign
+  eventually happens here, every image and every piece of text must be editable from the tenant
+  admin dashboard, not hardcoded in the component — "كل شي نحنا نحطه، صور، كلام." This connects to
+  the existing Admin/Public Contract split (`backend/architecture.md §10`) and Site Configuration
+  Capability groundwork already in this codebase, not a new architectural idea — just a real
+  constraint any future implementation of this must honor.
+- **Unresolved contradiction, not silently picked either way**: his freeform note says "ألوان
+  فاتحة مش شاشة بيضة" (light colors, not [just] a white screen) while his multiple-choice click on
+  the theme question selected "نتحول لـdark glassmorphism" (switch to dark glassmorphism). These
+  two answers disagree. Recorded honestly rather than guessed — whoever picks this up next
+  re-confirms the actual color direction with Salman before choosing one.
+- Explicit sequencing decision: this is **not** executed against the 2026-08-31 deadline push right
+  now — the agreed order (Security → UX/Product Review → Production blockers → Ali onboarding →
+  polish) continues unchanged.
+
+### Current Understanding
+
+A real visual-refresh idea exists for the customer booking page, direction not yet settled (light
+vs. dark, "Play Store style" as the closest working description so far), with one concrete,
+non-negotiable requirement already known regardless of which visual direction wins: full
+dashboard-editability of the page's images/text. Not scoped, not an Implementation Contract, not
+started.
+
+### Open Questions
+
+- Light vs. dark theme — the contradiction above, unresolved.
+- Whether this becomes its own scoped redesign task after the 2026-08-31 push, or gets folded into
+  a larger post-launch Site Configuration/page-builder effort (given the dashboard-editability
+  requirement overlaps with that existing capability track).
+
+### Promoted?
+
+No — captured only, deferred past the 2026-08-31 push per Salman's own explicit sequencing call.
+
 ## Related
 
 - Reservation Strategy Architecture design doc (harness plan file, this session — four revisions,
