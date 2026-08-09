@@ -20,6 +20,37 @@ in `.claudedocs/todo_list.md`.
    just "no bugs" — added as its own phase below (Phase 3.5) rather than folded silently into
    "polish."
 
+## Execution Order — ratified 2026-08-10 (supersedes phase-number order below)
+
+The phases below are numbered by discovery order, not execution priority. Salman ranked the actual
+remaining work by real Production impact after the three-sided Product Review closed; this is the
+order work actually happens in, regardless of each item's phase number:
+
+```
+1. 🔴 Availability reliability      (Phase "Customer" blocker, see Phase 3.5's Pass 1 evidence)
+       ↓  — can run in parallel with #2 as a separate workstream (backend/reliability vs. data cleanup)
+2. 🔴 Production Data Hygiene       (Phase 3.6)
+       ↓
+3. 🔴 STAFF barbers-roster scoping  (Phase 4's new item)
+       ↓
+4. 🔴 Overview redesign             (Phase 3.7) — explicitly NOT started before #2 closes; designing
+       ↓                             new stats/activity on top of known-dirty data is real wasted work
+5. 🟡 Calendar / Reservations / Staff / Store polish   (Phase 3.5's Admin-pass Improve items)
+       ↓
+6. Ali onboarding                   (Phase 3)
+       ↓
+7. Final production regression      (Phase 5)
+       ↓
+8. 2026-08-31 LIVE
+```
+
+Rationale in Salman's own words: #1 can prevent a booking from completing at all — highest
+Production impact by definition. #2 must precede #4 because a redesigned Overview built against
+data known to contain "REAL E2E TEST — Store products..." and QA staff names would be building a
+dashboard on top of not-production-ready data — real wasted work, not caution for its own sake. #3
+is a real security/privacy issue independent of both, sequenced after data hygiene only because
+it's lower urgency than #1/#2, not because it depends on them.
+
 **Still open, not yet decided** — assumed non-blocking for 2026-08-31 unless corrected:
 - Super Admin Dashboard — not part of "best booking web app" framing above; treated as deferred
   past this deadline. Flag if that's wrong.

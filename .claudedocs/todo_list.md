@@ -3,18 +3,22 @@
 
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
-Set 2026-08-09 by Salman: cash-only, both tenants, "best booking web app" UX bar. Full phased
-roadmap: `.claudedocs/architecture/RESERVATION_PRODUCTION_ROADMAP.md`. Phase 1 (Orphaned Admin
-Router Cleanup) — ✅ done 2026-08-09. Phase 3.5's Customer + Admin Product Review passes — ✅ done
-2026-08-09/10, Staff-scoped (`Jaafar`) pass in progress now. Two new named Production Blockers from
-this review, both real, both flagged directly by Salman (not just logged):
-- **Phase 3.6 — Production Data Hygiene**: real QA/test data confirmed sitting inside `rk`'s live
-  data across 5+ screens before go-live — 2nd independent confirmation of the 2026-08-02 "Permanent
-  Demo Tenant" idea, elevated from a note to a real priority.
-- **Phase 3.7 — Overview 🔴 Redesign-candidate**: contradictory data (Recent Orders vs. real
-  Orders), near-empty stats, test-data activity feed, buried last in nav.
-Also still open: the `/reservations/availability` intermittent-failure Production Blocker
-(`.claudedocs/work/customer-booking-flow-review/2026-08-09/summary.md`).
+Phase 3.5's three-sided Product Review (Customer/Admin/Staff) is ✅ DONE. Salman ratified the final
+execution order for everything found — see `.claudedocs/architecture/RESERVATION_PRODUCTION_ROADMAP.md`'s
+"Execution Order — ratified 2026-08-10" section for the full rationale:
+
+```
+1. 🔴 Availability reliability (backend/pooler root-cause + independent frontend error-state fix)
+2. 🔴 Production Data Hygiene (parallel workstream with #1 — separate concern, can run alongside)
+3. 🔴 STAFF /admin/barbers/ roster scoping
+4. 🔴 Overview redesign (NOT started before #2 closes -- no designing on top of dirty data)
+5. 🟡 Calendar/Reservations/Staff/Store polish
+6. Ali onboarding
+7. Final production regression
+8. 2026-08-31 LIVE
+```
+
+Immediate next-session priority: **#1 and #2 in parallel**, as two separate workstreams.
 
 ## 2026-08-09 — see full session report
 
