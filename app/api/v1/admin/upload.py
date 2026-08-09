@@ -15,6 +15,9 @@ Context-based path routing (matches storage-tenant.md FOLDER_MAP):
   barber        → staff/{barber_id}/ (Phase 3.7A, 2026-08-07) -- Barber.imageUrl is a plain field,
                    not a GalleryImage relation (one photo per barber, not a gallery), so this
                    context falls through the if/elif below unchanged, same as page_hero/page_logo.
+  catalog_service → catalog-services/{service_id}/ (Staff/Store IA Separation, 2026-08-09) --
+                   CatalogService.imageUrl is likewise a plain field, not a GalleryImage relation
+                   (one photo per service) -- same fall-through pattern as barber above.
 
 Authorization (Authorization Hardening, 2026-07-31): SUPER_ADMIN, TENANT_ADMIN only.
 
@@ -50,6 +53,7 @@ FOLDER_MAP = {
     "unit_cover":     "units/{unit_id}/cover",
     "unit_gallery":   "units/{unit_id}/gallery",
     "barber":         "staff/{barber_id}",
+    "catalog_service": "catalog-services/{service_id}",
 }
 
 IMAGE_TYPE_MAP = {
@@ -61,16 +65,18 @@ IMAGE_TYPE_MAP = {
     "unit_cover":     "cover",
     "unit_gallery":   "gallery",
     "barber":         "barber",
+    "catalog_service": "catalog_service",
 }
 
 
-def _build_folder(context: str, category_id: str | None, item_id: str | None, unit_id: str | None, barber_id: str | None = None) -> str:
+def _build_folder(context: str, category_id: str | None, item_id: str | None, unit_id: str | None, barber_id: str | None = None, service_id: str | None = None) -> str:
     template = FOLDER_MAP[context]
     return template.format(
         category_id=category_id or "",
         item_id=item_id or "",
         unit_id=unit_id or "",
         barber_id=barber_id or "",
+        service_id=service_id or "",
     )
 
 
@@ -82,6 +88,7 @@ async def upload_image(
     item_id:     Optional[str]  = Form(None),
     unit_id:     Optional[str]  = Form(None),
     barber_id:   Optional[str]  = Form(None),
+    service_id:  Optional[str]  = Form(None),
     caption_ar:  Optional[str]  = Form(None),
     caption_en:  Optional[str]  = Form(None),
     tenant:      dict            = Depends(get_current_tenant),
@@ -100,8 +107,10 @@ async def upload_image(
         raise HTTPException(status_code=400, detail=f"{context} context requires unit_id")
     if context == "barber" and not barber_id:
         raise HTTPException(status_code=400, detail="barber context requires barber_id")
+    if context == "catalog_service" and not service_id:
+        raise HTTPException(status_code=400, detail="catalog_service context requires service_id")
 
-    folder     = _build_folder(context, category_id, item_id, unit_id, barber_id)
+    folder     = _build_folder(context, category_id, item_id, unit_id, barber_id, service_id)
     file_bytes = await file.read()
 
     public_url = await upload_to_gallery_path(

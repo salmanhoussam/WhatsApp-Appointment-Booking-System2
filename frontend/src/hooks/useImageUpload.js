@@ -49,6 +49,7 @@ const VALID_CONTEXTS = [
   'page_hero', 'page_logo', 'page_story', 'page_demo',
   'unit_cover', 'unit_gallery',
   'barber',
+  'catalog_service',
 ]
 
 export default function useImageUpload() {
@@ -64,6 +65,7 @@ export default function useImageUpload() {
       item_id     = null,
       unit_id     = null,
       barber_id   = null,
+      service_id  = null,
       caption_ar  = null,
       caption_en  = null,
     } = options
@@ -84,6 +86,7 @@ export default function useImageUpload() {
       if (item_id)     form.append('item_id',     item_id)
       if (unit_id)     form.append('unit_id',     unit_id)
       if (barber_id)   form.append('barber_id',   barber_id)
+      if (service_id)  form.append('service_id',  service_id)
       if (caption_ar)  form.append('caption_ar',  caption_ar)
       if (caption_en)  form.append('caption_en',  caption_en)
 

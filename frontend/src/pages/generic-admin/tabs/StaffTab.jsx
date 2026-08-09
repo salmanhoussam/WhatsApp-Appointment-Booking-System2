@@ -7,17 +7,18 @@ import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 
 // ── Staff Tab (Phase 3.7A, 2026-08-07) ──────────────────────────────────────────────────────────
-// Barber roster CRUD only -- name/phone/description/image/working hours/active/sort order. No
-// Services/Categories/Skills/Pricing field anywhere in this file, not even a placeholder -- the
-// Staff Capability Investigation (.claudedocs/work/staff-capability-investigation/2026-08-07)
-// confirmed no Barber<->CatalogItem relationship exists in any form; that decision belongs to a
-// future Phase 3.7C, not this one. `Resource` (clinic) is out of scope too -- no real clinic tenant
-// exists yet, this tab is Barber-only per Salman's explicit call.
+// Barber roster CRUD -- name/phone/description/image/working hours/active/sort order.
+//
+// Staff/Store IA Separation (2026-08-09, .claudedocs/implementation/
+// STAFF_STORE_IA_SEPARATION_CONTRACT.md) -- adds an internal الموظفون/الخدمات toggle. الخدمات is
+// real CatalogService CRUD (create/edit/reorder/hide-show), wired to the already-built
+// /catalog-services/ endpoints (Phase 3.7C) -- this is Service *entity* management, deliberately
+// separate from the existing "الخدمات التي يقدمها" checklist below (Staff<->Service *assignment*,
+// unchanged). Two different jobs, same page, per the IA Contract's own reasoning.
 //
 // Modal/Field defined locally here, mirroring CatalogTab.jsx's own local copy rather than a shared
-// ui/Modal.jsx -- this is now the second real case of the same shape (Abstraction Rule would
-// justify extracting one), but doing that extraction here would mean touching CatalogTab.jsx, which
-// is explicitly out of this phase's scope (Phase 3.7B). Deliberately deferred, not forgotten.
+// ui/Modal.jsx -- deliberately not extracted (Abstraction Rule; the IA Contract explicitly calls
+// for no refactor in this task).
 
 const inputStyle = {
   width: '100%', padding: '10px 14px', borderRadius: 8,
@@ -91,7 +92,16 @@ const EMPTY_STAFF = {
   open_time: '09:00', close_time: '18:00', closed_days: [], service_ids: [],
 }
 
+const EMPTY_SERVICE = {
+  name_ar: '', name_en: '', description_ar: '', category_id: '',
+  price: '', currency: 'USD', duration_min: 30, image_url: '',
+}
+
 export default function StaffTab({ color }) {
+  // Staff/Store IA Separation (2026-08-09) -- الموظفون (existing content below, untouched) /
+  // الخدمات (new CatalogService CRUD).
+  const [subView, setSubView] = useState('employees')
+
   const [staff,   setStaff]   = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -107,7 +117,23 @@ export default function StaffTab({ color }) {
   // Phase 3.7C (2026-08-08) -- the real Staff<->Service relationship. All real CatalogServices for
   // this tenant, fetched once for the checklist -- reuses the same admin endpoint Reservations'
   // pickers already fetch from (GET /catalog-services/), no new backend surface for this list.
+  // Deliberately a SEPARATE fetch/state from svcList below (Services management) -- this one stays
+  // active-only, exactly as before; svcList needs include_inactive=true for the management view.
   const [services, setServices] = useState([])
+
+  // ── Services management (الخدمات sub-view, Staff/Store IA Separation, 2026-08-09) ─────────────
+  const [svcList,    setSvcList]    = useState([])
+  const [svcLoading, setSvcLoading] = useState(true)
+  const [catOptions, setCatOptions] = useState([]) // CatalogCategory, module_key='catalog', for the dropdown
+
+  const [showSvcModal, setShowSvcModal] = useState(false)
+  const [svcEditing,   setSvcEditing]   = useState(null)
+  const [svcForm,      setSvcForm]      = useState(EMPTY_SERVICE)
+  const [svcSaving,    setSvcSaving]    = useState(false)
+
+  const [svcImageFile,    setSvcImageFile]    = useState(null)
+  const [svcImagePreview, setSvcImagePreview] = useState(null)
+  const { upload: svcUpload, error: svcUploadError, reset: resetSvcUpload } = useImageUpload()
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -119,12 +145,40 @@ export default function StaffTab({ color }) {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { loadStaff() }, [loadStaff])
-  useEffect(() => {
+  // Made a reusable callback (was a one-shot mount-only effect) -- real bug found via required
+  // Browser Verification (2026-08-09): this list is what the "الخدمات التي يقدمها" assignment
+  // checklist renders, and it never refreshed after a service was created/edited/hidden in the new
+  // الخدمات sub-view (below), since StaffTab never unmounts when switching sub-views. A service
+  // created there silently never appeared as an assignable option until a full page reload. Fixed
+  // by calling this after every Services-CRUD mutation, not just once on mount.
+  const loadServices = useCallback(() => {
     adminApi.get('/catalog-services/')
       .then(r => setServices(r.data.data ?? []))
       .catch(() => setServices([]))
   }, [])
+
+  useEffect(() => { loadStaff() }, [loadStaff])
+  useEffect(() => { loadServices() }, [loadServices])
+
+  // ── Services management: load + category options ────────────────────────────
+
+  const loadSvcList = useCallback(() => {
+    setSvcLoading(true)
+    adminApi.get('/catalog-services/?include_inactive=true')
+      .then(r => setSvcList(r.data.data ?? []))
+      .catch(() => setSvcList([]))
+      .finally(() => setSvcLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (subView !== 'services') return
+    loadSvcList()
+    // Category dropdown: existing catalog categories only (module_key='catalog') -- category CRUD
+    // itself stays owned by CatalogTab.jsx, this only selects an existing one.
+    adminApi.get('/catalog/categories?include_inactive=true')
+      .then(r => setCatOptions((r.data.data ?? []).filter(c => c.module_key === 'catalog')))
+      .catch(() => setCatOptions([]))
+  }, [subView, loadSvcList])
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
 
@@ -236,16 +290,184 @@ export default function StaffTab({ color }) {
     loadStaff()
   }
 
+  // ── Services CRUD (الخدمات sub-view) ──────────────────────────────────────────
+
+  const resetSvcImageState = () => {
+    setSvcImageFile(null)
+    setSvcImagePreview(null)
+    resetSvcUpload()
+  }
+
+  const openCreateService = () => {
+    setSvcEditing(null)
+    setSvcForm({ ...EMPTY_SERVICE, category_id: catOptions[0]?.id ?? '' })
+    resetSvcImageState()
+    setShowSvcModal(true)
+  }
+
+  const openEditService = (svc) => {
+    setSvcEditing(svc)
+    setSvcForm({
+      name_ar: svc.name_ar, name_en: svc.name_en ?? '',
+      description_ar: svc.description_ar ?? '', category_id: svc.category_id ?? '',
+      price: svc.price ?? '', currency: svc.currency ?? 'USD',
+      duration_min: svc.duration_min ?? 30, image_url: svc.image_url ?? '',
+    })
+    resetSvcImageState()
+    setSvcImagePreview(svc.image_url || null)
+    setShowSvcModal(true)
+  }
+
+  const handleSvcFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSvcImageFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => setSvcImagePreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  // Create -> upload (if a new file was picked) -> patch image_url, same sequencing as the
+  // barber save() above and CatalogTab.jsx's own saveItem() -- the image needs a real id first.
+  const saveService = async () => {
+    if (!svcForm.name_ar.trim() || !svcForm.category_id) return
+    setSvcSaving(true)
+    try {
+      const body = {
+        name_ar:        svcForm.name_ar,
+        name_en:        svcForm.name_en || undefined,
+        description_ar: svcForm.description_ar || undefined,
+        price:          svcForm.price === '' ? undefined : Number(svcForm.price),
+        currency:       svcForm.currency,
+        duration_min:   Number(svcForm.duration_min) || 30,
+      }
+
+      let savedId = svcEditing?.id
+
+      if (svcEditing) {
+        await adminApi.patch(`/catalog-services/${svcEditing.id}`, body)
+      } else {
+        const res = await adminApi.post('/catalog-services/', { ...body, category_id: svcForm.category_id })
+        savedId = res.data.data.id
+      }
+
+      if (svcImageFile && savedId) {
+        const { url } = await svcUpload(svcImageFile, { context: 'catalog_service', service_id: savedId })
+        await adminApi.patch(`/catalog-services/${savedId}`, { image_url: url })
+      }
+
+      loadSvcList()
+      loadServices() // keep the assignment checklist's own list in sync -- see loadServices' own comment
+      setShowSvcModal(false)
+    } catch (err) {
+      alert(err?.response?.data?.detail ?? 'حدث خطأ')
+    } finally {
+      setSvcSaving(false)
+    }
+  }
+
+  const toggleServiceActive = async (svc) => {
+    await adminApi.patch(`/catalog-services/${svc.id}`, { is_active: !svc.is_active })
+    loadSvcList()
+    loadServices()
+  }
+
+  // Reorder (Catalog 3.7B pattern): swap sort_order with the neighbor, renumber both via PATCH.
+  const moveService = async (index, direction) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= svcList.length) return
+    const a = svcList[index]
+    const b = svcList[targetIndex]
+    await Promise.all([
+      adminApi.patch(`/catalog-services/${a.id}`, { sort_order: b.sort_order ?? targetIndex }),
+      adminApi.patch(`/catalog-services/${b.id}`, { sort_order: a.sort_order ?? index }),
+    ])
+    loadSvcList()
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ fontFamily: FONT }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>الموظفون</span>
-        <Button variant="primary" color={color} onClick={openCreate}>+ موظف جديد</Button>
+      {/* الموظفون / الخدمات toggle -- Staff/Store IA Separation, 2026-08-09. Same pill style as
+          ReservationsTab.jsx's Today/Week/List switcher. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {[['employees', 'الموظفون'], ['services', 'الخدمات']].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSubView(id)}
+            style={{
+              padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', fontFamily: FONT, border: 'none',
+              background: subView === id ? color : T.cardBg,
+              color: subView === id ? '#0a0a0f' : T.textSecond,
+              transition: 'background 0.15s ease, color 0.15s ease',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {loading ? (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>
+          {subView === 'employees' ? 'الموظفون' : 'الخدمات'}
+        </span>
+        {subView === 'employees' ? (
+          <Button variant="primary" color={color} onClick={openCreate}>+ موظف جديد</Button>
+        ) : (
+          <Button variant="primary" color={color} onClick={openCreateService} disabled={catOptions.length === 0}>+ خدمة جديدة</Button>
+        )}
+      </div>
+
+      {subView === 'services' ? (
+        svcLoading ? (
+          <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
+        ) : svcList.length === 0 ? (
+          <Card padding={0} style={{ textAlign: 'center' }}>
+            <EmptyState icon="✂️" message="لا توجد خدمات بعد — أضف أول خدمة للبدء" />
+          </Card>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+            {svcList.map((svc, index) => (
+              <Card key={svc.id} padding={16} style={{ opacity: svc.is_active ? 1 : 0.55 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  {svc.image_url
+                    ? <img src={svc.image_url} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                    : <div style={{ width: 48, height: 48, borderRadius: 10, background: `${color}18`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color }}>✂️</div>
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {svc.name_ar}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.textMuted }}>
+                      {svc.duration_min} دقيقة{svc.price != null ? ` · ${svc.price} ${svc.currency}` : ''}
+                    </div>
+                  </div>
+                  {!svc.is_active && (
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${T.textMuted}22`, color: T.textMuted, fontWeight: 600, flexShrink: 0 }}>
+                      مخفي
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <Button variant="secondary" size="sm" onClick={() => openEditService(svc)}>تعديل</Button>
+                  <Button variant={svc.is_active ? 'danger' : 'secondary'} size="sm" onClick={() => toggleServiceActive(svc)}>
+                    {svc.is_active ? 'إخفاء' : 'إظهار'}
+                  </Button>
+                  <div style={{ display: 'flex', gap: 2, marginInlineStart: 'auto' }}>
+                    <button type="button" onClick={() => moveService(index, -1)} disabled={index === 0}
+                      style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`, background: T.cardBg, color: T.textSecond, cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.4 : 1 }}>↑</button>
+                    <button type="button" onClick={() => moveService(index, 1)} disabled={index === svcList.length - 1}
+                      style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`, background: T.cardBg, color: T.textSecond, cursor: index === svcList.length - 1 ? 'default' : 'pointer', opacity: index === svcList.length - 1 ? 0.4 : 1 }}>↓</button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : loading ? (
         <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
       ) : staff.length === 0 ? (
         <Card padding={0} style={{ textAlign: 'center' }}>
@@ -388,6 +610,67 @@ export default function StaffTab({ color }) {
             <div style={{ fontSize: 11, color: T.textMuted, marginTop: 6 }}>
               اختياري — إذا لم تُحدَّد أي خدمة، يظهر هذا الموظف عند حجز أي خدمة
             </div>
+          </Field>
+        </Modal>
+      )}
+
+      {showSvcModal && (
+        <Modal
+          title={svcEditing ? 'تعديل الخدمة' : 'خدمة جديدة'}
+          onClose={() => setShowSvcModal(false)}
+          onSave={saveService}
+          saving={svcSaving}
+        >
+          <Field label="الاسم (عربي) *">
+            <input style={inputStyle} value={svcForm.name_ar} onChange={e => setSvcForm(p => ({ ...p, name_ar: e.target.value }))} placeholder="مثال: شعر ودقن" />
+          </Field>
+          <Field label="الاسم (إنجليزي)">
+            <input style={{ ...inputStyle, direction: 'ltr' }} value={svcForm.name_en} onChange={e => setSvcForm(p => ({ ...p, name_en: e.target.value }))} placeholder="Hair &amp; Beard" />
+          </Field>
+          <Field label="الوصف">
+            <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 64 }} value={svcForm.description_ar} onChange={e => setSvcForm(p => ({ ...p, description_ar: e.target.value }))} placeholder="وصف مختصر (اختياري)" />
+          </Field>
+          <Field label="القسم *">
+            <select
+              style={inputStyle}
+              value={svcForm.category_id}
+              onChange={e => setSvcForm(p => ({ ...p, category_id: e.target.value }))}
+              disabled={!!svcEditing}
+            >
+              {catOptions.length === 0 && <option value="">لا توجد أقسام خدمات بعد</option>}
+              {catOptions.map(c => (
+                <option key={c.id} value={c.id}>{c.name_ar}</option>
+              ))}
+            </select>
+          </Field>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Field label="السعر">
+              <input type="number" style={inputStyle} value={svcForm.price} onChange={e => setSvcForm(p => ({ ...p, price: e.target.value }))} placeholder="0" />
+            </Field>
+            <Field label="العملة">
+              <input style={{ ...inputStyle, direction: 'ltr' }} value={svcForm.currency} onChange={e => setSvcForm(p => ({ ...p, currency: e.target.value }))} placeholder="USD" />
+            </Field>
+          </div>
+          <Field label="المدة (دقيقة)">
+            <input type="number" style={inputStyle} value={svcForm.duration_min} onChange={e => setSvcForm(p => ({ ...p, duration_min: e.target.value }))} placeholder="30" />
+          </Field>
+
+          <Field label="الصورة">
+            {svcImagePreview && (
+              <img src={svcImagePreview} alt="" style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover', marginBottom: 10, display: 'block' }} />
+            )}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 14px', borderRadius: 8, cursor: 'pointer',
+              background: T.pageBg,
+              border: `1px dashed ${svcImageFile ? color : T.border}`,
+              color: svcImageFile ? color : T.textMuted,
+              fontSize: 13, fontFamily: FONT,
+            }}>
+              {svcImageFile ? svcImageFile.name : 'اختر صورة من جهازك'}
+              <input type="file" accept="image/*" onChange={handleSvcFileChange} style={{ display: 'none' }} />
+            </label>
+            {svcUploadError && <div style={{ fontSize: 12, color: T.danger, marginTop: 6 }}>{svcUploadError}</div>}
           </Field>
         </Modal>
       )}
