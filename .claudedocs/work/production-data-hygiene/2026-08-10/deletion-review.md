@@ -7,7 +7,8 @@ individually. Read-only queries only, re-run independently of the original inves
 (not trusting its output blind) via `venv/bin/python3` against the real `Reservation`/`StoreOrder`
 tables, `clientId = 7ef5c8c9-3d47-4aa9-b5e0-43b746ee2657` (`rk`).
 
-**No DELETE has been run. This is the report Salman asked to review before deciding.**
+**Executed 2026-08-10 — see "Execution Results" section at the end of this file.** Everything
+below this line is the original pre-approval review, left exactly as Salman reviewed it.
 
 ## Group A — `Barber` (3 rows recommended for deletion)
 
@@ -132,3 +133,105 @@ database — presented with everything found, nothing decided.**
    the WhatsApp ones) or test (add to the deletion list)?
 
 Nothing executes until both are answered.
+
+---
+
+## Execution Results — 2026-08-10
+
+**Decision**: Salman approved deletion of exactly the 42 rows in Groups A–D. All 7 Group E
+(uncertain) rows explicitly preserved, unchanged — no decision made on them yet, still open.
+
+**Script**: `scripts/cleanup_rk_test_data_20260810.py` — explicit hardcoded ID lists only (no
+pattern/LIKE delete), every delete scoped by both `id` and `clientId`, single database transaction
+(all-or-nothing), children (`Reservation`) deleted before parents (`Barber`/`CatalogService`).
+
+### Step 1 — Final pre-delete re-verification (immediately before deleting, not reused from the
+earlier review)
+
+- Re-confirmed all 42 target rows still present: 3 barbers, 2 services, 5 orders, 32 reservations.
+- Re-ran the cascading-effects check fresh: **zero** reservations referenced any of the 3 test
+  barbers or 2 test services (re-confirmed, not assumed from the earlier pass).
+
+### Step 2 — Pre-delete snapshot
+
+| Table | Count (clientId=rk) |
+|---|---|
+| Barber | 5 |
+| CatalogService | 8 |
+| StoreOrder | 5 |
+| StoreOrderItem | 6 |
+| Reservation | 39 |
+
+Full field-level fingerprint taken of every row **not** in a deletion list (2 barbers, 6 services,
+0 orders, 7 reservations — the 7 uncertain ones) for exact before/after comparison.
+
+### Step 3 — Delete (single transaction)
+
+Deleted: **32 reservations, 3 barbers, 2 services, 5 orders — exactly 42 rows**, confirmed by the
+script's own count of rows the delete calls reported affected, matching the pre-approved list
+exactly (no more, no less).
+
+**Exact deleted IDs:**
+
+- **Barber (3)**: `0d87ed78-c8a4-44a3-beee-cac2c4eb7b88`, `ba5033de-b478-4d25-a7f4-e702968b0ee2`,
+  `87d6c11a-fe22-4d08-8ead-22ef0e0138e5`
+- **CatalogService (2)**: `eaaabf7c-efd5-42d2-be32-e33ce3f098a5`,
+  `867e7a28-cdcf-4025-b422-3537f82c5ed5`
+- **StoreOrder (5)**: `c8ba498e-dd6e-4a61-9ee9-03d01f19bcd0`, `966b0cc5-ae37-40e3-851c-cb57b13e18c2`,
+  `744566b9-bed9-4525-ae0e-b48806e0bb55`, `0daaba62-8c2b-43a4-9f71-c2826ac2f95d`,
+  `84ff956a-0dd0-4abb-9580-e801b471c4ae`
+- **Reservation (32)**: `895e49a2-12e6-44ac-a026-c7c14f7e7617`, `15c4f1fd-faa8-414b-8de3-d2833f334f74`,
+  `ebabb2a0-7332-48a5-9295-9c9b2c5b5b59`, `b43098be-f6e0-482b-8da9-7d05428d7b4e`,
+  `35963527-f834-4a6f-bb54-8ba8a305b5f9`, `c29a9ef5-2b7c-4fa0-a692-8136d8ba732f`,
+  `f62baecb-f8ad-471e-bf70-343be15f44e1`, `a8bda88f-3880-43ce-b900-79507ac7a361`,
+  `9865fad1-6192-4684-afbc-ef78870b416d`, `00c93dd0-4e79-4d1c-9c72-a0ee81937ccc`,
+  `c237bf16-6310-48c5-8138-568f7cbcc620`, `ec20df7e-a9f8-4e05-9aeb-6dc1b630c8c4`,
+  `abc22337-c712-4938-9b01-e52e5939026e`, `9f95968c-6b03-4990-9458-8e15d986e4a7`,
+  `e4ab87b1-224f-4016-869e-f01012f7176a`, `2a2612bb-aa66-4619-b493-ae90e7dabd21`,
+  `f97bf576-b186-4327-9049-ffc4a9163f05`, `fa480c8a-8b03-4bcb-9ce8-9558b9c80760`,
+  `66a3e85d-fae5-4452-9d95-773de966f8ff`, `215dd50b-7f02-4709-8efc-06c996277ec0`,
+  `6268e2e7-d2ff-49b1-86ae-befb0de70f76`, `9aa6c103-dcb5-402e-98c8-0d8ba45a0d0e`,
+  `c9f34665-c783-4b93-ad8d-f5b0f5d981c6`, `bec27e28-d0c5-4fa0-adaa-a7b9360d14a1`,
+  `54478f5c-af76-4888-ba00-e43b6dc52279`, `c91bee72-6093-40ea-8af7-23a14f8afafb`,
+  `5ed06d0a-1ac1-4b3e-aae8-f17f850d5573`, `97d39b6b-3835-4783-9397-a1f43c748178`,
+  `796bfe3c-168c-4f4b-9b05-a9824ec31f72`, `fedf7a5e-5f5a-40e3-b35e-9978150edf1d`,
+  `67c0efe9-64fb-479f-a519-f5043f2ca1ee`, `1f57f5ff-af5a-4011-b84f-acaaf9b9899f`
+
+### Step 4 — Post-delete verification
+
+| Table | Pre | Post | Expected delta | Actual delta |
+|---|---|---|---|---|
+| Barber | 5 | **2** | −3 | −3 ✅ |
+| CatalogService | 8 | **6** | −2 | −2 ✅ |
+| StoreOrder | 5 | **0** | −5 | −5 ✅ |
+| StoreOrderItem | 6 | **0** | (cascade, no direct delete) | −6 ✅ |
+| Reservation | 39 | **7** | −32 | −32 ✅ |
+
+- **Exactly 42 rows removed** — confirmed by both the transaction's own reported delete counts and
+  the independent before/after count diff, matching each other.
+- **All 7 uncertain reservations still exist, byte-identical** to their pre-delete field values
+  (full fingerprint comparison, not just an existence check).
+- **Every other non-deleted row in all 4 tables is byte-identical** to its pre-delete state (the 2
+  remaining real barbers, 6 remaining real services, and the 7 remaining reservations) — no
+  unrelated row was touched.
+- **No FK/integrity errors** — the transaction committed cleanly; `StoreOrderItem`'s
+  `onDelete: Cascade` correctly removed all 6 child rows automatically when their 5 parent orders
+  were deleted, confirmed by the count dropping to exactly 0.
+
+### Smoke Checks (post-delete, real backend, real requests)
+
+- `venv/bin/python3 -c "from app.main import app"` → imports cleanly.
+- `GET /api/v1/public/reservations/barbers?client_slug=rk` → `200`, returns exactly the 2 real
+  barbers (`حسين`, `جعفر`) — no test entries.
+- `GET /api/v1/public/reservations/catalog-services?client_slug=rk` → `200`, 6 services (matches
+  8 − 2).
+- `GET /api/v1/admin/reservations/?client_slug=rk` (real Tenant Owner login) → `200`, 7
+  reservations (matches the 7 preserved uncertain rows exactly).
+
+## Still Open
+
+The 7 uncertain `Reservation` rows remain exactly as they were — no decision made on them. Salman's
+own two questions from the original review are still the open item:
+1. Does RK's staff actually log phone/WhatsApp-taken bookings with a name placeholder and no real
+   number (the 4 "زبون واتساب" rows)?
+2. Do "bo salo" / "ali aloka" / "ashraf kokha" match real walk-in customers from 2026-08-06?
