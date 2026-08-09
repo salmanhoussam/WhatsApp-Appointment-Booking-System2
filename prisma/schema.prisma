@@ -118,6 +118,11 @@ enum UserRole {
   TENANT_ADMIN
   MANAGER_RESERVATIONS
   MANAGER_UNITS
+  // Staff Scoped Access, Phase A (2026-08-09) -- a login account scoped to exactly one Barber row
+  // via User.barberId; see .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md. Distinct
+  // from Staff<->Service (BarberService) -- this is about what a logged-in user can DO, not which
+  // services a barber can perform.
+  STAFF
 
   @@schema("public")
 }
@@ -140,11 +145,16 @@ model User {
   // -- One-time setup link (generated at registration, invalidated on first use)
   setupToken        String?    @unique @map("setup_token")
   setupTokenExp     DateTime?  @map("setup_token_exp") @db.Timestamptz(6)
+  // -- Staff Scoped Access, Phase A (2026-08-09) -- nullable: only STAFF-role users have one.
+  // Unique: a login account maps to at most one Barber, and vice versa. No JWT change needed --
+  // get_current_admin_user() already loads the full User row from DB on every request.
+  barberId          String?    @unique @map("barber_id") @db.Uuid
   // ---------------------------------------------------------------------------
   createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   managedProperties Property[] @relation("manager_properties")
   client            Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  barber            Barber?    @relation(fields: [barberId], references: [id], onDelete: SetNull)
 
   @@map("users")
   @@schema("public")
@@ -856,6 +866,9 @@ model Barber {
   client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   reservations   Reservation[]
   barberServices BarberService[]
+  // Staff Scoped Access, Phase A (2026-08-09) -- opposite side of User.barberId, not a list: at
+  // most one login account per Barber.
+  user           User?
 
   @@index([clientId, isActive])
   @@map("barbers")
