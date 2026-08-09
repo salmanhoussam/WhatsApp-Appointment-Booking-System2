@@ -12,11 +12,10 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 2. 🟡 Production Data Hygiene -- 42 confirmed-safe rows deleted 2026-08-10, verified clean
         (exact IDs/counts: .claudedocs/work/production-data-hygiene/2026-08-10/deletion-review.md).
         7 reservations deliberately left untouched -- NOT an internal task, blocked on external
-        confirmation from RK/the real shop owner on two specific questions (see below). Does not
-        block moving to #3 -- these 7 rows are inert either way until RK actually answers.
-3. 🔴 STAFF /admin/barbers/ roster scoping  <- next-session priority
-4. 🔴 Overview redesign (NOT started before #2's 42-row cleanup landed -- it did; the 7 remaining
-        uncertain rows are too small a fraction of real data to block this any further)
+        confirmation from RK/the real shop owner on two specific questions (see below).
+3. ✅ STAFF /admin/barbers/ roster scoping -- DONE 2026-08-10, real-account tests + browser
+        regression both clean (.claudedocs/work/staff-barbers-roster-scoping/2026-08-10/evidence.md)
+4. 🔴 Overview redesign  <- next-session priority
 5. 🟡 Calendar/Reservations/Staff/Store polish
 6. Ali onboarding
 7. Final production regression
@@ -29,11 +28,9 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
    and no real number captured?
 2. Do "bo salo" / "ali aloka" / "ashraf kokha" match real walk-in customers from 2026-08-06?
 
-Next-session priority: #3, STAFF barbers-roster scoping (`GET /admin/barbers/` returns the full
-unfiltered staff roster to a `STAFF` token — real finding from the Staff-scoped review, not yet
-fixed).
-
-Immediate next-session priority: **#1 and #2 in parallel**, as two separate workstreams.
+Next-session priority: #4, Overview redesign — needs its own scoped Implementation Contract before
+any code, per the "no redesign before verdict" rule (findings:
+`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`'s "Overview — why it lands on 🔴").
 
 ## 2026-08-09 — see full session report
 

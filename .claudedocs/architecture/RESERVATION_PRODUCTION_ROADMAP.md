@@ -31,7 +31,7 @@ order work actually happens in, regardless of each item's phase number:
        ↓  — ran in parallel with #2 as a separate workstream (backend/reliability vs. data cleanup)
 2. 🟡 Production Data Hygiene       (Phase 3.6) — ✅ 42 rows deleted 2026-08-10; 7 uncertain rows still open
        ↓
-3. 🔴 STAFF barbers-roster scoping  (Phase 4's new item)
+3. ✅ STAFF barbers-roster scoping  DONE 2026-08-10 — see below
        ↓
 4. 🔴 Overview redesign             (Phase 3.7) — explicitly NOT started before #2 closes; designing
        ↓                             new stats/activity on top of known-dirty data is real wasted work
@@ -77,6 +77,19 @@ row confirmed byte-identical, zero FK errors, real post-delete smoke checks all 
 of RK's real August bookings — 4 "زبون واتساب" (phone-less WhatsApp-logged?) rows and 3 informal
 names ("bo salo"/"ali aloka"/"ashraf kokha") with patterned phone numbers. Marked 🟡 not ✅ until
 these are resolved.
+
+### #3 — STAFF `/admin/barbers/` Roster Scoping: ✅ DONE 2026-08-10
+
+Treated as a security/backend task per Salman's explicit instruction — investigation before any
+code (`.claudedocs/work/staff-barbers-roster-scoping/2026-08-10/investigation.md`), then real-account
+verification, not simulated. Reused the exact fail-closed pattern already proven in
+`reservations.py` (Staff Scoped Access Phase B) rather than a new mechanism. Real tests: Jaafar
+(real STAFF barber) now sees only himself; `TENANT_ADMIN` unchanged, full roster; a real
+STAFF-account-with-no-barberId test row gets a real `403`, not a silent 200. Write routes
+unaffected — investigation confirmed no related issue. Full browser regression on the Calendar
+(Today + Week, both roles) — zero new errors, zero broken rendering. Evidence:
+`.claudedocs/work/staff-barbers-roster-scoping/2026-08-10/evidence.md`. Commits: `6fd5712`,
+`ec46266`.
 
 **Still open, not yet decided** — assumed non-blocking for 2026-08-31 unless corrected:
 - Super Admin Dashboard — not part of "best booking web app" framing above; treated as deferred
