@@ -8,6 +8,7 @@ import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
 import StaffTab          from './tabs/StaffTab'
+import StoreTab          from './tabs/StoreTab'
 import MyClientsTab      from './tabs/MyClientsTab'
 import { useAdminRole, useAdminBarberId } from '../../hooks/useAdminRole'
 import { contentSchema }  from '../../tenant-os/schemas/content'
@@ -173,15 +174,19 @@ function buildNav(hasReservations) {
       { id: 'settings', labelAr: 'الإعدادات', Icon: IconSettings },
     ]
   }
+  // Staff/Store IA Separation (2026-08-09, .claudedocs/implementation/
+  // STAFF_STORE_IA_SEPARATION_CONTRACT.md) -- 'catalog' and 'orders' removed from this branch;
+  // Services now live inside 'staff' (its own internal toggle), Store Categories/Items/Orders live
+  // inside the new 'store' entry (its own internal toggle, reusing OrdersTab directly). The
+  // non-hasReservations branch above is untouched -- separate code path, out of this task's scope.
   return [
     { id: 'calendar',      labelAr: 'التقويم',    Icon: IconCalendar      },
     { id: 'reservations',  labelAr: 'الحجوزات',   Icon: IconList          },
-    { id: 'catalog',       labelAr: 'الكتالوج',   Icon: IconCatalog       },
     { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
+    { id: 'store',         labelAr: 'المتجر',     Icon: IconOrders        },
     { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
     { id: 'notifications', labelAr: 'الإشعارات',  Icon: IconNotifications },
     { id: 'settings',      labelAr: 'الإعدادات',  Icon: IconSettings      },
-    { id: 'orders',        labelAr: 'الطلبات',    Icon: IconOrders        },
     { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
   ]
 }
@@ -449,6 +454,9 @@ export default function GenericAdminDashboard() {
           />
         )
       case 'orders':
+        {/* Still needed here -- the non-hasReservations branch's own 'orders' nav entry still
+            renders this directly, untouched. Only the hasReservations branch's nav no longer
+            offers this id (Orders now lives inside the new 'store' case below). */}
         return <OrdersTab activeServices={activeServices} color={color} currency={currency} />
       case 'calendar':
         return <ReservationsTab color={color} defaultView="today" hideBarberPicker={isStaff} myBarberId={myBarberId} />
@@ -457,7 +465,11 @@ export default function GenericAdminDashboard() {
       case 'myclients':
         return <MyClientsTab color={color} />
       case 'catalog':
+        {/* Still needed here -- same reasoning as 'orders' above, for the non-hasReservations
+            branch. */}
         return <CatalogTab color={color} />
+      case 'store':
+        return <StoreTab color={color} currency={currency} activeServices={activeServices} />
       case 'staff':
         return <StaffTab color={color} />
       case 'customers':
