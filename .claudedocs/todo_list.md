@@ -1,6 +1,13 @@
 # Project Todo List — SalmanSaaS
 # Last updated: 2026-08-09
 
+## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
+
+Set 2026-08-09 by Salman: cash-only, both tenants, "best booking web app" UX bar. Full phased
+roadmap: `.claudedocs/architecture/RESERVATION_PRODUCTION_ROADMAP.md`. Phase 1 (Security Closure —
+`customers.py`/`prices.py`/`booking_services.py` have zero auth) is the immediate next-session
+priority, ahead of everything else in this file.
+
 ## 2026-08-09 — see full session report
 
 Staff Scoped Access (3-tier authorization) and Staff/Store IA Separation both shipped end-to-end
