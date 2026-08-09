@@ -1,13 +1,20 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-08-09
+# Last updated: 2026-08-10
 
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
 Set 2026-08-09 by Salman: cash-only, both tenants, "best booking web app" UX bar. Full phased
 roadmap: `.claudedocs/architecture/RESERVATION_PRODUCTION_ROADMAP.md`. Phase 1 (Orphaned Admin
-Router Cleanup — `customers.py`/`prices.py`/`booking_services.py`/`listings.py`, confirmed
-**unreachable dead code, not a live vulnerability** — see correction below) — ✅ done 2026-08-09.
-Phase 3.5 (customer-booking-flow UX/Product Review) is now the immediate next-session priority.
+Router Cleanup) — ✅ done 2026-08-09. Phase 3.5's Customer + Admin Product Review passes — ✅ done
+2026-08-09/10, Staff-scoped (`Jaafar`) pass in progress now. Two new named Production Blockers from
+this review, both real, both flagged directly by Salman (not just logged):
+- **Phase 3.6 — Production Data Hygiene**: real QA/test data confirmed sitting inside `rk`'s live
+  data across 5+ screens before go-live — 2nd independent confirmation of the 2026-08-02 "Permanent
+  Demo Tenant" idea, elevated from a note to a real priority.
+- **Phase 3.7 — Overview 🔴 Redesign-candidate**: contradictory data (Recent Orders vs. real
+  Orders), near-empty stats, test-data activity feed, buried last in nav.
+Also still open: the `/reservations/availability` intermittent-failure Production Blocker
+(`.claudedocs/work/customer-booking-flow-review/2026-08-09/summary.md`).
 
 ## 2026-08-09 — see full session report
 

@@ -126,6 +126,55 @@ flagged immediately rather than discovered in Phase 5.
 Estimate: 1 session for the review itself, 1-3 sessions to act on what it finds (depends entirely
 on what the review surfaces — unknown until run).
 
+**Pass 1 (Customer)**: done, `.claudedocs/work/customer-booking-flow-review/2026-08-09/summary.md`
+— Steps 1-3 ✅ Keep as-is, the availability endpoint became its own Production Blocker (see Phase
+3.6 below), the service-selection carousel shipped as a small, independent Improve
+(`159c631`/`a065150`).
+
+**Pass 2 (Admin, Tenant Owner)**: done, `.claudedocs/work/admin-dashboard-review/2026-08-10/
+summary.md` — Settings and Store Categories ✅ Keep as-is; Calendar/Reservations/Staff/Store Items
+& Orders 🟡 Improve; **Overview 🔴 Redesign-candidate** (see Phase 3.7 below). Surfaced the
+cross-cutting Production Data Hygiene finding (see Phase 3.6).
+
+**Pass 3 (Staff-scoped, `Jaafar`)**: next.
+
+## Phase 3.6 — Production Data Hygiene (NEW, elevated to a named Production Blocker 2026-08-10)
+
+Elevated by Salman's explicit call, not left as a 🟡 UX note: real QA/test data is confirmed
+sitting inside `rk`'s actual data — the tenant meant to go live 2026-08-31 — on 5+ real screens
+(Calendar barber columns, Staff Employees, Staff Services, Store Orders including a literal
+internal QA note visible in a real order, Overview's Activity feed). This is the **second**
+independent confirmation of an item first named 2026-08-02 (`todo_list.md`'s "Permanent Demo
+Tenant" idea) — per this project's own pattern-escalation rule, a second confirmation is the
+trigger to treat it as a real priority, not log it a third time.
+
+**Why this outranks most 🟡 UX items**: a real merchant opening their own dashboard and seeing
+"Test Staff NetCheck 1786131600" as a barber, or a customer-facing order note reading "REAL E2E
+TEST — Store products," is a trust-breaking event, not a cosmetic one — worse than most of the
+🟡 Improve items above.
+
+Scope (not yet executed): identify every test/QA row across `Barber`, `CatalogService`,
+`CatalogItem`, `StoreOrder`/`StoreOrderItem`, and whatever feeds the Overview activity widget on
+`rk`; decide delete vs. archive per row (never touch real customer data by mistake); re-verify
+each affected screen afterward. A real decision point: should this become a one-time cleanup script
+run before every tenant's go-live (Ali included), or a recurring hygiene check? Not decided here.
+
+Estimate: 1 session (mostly investigation + a careful, scoped delete pass — same discipline as any
+data-touching change, per this project's migration-staging concerns).
+
+## Phase 3.7 — Overview Redesign (🔴, scoped Implementation Contract required before any code)
+
+Per Salman's own confirmation: not a taste complaint — the screen currently gives a shop owner an
+unreliable picture of their own business (contradictory order counts, near-empty stat cards, a
+test-data activity feed, buried last in the nav). Full findings:
+`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`'s "Overview — why it lands on 🔴"
+section. Not started — per the "no redesign before verdict" rule, this needs its own scoped
+Implementation Contract (what real stats replace the current 2, where it moves in the nav, how the
+Recent Orders/Overview discrepancy gets root-caused) before any code, not an inline fix.
+
+Estimate: 1-2 sessions (root-causing the Orders-count discrepancy first, since that same data
+likely feeds whatever stats replace the current ones).
+
 ## Phase 4 — Platform Hardening
 
 - **Recurring Supabase pooler flakiness** — root-cause it or document a real mitigation (retry
@@ -152,12 +201,13 @@ Estimate: 1 session.
 
 ## Total estimate against the 2026-08-31 target
 
-Phase 1 (done) + Phase 2 (2-3) + Phase 3 (1-2) + Phase 3.5 (2-4) + Phase 4 (1-2) + Phase 5 (1) =
-**6-10 sessions remaining**. At this project's actual pace this window (near-daily heavy sessions,
-15-23 commits/session-day), that comfortably fits inside the 22 remaining days — Phase 3.5 is the
-real wildcard, since its second half depends on what the Product Review actually finds. Next up:
-Phase 3.5's customer-booking-flow pass, run immediately so any "Redesign" verdict has runway
-instead of surfacing days before the deadline.
+Phase 1 (done) + Phase 2 (2-3) + Phase 3 (1-2) + Phase 3.5 (Customer done, Admin done, Staff-scoped
+pass remaining) + Phase 3.6 (1, new) + Phase 3.7 (1-2, new) + Phase 4 (1-2) + Phase 5 (1) =
+**7-12 sessions remaining**. At this project's actual pace this window (near-daily heavy sessions,
+15-23 commits/session-day), that comfortably fits inside the remaining days. Next up: Phase 3.5's
+Staff-scoped (`Jaafar`) pass, completing the three-sided review (Customer/Admin/Staff) before
+sequencing the 🔴/blocker work (availability endpoint, Production Data Hygiene, Overview) by real
+impact rather than discovery order.
 
 ## Still Open — flag before Phase 2 starts
 
