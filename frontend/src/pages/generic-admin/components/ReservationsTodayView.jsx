@@ -283,7 +283,7 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
  *     via useBarbers()/useServices() in reservationInteractions.jsx, passed down so this view
  *     and ReservationsWeekCalendar.jsx share one fetch each instead of two independent ones.
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, services }) {
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, services, hideBarberPicker = false }) {
   const [startHour, endHour] = hourRange
   // Which barber's schedule is currently VISIBLE -- owned by ReservationsTab.jsx (props
   // `visibleBarberId`/`onVisibleBarberChange`), not local state here. This component fully
@@ -445,8 +445,14 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
             the real barber count ever grows past what a pill row comfortably fits, the fix is
             swapping the control (e.g. `overflowX:'auto'`, same proven fix ReservationsTab.jsx's own
             status-pills row already uses -- or a dropdown), never re-introducing multiple visible
-            columns. Renders only when there's an actual choice to make. */}
-        {barbers.length > 1 && (
+            columns. Renders only when there's an actual choice to make.
+
+            Staff Scoped Access Phase D (2026-08-09) -- hidden entirely for STAFF (hideBarberPicker):
+            the backend already scopes every reservation to their own barberId regardless of which
+            pill is "selected," so showing this picker to a STAFF user would be actively misleading,
+            not just unnecessary -- selecting another barber's name would silently keep showing their
+            own schedule underneath it. */}
+        {!hideBarberPicker && barbers.length > 1 && (
           <div style={{
             display: 'flex', borderRadius: 20, padding: 2, marginBottom: 14,
             background: T.pageBg, border: `1px solid ${T.border}`,

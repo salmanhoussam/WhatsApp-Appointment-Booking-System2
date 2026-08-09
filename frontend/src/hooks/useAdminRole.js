@@ -31,3 +31,20 @@ export function canAccessTab(role, tabId) {
   if (!role) return false;
   return (ROLE_TABS[role] ?? []).includes(tabId);
 }
+
+/**
+ * Staff Scoped Access Phase D (2026-08-09) -- the STAFF-role JWT now carries a display-only
+ * barber_id claim (never used for backend authorization -- that stays DB-sourced, see
+ * get_current_admin_user()). A separate hook rather than extending useAdminRole()'s return shape,
+ * to avoid changing its existing string-return contract for every current call site.
+ */
+export function useAdminBarberId() {
+  try {
+    const token = localStorage.getItem('admin_access_token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload?.barber_id ?? null;
+  } catch {
+    return null;
+  }
+}

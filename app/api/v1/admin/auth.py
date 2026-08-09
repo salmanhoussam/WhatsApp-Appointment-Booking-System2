@@ -168,6 +168,12 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
             "client_id": user.clientId,
             "slug": user.client.slug,
             "role": user.role,
+            # Staff Scoped Access Phase D (2026-08-09) -- display-only, never used for backend
+            # authorization (that stays DB-sourced per Phase A/B, get_current_admin_user() reloads
+            # the real User row on every request). The frontend needs a reliable "my own barberId"
+            # that survives page reloads without depending on reservation data being non-empty --
+            # see .claudedocs/work/staff-scoped-access/2026-08-09/phase-d-evidence.md.
+            "barber_id": str(user.barberId) if user.barberId else None,
         })
 
         _set_auth_cookie(response, token)
@@ -224,6 +230,7 @@ async def magic_link_login(token: str, response: Response):
         "client_id": user.clientId,
         "slug":      user.client.slug,
         "role":      user.role,
+        "barber_id": str(user.barberId) if user.barberId else None,
     })
     _set_auth_cookie(response, jwt)
 

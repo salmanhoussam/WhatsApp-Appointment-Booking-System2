@@ -8,6 +8,8 @@ import OverviewTab       from './tabs/OverviewTab'
 import OrdersTab         from './tabs/OrdersTab'
 import ReservationsTab   from './tabs/ReservationsTab'
 import StaffTab          from './tabs/StaffTab'
+import MyClientsTab      from './tabs/MyClientsTab'
+import { useAdminRole, useAdminBarberId } from '../../hooks/useAdminRole'
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
 import useImageUpload     from '../../hooks/useImageUpload'
@@ -183,6 +185,21 @@ function buildNav(hasReservations) {
     { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
   ]
 }
+
+// Staff Scoped Access Phase D (2026-08-09, .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md).
+// Real finding from this phase: useAdminRole.js's ROLE_TABS/canAccessTab mechanism ("add STAFF to
+// ROLE_TABS") is wired ONLY into the legacy SmarAdminDashboard.jsx (different tab-id vocabulary
+// entirely -- 'inbox'/'units'/'gallery'/'housekeeping'/etc.) -- this dashboard (GenericAdminDashboard,
+// what rk actually uses) has never used ROLE_TABS at all; buildNav() above is its own, separate,
+// activeServices-driven mechanism. Adding STAFF to the unused ROLE_TABS object would have been dead
+// code -- this is a parallel, equivalent filter for THIS dashboard's real nav shape instead. Backend
+// enforcement (Phases A-C) does not depend on this in any way -- this is UI-only, per Salman's own
+// framing of Phase D.
+const STAFF_NAV = [
+  { id: 'calendar',     labelAr: 'التقويم',   Icon: IconCalendar  },
+  { id: 'reservations', labelAr: 'الحجوزات',  Icon: IconList      },
+  { id: 'myclients',    labelAr: 'عملائي',    Icon: IconCustomers },
+]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
@@ -394,7 +411,13 @@ export default function GenericAdminDashboard() {
   const currency        = settings?.currency       ?? config?.currency ?? 'USD'
   const activeServices  = config?.active_services  ?? []
   const hasReservations = activeServices.includes('reservations')
-  const NAV             = useMemo(() => buildNav(hasReservations), [hasReservations])
+  const role             = useAdminRole()
+  const isStaff          = role === 'STAFF'
+  const myBarberId       = useAdminBarberId()
+  const NAV               = useMemo(
+    () => (isStaff ? STAFF_NAV : buildNav(hasReservations)),
+    [hasReservations, isStaff],
+  )
 
   // Calendar becomes the default landing tab once we know this is a reservations tenant --
   // `hasReservations` starts false (DEFAULT_CONFIG) until the real config fetch resolves, so this
@@ -428,9 +451,11 @@ export default function GenericAdminDashboard() {
       case 'orders':
         return <OrdersTab activeServices={activeServices} color={color} currency={currency} />
       case 'calendar':
-        return <ReservationsTab color={color} defaultView="today" />
+        return <ReservationsTab color={color} defaultView="today" hideBarberPicker={isStaff} myBarberId={myBarberId} />
       case 'reservations':
-        return <ReservationsTab color={color} defaultView="list" />
+        return <ReservationsTab color={color} defaultView="list" hideBarberPicker={isStaff} myBarberId={myBarberId} />
+      case 'myclients':
+        return <MyClientsTab color={color} />
       case 'catalog':
         return <CatalogTab color={color} />
       case 'staff':

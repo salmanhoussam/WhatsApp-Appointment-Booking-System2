@@ -308,7 +308,7 @@ function MobileReservationCard({ reservation, idx, color, onUpdate, onOpen }) {
  * Refactor (2026-08-03) -- rather than duplicating this tab's state/loading/request-sequencing
  * logic into a second component.
  */
-export default function ReservationsTab({ color, defaultView = 'list' }) {
+export default function ReservationsTab({ color, defaultView = 'list', hideBarberPicker = false, myBarberId = null }) {
   const [reservations, setReservations] = useState([])
   const [loading,      setLoading]      = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -327,7 +327,15 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
   // Browser Verification, 2026-08-05: without lifting this, the staff switcher silently reset back
   // to the first barber on every single ▶/◀ day-navigation click. ReservationsTab itself never
   // unmounts across those, so state lives here instead, same reasoning as todayViewDate above.
-  const [visibleBarberId, setVisibleBarberId] = useState(null)
+  // Staff Scoped Access Phase D (2026-08-09) -- for a STAFF caller, seeded directly from the JWT's
+  // display-only barber_id claim (useAdminBarberId(), passed in as myBarberId), never left to
+  // ReservationsTodayView's own "default to barbers[0]" effect. That effect can't be trusted here:
+  // `barbers` is the tenant's full, unscoped list (Phase B never touched GET /barbers/), so
+  // barbers[0] could just as easily resolve to a different staff member -- which would silently
+  // filter the calendar to nothing even though the backend already sent this STAFF user's own,
+  // real reservations. Non-STAFF callers are unaffected -- myBarberId is null for them, same as
+  // before this phase.
+  const [visibleBarberId, setVisibleBarberId] = useState(() => myBarberId ?? null)
   // Barbers/services (Phase 3.4, 2026-08-06) -- fetched once here via the shared hooks and passed
   // down to both Today and Week, instead of each view independently re-fetching the same data on
   // every mount/toggle (a real, confirmed duplicate network call before this). Phase 3.7C
@@ -742,6 +750,7 @@ export default function ReservationsTab({ color, defaultView = 'list' }) {
             barbers={barbers}
             barbersLoading={barbersLoading}
             services={services}
+            hideBarberPicker={hideBarberPicker}
           />
         )
       ) : isMobile ? (
