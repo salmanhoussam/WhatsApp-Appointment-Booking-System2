@@ -107,3 +107,39 @@ not a proposal. No formal ADR (per this project's Abstraction Rule, correcting/b
 from an investigation isn't automatically ADR-worthy on a first instance). Revisit if a second
 independent tenant's real use of `STAFF` roles stresses this model in a way this entry didn't
 anticipate.
+
+## 2026-08-09 (correction — the `customers.py`/`prices.py`/`booking_services.py` finding was wrong)
+
+### Context
+
+While planning the Security Closure phase of the 2026-08-31 production roadmap, re-verified the
+"zero auth, reachable" claim above (Discovery bullet, and both Open Questions references) before
+acting on it, per this project's own Evidence Interrogation standard.
+
+### Discovery
+
+The claim does not hold up. `app/api/v1/admin/__init__.py`'s import line never includes
+`customers`, `prices`, `booking_services`, or `listings` — none of the four are ever
+`include_router()`-ed, and `app/main.py` only mounts that one `admin_v1_router`. Zero frontend
+reference anywhere (`GenericAdminDashboard.jsx`'s "العملاء" nav tab renders `<ComingSoonTab>`,
+never calls `/admin/customers`). All four files are confirmed **unreachable** — the original
+2026-07-31 `todo_list.md` finding ("none registered... finish wiring or delete") was correct; this
+capability's own 2026-08-09 investigation entry re-described the same dead code as a live,
+exploitable hole without re-checking router registration first.
+
+### Current Understanding
+
+This was dead/orphaned admin CRUD scaffolding (the "Forgotten" drift category,
+`repository-hygiene.md`), not a live vulnerability. Deleted 2026-08-09 as Repository Hygiene, not
+a security fix — the distinction matters for the audit trail. Their underlying models (`Customer`,
+`Price`) remain live via other, already-secured paths (`customer_repo.py`/`price_repo.py`, used by
+`public_service.py`/`admin/units.py`); `BookingService`/admin-side `ListingService` had no other
+live consumer at all. Full evidence: `.claudedocs/work/orphaned-admin-routers-cleanup/2026-08-09/`.
+
+### Open Questions
+
+None — this closes the item both prior entries left open.
+
+### Promoted?
+
+N/A — this is a correction to a prior entry's Discovery, not a new capability finding.

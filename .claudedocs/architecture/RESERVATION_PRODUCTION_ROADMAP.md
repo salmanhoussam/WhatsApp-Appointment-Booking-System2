@@ -37,22 +37,29 @@ booking real appointments and buying real products, cash-only, without:
 - Ali requiring new code instead of new configuration,
 - the booking flow itself falling short of a real UX bar — not just functionally correct.
 
-## Phase 1 — Security Closure (BLOCKING — do this first, nothing below matters if this is open)
+## Phase 1 — Orphaned Admin Router Cleanup — ✅ DONE 2026-08-09
 
-- **Close `customers.py`/`prices.py`/`booking_services.py`'s missing auth.** Confirmed twice now:
-  zero tenant resolution, zero role check. Anyone who knows a `client_id` can read/write them
-  today. This is the one item on this whole roadmap that is a real security incident waiting to
-  happen, not a quality issue.
-- **Decide the fate of the dead admin CRUD scaffolding** (`customers.py`, `prices.py`,
-  `booking_services.py`, `listings.py`, none registered in `admin/__init__.py`) — for each file:
-  finish wiring it with real auth, or delete it. Do not leave an unauthenticated file sitting
-  unregistered and call that "safe" — an unregistered route is one router-mount away from becoming
-  live.
-- **Re-confirm `settings.py`'s deliberate exclusion from the router-level auth floor** still holds
-  (it's a documented exception for the Soft-Block allowlist ordering, not an oversight) — a
-  20-minute check, not new work.
+Renamed from "Security Closure" — corrected while planning this phase, before writing any code:
+`customers.py`/`prices.py`/`booking_services.py`/`listings.py` were never `include_router()`-ed
+into `admin/__init__.py`, and `app/main.py` only mounts that one router — meaning these four files
+were **never reachable by any real HTTP request**. The earlier "any caller who knows a client_id
+can read/write them today" claim was wrong (not re-verified against router registration before
+being written). This was confirmed dead/orphaned admin CRUD scaffolding — Repository Hygiene, not
+a live security incident. Full evidence:
+`.claudedocs/work/orphaned-admin-routers-cleanup/2026-08-09/summary.md`; correction recorded in
+`.claudedocs/evolution/user-roles-permissions.md`'s 2026-08-09 correction entry.
 
-Estimate: 1 session (mostly decision + wiring, code footprint is small).
+- All four files deleted (`git rm`). Service/repository layer left untouched — `customer_repo.py`/
+  `price_repo.py`/`price_service.py` remain live via other, already-secured paths
+  (`admin/units.py`, `public_service.py`, `whatsapp_flow.py`); `customer_service.py`/
+  `booking_service_service.py`/admin-side `ListingService` had no other live consumer at all.
+- Verified: app imports cleanly post-deletion (`venv/bin/python3 -c "from app.main import app"`),
+  zero dangling references anywhere in `app/`/`frontend/src/`, zero test coverage lost.
+- **`settings.py`'s deliberate exclusion from the router-level auth floor** re-confirmed still
+  holds — the documented Soft-Block allowlist ordering exception in `admin/__init__.py`'s own
+  comment block, unaffected by this cleanup.
+
+Actual time: well under the original 1-session estimate — the finding shrank once verified.
 
 ## Phase 2 — Core Data Model Cleanup
 
@@ -91,17 +98,30 @@ Added per Salman's explicit framing — this deadline isn't just "no bugs," it's
 Run a genuine Product Review (not a technical audit — see `feedback_product_review_vs_technical_audit`
 memory: UX verdicts ✅/🟡/🔴, not a bug list) across the full customer + admin journey on both RK
 and Ali:
-- **Customer-facing booking flow** — service selection, staff picker, calendar/slot picking,
-  confirmation (WhatsApp), mobile experience specifically (most real bookings will be on phones).
-- **Admin dashboard** — Calendar (Today/Week), Reservations List, Staff, Store, Orders — the
-  dashboard redesign shipped this week, so this is the first real chance to evaluate it as a
-  finished product rather than a work-in-progress.
-- **Staff-scoped experience** (Jaafar's real account) — the newest surface, least product-reviewed
-  so far.
+- **Customer-facing booking flow** (run first — highest-stakes surface) — service selection, staff
+  picker, calendar/slot picking, confirmation (WhatsApp), mobile experience specifically (most real
+  bookings will be on phones). Reviewed against Salman's own question list, not "does the button
+  exist": هل أفهم ماذا أفعل؟ هل الخطوة التالية واضحة؟ هل اختيار الخدمة/الموظف سهل ومنطقي؟ هل الـ
+  calendar والـ slots مفهومة على الهاتف؟ هل WhatsApp confirmation طبيعي بلا احتكاك؟ هل التجربة تبدو
+  كمنتج حقيقي أم admin system متحوّل إلى booking app؟
+- **Admin dashboard** (RK, Tenant Owner) — Calendar (Today/Week), Reservations List, Staff, Store,
+  Orders, Overview, Settings — the dashboard redesign shipped this week, so this is the first real
+  chance to evaluate it as a finished product rather than a work-in-progress.
+- **Staff-scoped experience** (Jaafar's real `STAFF` account) — Calendar, My Clients — the newest
+  surface, least product-reviewed so far.
 
-Every screen gets exactly one verdict — Keep as-is / Improve / Redesign — per this project's own
-UX review vocabulary. Anything landing on Redesign this late risks the deadline; flag those
-immediately rather than discovering them in Phase 5.
+Ali is out of scope for this pass (not onboarded yet — reviewed as part of Phase 3's onboarding).
+
+Every screen/flow gets exactly one verdict, per this project's own UX review vocabulary, and the
+review's job stops at the verdict:
+```
+Review → ✅ Keep as-is (don't touch it)
+       → 🟡 Improve (a specific, scoped fix)
+       → 🔴 Redesign (opens its own separate Implementation Contract — never started inline)
+```
+Salman's explicit rule: no redesign work starts mid-review. This is what protects the 2026-08-31
+deadline from turning into an open-ended UI rewrite — a 🔴 becomes a named, separate next task,
+flagged immediately rather than discovered in Phase 5.
 
 Estimate: 1 session for the review itself, 1-3 sessions to act on what it finds (depends entirely
 on what the review surfaces — unknown until run).
@@ -132,13 +152,12 @@ Estimate: 1 session.
 
 ## Total estimate against the 2026-08-31 target
 
-Phase 1 (1) + Phase 2 (2-3) + Phase 3 (1-2) + Phase 3.5 (2-4) + Phase 4 (1-2) + Phase 5 (1) =
-**8-13 sessions**. At this project's actual pace this window (near-daily heavy sessions,
-15-23 commits/session-day), that fits inside the 22 remaining days — but Phase 3.5 is the real
-wildcard, since its second half depends on what the Product Review actually finds. Recommend
-running Phase 1 + Phase 3.5's review in the very next session or two, in parallel — security first,
-and an early read on the UX bar so any "Redesign" verdict has runway instead of surfacing days
-before the deadline.
+Phase 1 (done) + Phase 2 (2-3) + Phase 3 (1-2) + Phase 3.5 (2-4) + Phase 4 (1-2) + Phase 5 (1) =
+**6-10 sessions remaining**. At this project's actual pace this window (near-daily heavy sessions,
+15-23 commits/session-day), that comfortably fits inside the 22 remaining days — Phase 3.5 is the
+real wildcard, since its second half depends on what the Product Review actually finds. Next up:
+Phase 3.5's customer-booking-flow pass, run immediately so any "Redesign" verdict has runway
+instead of surfacing days before the deadline.
 
 ## Still Open — flag before Phase 2 starts
 
