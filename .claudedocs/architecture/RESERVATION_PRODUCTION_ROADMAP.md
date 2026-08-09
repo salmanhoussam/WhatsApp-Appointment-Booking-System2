@@ -29,7 +29,7 @@ order work actually happens in, regardless of each item's phase number:
 ```
 1. ✅ Availability reliability      DONE 2026-08-10 — see below
        ↓  — ran in parallel with #2 as a separate workstream (backend/reliability vs. data cleanup)
-2. 🔴 Production Data Hygiene       (Phase 3.6) — investigation done, deletion awaiting Salman's go-ahead
+2. 🟡 Production Data Hygiene       (Phase 3.6) — ✅ 42 rows deleted 2026-08-10; 7 uncertain rows still open
        ↓
 3. 🔴 STAFF barbers-roster scoping  (Phase 4's new item)
        ↓
@@ -62,15 +62,21 @@ sequential and 10/10 concurrent requests succeeded post-fix, vs. ~50% failure be
 `.claudedocs/work/availability-reliability/2026-08-10/summary.md` +
 `frontend-verification.md`. Commits: `693c558`, `2cfdf40`, `b80cbab`.
 
-### #2 — Production Data Hygiene: investigation done, awaiting Salman's go-ahead on deletion
+### #2 — Production Data Hygiene: 42 rows deleted 2026-08-10; 7 uncertain rows still open
 
-Full inventory: `.claudedocs/work/production-data-hygiene/2026-08-10/inventory.md`. Worse than the
-original Product Review's "scattered noise" framing: `rk` currently has **zero** confidently-real
-`StoreOrder` rows (0/5) and **zero** confidently-real `Reservation` rows (0/39) — the entire order/
-booking history is test data. 42 rows across 4 tables are confirmed-safe to delete (cascading
-effects checked clean, no real row depends on any of them); 7 `Reservation` rows are genuinely
-uncertain and need Salman's own knowledge of RK's real August bookings, not a database read. Not
-executed yet — deletion of production-bound data needs explicit confirmation first.
+Full inventory: `.claudedocs/work/production-data-hygiene/2026-08-10/inventory.md`; per-row review
++ execution results: `deletion-review.md`. Confirmed worse than the original Product Review's
+"scattered noise" framing: `rk` had **zero** confidently-real `StoreOrder` rows (0/5) and **zero**
+confidently-real `Reservation` rows (0/39) before this cleanup. After Salman's explicit approval
+of the full per-row report, **42 rows deleted** (3 Barber, 2 CatalogService, 5 StoreOrder, 32
+Reservation — exact IDs in the evidence file) via a single transaction, re-verified before and
+after (exact count deltas, the 7 preserved uncertain rows confirmed byte-identical, every other
+row confirmed byte-identical, zero FK errors, real post-delete smoke checks all passing).
+
+**Still open**: 7 `Reservation` rows remain, explicitly untouched, pending Salman's own knowledge
+of RK's real August bookings — 4 "زبون واتساب" (phone-less WhatsApp-logged?) rows and 3 informal
+names ("bo salo"/"ali aloka"/"ashraf kokha") with patterned phone numbers. Marked 🟡 not ✅ until
+these are resolved.
 
 **Still open, not yet decided** — assumed non-blocking for 2026-08-31 unless corrected:
 - Super Admin Dashboard — not part of "best booking web app" framing above; treated as deferred
