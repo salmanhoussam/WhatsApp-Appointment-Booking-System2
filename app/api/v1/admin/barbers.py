@@ -32,6 +32,10 @@ from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.db.dependencies import get_current_tenant
 from app.repositories import barber_repo, barber_service_repo
+# Reused, not re-implemented -- this is the same fail-closed STAFF-scoping check
+# app/api/v1/admin/reservations.py already uses (Staff Scoped Access Phase B, 2026-08-09). Single
+# source of truth stays there; this file just calls it a second time.
+from app.api.v1.admin.reservations import _require_staff_barber_id
 
 router = APIRouter(prefix="/barbers", tags=["Admin Barbers"])
 
@@ -89,7 +93,16 @@ async def list_barbers(
     # routes below (create/update/deactivate/set_barber_services) deliberately do NOT include STAFF.
     _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
 ):
+    # Roster scoping (2026-08-10, .claudedocs/work/staff-barbers-roster-scoping/2026-08-10/
+    # investigation.md): this route used to return the FULL, unfiltered roster -- names, phone
+    # numbers, working hours -- to any STAFF token, not just the caller's own row. STAFF now sees
+    # only themselves, server-side (fail-closed: a STAFF account with no barberId link gets a real
+    # 403, never a silent empty/full fallback). Every other role is unaffected -- unchanged
+    # behavior, full roster, exactly as before.
+    staff_barber_id = _require_staff_barber_id(_user)
     barbers = await barber_repo.list_barbers(tenant["id"])
+    if staff_barber_id is not None:
+        barbers = [b for b in barbers if b.id == staff_barber_id]
     return {"success": True, "data": [_fmt(b) for b in barbers]}
 
 
