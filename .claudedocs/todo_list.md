@@ -9,19 +9,29 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 
 ```
 1. ✅ Availability reliability -- DONE 2026-08-10, 10/10 load-test success post-fix
-2. 🔴 Production Data Hygiene -- investigation done, 0 real StoreOrders / 0 real Reservations
-        found (worse than expected), deletion awaiting Salman's go-ahead + his read on 7 uncertain rows
-3. 🔴 STAFF /admin/barbers/ roster scoping
-4. 🔴 Overview redesign (NOT started before #2 closes -- no designing on top of dirty data)
+2. 🟡 Production Data Hygiene -- 42 confirmed-safe rows deleted 2026-08-10, verified clean
+        (exact IDs/counts: .claudedocs/work/production-data-hygiene/2026-08-10/deletion-review.md).
+        7 reservations deliberately left untouched -- NOT an internal task, blocked on external
+        confirmation from RK/the real shop owner on two specific questions (see below). Does not
+        block moving to #3 -- these 7 rows are inert either way until RK actually answers.
+3. 🔴 STAFF /admin/barbers/ roster scoping  <- next-session priority
+4. 🔴 Overview redesign (NOT started before #2's 42-row cleanup landed -- it did; the 7 remaining
+        uncertain rows are too small a fraction of real data to block this any further)
 5. 🟡 Calendar/Reservations/Staff/Store polish
 6. Ali onboarding
 7. Final production regression
 8. 2026-08-31 LIVE
 ```
 
-Next-session priority: get Salman's decision on Production Data Hygiene (42 rows confirmed safe to
-delete, 7 need his judgment — `.claudedocs/work/production-data-hygiene/2026-08-10/inventory.md`),
-then execute it, then move to #3 (STAFF roster scoping).
+**Blocked on RK, not on us** — two questions only the real shop owner can answer, needed before the
+7 remaining uncertain reservations can be resolved either way:
+1. Does RK staff actually log phone/WhatsApp-taken bookings with a name placeholder ("زبون واتساب")
+   and no real number captured?
+2. Do "bo salo" / "ali aloka" / "ashraf kokha" match real walk-in customers from 2026-08-06?
+
+Next-session priority: #3, STAFF barbers-roster scoping (`GET /admin/barbers/` returns the full
+unfiltered staff roster to a `STAFF` token — real finding from the Staff-scoped review, not yet
+fixed).
 
 Immediate next-session priority: **#1 and #2 in parallel**, as two separate workstreams.
 
