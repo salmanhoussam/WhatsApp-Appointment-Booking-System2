@@ -22,6 +22,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.db.client import prisma_client
 from app.core.security import decode_token
 from app.core.config import settings
+from app.core.db_resilience import with_db_resilience
 from app.services.security_audit_service import log_security_event
 
 # ── In-process TTL cache ─────────────────────────────────────────────────────
@@ -181,7 +182,17 @@ async def _verify_tenant(
         )
         return tenant
 
-    client = await prisma_client.client.find_unique(where={"slug": slug})
+    # Wrapped in with_db_resilience (2026-08-10) -- this is THE single most foundational DB
+    # call in the app: every route, public or admin, resolves its tenant through here first
+    # (before even require_service() runs). A cache miss under real concurrent traffic
+    # (cache-stampede -- several requests racing to resolve the same slug before any of them
+    # populate _tenant_cache) is exactly where the confirmed transient pooler failures
+    # (httpx.ReadTimeout, Prisma P1001 "Can't reach database server") were actually landing --
+    # not in whatever business logic ran after it. See db_resilience.py's own docstring.
+    client = await with_db_resilience(
+        lambda: prisma_client.client.find_unique(where={"slug": slug}),
+        label=f"verify_tenant:{slug}",
+    )
     if not client:
         logger.warning("⚠️  Tenant slug not found in DB: '%s'", slug)
         raise HTTPException(status_code=404, detail=f"Tenant '{slug}' not found.")

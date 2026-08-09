@@ -18,6 +18,7 @@ from prisma import Json
 
 from app.db.client import prisma_client
 from app.db.dependencies import get_current_tenant
+from app.core.db_resilience import with_db_resilience
 
 # Maps service_type (from Client.service_type or conversation extraction)
 # to the list of service keys to seed on tenant creation.
@@ -33,14 +34,23 @@ DEFAULT_SERVICES = ["booking", "gallery", "whatsapp_ordering"]
 
 
 def require_service(service_key: str) -> Callable:
-    """Dependency factory — raises 403 if tenant doesn't have service active."""
+    """Dependency factory — raises 403 if tenant doesn't have service active.
+
+    Wrapped in with_db_resilience (2026-08-10) -- this dependency is the first thing every
+    gated route touches, so a transient DB/pooler hiccup here previously failed the ENTIRE
+    request (every route in the app), not just whatever business logic came after it. See
+    app/core/db_resilience.py's own docstring for the confirmed root cause.
+    """
     async def _check(tenant: dict = Depends(get_current_tenant)):
-        svc = await prisma_client.clientservice.find_first(
-            where={
-                "clientId": tenant["id"],
-                "serviceKey": service_key,
-                "isActive": True,
-            }
+        svc = await with_db_resilience(
+            lambda: prisma_client.clientservice.find_first(
+                where={
+                    "clientId": tenant["id"],
+                    "serviceKey": service_key,
+                    "isActive": True,
+                }
+            ),
+            label=f"require_service:{service_key}",
         )
         if not svc:
             raise HTTPException(

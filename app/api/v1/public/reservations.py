@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
+from app.core.db_resilience import with_db_resilience
 from app.services import reservation_service, catalog_service_service
 from app.repositories import resource_repo, barber_repo, barber_service_repo
 
@@ -129,7 +130,10 @@ async def list_public_barbers(
     since no assignments exist yet), falls back to the full unfiltered list. This one rule is what
     keeps the endpoint backward-compatible with zero migration step for existing tenants -- a
     service with no assignments behaves exactly as it did before this filter existed."""
-    barbers = await barber_repo.list_barbers(tenant["id"], active_only=True)
+    barbers = await with_db_resilience(
+        lambda: barber_repo.list_barbers(tenant["id"], active_only=True),
+        label="list_public_barbers",
+    )
 
     if service_id is not None:
         qualified_ids = set(await barber_service_repo.list_barber_ids_for_service(tenant["id"], str(service_id)))
@@ -160,7 +164,10 @@ async def list_public_services(
     /reservations/services would have matched that wildcard first, with "reservations" captured as
     {slug} -- confirmed live: it returned a 422 demanding unit_id, that route's own required param,
     not this one's. Found via real Browser Verification, not assumed."""
-    data = await catalog_service_service.public_list_services(tenant["id"])
+    data = await with_db_resilience(
+        lambda: catalog_service_service.public_list_services(tenant["id"]),
+        label="public_list_services",
+    )
     return {"success": True, "data": data}
 
 
@@ -186,11 +193,14 @@ async def get_availability(
         raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD.")
 
     try:
-        slots = await reservation_service.get_available_slots(
-            client_id     = tenant["id"],
-            barber_id     = str(barber_id),
-            target_date   = target_date,
-            duration_min  = duration_min,
+        slots = await with_db_resilience(
+            lambda: reservation_service.get_available_slots(
+                client_id     = tenant["id"],
+                barber_id     = str(barber_id),
+                target_date   = target_date,
+                duration_min  = duration_min,
+            ),
+            label="get_available_slots",
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
