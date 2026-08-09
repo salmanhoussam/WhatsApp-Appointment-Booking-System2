@@ -112,6 +112,15 @@ and Ali:
 
 Ali is out of scope for this pass (not onboarded yet — reviewed as part of Phase 3's onboarding).
 
+**STATUS: ✅ DONE 2026-08-10 — all three passes complete.** Customer:
+`.claudedocs/work/customer-booking-flow-review/2026-08-09/summary.md`. Admin:
+`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`. Staff:
+`.claudedocs/work/staff-scoped-review/2026-08-10/summary.md`. Fallout tracked as Phase 3.6
+(Production Data Hygiene) and Phase 3.7 (Overview Redesign) below, plus the already-tracked
+availability-endpoint blocker and one small new item: `GET /admin/barbers/` returns the full
+unfiltered staff roster (names/phones/hours) to a `STAFF` token — real, independently confirmed via
+direct `curl`, not yet scoped to fix (folded into Phase 4 below).
+
 Every screen/flow gets exactly one verdict, per this project's own UX review vocabulary, and the
 review's job stops at the verdict:
 ```
@@ -177,6 +186,13 @@ likely feeds whatever stats replace the current ones).
 
 ## Phase 4 — Platform Hardening
 
+- **`GET /admin/barbers/` is not role-scoped** — returns the full staff roster (names, phone
+  numbers, working hours) to a `STAFF` token, confirmed via direct `curl` with Jaafar's real
+  bearer token (`.claudedocs/work/staff-scoped-review/2026-08-10/summary.md`). Low current impact
+  on `rk`'s own data (several phone fields null) but a real PII exposure once real staff phone
+  numbers are on file — exactly the state RK/Ali reach by 2026-08-31. Matches this project's
+  already-named "Least Privilege" principle (`todo_list.md`, 2026-07-30) — possibly its second
+  confirming case.
 - **Recurring Supabase pooler flakiness** — root-cause it or document a real mitigation (retry
   policy, connection pool tuning) rather than continuing to treat every occurrence as a one-off.
 - **Response-serialization pattern (camelCase Prisma vs. snake_case Pydantic `response_model`)** —
