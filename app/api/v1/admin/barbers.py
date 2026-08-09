@@ -84,7 +84,10 @@ def _fmt(b) -> dict:
 async def list_barbers(
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
+    # STAFF added 2026-08-09 (Staff Scoped Access Phase D fix) -- read-only grant, not an ownership
+    # grant. The Calendar needs this list to resolve/render the caller's own barber row; write
+    # routes below (create/update/deactivate/set_barber_services) deliberately do NOT include STAFF.
+    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
 ):
     barbers = await barber_repo.list_barbers(tenant["id"])
     return {"success": True, "data": [_fmt(b) for b in barbers]}

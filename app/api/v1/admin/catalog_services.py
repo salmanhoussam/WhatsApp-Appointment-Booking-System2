@@ -63,7 +63,10 @@ async def list_catalog_services(
     category_id:      Optional[str] = Query(None),
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
+    # STAFF added 2026-08-09 (Staff Scoped Access Phase D fix) -- read-only grant, not an ownership
+    # grant. The Calendar needs this list to resolve service names on the caller's own reservation
+    # cards; write routes below (create/update) deliberately do NOT include STAFF.
+    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
 ):
     data = await catalog_service_service.admin_list_services(tenant["id"], include_inactive, category_id)
     return {"success": True, "data": data}
