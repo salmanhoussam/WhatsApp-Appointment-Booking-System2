@@ -65,7 +65,9 @@ const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
  * WhatsApp (primary) and a local name/phone form (secondary, collapsed by default). Consumes only
  * the existing backend (barbers/availability/create) -- no slot or conflict logic here.
  *
- * `mode`: 'loading' | 'booking' (real Barber rows exist) | 'legacy' (generic date/time form).
+ * `mode`: 'loading' | 'booking' (real Barber rows exist) | 'legacy' (generic date/time form) |
+ * 'error' (the barbers fetch itself failed -- distinct from 'legacy', which means it succeeded
+ * and genuinely found zero staff; added 2026-08-10, see the barbersError bug-fix comment below).
  */
 export default function useReservationBooking() {
   const { config, isLoading: configLoading } = useTenantConfig()
@@ -73,6 +75,7 @@ export default function useReservationBooking() {
 
   const [barbers, setBarbers] = useState([])
   const [barbersLoading, setBarbersLoading] = useState(true)
+  const [barbersError, setBarbersError] = useState(false)
   const [selectedBarberId, setSelectedBarberId] = useState(null)
 
   const [services, setServices] = useState([])
@@ -85,6 +88,7 @@ export default function useReservationBooking() {
 
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsError, setSlotsError] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState(null)
 
   const [showLocalForm, setShowLocalForm] = useState(false)
@@ -103,9 +107,13 @@ export default function useReservationBooking() {
     return () => { mountedRef.current = false }
   }, [])
 
+  const [barbersRetryKey, setBarbersRetryKey] = useState(0)
+  const retryBarbers = useCallback(() => setBarbersRetryKey((k) => k + 1), [])
+
   useEffect(() => {
     if (!slug) return
     setBarbersLoading(true)
+    setBarbersError(false)
     publicApi.get('/reservations/barbers', { params: { client_slug: slug } })
       .then(({ data }) => {
         if (!mountedRef.current) return
@@ -113,11 +121,19 @@ export default function useReservationBooking() {
         setBarbers(list)
         if (list.length) setSelectedBarberId(list[0].id)
       })
-      .catch(() => { if (mountedRef.current) setBarbers([]) })
+      // Bug fix (2026-08-10, .claudedocs/work/availability-reliability/2026-08-10/summary.md):
+      // a failed request used to be treated identically to "this tenant genuinely has zero
+      // staff" (both set barbers=[]), silently dropping a real customer into the old legacy
+      // form. barbersError now keeps that distinction all the way to the UI.
+      .catch(() => { if (mountedRef.current) { setBarbers([]); setBarbersError(true) } })
       .finally(() => { if (mountedRef.current) setBarbersLoading(false) })
-  }, [slug])
+  }, [slug, barbersRetryKey])
 
-  const mode = barbersLoading ? 'loading' : (barbers.length > 0 ? 'booking' : 'legacy')
+  const mode = barbersLoading
+    ? 'loading'
+    : barbersError
+      ? 'error'
+      : (barbers.length > 0 ? 'booking' : 'legacy')
 
   // Phase 3.7C (2026-08-08) -- was a category-walk (fetchAllCategories -> fetchItems per category
   // -> filter by metadata.requires_booking); now a single call against the real CatalogService
@@ -158,17 +174,25 @@ export default function useReservationBooking() {
   const selectedBarber  = barbers.find((b) => b.id === selectedBarberId) ?? null
   const durationMin     = selectedService?.duration_min ?? null
 
+  const [slotsRetryKey, setSlotsRetryKey] = useState(0)
+  const retrySlots = useCallback(() => setSlotsRetryKey((k) => k + 1), [])
+
   useEffect(() => {
     if (!slug || !selectedBarberId || !durationMin || !selectedDate) return
     setSlotsLoading(true)
+    setSlotsError(false)
     setSelectedSlot(null)
     publicApi.get('/reservations/availability', {
       params: { client_slug: slug, barber_id: selectedBarberId, date: selectedDate, duration_min: durationMin },
     })
       .then(({ data }) => { if (mountedRef.current) setSlots(data?.data ?? []) })
-      .catch(() => { if (mountedRef.current) setSlots([]) })
+      // Bug fix (2026-08-10): a failed request rendered the identical "no appointments today"
+      // copy as a real, confirmed empty day -- a customer hitting a bad moment saw what looked
+      // like a fully-booked shop on every date they tried, with no way to tell the difference.
+      // slotsError keeps that distinction all the way to CalendarPanel.
+      .catch(() => { if (mountedRef.current) { setSlots([]); setSlotsError(true) } })
       .finally(() => { if (mountedRef.current) setSlotsLoading(false) })
-  }, [slug, selectedBarberId, selectedDate, durationMin])
+  }, [slug, selectedBarberId, selectedDate, durationMin, slotsRetryKey])
 
   const resetConfirmation = useCallback(() => {
     setReservationId(null)
@@ -274,8 +298,8 @@ export default function useReservationBooking() {
     weekdaysShort: AR_WEEKDAYS_SHORT,
     selectedDate, chooseDate,
     services, servicesLoading, selectedServiceId, selectedService, chooseService,
-    barbers, barbersLoading, selectedBarberId, selectedBarber, chooseBarber,
-    slots, slotsLoading, selectedSlot, chooseSlot,
+    barbers, barbersLoading, barbersError, retryBarbers, selectedBarberId, selectedBarber, chooseBarber,
+    slots, slotsLoading, slotsError, retrySlots, selectedSlot, chooseSlot,
     showLocalForm, toggleLocalForm,
     customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, reservationId, confirmMethod, whatsappUrl,

@@ -264,7 +264,8 @@ function isTodayIso(iso) {
 function CalendarPanel({ booking }) {
   const {
     monthGrid, goPrevMonth, goNextMonth, monthOffset, weekdaysShort,
-    selectedDate, chooseDate, slots, slotsLoading, selectedSlot, chooseSlot, formatArabicDate,
+    selectedDate, chooseDate, slots, slotsLoading, slotsError, retrySlots, selectedSlot, chooseSlot,
+    formatArabicDate,
   } = booking
 
   // Bring the earliest (first) slot into view when viewing today -- no "find slot near now" search
@@ -348,7 +349,28 @@ function CalendarPanel({ booking }) {
         </div>
 
         {slotsLoading && <LightLoadingDot />}
-        {!slotsLoading && slots.length === 0 && (
+        {/* Bug fix (2026-08-10): a failed availability request used to render the identical "no
+            appointments today" copy as a real, confirmed empty day -- a customer hitting a bad
+            backend moment saw what looked like a fully-booked shop on every date they tried, with
+            no way to tell the difference. slotsError keeps that distinct, with a real retry. */}
+        {!slotsLoading && slotsError && (
+          <div style={{ textAlign: 'center', padding: '30px 0' }}>
+            <p style={{ color: T.textMuted, fontSize: 13, marginBottom: 12 }}>
+              حدث خطأ أثناء تحميل المواعيد. يرجى المحاولة مجدداً.
+            </p>
+            <button
+              onClick={retrySlots}
+              style={{
+                padding: '9px 22px', borderRadius: 999, border: `1px solid ${T.border}`,
+                background: T.cardBg, color: T.textPrimary, fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: FONT,
+              }}
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+        {!slotsLoading && !slotsError && slots.length === 0 && (
           <p style={{ color: T.textMuted, fontSize: 13, textAlign: 'center', padding: '30px 0' }}>
             لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
           </p>
@@ -818,6 +840,35 @@ export default function ReservePage() {
           textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontFamily: FONT, fontSize: 16,
         }}>
           خدمة الحجز غير متاحة حالياً.
+        </div>
+      </div>
+    )
+  }
+
+  // Bug fix (2026-08-10): a failed barbers fetch used to be silently treated as "this tenant has
+  // zero staff", dropping a real customer into the old legacy form with no explanation. mode
+  // === 'error' keeps that distinct -- see useReservationBooking.js's barbersError comment.
+  if (mode === 'error') {
+    return (
+      <div style={{ minHeight: '100vh', background: T.pageBg }}>
+        <TenantModuleNav />
+        <div style={{
+          maxWidth: 420, margin: '160px auto 0', padding: '0 20px', textAlign: 'center',
+          direction: 'rtl', fontFamily: FONT,
+        }}>
+          <p style={{ fontSize: 15, color: T.textSecond, marginBottom: 18 }}>
+            حدث خطأ أثناء تحميل صفحة الحجز. يرجى المحاولة مجدداً.
+          </p>
+          <button
+            onClick={booking.retryBarbers}
+            style={{
+              padding: '12px 28px', borderRadius: 999, border: 'none',
+              background: T.green, color: '#fff', fontSize: 14, fontWeight: 700,
+              cursor: 'pointer', fontFamily: FONT,
+            }}
+          >
+            إعادة المحاولة
+          </button>
         </div>
       </div>
     )
