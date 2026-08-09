@@ -27,6 +27,15 @@ from app.repositories import resource_repo, barber_repo, catalog_service_repo
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
 
+
+class ReservationAccessDenied(Exception):
+    """Staff Scoped Access (Phase B, 2026-08-09) -- raised when a STAFF-role caller (identified by
+    staff_barber_id, always server-derived from the authenticated User, never from client input)
+    attempts to read/modify a reservation that isn't theirs, or reassign one to a different barber.
+    Routes translate this into a real 403 -- see
+    .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md."""
+    pass
+
 # module_key → required metadata keys (informational — not enforced as 400, just documented)
 MODULE_DEFAULTS: dict[str, dict] = {
     "restaurant":  {"duration_min": 90},
@@ -367,13 +376,22 @@ async def get_available_slots(
     return slots
 
 
-async def get_reservation(client_id: str, reservation_id: str, customer_phone: str | None = None) -> dict | None:
+async def get_reservation(
+    client_id: str,
+    reservation_id: str,
+    customer_phone: str | None = None,
+    staff_barber_id: str | None = None,
+) -> dict | None:
     repo = ReservationRepository(prisma_client)
     if customer_phone:
         r = await repo.find_by_id_and_phone(reservation_id, client_id, customer_phone)
     else:
         r = await repo.find_by_id(reservation_id, client_id)
-    return _fmt(r) if r else None
+    if not r:
+        return None
+    if staff_barber_id is not None and getattr(r, "barberId", None) != staff_barber_id:
+        raise ReservationAccessDenied()
+    return _fmt(r)
 
 
 async def list_reservations(
@@ -383,16 +401,28 @@ async def list_reservations(
     date_from:   datetime | None = None,
     date_to:     datetime | None = None,
     limit:       int = 50,
+    barber_id:   str | None = None,
 ) -> list[dict]:
     repo = ReservationRepository(prisma_client)
-    rows = await repo.list_by_client(client_id, module_key, status, date_from, date_to, limit)
+    rows = await repo.list_by_client(client_id, module_key, status, date_from, date_to, limit, barber_id)
     return [_fmt(r) for r in rows]
 
 
-async def update_status(client_id: str, reservation_id: str, new_status: str) -> dict | None:
+async def update_status(
+    client_id: str,
+    reservation_id: str,
+    new_status: str,
+    staff_barber_id: str | None = None,
+) -> dict | None:
     if new_status not in VALID_STATUSES:
         raise ValueError(f"Invalid status. Use: {VALID_STATUSES}")
     repo = ReservationRepository(prisma_client)
+    if staff_barber_id is not None:
+        existing = await repo.find_by_id(reservation_id, client_id)
+        if not existing:
+            return None
+        if getattr(existing, "barberId", None) != staff_barber_id:
+            raise ReservationAccessDenied()
     r = await repo.update_status(reservation_id, client_id, new_status)
     return _fmt(r) if r else None
 
@@ -411,6 +441,7 @@ async def edit_reservation(
     new_customer_name:     str | None = None,
     new_customer_phone:    str | None = None,
     new_service_id:        str | None = None,
+    staff_barber_id:       str | None = None,
 ) -> dict | None:
     """
     Admin Dashboard Calendar mutation for an EXISTING reservation -- covers drag-and-drop reschedule
@@ -426,11 +457,24 @@ async def edit_reservation(
     barber) -- a name/phone/service-only edit must not be blocked by a check that has nothing to do
     with what's actually changing, and must not be blocked by the reservation's OWN existing time
     already being in the past.
+
+    staff_barber_id (Phase B, Staff Scoped Access, 2026-08-09): when set, this is a STAFF-role
+    caller -- the reservation must already belong to them (else ReservationAccessDenied, -> 403),
+    and they may not reassign it to a *different* barber (new_barber_id, if given, must equal their
+    own barberId) -- otherwise a staff member could use their own reservation as a back door to
+    write onto another barber's calendar, which is exactly the boundary this capability exists to
+    enforce.
     """
     repo = ReservationRepository(prisma_client)
     existing = await repo.find_by_id(reservation_id, client_id)
     if not existing:
         return None
+
+    if staff_barber_id is not None:
+        if getattr(existing, "barberId", None) != staff_barber_id:
+            raise ReservationAccessDenied()
+        if new_barber_id is not None and new_barber_id != staff_barber_id:
+            raise ReservationAccessDenied()
 
     # Phase 1.x fix (2026-08-05, same root cause as get_available_slots()'s past-slot filter):
     # new_reserved_at is a naive-local wall-clock value labeled UTC (no real conversion, the

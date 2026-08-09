@@ -36,12 +36,15 @@ class ReservationRepository:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         limit: int = 50,
+        barber_id: str | None = None,
     ) -> list:
         where: dict = {"clientId": client_id}
         if module_key:
             where["moduleKey"] = module_key
         if status:
             where["status"] = status
+        if barber_id:
+            where["barberId"] = barber_id
         if date_from or date_to:
             where["reservedAt"] = {}
             if date_from:

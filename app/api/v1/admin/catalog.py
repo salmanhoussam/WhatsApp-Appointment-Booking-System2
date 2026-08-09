@@ -2,11 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 
-from app.db.dependencies import get_current_admin_user
+from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.services import catalog_service
 
 router = APIRouter()
+
+# Staff Scoped Access (Phase B, 2026-08-09, .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md):
+# this file previously had NO require_roles() gate at all -- any authenticated admin, any role,
+# could reach every route below. Closed here to explicitly exclude STAFF while preserving every
+# other role's existing de-facto access exactly as it was (nothing removed for SUPER_ADMIN/
+# TENANT_ADMIN/MANAGER_RESERVATIONS/MANAGER_UNITS -- they simply weren't gated before either).
+CATALOG_ROLES = ("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS")
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -75,7 +82,7 @@ async def list_categories(
     module_key:       Optional[str] = Query(None),
     parent_id:        Optional[str] = Query(None),
     include_inactive: bool          = Query(False),
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_list_categories(
@@ -90,7 +97,7 @@ async def list_categories(
 @router.post("/categories", status_code=201)
 async def create_category(
     body: CategoryCreate,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_create_category(
@@ -110,7 +117,7 @@ async def create_category(
 async def update_category(
     category_id: str,
     body: CategoryUpdate,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_update_category(
@@ -130,7 +137,7 @@ async def update_category(
 @router.delete("/categories/{category_id}")
 async def delete_category(
     category_id: str,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     await catalog_service.admin_delete_category(user.clientId, category_id)
@@ -140,7 +147,7 @@ async def delete_category(
 @router.post("/seed-from-template", status_code=201)
 async def seed_from_template(
     body: SeedFromTemplateRequest,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_seed_from_template(
@@ -160,7 +167,7 @@ async def list_items(
     category_id:      Optional[str] = Query(None),
     featured_only:    bool          = Query(False),
     include_inactive: bool          = Query(False),
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_list_items(
@@ -175,7 +182,7 @@ async def list_items(
 @router.post("/items", status_code=201)
 async def create_item(
     body: ItemCreate,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_create_item(
@@ -199,7 +206,7 @@ async def create_item(
 async def update_item(
     item_id: str,
     body: ItemUpdate,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_update_item(
@@ -224,7 +231,7 @@ async def update_item(
 @router.delete("/items/{item_id}")
 async def delete_item(
     item_id: str,
-    user = Depends(get_current_admin_user),
+    user = Depends(require_roles(*CATALOG_ROLES)),
     _svc = Depends(require_service("catalog")),
 ):
     await catalog_service.admin_delete_item(user.clientId, item_id)
