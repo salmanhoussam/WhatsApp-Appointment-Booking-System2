@@ -1,17 +1,16 @@
 # Dashboard UX Corrections — Pre-Polish Implementation Plan
 
-> **STATUS: ⏸ NOT APPROVED — NO IMPLEMENTATION UNTIL SALMAN EXPLICITLY SAYS "APPROVED."**
-> This file is the durable, project-committed record of the plan (the harness's own ephemeral
-> plan-mode file is not guaranteed to survive a context compact/reload — this one is). If this
-> session is resumed after a compact, **read this file, check the Status line above, and do not
-> start any code until it says APPROVED** — per `context-recovery-protocol.md`'s own
-> repository-over-memory rule and Salman's explicit instruction on 2026-08-10.
+> **STATUS: ✅ APPROVED — 2026-08-10, Salman's explicit approval.** Implementation proceeds in
+> Section E's order, with Section F's real verification (desktop + mobile, per Section B.12's
+> standing requirement) run before any item is considered done — same discipline as every other
+> Implementation Contract this session (`OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md`,
+> `STAFF_SCOPED_ACCESS_CONTRACT.md`, `STAFF_STORE_IA_SEPARATION_CONTRACT.md`).
 >
-> Once approved, implementation proceeds strictly in Section E's order, with Section F's real
-> verification (desktop + mobile, per Section B.12's standing requirement) run before any item is
-> considered done, exactly like every other Implementation Contract this session
-> (`OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md`, `STAFF_SCOPED_ACCESS_CONTRACT.md`,
-> `STAFF_STORE_IA_SEPARATION_CONTRACT.md`).
+> **One item stays gated regardless of this approval**: E's step 7 (#2, Reservations
+> List-vs-Calendar) reverses a documented 2026-08-03 product decision (see Section G, Q1). The
+> plan's own text requires an explicit confirmation on that specific reversal before it starts —
+> a blanket "approved" on the plan does not by itself resolve a flagged decision-reversal inside
+> it. Every other item proceeds now.
 
 ## Context
 
