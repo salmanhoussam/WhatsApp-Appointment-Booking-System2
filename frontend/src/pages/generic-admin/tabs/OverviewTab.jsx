@@ -458,57 +458,6 @@ function RecentOrders({ orders, color, currency }) {
   )
 }
 
-// ── TopCatalogItems ────────────────────────────────────────────────────────────
-
-function TopCatalogItems({ items, loading, color }) {
-  return (
-    <div style={{
-      background: T.cardBg,
-      border: `1px solid ${T.border}`,
-      boxShadow: T.shadow,
-      borderRadius: 14, padding: '18px 20px', minWidth: 0,
-    }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: T.textSecond, marginBottom: 14 }}>
-        من الكتالوج
-      </div>
-      {loading ? (
-        <p style={{ color: T.textMuted, fontSize: 13, margin: 0 }}>جاري التحميل...</p>
-      ) : items.length === 0 ? (
-        <EmptyState message="لا توجد منتجات بعد" style={{ padding: '24px 0' }} />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {items.map(item => (
-            <div key={item.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '9px 12px',
-              background: T.pageBg,
-              borderRadius: 9,
-            }}>
-              {item.image_url
-                ? <img src={item.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
-                : <div style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, flexShrink: 0 }} />
-              }
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.name_ar}
-                </div>
-                {item.category_name && (
-                  <div style={{ fontSize: 11, color: T.textMuted }}>{item.category_name}</div>
-                )}
-              </div>
-              {item.price != null && (
-                <div style={{ fontSize: 12, fontWeight: 700, color, flexShrink: 0 }}>
-                  {item.price} {item.currency}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── OverviewTab ────────────────────────────────────────────────────────────────
 /**
  * Props:
@@ -727,21 +676,14 @@ export default function OverviewTab({ color, activeServices, hasReservations, cu
         </div>
       )}
 
-      {/* ── Bottom panels ──────────────────────────────────────────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: hasOrders ? '1fr 1fr' : '1fr',
-        gap: 14,
-      }}>
-        {hasOrders && (
-          <RecentOrders orders={orders} color={color} currency={currency} />
-        )}
-        <TopCatalogItems
-          items={catalogItems.slice(0, 5)}
-          loading={catalogLoading}
-          color={color}
-        />
-      </div>
+      {/* ── Bottom panel ──────────────────────────────────────────────── */}
+      {/* TopCatalogItems ("من الكتالوج") removed 2026-08-10 (Overview UX Improvements Contract) --
+          it was an arbitrary catalogItems.slice(0, 5), unrelated to sales/orders/activity,
+          duplicating data already fully browsable in Staff -> Services and Store -> Items, with
+          no distinct purpose on this screen. RecentOrders now takes the full row alone. */}
+      {hasOrders && (
+        <RecentOrders orders={orders} color={color} currency={currency} />
+      )}
     </div>
   )
 }

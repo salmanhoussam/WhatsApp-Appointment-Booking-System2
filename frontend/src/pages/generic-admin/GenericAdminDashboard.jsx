@@ -179,7 +179,11 @@ function buildNav(hasReservations) {
   // Services now live inside 'staff' (its own internal toggle), Store Categories/Items/Orders live
   // inside the new 'store' entry (its own internal toggle, reusing OrdersTab directly). The
   // non-hasReservations branch above is untouched -- separate code path, out of this task's scope.
+  // Overview moved to the front (2026-08-10, Overview UX Improvements Contract) -- matches the
+  // !hasReservations branch above, which already puts it first; this branch was the inconsistent
+  // outlier with it last.
   return [
+    { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
     { id: 'calendar',      labelAr: 'التقويم',    Icon: IconCalendar      },
     { id: 'reservations',  labelAr: 'الحجوزات',   Icon: IconList          },
     { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
@@ -187,7 +191,6 @@ function buildNav(hasReservations) {
     { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
     { id: 'notifications', labelAr: 'الإشعارات',  Icon: IconNotifications },
     { id: 'settings',      labelAr: 'الإعدادات',  Icon: IconSettings      },
-    { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
   ]
 }
 
