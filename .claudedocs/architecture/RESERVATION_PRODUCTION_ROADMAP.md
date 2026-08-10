@@ -272,6 +272,15 @@ likely feeds whatever stats replace the current ones).
   before calling this line production-hardened.
 - ~~Super Admin Dashboard~~ — **deferred past 2026-08-31**, per the scope decision above (not part
   of "best booking web app" for RK/Ali's own users).
+- **`POST /api/v1/auth/users/login` is not covered by the availability-reliability fix** — hit a
+  real, live `P1001` pooler failure on this exact route while gathering evidence for the Overview
+  contract (2026-08-10), self-resolved on retry seconds later (same known transient class, real
+  traceback confirmed in the backend log). `with_db_resilience()` (Production Blocker #1) was
+  deliberately scoped to the reservation flow's hot paths and `require_service()`/`_verify_tenant()`
+  — it never touched `app/api/v1/admin/auth.py`. A real customer/admin failing to even log in during
+  a pooler hiccup is at least as bad as the availability-endpoint symptom #1 already fixed. Not
+  fixed here (out of the Overview contract's scope) — named as a real follow-up candidate for this
+  same wrapper, same pattern, different route.
 
 Estimate: 1-2 sessions.
 
