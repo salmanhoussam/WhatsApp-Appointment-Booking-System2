@@ -18,7 +18,12 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 4. ✅ Overview UX improvements -- DONE 2026-08-10. Reclassified 🔴→🟡 first (fresh evidence showed
         3 of 5 original reasons no longer reproduced post-cleanup) -- small named contract, not a
         redesign (.claudedocs/implementation/OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md)
-5. 🟡 Calendar/Reservations/Staff/Store polish  <- next-session priority
+5. ⏸ Calendar/Reservations/Staff/Store polish  <- next-session priority, PLAN WRITTEN, NOT APPROVED
+        Full plan: `.claudedocs/implementation/DASHBOARD_UX_CORRECTIONS_CONTRACT.md` (13 real
+        observations investigated, A-G structure). Several turned out different from their stated
+        premise once verified (Overview empty-states, Store order status, Staff/Services data
+        already clean) -- see the file. **Do NOT start any code from this contract until its own
+        Status line says APPROVED** -- check that line first, every time this is resumed.
 6. Ali onboarding
 7. Final production regression
 8. 2026-08-31 LIVE
