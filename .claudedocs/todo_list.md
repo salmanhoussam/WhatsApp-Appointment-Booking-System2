@@ -15,8 +15,10 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
         confirmation from RK/the real shop owner on two specific questions (see below).
 3. ✅ STAFF /admin/barbers/ roster scoping -- DONE 2026-08-10, real-account tests + browser
         regression both clean (.claudedocs/work/staff-barbers-roster-scoping/2026-08-10/evidence.md)
-4. 🔴 Overview redesign  <- next-session priority
-5. 🟡 Calendar/Reservations/Staff/Store polish
+4. ✅ Overview UX improvements -- DONE 2026-08-10. Reclassified 🔴→🟡 first (fresh evidence showed
+        3 of 5 original reasons no longer reproduced post-cleanup) -- small named contract, not a
+        redesign (.claudedocs/implementation/OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md)
+5. 🟡 Calendar/Reservations/Staff/Store polish  <- next-session priority
 6. Ali onboarding
 7. Final production regression
 8. 2026-08-31 LIVE
@@ -28,9 +30,12 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
    and no real number captured?
 2. Do "bo salo" / "ali aloka" / "ashraf kokha" match real walk-in customers from 2026-08-06?
 
-Next-session priority: #4, Overview redesign — needs its own scoped Implementation Contract before
-any code, per the "no redesign before verdict" rule (findings:
-`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`'s "Overview — why it lands on 🔴").
+**Also open, not blocking, logged as a Phase 4 follow-up**: `POST /api/v1/auth/users/login` hit the
+same known transient pooler-flakiness class (`P1001`) twice during today's testing, unwrapped by
+the earlier availability-reliability fix (which was scoped to the reservation flow only).
+
+Next-session priority: #5, Calendar/Reservations/Staff/Store polish — the remaining 🟡 items from
+the three-sided Product Review (`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`).
 
 ## 2026-08-09 — see full session report
 

@@ -33,8 +33,8 @@ order work actually happens in, regardless of each item's phase number:
        ↓
 3. ✅ STAFF barbers-roster scoping  DONE 2026-08-10 — see below
        ↓
-4. 🔴 Overview redesign             (Phase 3.7) — explicitly NOT started before #2 closes; designing
-       ↓                             new stats/activity on top of known-dirty data is real wasted work
+4. ✅ Overview UX improvements      DONE 2026-08-10 — reclassified 🔴→🟡 first, see below
+       ↓
 5. 🟡 Calendar / Reservations / Staff / Store polish   (Phase 3.5's Admin-pass Improve items)
        ↓
 6. Ali onboarding                   (Phase 3)
@@ -242,18 +242,31 @@ run before every tenant's go-live (Ali included), or a recurring hygiene check? 
 Estimate: 1 session (mostly investigation + a careful, scoped delete pass — same discipline as any
 data-touching change, per this project's migration-staging concerns).
 
-## Phase 3.7 — Overview Redesign (🔴, scoped Implementation Contract required before any code)
+## Phase 3.7 — Overview UX Improvements — ✅ DONE 2026-08-10 (reclassified 🔴→🟡 before any code)
 
-Per Salman's own confirmation: not a taste complaint — the screen currently gives a shop owner an
-unreliable picture of their own business (contradictory order counts, near-empty stat cards, a
-test-data activity feed, buried last in the nav). Full findings:
-`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`'s "Overview — why it lands on 🔴"
-section. Not started — per the "no redesign before verdict" rule, this needs its own scoped
-Implementation Contract (what real stats replace the current 2, where it moves in the nav, how the
-Recent Orders/Overview discrepancy gets root-caused) before any code, not an inline fix.
+Originally rated 🔴 (`.claudedocs/work/admin-dashboard-review/2026-08-10/summary.md`'s "Overview —
+why it lands on 🔴": contradictory order counts, near-empty stat cards, a test-data activity feed,
+buried last in nav). Before writing a redesign contract, a **fresh evidence pass**
+(`.claudedocs/work/overview-redesign-contract/2026-08-10/evidence-pass.md`) re-checked all 5
+reasons against current data — 3 no longer reproduced (all 6 stat cards render; the activity feed
+now shows only the 7 deliberately-preserved uncertain reservations, not QA noise; Recent Orders and
+Store Orders are no longer contradictory, both correctly show 0 post-cleanup). Per Salman's own
+rule (🔴 must be based on a currently-proven problem, not a possible future one), reclassified to
+🟡 — a small, explicitly-not-called-"redesign" contract instead:
+`.claudedocs/implementation/OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md`.
 
-Estimate: 1-2 sessions (root-causing the Orders-count discrepancy first, since that same data
-likely feeds whatever stats replace the current ones).
+Of 5 investigated items, 2 needed code (removed the "من الكتالوج" widget — an arbitrary catalog
+slice with no sales/order relevance; moved Overview to the front of the nav, matching a convention
+this codebase's own other tenant-type branch already used) and 3 correctly resolved to **no
+change** after real investigation/testing: a customer-count stat (no data available without
+inventing a new backend API), a mobile bottom-nav overlay (a real *transient* mid-scroll overlap
+existed, but a true max-scroll test confirmed nothing is ever *permanently* hidden — not a bug).
+Full regression check (Calendar/Reservations/Staff/Store, both roles, both viewports) clean.
+Evidence: `.claudedocs/work/overview-redesign-contract/2026-08-10/evidence.md`. Commits: `6d737d5`,
+`aefa5fc`.
+
+Actual time: well under the original 1-2 session redesign estimate — the finding shrank once
+verified, same pattern as Phase 1's Orphaned Admin Router Cleanup.
 
 ## Phase 4 — Platform Hardening
 
