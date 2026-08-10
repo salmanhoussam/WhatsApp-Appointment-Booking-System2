@@ -56,12 +56,24 @@ not implemented**. Named here as a real, explicit non-decision: a future small a
 (e.g., distinct `customerPhone` across `Reservation`) would close this, but that's backend work,
 out of this contract's frontend-only scope.
 
-### 4. Mobile bottom-nav overlap — pending a real scroll-position test (running now, not assumed)
+### 4. Mobile bottom-nav overlap — resolved: NOT a real bug, NO change made
 
-Per Salman's explicit instruction: fix only if confirmed via a real scroll/viewport test, no
-speculative change. Test in progress; result and any resulting fix (or explicit "not confirmed, no
-change made") will be appended to this contract's Verification section before implementation of
-this specific item, not assumed either way here.
+Two real tests, not one. First test found a real, geometrically-confirmed overlap **mid-scroll**
+(scroll≈300px, a stat card fully behind the bottom tab bar). Per Salman's own correction — a fixed
+bottom bar occluding content while actively scrolling past it is normal, expected behavior for any
+fixed-position bar, not itself a defect — the real question is only whether content is ever
+**permanently** unreachable at true maximum scroll. Ran that specific test:
+`window.scrollTo(0, document.body.scrollHeight)`, confirmed genuinely at max
+(`scrollY(1937) + innerHeight(844) = 2781 = document.body.scrollHeight` exactly). Last real content
+(the "من الكتالوج"/"آخر الطلبات" row) sits with **21–40px of real clearance** above the bar —
+`<main>`'s existing ~100px bottom padding already handles this correctly. **No content is ever
+permanently hidden. No fix made** — adding padding "just in case" was explicitly ruled out per
+Salman's own instruction once the test came back clean.
+
+(Side note from this same test pass: hit the real, known transient pooler `500` on the login
+endpoint 4 times before succeeding on a 5th attempt with a longer wait — consistent with, not a new
+instance beyond, the Phase 4 follow-up already logged in the roadmap. Not touched here, per
+Salman's explicit "don't touch it inside Overview" instruction.)
 
 ## Files Touched
 
@@ -70,8 +82,7 @@ this specific item, not assumed either way here.
   full-width for `RecentOrders`, since it's the only occupant left).
 - `frontend/src/pages/generic-admin/GenericAdminDashboard.jsx` — reorder `overview` to the front of
   `buildNav()`'s `hasReservations` return array. No other line in this function changes.
-- *(Item 4, conditional)* — a small CSS padding/z-index fix, file TBD by what the real scroll test
-  finds, only if it confirms a real overlap.
+- Item 4: no file touched — confirmed not a real bug (see above).
 
 ## Acceptance Criteria
 
@@ -99,7 +110,20 @@ this specific item, not assumed either way here.
   the nav-order change is exactly the kind of thing that's cheap to verify doesn't silently affect
   routing/tab-switching elsewhere.
 
-## Status
+## Status — ✅ DONE 2026-08-10
 
-Not yet implemented — this contract is presented for review before any code, per Salman's explicit
-instruction. Item 4's real test result will be appended before implementation starts.
+Implemented exactly the two confirmed items (1&5 combined as one decision, 2) — items 3 and 4
+correctly resulted in **no code change**, per their own investigation/test outcomes above.
+
+**Real verification** (not simulated): full desktop + mobile pass, both roles.
+- Nav order: `نظرة عامة` now first, desktop sidebar and mobile bottom bar both confirmed.
+- "من الكتالوج" confirmed absent from `document.body.innerText`; all 6 stat cards, both charts,
+  Activity Feed, Best Sellers, and Recent Orders all still render correctly.
+- **Regression check** (explicitly required): Calendar, Reservations, Staff, Store all loaded real
+  content with zero errors.
+- **STAFF negative check**: Jaafar's nav still has zero `نظرة عامة` entry — unchanged.
+- Zero new console errors, zero new network errors ≥ 400 attributable to these changes. One
+  transient pooler `500` observed on an unrelated Calendar fetch, self-resolved — matches the
+  already-documented, already-tracked flakiness pattern, not a regression from this work.
+
+Full evidence: `.claudedocs/work/overview-redesign-contract/2026-08-10/evidence.md`.
