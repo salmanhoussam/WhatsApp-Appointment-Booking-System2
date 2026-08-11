@@ -102,6 +102,13 @@ export default function StaffTab({ color }) {
   // الخدمات (new CatalogService CRUD).
   const [subView, setSubView] = useState('employees')
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const [staff,   setStaff]   = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -159,6 +166,53 @@ export default function StaffTab({ color }) {
 
   useEffect(() => { loadStaff() }, [loadStaff])
   useEffect(() => { loadServices() }, [loadServices])
+
+  // ── Employee <-> Service panel (Dashboard UX Corrections #7/C, 2026-08-10) ───────────────────
+  // A visible, at-a-glance two-panel view of the Staff<->Service relationship -- COEXISTS with the
+  // edit-modal checklist above (G3 default: coexist, not replace); the modal stays the full
+  // barber-profile editor, this panel is for quick browsing/toggling without opening it. Reuses the
+  // exact same already-existing endpoints (GET/PATCH /barbers/{id}/services), no new backend surface.
+  const [panelSelectedId, setPanelSelectedId] = useState(null)
+  const [panelServiceIds, setPanelServiceIds] = useState([])
+  const [panelLoading,    setPanelLoading]    = useState(false)
+  const [panelTogglingId, setPanelTogglingId] = useState(null)
+
+  // Default the panel's selected employee to the first real staff member once the roster loads --
+  // never left unselected when a real employee exists.
+  useEffect(() => {
+    if (panelSelectedId == null && staff.length > 0) setPanelSelectedId(staff[0].id)
+  }, [staff, panelSelectedId])
+
+  const loadPanelServices = useCallback((barberId) => {
+    if (!barberId) return
+    setPanelLoading(true)
+    adminApi.get(`/barbers/${barberId}/services`)
+      .then(r => setPanelServiceIds(r.data.data ?? []))
+      .catch(() => setPanelServiceIds([]))
+      .finally(() => setPanelLoading(false))
+  }, [])
+
+  useEffect(() => { loadPanelServices(panelSelectedId) }, [panelSelectedId, loadPanelServices])
+
+  // Toggle -> PATCH the full list (same contract the edit-modal's save() already uses) -> re-fetch
+  // to prove the round-trip actually persisted, rather than trusting an optimistic local update
+  // (Section F's explicit verification requirement: "confirm it persists, re-fetch to prove it
+  // round-tripped, not just local state").
+  const togglePanelService = async (serviceId) => {
+    if (!panelSelectedId || panelTogglingId) return
+    const next = panelServiceIds.includes(serviceId)
+      ? panelServiceIds.filter(id => id !== serviceId)
+      : [...panelServiceIds, serviceId]
+    setPanelTogglingId(serviceId)
+    try {
+      await adminApi.patch(`/barbers/${panelSelectedId}/services`, { service_ids: next })
+      loadPanelServices(panelSelectedId)
+    } catch (err) {
+      alert(err?.response?.data?.detail ?? 'حدث خطأ أثناء تحديث الخدمات')
+    } finally {
+      setPanelTogglingId(null)
+    }
+  }
 
   // ── Services management: load + category options ────────────────────────────
 
@@ -420,6 +474,91 @@ export default function StaffTab({ color }) {
           <Button variant="primary" color={color} onClick={openCreateService} disabled={catOptions.length === 0}>+ خدمة جديدة</Button>
         )}
       </div>
+
+      {/* Employee <-> Service two-panel view (#7/C, 2026-08-10) -- only in الموظفون sub-view, only
+          once real staff exist (an empty roster has nothing to select). Coexists with the card
+          grid below, unchanged, and with the edit-modal checklist (G3 default). */}
+      {subView === 'employees' && !loading && staff.length > 0 && (
+        <Card padding={0} style={{ marginBottom: 16, overflow: 'hidden' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '200px 1fr',
+            direction: 'rtl', fontFamily: FONT,
+          }}>
+            {/* Left panel: employees */}
+            <div style={{
+              borderInlineEnd: isMobile ? 'none' : `1px solid ${T.borderSoft}`,
+              borderBottom: isMobile ? `1px solid ${T.borderSoft}` : 'none',
+              padding: 10,
+              display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 4,
+              overflowX: isMobile ? 'auto' : 'visible',
+            }}>
+              {staff.map(member => {
+                const active = panelSelectedId === member.id
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => setPanelSelectedId(member.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 10px', borderRadius: 8, textAlign: 'right',
+                      cursor: 'pointer', fontFamily: FONT, fontSize: 13, fontWeight: active ? 700 : 500,
+                      background: active ? `${color}14` : 'transparent',
+                      color: active ? color : T.textSecond,
+                      border: `1px solid ${active ? `${color}44` : 'transparent'}`,
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                      minHeight: 36, // real tap-target sizing (Section B.12)
+                    }}
+                  >
+                    {member.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Right panel: selected employee's services */}
+            <div style={{ padding: 16, minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 10 }}>
+                الخدمات التي يقدمها {staff.find(s => s.id === panelSelectedId)?.name ?? ''}
+              </div>
+              {services.length === 0 ? (
+                <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد خدمات بعد — أضف خدمات أولاً</div>
+              ) : panelLoading ? (
+                <div style={{ fontSize: 12, color: T.textMuted }}>جاري التحميل...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {services.map(s => {
+                    const checked = panelServiceIds.includes(s.id)
+                    const toggling = panelTogglingId === s.id
+                    return (
+                      <label
+                        key={s.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 6px', borderRadius: 6,
+                          cursor: toggling ? 'wait' : 'pointer', fontSize: 13, color: T.textPrimary,
+                          opacity: toggling ? 0.6 : 1,
+                          minHeight: 36, // real tap-target sizing (Section B.12)
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={toggling}
+                          onChange={() => togglePanelService(s.id)}
+                          style={{ width: 16, height: 16, accentColor: color, cursor: 'pointer', flexShrink: 0 }}
+                        />
+                        {s.name_ar}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {subView === 'services' ? (
         svcLoading ? (
