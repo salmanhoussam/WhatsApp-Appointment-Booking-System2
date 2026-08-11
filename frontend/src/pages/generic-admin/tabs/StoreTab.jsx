@@ -373,6 +373,27 @@ export default function StoreTab({ color, currency = 'USD', activeServices }) {
             </Card>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Publish nudge (Dashboard UX Corrections #9, 2026-08-10): the show/hide mechanism
+                  itself (toggleItemActive, the "مخفي" badge, إظهار/إخفاء per row below) already
+                  existed and worked -- the real gap was that nothing surfaced the storefront-wide
+                  consequence unless an admin read every row's badge individually. Purely derived
+                  from `items` (already fetched), no new API call. Shown only in the worst case --
+                  every product hidden, so a customer would see an empty store -- not on every
+                  partial-hide, to avoid nagging an admin who intentionally hid a few items. */}
+              {items.every(i => !i.is_active) && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 16px', borderRadius: 10,
+                  background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.35)',
+                  fontSize: 13, color: '#b45309', fontFamily: FONT,
+                }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+                  <span>
+                    كل منتجاتك ({items.length}) غير ظاهرة للعملاء الآن — المتجر يبدو فارغًا لهم. اضغط
+                    "إظهار" على أي منتج بالأسفل لعرضه.
+                  </span>
+                </div>
+              )}
               {items.map(item => (
                 <Card key={item.id} padding="14px 18px" style={{ display: 'flex', alignItems: 'center', gap: 16, opacity: item.is_active ? 1 : 0.55 }}>
                   {item.image_url && (
