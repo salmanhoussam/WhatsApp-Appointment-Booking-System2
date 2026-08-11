@@ -69,13 +69,16 @@ function fmtPrice(val, currency) {
 }
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────
+// Chevron affordance (Dashboard UX Corrections #10, 2026-08-10): the click handler and status-
+// transition logic here already worked end-to-end -- the only real gap was discoverability, the
+// badge gave no visual signal it was interactive. Purely additive, no logic change.
 function StatusBadge({ status, clickable, onClick }) {
   const m = STATUS_META[status] ?? { label: status, bg: T.pageBg, color: T.textSecond }
   return (
     <span
       onClick={onClick}
       style={{
-        display: 'inline-block', fontSize: 11, fontWeight: 600,
+        display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600,
         padding: '3px 10px', borderRadius: 20,
         background: m.bg, color: m.color,
         cursor: clickable ? 'pointer' : 'default',
@@ -85,6 +88,11 @@ function StatusBadge({ status, clickable, onClick }) {
       }}
     >
       {m.label}
+      {clickable && (
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.75 }}>
+          <path d="M2.5 4.5L6 8L9.5 4.5" stroke={m.color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
     </span>
   )
 }
