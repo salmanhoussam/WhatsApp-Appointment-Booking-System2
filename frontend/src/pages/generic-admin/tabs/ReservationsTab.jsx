@@ -622,20 +622,29 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
 
         {/* View switcher — List is its own pill; Today/Week is one segmented control (Phase 3.1,
             2026-08-03) so switching feels like moving between two modes of the same calendar, not
-            two separate pages, per Salman's explicit note. */}
+            two separate pages, per Salman's explicit note.
+            "قائمة" pill (Dashboard UX Corrections #4, 2026-08-10): only rendered on the Calendar-tab
+            instance (`defaultView="today"`) — GenericAdminDashboard.jsx's Reservations-tab instance
+            (`defaultView="list"`) already defaults to and lives in List mode, so the pill there was
+            always active-and-inert. `defaultView` is safe to gate on directly (not `viewMode`,
+            which changes at runtime): the wrapping `motion.div key={activeTab}` in
+            GenericAdminDashboard.jsx fully remounts this component on every tab switch, so
+            `defaultView` is fixed for this instance's whole lifetime, no new prop needed. */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginRight: isMobile ? 0 : 'auto' }}>
-          <button
-            onClick={() => { setViewMode('list'); setPage(1) }}
-            style={{
-              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-              cursor: 'pointer', fontFamily: FONT,
-              background: viewMode === 'list' ? `${color}14` : T.cardBg,
-              color: viewMode === 'list' ? color : T.textSecond,
-              border: `1px solid ${viewMode === 'list' ? `${color}55` : T.border}`,
-            }}
-          >
-            قائمة
-          </button>
+          {defaultView !== 'list' && (
+            <button
+              onClick={() => { setViewMode('list'); setPage(1) }}
+              style={{
+                padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: FONT,
+                background: viewMode === 'list' ? `${color}14` : T.cardBg,
+                color: viewMode === 'list' ? color : T.textSecond,
+                border: `1px solid ${viewMode === 'list' ? `${color}55` : T.border}`,
+              }}
+            >
+              قائمة
+            </button>
+          )}
 
           <div style={{
             display: 'flex', borderRadius: 20, padding: 2,
