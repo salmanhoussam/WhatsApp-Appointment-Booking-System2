@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion }           from 'framer-motion'
 import adminApi          from '../../utils/admin.config'
 import useTenantConfig   from '../../hooks/useTenantConfig'
@@ -296,7 +297,39 @@ const SPRING_SNAPPY = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
 const SIDEBAR_W = 240
 
 export default function GenericAdminDashboard() {
-  const [activeTab,    setActiveTab]    = useState('overview')
+  // URL <-> tab sync (Dashboard UX Corrections #11, 2026-08-10). Both real route patterns that
+  // mount this component (`/dashboard/:slug/*` legacy, `/:slug/dashboard/*` canonical --
+  // App.jsx, rules/frontend/routing.md §0b) use a `/*` wildcard, so `params['*']` is the trailing
+  // tab segment regardless of which base pattern is active -- deriving `basePath` from it works
+  // uniformly for both, without deciding between them (that decision stays out of scope, per the
+  // plan's Section G Q6 -- this only fixes the symptom: activeTab was previously pure React state,
+  // never read from or written to the URL at all).
+  const location = useLocation()
+  const navigate = useNavigate()
+  const routeParams = useParams()
+  const initialUrlTab = (routeParams['*'] ?? '').split('/').filter(Boolean)[0] ?? ''
+  // Captured once at mount -- tells the default-landing-tab effect below whether the URL already
+  // named a tab, so it doesn't blindly override a real deep link/hard-refresh with 'calendar'.
+  const hadInitialUrlTabRef = useRef(Boolean(initialUrlTab))
+
+  // Role is resolved synchronously from the already-stored JWT (useAdminRole() reads
+  // localStorage directly, no network wait) -- computed here, ahead of the other config-dependent
+  // state below, specifically so activeTab's own initializer can use it (see next). Real bug found
+  // via browser verification, 2026-08-11: previously `activeTab` always initialized to 'overview'
+  // even for STAFF (whose nav never offers that tab), which briefly mounted OverviewTab -- firing
+  // real 403s against catalog/store endpoints STAFF has no access to -- before a later effect
+  // force-navigated to 'calendar' once the async tenant-config fetch resolved `hasReservations`.
+  // That flash-then-redirect window is also the exact window repeated real nav clicks were
+  // observed silently swallowed in (STAFF_STORE... err, dashboard-ux-corrections evidence,
+  // item-11). Since isStaff needs no async wait, STAFF's default tab is now resolved at the very
+  // first render instead, skipping the flash (and the effect below) entirely for this role.
+  const role       = useAdminRole()
+  const isStaff    = role === 'STAFF'
+  const myBarberId = useAdminBarberId()
+
+  const [activeTab,    setActiveTabRaw] = useState(
+    () => initialUrlTab || (isStaff ? 'calendar' : 'overview')
+  )
   const [settings,     setSettings]     = useState(null)
   const [loading,      setLoading]      = useState(true)
   const [isMobile,     setIsMobile]     = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
@@ -419,25 +452,44 @@ export default function GenericAdminDashboard() {
   const currency        = settings?.currency       ?? config?.currency ?? 'USD'
   const activeServices  = config?.active_services  ?? []
   const hasReservations = activeServices.includes('reservations')
-  const role             = useAdminRole()
-  const isStaff          = role === 'STAFF'
-  const myBarberId       = useAdminBarberId()
   const NAV               = useMemo(
     () => (isStaff ? STAFF_NAV : buildNav(hasReservations)),
     [hasReservations, isStaff],
   )
 
+  // basePath = current URL with the trailing tab segment removed -- works for both real route
+  // patterns since both wildcard-capture the tab segment into routeParams['*'].
+  const urlTail = routeParams['*'] ?? ''
+  const basePath = (urlTail
+    ? location.pathname.slice(0, location.pathname.length - urlTail.length)
+    : location.pathname
+  ).replace(/\/$/, '')
+
+  // Single entry point for changing tabs -- updates both the in-memory activeTab state AND the
+  // URL (replace, not push, so tab-switching doesn't spam browser history -- explicit requirement,
+  // Section B.11). Every setActiveTab call site below is replaced with this.
+  const changeTab = useCallback((id) => {
+    setActiveTabRaw(id)
+    navigate(`${basePath}/${id}`, { replace: true })
+  }, [navigate, basePath])
+
   // Calendar becomes the default landing tab once we know this is a reservations tenant --
   // `hasReservations` starts false (DEFAULT_CONFIG) until the real config fetch resolves, so this
   // fires exactly once per real session for a tenant like `hr`, never overriding a tab the owner
-  // has already clicked into afterward.
+  // has already clicked into afterward. Amended 2026-08-10 (#11): also never overrides a tab the
+  // URL already named at mount (a real deep link or a hard refresh on a non-default tab) --
+  // previously this force-set 'calendar' unconditionally, discarding the URL's own trailing
+  // segment even when it named a valid tab. Skips entirely for STAFF -- that role's default is
+  // already resolved synchronously in activeTab's own initializer above, so this effect has
+  // nothing left to do for it (and firing anyway would just be a redundant post-mount navigate).
   const hasSetDefaultRef = useRef(false)
   useEffect(() => {
+    if (isStaff) return
     if (hasReservations && !hasSetDefaultRef.current) {
       hasSetDefaultRef.current = true
-      setActiveTab('calendar')
+      if (!hadInitialUrlTabRef.current) changeTab('calendar')
     }
-  }, [hasReservations])
+  }, [hasReservations, changeTab, isStaff])
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('admin_access_token')
@@ -552,7 +604,7 @@ export default function GenericAdminDashboard() {
                 item={item}
                 isActive={activeTab === item.id}
                 color={color}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => changeTab(item.id)}
               />
             ))}
           </nav>
@@ -777,7 +829,7 @@ export default function GenericAdminDashboard() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => changeTab(item.id)}
                 style={{
                   flex: 1, padding: '10px 4px 12px',
                   border: 'none', cursor: 'pointer',

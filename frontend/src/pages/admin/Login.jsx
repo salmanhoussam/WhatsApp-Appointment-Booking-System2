@@ -33,14 +33,20 @@ export default function Login() {
 
       const { token, slug: returnedSlug } = data;
       localStorage.setItem('admin_access_token', token);
-      // `smar` is the one tenant with its own dedicated dashboard (SmarAdminDashboard), where
-      // "units" is a real, meaningful sub-route -- left untouched. Every other tenant goes
-      // through GenericAdminDashboard, which ignores this path segment entirely (its tabs are
-      // client-side state, not routes) but still shows it in the address bar; "/calendar" reads
-      // correctly for reservations-enabled tenants rather than the vestigial "/units" (Dashboard
-      // Navigation Refactor, 2026-08-03).
-      const landing = returnedSlug === 'smar' ? 'units' : 'calendar';
-      navigate(`/dashboard/${returnedSlug}/${landing}`);
+      // Canonical redirect (Dashboard UX Corrections #11, 2026-08-10) -- matches
+      // SSOLoginPage.jsx's own already-fixed behavior exactly: every tenant -> `/{slug}/dashboard`,
+      // no per-tenant branching, no trailing tab segment (routing.md §0b). This file previously
+      // special-cased `smar` -> `/dashboard/smar/units`, on the assumption `/dashboard/:slug/*`
+      // routes to SmarAdminDashboard -- confirmed false by reading App.jsx's real route table
+      // (`/dashboard/:slug/*` renders GenericAdminDashboard, same as the canonical pattern;
+      // routing.md §0b's own table independently confirms this and calls it an unclassified
+      // duplicate path). The smar special-case was therefore never reaching SmarAdminDashboard in
+      // the first place -- removing it doesn't change smar's real resolved component, only makes
+      // this file consistent with SSOLoginPage.jsx instead of carrying a second, divergent
+      // redirect target for the same destination. GenericAdminDashboard's own URL-sync (this same
+      // contract) lands a reservations tenant on 'calendar' automatically once its config resolves,
+      // so no tab segment needs to be hardcoded here at all.
+      navigate(`/${returnedSlug}/dashboard`);
     } catch (err) {
       setError('بيانات الدخول غير صحيحة. تأكد من البيانات وحاول مرة أخرى.');
       console.error('Login error:', err);
