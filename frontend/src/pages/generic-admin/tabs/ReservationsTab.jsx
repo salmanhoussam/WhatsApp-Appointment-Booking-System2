@@ -6,6 +6,7 @@ import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/Reser
 import ReservationsTodayView from '../components/ReservationsTodayView'
 import { useBarbers, useServices, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
+import DatePicker from '../components/DatePicker'
 import { T, FONT } from '../theme'
 
 // ── Design tokens (Phase 3.1 UX Iteration, 2026-08-05 -- light theme, reuses the same `T` tokens
@@ -536,17 +537,17 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap' }}>
           {viewMode === 'list' && (
             <>
-              <input
-                type="date"
+              {/* Custom DatePicker (Dashboard UX Corrections #3, 2026-08-10) -- replaces the native
+                  <input type="date">, same reasoning Dropdown.jsx already established for native
+                  <select>: format/picker chrome is OS/browser-controlled, not something this app's
+                  CSS can govern. Wire format unchanged -- still the same ISO 'YYYY-MM-DD' `load()`
+                  already sends; only the displayed/typed format (MM/DD/YYYY) and picker UI change.
+                  DatePicker's own root has `flex: 1, minWidth: 0`, preserving the same mobile
+                  horizontal-overflow fix the native input's style comment used to document here. */}
+              <DatePicker
                 value={showAllDates ? '' : dateFilter}
-                onChange={e => { setDateFilter(e.target.value); setShowAllDates(false) }}
+                onChange={(iso) => { setDateFilter(iso); setShowAllDates(false) }}
                 disabled={showAllDates}
-                style={{
-                  ...inputStyle, flex: 1, minWidth: 0, opacity: showAllDates ? 0.5 : 1,
-                  // Native date inputs have their own UA-defined content width, which a flex item
-                  // won't shrink below without an explicit min-width:0 -- a second, independent real
-                  // cause of the same mobile horizontal-overflow bug (this row is flex-wrap:nowrap).
-                }}
               />
               <button
                 onClick={() => { setDateFilter(todayISO()); setShowAllDates(false) }}
