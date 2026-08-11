@@ -268,8 +268,40 @@ Evidence: `.claudedocs/work/overview-redesign-contract/2026-08-10/evidence.md`. 
 Actual time: well under the original 1-2 session redesign estimate — the finding shrank once
 verified, same pattern as Phase 1's Orphaned Admin Router Cleanup.
 
+## Phase 3.8 — Dashboard UX Corrections — 🟡 mostly done, one real bug open (2026-08-11/12)
+
+13 real dashboard observations investigated + planned
+(`.claudedocs/implementation/DASHBOARD_UX_CORRECTIONS_CONTRACT.md`), approved 2026-08-10, executed
+in the plan's own Section E order. Items #4, #9, #10, #3, #7/C all shipped and real-browser
+verified (desktop + mobile, evidence per item in
+`.claudedocs/work/dashboard-ux-corrections/2026-08-10/`). Commits: `0373c3f` (#4), `73e8107` (#10),
+`9577141` (#9), `5c5f381` (#3), `b0d3cea` (#7/C).
+
+Item #2 (Reservations List-vs-Calendar) stays gated — it reverses a documented 2026-08-03 product
+decision, needs explicit confirmation before any code (plan's own Section G Q1). Item #1 (Overview
+empty-state) never had a reproducible case named, stays unimplemented per the plan's own rule.
+
+**Item #11 (routing/URL fixes) — partially done, commit `08ce853`.** TENANT_ADMIN portion (URL↔tab
+sync, canonical Login.jsx redirect, hard-refresh tab preservation) fully verified. A real STAFF
+Overview-flash bug (transient 403s against catalog/store endpoints STAFF can't access) was found and
+fixed as part of this work. **Left open, not silently shipped:** a real, confirmed, ~50%
+intermittent bug where a STAFF user's first nav click after fresh login sometimes never reaches
+React's click handler at all — reproduces on both the dev server AND a genuine `vite build` +
+`vite preview` production run (ruling out React StrictMode's dev-only double-mount, the leading
+hypothesis for several hours of real investigation). Root cause not isolated after 5 independent
+real-browser test rounds. Self-resolves on a second click or reload — never permanently stuck. Full
+investigation, every excluded alternative and its evidence:
+`.claudedocs/work/dashboard-ux-corrections/2026-08-10/item-11-evidence.md`. Carried forward to
+Phase 4 below as a named, real, unresolved item.
+
 ## Phase 4 — Platform Hardening
 
+- **STAFF nav-click intermittent failure (Phase 3.8)** — real, confirmed, ~50% reproduction rate on
+  a STAFF user's first dashboard nav click after fresh login, on both dev and production builds.
+  Root cause not isolated (StrictMode ruled out; mobile state, router logic, and session-expiry all
+  ruled out too). Needs a real debugging session with deeper tooling (React DevTools Profiler, or a
+  non-CDP-driven manual test) before another fix attempt — full writeup:
+  `.claudedocs/work/dashboard-ux-corrections/2026-08-10/item-11-evidence.md`.
 - **`GET /admin/barbers/` is not role-scoped** — returns the full staff roster (names, phone
   numbers, working hours) to a `STAFF` token, confirmed via direct `curl` with Jaafar's real
   bearer token (`.claudedocs/work/staff-scoped-review/2026-08-10/summary.md`). Low current impact

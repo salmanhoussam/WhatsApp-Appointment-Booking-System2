@@ -1,5 +1,5 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-08-10
+# Last updated: 2026-08-12
 
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
@@ -18,12 +18,20 @@ execution order for everything found — see `.claudedocs/architecture/RESERVATI
 4. ✅ Overview UX improvements -- DONE 2026-08-10. Reclassified 🔴→🟡 first (fresh evidence showed
         3 of 5 original reasons no longer reproduced post-cleanup) -- small named contract, not a
         redesign (.claudedocs/implementation/OVERVIEW_UX_IMPROVEMENTS_CONTRACT.md)
-5. ⏸ Calendar/Reservations/Staff/Store polish  <- next-session priority, PLAN WRITTEN, NOT APPROVED
-        Full plan: `.claudedocs/implementation/DASHBOARD_UX_CORRECTIONS_CONTRACT.md` (13 real
-        observations investigated, A-G structure). Several turned out different from their stated
-        premise once verified (Overview empty-states, Store order status, Staff/Services data
-        already clean) -- see the file. **Do NOT start any code from this contract until its own
-        Status line says APPROVED** -- check that line first, every time this is resumed.
+5. 🟡 Calendar/Reservations/Staff/Store polish -- APPROVED 2026-08-10, MOSTLY DONE 2026-08-12
+        Plan: `.claudedocs/implementation/DASHBOARD_UX_CORRECTIONS_CONTRACT.md`. Items #4/#9/#10/#3/
+        #7C all shipped + real-browser verified (evidence per item:
+        `.claudedocs/work/dashboard-ux-corrections/2026-08-10/`). Item #2 (Reservations
+        List-vs-Calendar) still gated on an explicit product-reversal confirmation (plan's own
+        Section G Q1) -- NOT started. Item #1 (Overview empty-state) never had a reproducible case
+        named -- NOT implemented, per the plan's own rule.
+        Item #11 (routing/URL fixes) -- **partial**. TENANT_ADMIN portion done+verified. A real,
+        confirmed STAFF-role nav-click bug (~50% intermittent, first click after login, reproduces
+        even on a real production build) was found and is UNRESOLVED after substantial
+        investigation -- full writeup + every ruled-out hypothesis:
+        `.claudedocs/work/dashboard-ux-corrections/2026-08-10/item-11-evidence.md`. Carried to
+        Phase 4 in the roadmap as a named open item. Self-resolves on a 2nd click/reload -- not a
+        hard blocker to reaching any page, but a real rough edge on STAFF's daily entry point.
 6. Ali onboarding
 7. Final production regression
 8. 2026-08-31 LIVE
