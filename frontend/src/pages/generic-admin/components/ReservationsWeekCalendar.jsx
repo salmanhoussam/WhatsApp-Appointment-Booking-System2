@@ -90,7 +90,12 @@ function WeekReservationCardBody({ item, color, pending, onOpen, isOverlay }) {
       style={{
         width: '100%', height: '100%', boxSizing: 'border-box',
         borderRadius: 6, padding: '3px 6px', textAlign: 'right',
-        background: `${color}14`, border: `1px solid ${color}55`,
+        // Colored left-edge stripe instead of a full uniform border (Alzabt Master Product Plan,
+        // Section D/H -- the Setmore/Trafft reference pattern, confirmed twice independently
+        // across the 7 reference images). borderInlineStart, not borderLeft, so the accent edge
+        // stays on the correct (reading-start) side in this RTL app.
+        background: `${color}14`, border: `1px solid ${T.borderSoft}`,
+        borderInlineStart: `3px solid ${color}`,
         color: T.textPrimary, fontSize: 11, overflow: 'hidden', fontFamily: FONT,
         cursor: isOverlay ? 'grabbing' : (pending ? 'wait' : 'grab'),
         boxShadow: isOverlay ? T.shadowLg : 'none',

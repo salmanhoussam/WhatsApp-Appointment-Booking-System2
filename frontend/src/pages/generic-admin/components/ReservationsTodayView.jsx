@@ -117,7 +117,11 @@ function ReservationCardBody({ item, serviceName, color, onOpen, isOverlay, isDr
         width: '100%', height: '100%', boxSizing: 'border-box',
         borderRadius: 8, padding: '4px 7px', overflow: 'hidden',
         cursor: isOverlay ? 'grabbing' : (pending ? 'wait' : 'grab'),
-        background: `${color}14`, border: `1px solid ${color}55`,
+        // Colored left-edge stripe instead of a full uniform border -- same treatment as
+        // WeekReservationCardBody, kept consistent between Today and Week (Alzabt Master Product
+        // Plan, Section D/H). borderInlineStart, not borderLeft, for correct RTL edge placement.
+        background: `${color}14`, border: `1px solid ${T.borderSoft}`,
+        borderInlineStart: `3px solid ${color}`,
         fontFamily: FONT, textAlign: 'right',
         boxShadow: isOverlay ? T.shadowLg : 'none',
         opacity: pending ? 0.5 : 1,
