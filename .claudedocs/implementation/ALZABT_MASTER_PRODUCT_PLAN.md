@@ -417,7 +417,7 @@ out of scope, not just "less relevant."
 | Reservations (admin) | Yes | — | List view, status chevron, DatePicker | No | STAFF nav-click bug (functional, tracked separately) |
 | Dashboard/Overview | Yes | Branding/color only | Stat cards | No | Personalized greeting; sparkline-in-stat-card |
 | Staff/Services | Yes | Roster/services data | Two-panel widget (shipped) | No | None identified |
-| Onboarding | Yes | — | `TenantRegisterPage.jsx` exists, canonically linked | Not deeply audited (§P) | Real UX pass still needed |
+| Onboarding | Yes | — | `TenantRegisterPage.jsx` exists, canonically linked; a real "حلاقة رجالي" (Men's Barbershop) template already exists in `template-registry.js` | **Confirmed broken for self-registration** (audited 2026-08-12, see below) — visual layer not touched, not the real gap | Deferred, not required for this launch (RK/alzabt-demo both manually seeded) |
 | Demo | Yes | — | The `/demo/create` mechanism itself works for restaurant/store | **Yes, for Barber/`booking` type — confirmed Product Readiness Gap, §J** | — |
 | Marketing/Landing | Yes — this is the new work | — | Nothing exists under this name yet | **Greenfield**, not a redesign of `HomePage.jsx`/`DemoLandingPage.jsx` | — |
 
@@ -432,6 +432,14 @@ code. **Success criterion, updated per the rollout order**: the *next* real tena
 new product code, and that attempt is what actually proves the Barber-built product generalizes.
 Until a clinic is actually being onboarded, nothing in this plan should be built as if Clinic
 support already needs to exist.
+
+**Known blocker for this criterion, confirmed 2026-08-12 (Section K step 9's onboarding audit)**:
+self-registration through `TenantRegisterPage.jsx` does not currently produce a working
+Reservations tenant for ANY business type, including the barbershop template that already exists
+in the registry — full evidence in `.claudedocs/work/onboarding-audit/2026-08-12/summary.md`.
+Deliberately not fixed as part of this launch (RK/alzabt-demo both manually seeded, proving the
+product itself works) — but a real Clinic onboarding attempt will hit this exact gap and needs it
+fixed first, whenever that happens.
 
 ---
 
@@ -513,11 +521,21 @@ All of Section P is now closed (see §P). Salman's explicit execution order:
    reference tenant (§J); build the new landing page in the Violet Confidence product-brand
    (Section A), centered-hero structure (§P/Section C, Image 6 pattern).
 8. **RK verification** — the whole system proven end-to-end against the real reference tenant.
-9. **Onboarding Audit** — `TenantRegisterPage.jsx`, only now, once the 5 core surfaces + demo/
-   marketing are real. Explicit reasoning (Salman): no evidence today that onboarding is broken;
-   its real requirements become clear once a genuinely new tenant (Clinic) actually goes through
-   it, not from assumption. This also avoids touching onboarding twice.
-10. **Apply/adjust the visual system to onboarding** — only if step 9 actually finds it needs it.
+9. **Onboarding Audit** — ✅ DONE 2026-08-12,
+   `.claudedocs/work/onboarding-audit/2026-08-12/summary.md`. Found a real, confirmed functional
+   gap (not visual): a real "حلاقة رجالي" barbershop template already exists in
+   `template-registry.js`, but self-registering through it activates **zero**
+   `booking`/`reservations` client-services (`TenantRegisterPage.jsx`'s `MODULE_TO_VENUE` maps its
+   `module_key: 'catalog'` to a `venueType: 'services'` that isn't a real key in
+   `registration_service.py`'s `_SERVICE_SEED_MAP`, silently falling through to `["catalog"]`
+   only) — and even if that were fixed, the registration flow's seed step only ever creates
+   `CatalogCategory` rows, never real `Barber`/`CatalogService` rows. Two independent root causes.
+   **Decision: not fixed now** — same reasoning already applied to the `/demo/create` gap (§J):
+   RK and `alzabt-demo` both already prove the product works without this path; self-service
+   registration was never part of what Section G requires for 2026-08-31. Left open, named, for
+   whenever a real Clinic (or any genuinely new Barber tenant) needs to self-register.
+10. **Apply/adjust the visual system to onboarding** — not needed; the real gap found was
+    functional, not visual (see step 9).
 11. **Full UX polish** — anything not already covered by steps 1-10.
 12. **Final regression.**
 13. **LIVE.**
