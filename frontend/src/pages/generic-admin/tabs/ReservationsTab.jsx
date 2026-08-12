@@ -244,7 +244,12 @@ function MobileReservationCard({ reservation, idx, color, onUpdate, onOpen }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.04, type: 'spring', stiffness: 260, damping: 22 }}
-      style={{ ...card, padding: '14px 16px', marginBottom: 10, cursor: onOpen ? 'pointer' : 'default' }}
+      style={{
+        ...card, padding: '14px 16px', marginBottom: 10, cursor: onOpen ? 'pointer' : 'default',
+        // Same status-color stripe as the desktop table (Alzabt Master Product Plan, Section D/E),
+        // kept consistent across viewports.
+        borderInlineStart: `3px solid ${STATUS_META[reservation.status]?.color ?? T.borderSoft}`,
+      }}
     >
       {/* Top: customer + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -828,7 +833,18 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
                       onMouseEnter={e => e.currentTarget.style.background = T.pageBg}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <td style={{ ...tdStyle, color: T.textMuted, fontSize: 11, width: 36 }}>
+                      {/* Colored left-edge stripe on the first cell (Alzabt Master Product Plan,
+                          Section D/E) -- same treatment already applied to Calendar blocks, here
+                          keyed by STATUS rather than staff, since a list row's most useful
+                          at-a-glance signal is its status. Additive alongside the existing
+                          StatusCell badge, not a replacement. borderInlineStart for correct RTL
+                          edge placement -- border-collapse on the table means the stripe belongs
+                          on the first <td>, not the <tr> itself (a <tr>-level border doesn't
+                          render reliably under border-collapse:collapse). */}
+                      <td style={{
+                        ...tdStyle, color: T.textMuted, fontSize: 11, width: 36,
+                        borderInlineStart: `3px solid ${STATUS_META[res.status]?.color ?? T.borderSoft}`,
+                      }}>
                         {(page - 1) * PAGE_SIZE + idx + 1}
                       </td>
 
