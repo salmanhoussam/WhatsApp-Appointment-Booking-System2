@@ -3,7 +3,7 @@ import { useNavigate }           from 'react-router-dom'
 import { motion }                from 'framer-motion'
 import {
   Scissors, UserRound, ScissorsLineDashed, Wind, Sparkles, Paintbrush,
-  ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, CalendarDays, Timer, MessageCircle,
+  ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, CalendarDays, Timer, MessageCircle, Tag,
 } from 'lucide-react'
 import publicApi              from '../../../utils/publicApi'
 import useTenantSlug          from '../../../hooks/useTenantSlug'
@@ -162,7 +162,20 @@ function ServiceCircle({ item, selected, onClick }) {
       <span style={{ fontSize: 12.5, fontWeight: 700, color: T.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>
         {item.name_ar}
       </span>
-      <span style={{ fontSize: 10.5, color: T.textSecond }}>{item.duration_min} دقيقة</span>
+      {/* Price (Alzabt Master Product Plan, Section D/E's confirmed content gap -- the reference
+          set's own booking-widget image showed price alongside duration on every service; this
+          page previously showed duration only, even though CatalogService.price/currency were
+          already returned by the API, just never rendered). Same duration+price combined-line
+          convention already used in StaffTab.jsx's service cards, not a new format invented here. */}
+      <span style={{ fontSize: 10.5, color: T.textSecond, textAlign: 'center', lineHeight: 1.3 }}>
+        {item.duration_min} دقيقة
+        {item.price != null && (
+          <>
+            {' · '}
+            <span style={{ color: T.green, fontWeight: 700 }}>{item.price} {item.currency}</span>
+          </>
+        )}
+      </span>
     </button>
   )
 }
@@ -403,6 +416,10 @@ function SummaryCard({ booking }) {
     { icon: CalendarDays, label: 'اليوم', value: selectedSlot ? formatArabicDate(selectedDate) : null },
     { icon: Clock, label: 'الوقت', value: selectedSlot?.time },
     { icon: Timer, label: 'المدة', value: selectedService?.duration_min ? `${selectedService.duration_min} دقيقة` : null },
+    // Price row (Alzabt Master Product Plan, Section D/E) -- same confirmed content gap as
+    // ServiceCircle above; shown here too so the price is visible through the whole flow, not
+    // just at the initial service-picking step.
+    { icon: Tag, label: 'السعر', value: selectedService?.price != null ? `${selectedService.price} ${selectedService.currency}` : null },
   ]
   return (
     <div style={{
