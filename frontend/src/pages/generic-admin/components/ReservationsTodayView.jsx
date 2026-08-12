@@ -9,6 +9,7 @@ import {
   fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
 } from './reservationInteractions'
+import DatePicker from './DatePicker'
 import { T, FONT } from '../theme'
 
 // ── Today View — Phase 3.1 Calendar UX Redesign (2026-08-03) ─────────────────────────────────────
@@ -88,16 +89,14 @@ function DayNav({ date, onDateChange, color }) {
         </button>
       )}
 
-      <input
-        type="date"
-        value={date}
-        onChange={(e) => e.target.value && onDateChange(e.target.value)}
-        style={{
-          marginRight: 'auto', padding: '6px 10px', borderRadius: 8, fontSize: 12,
-          background: T.cardBg, border: `1px solid ${T.border}`,
-          color: T.textPrimary, colorScheme: 'light', fontFamily: FONT,
-        }}
-      />
+      {/* Custom DatePicker, not native <input type="date"> (Calendar Visual Redesign, 2026-08-12) --
+          same component Dashboard UX Corrections #3 already established for the List view's date
+          filter; Today's own day-nav was the one remaining native date input in this file. Wire
+          format unchanged (ISO 'YYYY-MM-DD'), only the picker chrome changes. Wrapped so its own
+          `flex:1` doesn't stretch across all remaining header width. */}
+      <div style={{ marginRight: 'auto', maxWidth: 150 }}>
+        <DatePicker value={date} onChange={(iso) => onDateChange(iso)} />
+      </div>
     </div>
   )
 }
@@ -482,20 +481,25 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
           </div>
         )}
 
-        {/* Floating "+" -- second Quick Create entry point (Phase 3.2), for when hunting the exact
-            empty slot isn't the fastest path; defaults to whichever barber's schedule is currently
-            visible (Phase 3.3 fix -- previously silently fell back to barbers[0] regardless of what
-            was on screen). */}
+        {/* Quick Create entry point (Phase 3.2), for when hunting the exact empty slot isn't the
+            fastest path; defaults to whichever barber's schedule is currently visible (Phase 3.3
+            fix -- previously silently fell back to barbers[0] regardless of what was on screen).
+            Upgraded from an icon-only square to a labeled button (Calendar Visual Redesign,
+            2026-08-12) -- same header-level prominence as Week's own new "+ حجز جديد" button,
+            same click behavior/handler, no new mutation path. */}
         <button
           onClick={(e) => setCreateSlot({ barberId: visibleBarberId, anchor: { x: e.clientX, y: e.clientY } })}
-          title="حجز سريع"
           style={{
-            width: 32, height: 32, borderRadius: 8, border: `1px solid ${color}66`,
-            background: `${color}18`, color, cursor: 'pointer', fontSize: 18, fontWeight: 700,
-            marginBottom: 14, flexShrink: 0, lineHeight: 1,
+            padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
+            cursor: 'pointer', fontFamily: FONT, border: 'none',
+            background: color, color: '#fff',
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: `0 4px 14px ${color}40`,
+            marginBottom: 14, flexShrink: 0,
           }}
         >
-          +
+          <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+          حجز جديد
         </button>
       </div>
 

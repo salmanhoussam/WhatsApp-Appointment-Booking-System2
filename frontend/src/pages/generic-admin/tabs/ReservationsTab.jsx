@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Component } from 'react'
 import { motion } from 'framer-motion'
+import { CalendarCheck2, Clock3, XCircle, ListChecks } from 'lucide-react'
 import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
@@ -7,6 +8,7 @@ import ReservationsTodayView from '../components/ReservationsTodayView'
 import { useBarbers, useServices, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
 import DatePicker from '../components/DatePicker'
+import StatCard from '../components/StatCard'
 import { T, FONT } from '../theme'
 
 // ── Design tokens (Phase 3.1 UX Iteration, 2026-08-05 -- light theme, reuses the same `T` tokens
@@ -296,6 +298,27 @@ function MobileReservationCard({ reservation, idx, color, onUpdate, onOpen }) {
         </div>
       )}
     </motion.div>
+  )
+}
+
+// ── Calendar KPI row ────────────────────────────────────────────────────────────
+// Calendar Visual Redesign (2026-08-12) -- a lightweight summary row above the Today/Week grid,
+// reusing the existing StatCard component (no new card component invented). Every number here is
+// real data already fetched for the current view (`countByStatus`, computed from the same
+// `reservations` array the grid itself renders) -- no trend/delta badges (StatCard's own
+// `trend=null` already hides that UI), since no week-over-week comparison data exists yet. Not
+// rendered for List mode -- List already has its own status-count pills doing this job inline.
+function CalendarKPIRow({ total, countByStatus, color, isLoading }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12,
+      marginBottom: 16,
+    }}>
+      <StatCard label="الحجوزات" value={total} icon={<ListChecks size={20} color={color} />} color={color} isLoading={isLoading} />
+      <StatCard label="مؤكّدة" value={countByStatus.confirmed ?? 0} icon={<CalendarCheck2 size={20} color={STATUS_META.confirmed.color} />} color={STATUS_META.confirmed.color} isLoading={isLoading} />
+      <StatCard label="معلّقة" value={countByStatus.pending ?? 0} icon={<Clock3 size={20} color={STATUS_META.pending.color} />} color={STATUS_META.pending.color} isLoading={isLoading} />
+      <StatCard label="ملغاة" value={countByStatus.cancelled ?? 0} icon={<XCircle size={20} color={STATUS_META.cancelled.color} />} color={STATUS_META.cancelled.color} isLoading={isLoading} />
+    </div>
   )
 }
 
@@ -721,6 +744,16 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             ? ` — ${fmtDate(todayViewDate + 'T00:00:00')}`
             : (showAllDates ? '' : ` — ${fmtDate(dateFilter + 'T00:00:00')}`)}
         </div>
+      )}
+
+      {/* ── Calendar KPI row — Today/Week only, real data, no invented metrics ── */}
+      {viewMode !== 'list' && (
+        <CalendarKPIRow
+          total={reservations.length}
+          countByStatus={countByStatus}
+          color={color}
+          isLoading={loading}
+        />
       )}
 
       {/* ── Content ────────────────────────────────────────────────── */}

@@ -82,14 +82,16 @@ const slideVariants = {
 // DragOverlay's floating copy. Extracted into real components (not inlined in a .map()) because
 // hooks -- useDraggable here, useDroppable on WeekDayColumn below -- cannot be called inside a
 // render-time loop callback.
-function WeekReservationCardBody({ item, color, pending, onOpen, isOverlay }) {
+function WeekReservationCardBody({ item, serviceName, color, pending, onOpen, isOverlay, compact }) {
   const meta = item.metadata || {}
+  const label = serviceName || meta.service_name
   return (
     <button
       onClick={(e) => { e.stopPropagation(); if (!pending) onOpen?.(item, e) }}
       style={{
         width: '100%', height: '100%', boxSizing: 'border-box',
-        borderRadius: 6, padding: '3px 6px', textAlign: 'right',
+        borderRadius: 7, padding: compact ? '3px 6px' : '4px 7px', textAlign: 'right',
+        display: 'flex', flexDirection: 'column', gap: 1,
         // Colored left-edge stripe instead of a full uniform border (Alzabt Master Product Plan,
         // Section D/H -- the Setmore/Trafft reference pattern, confirmed twice independently
         // across the 7 reference images). borderInlineStart, not borderLeft, so the accent edge
@@ -101,17 +103,25 @@ function WeekReservationCardBody({ item, color, pending, onOpen, isOverlay }) {
         boxShadow: isOverlay ? T.shadowLg : 'none',
         opacity: pending ? 0.5 : 1,
       }}
-      title={`${item.customer_name} — ${fmtTimeUTC(item.reserved_at)}${meta.service_name ? ` — ${meta.service_name}` : ''}`}
+      title={`${item.customer_name} — ${fmtTimeUTC(item.reserved_at)}${label ? ` — ${label}` : ''}`}
     >
       <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {item.customer_name}
       </div>
-      <div style={{ color: T.textSecond, whiteSpace: 'nowrap' }}>{fmtTimeUTC(item.reserved_at)}</div>
+      {/* Service name -- parity with Today's own ReservationCardBody, which already shows this.
+          Only rendered when there's real vertical room for it (compact=false), so short/15-min
+          blocks don't clip a 3rd line of text. */}
+      {label && !compact && (
+        <div style={{ color: T.textSecond, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 10 }}>
+          {label}
+        </div>
+      )}
+      <div style={{ color: T.textSecond, whiteSpace: 'nowrap', fontSize: 10, marginTop: 'auto' }}>{fmtTimeUTC(item.reserved_at)}</div>
     </button>
   )
 }
 
-function WeekReservationCard({ item, top, height, color, pending, onOpen }) {
+function WeekReservationCard({ item, top, height, color, serviceName, pending, onOpen }) {
   const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({ id: item.id, disabled: pending })
   return (
     <div
@@ -127,7 +137,7 @@ function WeekReservationCard({ item, top, height, color, pending, onOpen }) {
         touchAction: 'none',
       }}
     >
-      <WeekReservationCardBody item={item} color={color} pending={pending} onOpen={onOpen} />
+      <WeekReservationCardBody item={item} serviceName={serviceName} color={color} pending={pending} onOpen={onOpen} compact={height < 40} />
     </div>
   )
 }
@@ -142,7 +152,7 @@ function WeekReservationCard({ item, top, height, color, pending, onOpen }) {
 // other days that must never get a line or an auto-scroll.
 function WeekDayColumn({
   day, dayKey, dayReservations, gridHeight, hours, startHour, color, isToday,
-  pendingIds, onEmptySlotClick, onOpen, nowIndex,
+  pendingIds, onEmptySlotClick, onOpen, nowIndex, serviceNameFor,
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey })
   const nowLineRef = useRef(null)
@@ -200,6 +210,7 @@ function WeekDayColumn({
         return (
           <WeekReservationCard
             key={r.id} item={r} top={top} height={height} color={color}
+            serviceName={serviceNameFor(r)}
             pending={pendingIds.has(r.id)} onOpen={onOpen}
           />
         )
@@ -416,23 +427,41 @@ export default function ReservationsWeekCalendar({
   return (
     <div style={{ direction: 'rtl', fontFamily: FONT }}>
       {/* Week nav header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <NavBtn label="‹ السابق" onClick={() => goWeek(-1)} color={color} />
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.span
-            key={isoDateKey(weekStart)}
-            custom={direction} variants={slideVariants}
-            initial="enter" animate="center" exit="exit"
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, minWidth: 140, textAlign: 'center' }}
-          >
-            {weekLabel}
-          </motion.span>
-        </AnimatePresence>
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <NavBtn label="‹ السابق" onClick={() => goWeek(-1)} color={color} />
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.span
+              key={isoDateKey(weekStart)}
+              custom={direction} variants={slideVariants}
+              initial="enter" animate="center" exit="exit"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, minWidth: 140, textAlign: 'center' }}
+            >
+              {weekLabel}
+            </motion.span>
+          </AnimatePresence>
           <NavBtn label="اليوم" onClick={goToday} color={color} />
           <NavBtn label="التالي ›" onClick={() => goWeek(1)} color={color} />
         </div>
+
+        {/* Header-level Add Appointment (Calendar Visual Redesign, 2026-08-12) -- Week previously
+            had no explicit add button, only an empty-slot click. Reuses the exact same CreatePopover
+            already wired below, just triggered without a pre-filled slot (defaultReservedAt stays
+            undefined, matching List's own "+ حجز جديد" button precedent) -- no new mutation path. */}
+        <button
+          onClick={(e) => setCreateSlot({ reservedAt: undefined, anchor: { x: e.clientX, y: e.clientY } })}
+          style={{
+            padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
+            cursor: 'pointer', fontFamily: FONT, border: 'none',
+            background: color, color: '#fff',
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: `0 4px 14px ${color}40`,
+          }}
+        >
+          <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+          حجز جديد
+        </button>
       </div>
 
       {conflictMsg && (
@@ -454,19 +483,25 @@ export default function ReservationsWeekCalendar({
             <div style={{ borderBottom: `1px solid ${T.border}` }} />
             {days.map(d => {
               const isToday = isSameDay(d, today)
+              // Real count already computed for this exact column below (byDay) -- not a second
+              // fetch, not an invented metric, same data the day column itself renders.
+              const dayCount = byDay.get(isoDateKey(d))?.length ?? 0
               return (
                 <div
                   key={isoDateKey(d)}
                   style={{
-                    padding: '10px 6px', textAlign: 'center',
+                    padding: '12px 6px 10px', textAlign: 'center',
                     borderBottom: `1px solid ${T.border}`,
                     borderRight: `1px solid ${T.borderSoft}`,
                     background: isToday ? `${color}12` : 'transparent',
                   }}
                 >
-                  <div style={{ fontSize: 11, color: T.textMuted }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? color : T.textPrimary }}>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 2 }}>{DAYS_AR[dayOfWeekUTC(d)]}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: isToday ? color : T.textPrimary, letterSpacing: '-0.01em' }}>
                     {fmtDayLabel(d)}
+                  </div>
+                  <div style={{ fontSize: 10, color: T.textMuted, marginTop: 3 }}>
+                    {dayCount > 0 ? `${dayCount} حجز` : '—'}
                   </div>
                 </div>
               )
@@ -506,6 +541,7 @@ export default function ReservationsWeekCalendar({
                   onEmptySlotClick={handleEmptySlotClick}
                   onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
                   nowIndex={isToday ? nowIndex : null}
+                  serviceNameFor={serviceNameFor}
                 />
               )
             })}
