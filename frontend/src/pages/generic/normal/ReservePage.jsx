@@ -11,27 +11,14 @@ import { useTenantBase }      from '../../../hooks/useTenantSlug'
 import useReservationBooking  from '../../../hooks/useReservationBooking'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
 import { hasCapability }      from '../../../utils/capabilities'
+import { T, FONT }            from '../../../theme'
 
-const FONT = "'Cairo', 'Segoe UI', sans-serif"
-
-// ── Light design tokens — used only by the booking-mode page ────────────────────────────────────
-// Redesigned 2026-08-03 per Salman's own visual reference (light, Apple/Airbnb/Fresha-style app,
-// not a dark dashboard). Scoped to `mode === 'booking'` only -- the legacy generic date/time form
-// (other tenant types, out of this Pilot's scope) keeps its original dark styling untouched below.
-const T = {
-  pageBg:      '#F7F8FA',
-  cardBg:      '#FFFFFF',
-  border:      'rgba(15,23,42,0.08)',
-  borderSoft:  'rgba(15,23,42,0.05)',
-  textPrimary: '#0F172A',
-  textSecond:  '#6B7280',
-  textMuted:   '#9CA3AF',
-  green:       '#16A34A',
-  greenSoft:   'rgba(22,163,74,0.10)',
-  whatsapp:    '#25D366',
-  shadow:      '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
-  shadowLg:    '0 4px 24px rgba(15,23,42,0.06)',
-}
+// Light design tokens (T, FONT) now imported from the shared source (frontend/src/theme.js) --
+// previously a local, byte-identical duplicate of the same object also kept in
+// pages/generic-admin/theme.js (Alzabt Master Product Plan, Section K step 1: token-sharing
+// refactor, zero visual change). Scoped to `mode === 'booking'` only -- the legacy generic
+// date/time form (other tenant types, out of this Pilot's scope) keeps its original dark styling
+// untouched below.
 
 const SERVICE_ICONS = {
   'شعر':            Scissors,
