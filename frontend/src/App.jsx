@@ -47,6 +47,12 @@ const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'
 // Marketing landing page — formerly on Cloudflare, now integrated
 const MarketingApp = lazy(() => import('./pages/marketing/MarketingApp'));
 
+// عالزبط (Alzabt) — the Reservations-capability product's own marketing entry point (Alzabt
+// Master Product Plan, Section K step 7, 2026-08-12). Deliberately separate from MarketingApp
+// above (platform-wide, generic) -- scoped to Barber/Reservations only, per the Plan's rollout
+// priority (Section A).
+const AlzabtLandingPage = lazy(() => import('./pages/alzabt/AlzabtLandingPage'));
+
 // Dating module (Phase 75) — standalone, before /:slug/* catch-all
 const DatingPageResolver = lazy(() => import('./pages/dating/DatingPageResolver'));
 const DatingCreatePage   = lazy(() => import('./pages/dating/DatingCreatePage'));
@@ -206,6 +212,13 @@ function App() {
           {/* ── Marketing landing (accessible everywhere, before tenant catch-all) ── */}
           <Route path="/marketing" element={
             <Suspense fallback={null}><MarketingApp /></Suspense>
+          } />
+
+          {/* ── عالزبط (Alzabt) product marketing entry point (Alzabt Master Product Plan,
+              Section K step 7) — real route, part of the product, not a mockup. Must sit before
+              the /:slug/* tenant catch-all, same as /marketing above. */}
+          <Route path="/alzabt" element={
+            <Suspense fallback={null}><AlzabtLandingPage /></Suspense>
           } />
 
           {/* ── Dating module routes (must be before /:slug/*) ── */}
