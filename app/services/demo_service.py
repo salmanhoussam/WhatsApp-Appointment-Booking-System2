@@ -23,12 +23,13 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
-from prisma import Prisma
+from prisma import Prisma, Json
 
 from app.core.exceptions import ConflictError
 from app.core.security import get_password_hash
 from app.repositories.demo_repo import DemoRepository
 from app.repositories import admin_catalog_repo as catalog_repo
+from app.repositories import barber_repo, catalog_service_repo, barber_service_repo
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +43,18 @@ _SERVICE_MAP: dict[str, list[str]] = {
     "restaurant": ["restaurant", "gallery", "catalog"],
     "store":      ["store",      "gallery", "catalog"],
     "booking":    ["booking",    "gallery", "whatsapp_ordering", "catalog"],
+    # Both booking AND reservations -- service-system.md's documented pitfall (seeding only one
+    # leaves the admin Reservations tab/route silently unreachable). Same 4 keys
+    # scripts/seed_alzabt_demo_tenant.py already proved for the alzabt-demo reference tenant.
+    "barbershop": ["booking", "reservations", "catalog", "whatsapp_ordering"],
 }
 
 _VENUE_TYPE_MAP: dict[str, str] = {
     "restaurant": "restaurant",
     "store":      "ecommerce",
     "booking":    "real_estate",
+    # Matches Client.service_type already used by RK and alzabt-demo -- one canonical value.
+    "barbershop": "barbershop",
 }
 
 _DEFAULT_CONFIG = {
@@ -134,6 +141,17 @@ _CATALOG_SEED_MAP: dict[str, list] = {
     "store":      _STORE_SEED,
 }
 
+# Barbershop seed data -- same realistic set as scripts/seed_alzabt_demo_tenant.py's SERVICES
+# list (independently authored data, same shape). Tuple: (name_ar, name_en, duration_min, price).
+_BARBERSHOP_SEED_SERVICES: list[tuple[str, str, int, float]] = [
+    ("شعر",       "Haircut",           20, 8.0),
+    ("لحية",      "Beard Trim",        15, 6.0),
+    ("شعر ولحية", "Haircut & Beard",   30, 12.0),
+    ("كرياتين",   "Keratin Treatment", 75, 25.0),
+    ("تصفيف",     "Styling",           15, 5.0),
+    ("صبغة",      "Hair Color",        40, 15.0),
+]
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _slugify(text: str) -> str:
@@ -163,17 +181,22 @@ def _temp_password(length: int = 8) -> str:
 
 # ── Catalog seeder ────────────────────────────────────────────────────────────
 
-async def _seed_demo_catalog(client_id: str, business_type: str) -> None:
+async def _seed_demo_catalog(client_id: str, business_type: str, name_ar: str = "") -> None:
     """
     Seed sample CatalogCategories + CatalogItems for a new trial tenant.
 
     - restaurant → 4 categories, 2 items each (8 items total)
     - store      → 3 categories, 2 items each (6 items total)
+    - barbershop → 1 Barber, 1 CatalogCategory, 6 CatalogService rows (real reservation model)
     - booking    → no catalog needed; returns immediately
 
     Uses admin_catalog_repo so all writes go through the proper repository layer.
     Every row carries clientId — no cross-tenant leakage possible.
     """
+    if business_type == "barbershop":
+        await _seed_demo_barbershop(client_id, name_ar)
+        return
+
     seed_data = _CATALOG_SEED_MAP.get(business_type)
     if not seed_data:
         # booking (and any unknown type) — catalog not relevant
@@ -213,6 +236,56 @@ async def _seed_demo_catalog(client_id: str, business_type: str) -> None:
     )
 
 
+async def _seed_demo_barbershop(client_id: str, name_ar: str = "") -> None:
+    """
+    Seed a real reservations-model demo tenant: 1 Barber, 1 CatalogCategory, 6 CatalogService
+    rows, then assign every service to the one barber. Same shape
+    scripts/seed_alzabt_demo_tenant.py already proved for the standalone alzabt-demo reference
+    tenant -- reused here as the auto-provisioning path for a real per-visitor demo.
+
+    Personalized barber name (Salman's explicit request): includes the visitor's own business
+    name so the booking page feels built for them, not a generic placeholder.
+    """
+    barber_name = f"الحلاق الرئيسي — {name_ar}" if name_ar else "الحلاق الرئيسي"
+    barber = await barber_repo.create_barber({
+        "clientId":     client_id,
+        "name":         barber_name,
+        "workingHours": Json({"open_time": "09:00", "close_time": "20:00", "closed_days": []}),
+        "sortOrder":    0,
+    })
+
+    category = await catalog_repo.create_category({
+        "clientId":  client_id,
+        "moduleKey": "catalog",
+        "nameAr":    "الخدمات",
+        "nameEn":    "Services",
+        "sortOrder": 0,
+    })
+
+    created_service_ids = []
+    for i, (svc_name_ar, svc_name_en, duration_min, price) in enumerate(_BARBERSHOP_SEED_SERVICES):
+        service = await catalog_service_repo.create_catalog_service({
+            "clientId":    client_id,
+            "categoryId":  category.id,
+            "nameAr":      svc_name_ar,
+            "nameEn":      svc_name_en,
+            "durationMin": duration_min,
+            "price":       price,
+            "currency":    "USD",
+            "isActive":    True,
+            "isFeatured":  True,
+            "sortOrder":   i,
+        })
+        created_service_ids.append(service.id)
+
+    await barber_service_repo.set_services_for_barber(client_id, barber.id, created_service_ids)
+
+    logger.info(
+        "Seeded barbershop demo: 1 barber, %d services for client_id=%s",
+        len(created_service_ids), client_id,
+    )
+
+
 # ── Main service function ─────────────────────────────────────────────────────
 
 async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_en: str) -> dict:
@@ -221,19 +294,27 @@ async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_
 
     Args:
         db:            Prisma DB connection (injected by route).
-        business_type: "restaurant" | "store" | "booking"
+        business_type: "restaurant" | "store" | "booking" | "barbershop"
         name_ar:       Business name in Arabic.
-        name_en:       Business name in English (used for slug generation).
+        name_en:       Business name in English (used for slug generation). Optional --
+                       a mobile, Arabic-only visitor may leave this empty.
 
     Returns dict with: slug, admin_url, temp_password, expires_at
     """
     repo = DemoRepository(db)
 
     # ── 1. Generate a collision-resistant slug ─────────────────────────────
+    # name_en is optional (demo.py's DemoCreateRequest) -- fall back to a business-type-aware
+    # word rather than _slugify's own generic "tenant" default, so a barbershop-type demo still
+    # gets a meaningful slug like demo-barber-a3f9 instead of demo-tenant-a3f9.
+    slug_seed = name_en.strip() if name_en and name_en.strip() else (
+        "Barber" if business_type == "barbershop" else name_en
+    )
+
     # Retry up to 5 times in the extremely unlikely event of a hex collision.
     slug = None
     for _ in range(5):
-        candidate = _unique_slug(name_en)
+        candidate = _unique_slug(slug_seed)
         if not await repo.slug_exists(candidate):
             slug = candidate
             break
@@ -287,12 +368,15 @@ async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_
     services_to_seed = _SERVICE_MAP.get(business_type, ["catalog"])
     await repo.seed_services(client.id, services_to_seed)
 
-    # ── 5. Seed sample catalog (restaurant / store only) ──────────────────
-    await _seed_demo_catalog(client.id, business_type)
+    # ── 5. Seed sample catalog (restaurant / store / barbershop) ──────────
+    await _seed_demo_catalog(client.id, business_type, name_ar)
 
     # ── 6. Build response ──────────────────────────────────────────────────
     base_url  = os.getenv("FRONTEND_URL", "https://demo.salmansaas.com")
-    admin_url = f"{base_url}/{slug}/admin"
+    # Canonical admin URL per routing.md §0b -- /{slug}/dashboard (GenericAdminDashboard), not
+    # the legacy /{slug}/admin (SmarAdminDashboard) this line pointed to before. Directly relevant
+    # here since this URL is surfaced to real visitors in the demo-builder's success view.
+    admin_url = f"{base_url}/{slug}/dashboard"
 
     logger.info("Demo tenant created: slug=%s type=%s expires=%s", slug, business_type, trial_ends_at.isoformat())
 

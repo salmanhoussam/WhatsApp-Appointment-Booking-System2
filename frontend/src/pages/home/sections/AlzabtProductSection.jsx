@@ -6,6 +6,15 @@
 //
 // IA decision, 2026-08-12 (salmansaas.com Product IA plan): root shows exactly two sections,
 // Smart Order (placeholder, above) and Alzabt (real, below) -- no broader redesign.
+//
+// CTA updated same day, 2nd decision: root now doubles as the real per-visitor demo-builder
+// picker (Salman's explicit call, reversing the earlier "static alzabt-demo tenant only"
+// decision) -- this section's CTA now leads into that builder, not the /alzabt marketing page.
+// /alzabt itself and demo.salmansaas.com/alzabt are UNCHANGED, still pointing at the static
+// alzabt-demo reference tenant -- two coexisting "try it" paths by design.
+//
+// Relative navigate (no leading slash) -- this component renders inside ShowcaseRoutes, which
+// mounts at "/" in prod but "/showcase" in dev; an absolute "/demo-builder" would 404 in dev.
 
 import { useNavigate } from 'react-router-dom'
 import { Scissors, ArrowLeft } from 'lucide-react'
@@ -48,7 +57,7 @@ export default function AlzabtProductSection() {
       </p>
 
       <button
-        onClick={() => navigate('/alzabt')}
+        onClick={() => navigate('demo-builder')}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '13px 26px', borderRadius: 999, border: 'none',

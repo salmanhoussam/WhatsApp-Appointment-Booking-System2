@@ -27,13 +27,13 @@ router = APIRouter()
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
-VALID_BUSINESS_TYPES = {"restaurant", "store", "booking"}
+VALID_BUSINESS_TYPES = {"restaurant", "store", "booking", "barbershop"}
 
 
 class DemoCreateRequest(BaseModel):
     business_type: str
     name_ar: str
-    name_en: str
+    name_en: str = ""
 
     @field_validator("business_type")
     @classmethod
@@ -45,13 +45,24 @@ class DemoCreateRequest(BaseModel):
             )
         return v
 
-    @field_validator("name_ar", "name_en")
+    @field_validator("name_ar")
     @classmethod
-    def name_not_empty(cls, v: str) -> str:
+    def name_ar_required(cls, v: str) -> str:
         v = v.strip()
         if len(v) < 2:
             raise ValueError("Name must be at least 2 characters.")
         if len(v) > 100:
+            raise ValueError("Name must be at most 100 characters.")
+        return v
+
+    @field_validator("name_en")
+    @classmethod
+    def name_en_optional(cls, v: str) -> str:
+        # Optional — a mobile, Arabic-only visitor shouldn't be blocked from the demo builder
+        # just because they skipped the English name. demo_service.py falls back to a
+        # business-type-aware slug seed when this is empty.
+        v = v.strip()
+        if v and len(v) > 100:
             raise ValueError("Name must be at most 100 characters.")
         return v
 

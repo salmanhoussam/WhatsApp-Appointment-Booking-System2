@@ -5,6 +5,7 @@ import DemoLauncher from '../components/DemoLauncher';
 import '../pages/showcase/showcase.css';
 
 const ProductShowcaseHome = lazy(() => import('../pages/home/ProductShowcaseHome'));
+const DemoBuilderPage     = lazy(() => import('../pages/home/DemoBuilderPage'));
 const DemoLandingPage     = lazy(() => import('../pages/showcase/pages/DemoLandingPage'));
 const GeneralPrivacyPage  = lazy(() => import('../pages/showcase/pages/GeneralPrivacyPage'));
 const PrivacyTermsPage    = lazy(() => import('../pages/showcase/pages/PrivacyTermsPage'));
@@ -37,6 +38,10 @@ function ShowcaseRoutes() {
     <Routes>
       <Route element={<ShowcaseLayout />}>
         <Route index element={<Suspense fallback={<PageFallback />}><ProductShowcaseHome /></Suspense>} />
+        {/* Real per-visitor Alzabt demo builder (Barber only) -- reachable only from root's
+            Alzabt section CTA. /alzabt and demo.salmansaas.com/alzabt stay unchanged, still
+            pointing at the static alzabt-demo reference tenant. */}
+        <Route path="demo-builder" element={<Suspense fallback={<PageFallback />}><DemoBuilderPage /></Suspense>} />
         <Route path="home" element={<Suspense fallback={<PageFallback />}><DemoLandingPage /></Suspense>} />
         <Route path="privacy" element={<Suspense fallback={<PageFallback />}><GeneralPrivacyPage /></Suspense>} />
         <Route path="terms" element={<Suspense fallback={<PageFallback />}><PrivacyTermsPage /></Suspense>} />
