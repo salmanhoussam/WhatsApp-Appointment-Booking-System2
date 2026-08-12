@@ -1,6 +1,16 @@
 # Project Todo List — SalmanSaaS
 # Last updated: 2026-08-12
 
+## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
+
+Alzabt IS the product (RK is the reference tenant, not a separate project). Master reference:
+`.claudedocs/implementation/ALZABT_MASTER_PRODUCT_PLAN.md` (Revision 2, all decisions resolved).
+Section K Steps 1-9 are DONE, committed, real-browser verified — do not redo them. Full state saved
+in memory (`project_alzabt_master_plan_priority.md`) — read that first on any resume. Barber-first;
+Clinic is next (gated on a real onboarding fix, see the plan's Section K step 9 finding); Real
+Estate deferred. **Step 13 (LIVE) is explicitly not executed — requires Salman's fresh, explicit
+approval, never autonomous.**
+
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
 Phase 3.5's three-sided Product Review (Customer/Admin/Staff) is ✅ DONE. Salman ratified the final
