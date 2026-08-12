@@ -1,10 +1,10 @@
 # عالزبط (Alzabt) — Master Product Plan
 
-> **STATUS: ✅ APPROVED — standing architecture/reference, 2026-08-12.** This is not a one-time
-> planning artifact — it is the reference consulted during execution, kept updated as real decisions
-> land (per this project's own documentation discipline). Do not reopen it from scratch; update it
-> in place as sections resolve. Section P's remaining open decisions are the only gate before
-> Section K's implementation phases start.
+> **STATUS: ✅ APPROVED, Section P FULLY RESOLVED — ready for execution, 2026-08-12.** This is not
+> a one-time planning artifact — it is the reference consulted during execution, kept updated as
+> real decisions land (per this project's own documentation discipline). Do not reopen it from
+> scratch. Section K names the resolved, ready-to-execute order (13 steps, starting with the visual
+> system, ending at LIVE). Implementation proceeds directly from here.
 >
 > History: Revision 1 wrongly framed Alzabt as a post-2026-08-31 initiative — rejected. Revision 2
 > corrected that (Alzabt IS the product launching 2026-08-31, RK is the reference tenant), added the
@@ -39,6 +39,30 @@ Alzabt" — the two happen together, RK validating each real piece of Alzabt as 
 
 Every finding is classified as: (1) Product-level/reusable, (2) RK-specific configuration, (3) a
 real bug found via RK, or (4) genuinely post-launch.
+
+### Two Distinct Brand Layers — resolved 2026-08-12, load-bearing for everything below
+
+**عالزبط (Alzabt) the product-brand** and **each tenant's own configured identity** are two
+different colors, on purpose:
+
+- **Tenant-rendered surfaces** (Booking Page, Admin Dashboard, Calendar, Reservations, Staff) stay
+  driven by `Client.primary_color`, exactly as today — RK's real color (green, `#16A34A` family)
+  is **unchanged**. "Visual system" work on these 5 surfaces (Section H/K) is about **UX patterns**
+  (price display, calendar block treatment, personalized greeting, chevron affordances, token
+  sharing) — **not a recolor**. A future clinic tenant keeps its own `primary_color` too; nothing
+  here hardcodes green or violet into tenant-facing product code.
+- **The Alzabt product/marketing brand** — the new landing page, demo entry point, "جرّب عالزبط"
+  positioning — gets its own fixed identity, decided 2026-08-12: **"Violet Confidence"**:
+  ```
+  Primary accent:   #7C3AED  (violet)
+  Neutral base:     #0A0A0F  (near-black)
+  Surface:          #FFFFFF / #FAFAFF
+  Semantic success: #16A34A  (kept deliberately separate from the brand accent — Image 3's own
+                              principle, Section C: brand color and success/status color should
+                              never be the same color)
+  ```
+  This applies **only** to the new marketing/demo-entry layer (Section K step 7) — never to
+  tenant-rendered pages.
 
 ### Rollout Priority — explicit and standing (Salman, 2026-08-12)
 
@@ -455,40 +479,52 @@ didn't show a mobile view is marked *not shown*, never silently assumed.
 
 ---
 
-## J. Demo Strategy — Core Scope, Barber-Type Only
+## J. Demo Strategy — RESOLVED 2026-08-12: static pre-seeded reference tenant
 
-The `/demo/create` gap (Section B5) is a **Product Readiness Gap**, not a marketing nice-to-have.
-"جرّب عالزبط" must actually work by 2026-08-31, and it must demo the **Barber/Reservations**
-experience specifically — not a generic multi-business-type demo picker (that stays as-is for
-restaurant/store; Alzabt's own "جرّب عالزبط الآن" entry point is Barber-framed, per Section A).
+**Decided**: "جرّب عالزبط" points directly at a **stable, pre-seeded reference demo tenant** for
+barber reservations — real backend data, proven, not mock marketing data (RK itself, in a
+sandboxed/read-only-appropriate mode, or a dedicated `alzabt-demo` barber tenant seeded once with
+the same real Barber/CatalogService/working_hours shape RK already has).
 
-Two real paths, Open Decision (§P):
-1. **Fix the auto-provisioner for Barber type** — a real branch in `demo_service.py` (correct
-   `_VENUE_TYPE_MAP`/venue model away from `real_estate`, seed real `Barber`+`CatalogService`+
-   `working_hours`, seed both `booking` AND `reservations` client-service keys, canonical
-   `admin_url`). Every visitor gets their own real, throwaway barber-shop sandbox.
-2. **Point "جرّب عالزبط" at a stable, pre-seeded reference demo tenant** (a dedicated
-   `alzabt-demo` barber tenant, or RK itself in a sandboxed/read-only mode). Less new backend work;
-   needs a real decision on shared-state handling.
+**Explicitly not built now**: a new `/demo/create` provisioning path for Barber/`booking` type.
+Fixing the auto-provisioner (Section B5's confirmed gap: wrong `_VENUE_TYPE_MAP` entry, zero seeded
+data, missing `reservations` client-service key) is **not a requirement for the Alzabt barber
+launch** — no new backend/seed work opens now. The idea itself isn't cancelled: if a later stage
+wants every visitor to get their own independent tenant, the correct real fix (Barber + Services +
+working hours + `reservations` client-service key + canonical `admin_url`) gets built then, exactly
+as already documented in Section B5 — not reinvented. For now, this keeps effort on what's actually
+being shipped: a real, reusable Barber/Reservations product.
 
 ---
 
-## K. Implementation Phases (Barber/Reservations scope only, no code until §P resolves)
+## K. Implementation Phases — RESOLVED order, 2026-08-12, ready to execute
 
-1. **Visual system decision** (§D's mapping table is the input; §P names the specific open
-   choices).
-2. **Apply to existing Barber surfaces** — Booking Page price display + token sharing, Calendar
-   block polish (if decided), Dashboard greeting/sparkline.
-3. **Demo infrastructure fix, Barber type** (§J, whichever path is chosen).
-4. **Alzabt marketing entry point** — Barber-framed, built from §D's mapping, greenfield.
-5. **RK verification** across all of the above.
-6. **Full UX polish** — anything not already covered.
-7. **Final regression.**
-8. **LIVE.**
+All of Section P is now closed (see §P). Salman's explicit execution order:
+
+1. **Visual system** — lock the pattern-level decisions (price display, calendar block treatment,
+   greeting, etc. — Section D/H), no tenant-color changes (Section A's Two Brand Layers).
+2. **Booking Page (Barber)** — apply the resolved patterns; add price display (the one confirmed
+   content gap).
+3. **Calendar** — apply resolved patterns (block-color treatment, if adopted).
+4. **Dashboard** — apply resolved patterns (personalized greeting, sparkline, token sharing).
+5. **Reservations** — apply resolved patterns.
+6. **Staff / Services** — apply resolved patterns.
+7. **Demo linking + Alzabt marketing entry point** — point "جرّب عالزبط" at the static pre-seeded
+   reference tenant (§J); build the new landing page in the Violet Confidence product-brand
+   (Section A), centered-hero structure (§P/Section C, Image 6 pattern).
+8. **RK verification** — the whole system proven end-to-end against the real reference tenant.
+9. **Onboarding Audit** — `TenantRegisterPage.jsx`, only now, once the 5 core surfaces + demo/
+   marketing are real. Explicit reasoning (Salman): no evidence today that onboarding is broken;
+   its real requirements become clear once a genuinely new tenant (Clinic) actually goes through
+   it, not from assumption. This also avoids touching onboarding twice.
+10. **Apply/adjust the visual system to onboarding** — only if step 9 actually finds it needs it.
+11. **Full UX polish** — anything not already covered by steps 1-10.
+12. **Final regression.**
+13. **LIVE.**
 
 **Explicitly deferred, not part of these phases**: Clinic onboarding/verification (Section F —
-starts only once phase 8 above is real and Salman signals Clinic work should begin); any Real-
-Estate/`smar` visual or functional work (Section A).
+starts only once phase 13 above is real and Salman signals Clinic work should begin); any Real-
+Estate/`smar` visual or functional work (Section A); a new `/demo/create` provisioning path (§J).
 
 ---
 
@@ -537,24 +573,24 @@ separate commits per change — the same discipline already proven this session.
 
 ---
 
-## P. Open Decisions — the remaining gate before implementation
+## P. Open Decisions — ALL RESOLVED, 2026-08-12
 
-1. **Visual system specifics** — accent palette/typography/spacing scale to formally adopt (§D
-   gives the *pattern* evidence; actual values still need a decision).
-2. **Calendar block color treatment** — adopt the colored-left-border-stripe pattern (Img 2/4) for
-   `ReservationsWeekCalendar.jsx`, or keep the current treatment?
-3. **Marketing hero structure** — left-text/right-floating-card (Img 3/7) vs. centered+full-width-
-   proof-below (Img 6)?
-4. **Demo infrastructure**: fix the real auto-provisioner for Barber type vs. a stable pre-seeded
-   reference tenant (§J)?
-5. **Onboarding audit** — does `TenantRegisterPage.jsx` need its own dedicated visual/UX review
-   before the visual system is applied to it?
+1. **Visual system foundation** — ✅ **Two distinct brand layers** (Section A): tenant-rendered
+   surfaces stay `Client.primary_color`-driven (RK's green unchanged); the Alzabt product/marketing
+   brand gets its own fixed "Violet Confidence" palette (`#7C3AED` primary), used only on the new
+   marketing/demo-entry layer.
+2. **Calendar block color treatment** — not explicitly re-confirmed after the palette decision;
+   treated as a small, low-risk polish item to evaluate during Section K step 3, not a blocker.
+3. **Marketing hero structure** — ✅ **Centered content + full-width proof below** (Image 6 /
+   Calendr.com pattern), not the left-text/right-floating-card family (Images 3/7).
+4. **Demo infrastructure** — ✅ **Static pre-seeded reference tenant** (Section J, fully resolved).
+   `/demo/create`'s Barber-type gap stays documented (Section B5) but is explicitly not fixed now.
+5. **Onboarding audit** — ✅ **Deferred**, with an explicit resolved order (Section K steps 1-10).
 
 ---
 
 ## Q. Definition of Done (for this Master Plan)
 
 This document is the standing architecture reference for Alzabt (Barber/Reservations scope) — kept
-updated in place as Section P's decisions land and as implementation (Section K) proceeds. Once
-Section P is resolved, execution proceeds directly per Section K without reopening this plan from
-scratch, per Salman's explicit instruction (2026-08-12).
+updated in place as implementation (Section K) proceeds, never reopened from scratch, per Salman's
+explicit instruction (2026-08-12). Section P is fully resolved; execution starts at Section K step 1.
