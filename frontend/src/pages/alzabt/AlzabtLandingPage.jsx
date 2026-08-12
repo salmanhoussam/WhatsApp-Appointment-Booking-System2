@@ -20,6 +20,11 @@
 //
 // "جرّب عالزبط" links directly to the real, isolated alzabt-demo reference tenant's real booking
 // page (scripts/seed_alzabt_demo_tenant.py) -- never RK's real production tenant.
+//
+// Demo entry point (salmansaas.com Product IA decision, 2026-08-12): production traffic goes to
+// demo.salmansaas.com/alzabt (App.jsx's IS_DEMO_SUBDOMAIN route, redirects into this same
+// alzabt-demo tenant) -- same env-detection idiom as pages/showcase/config.js's REGISTER_URL.
+// Local/dev traffic (demo.salmansaas.com doesn't resolve locally) still navigates in-app.
 
 import { useNavigate } from 'react-router-dom'
 import { Scissors, CalendarDays, MessageCircle, Users, Layers, Link2 } from 'lucide-react'
@@ -97,7 +102,13 @@ const BENEFITS = [
 
 export default function AlzabtLandingPage() {
   const navigate = useNavigate()
-  const tryDemo = () => navigate(`/${DEMO_SLUG}/reserve`)
+  const tryDemo = () => {
+    if (window.location.hostname.includes('salmansaas.com')) {
+      window.location.href = 'https://demo.salmansaas.com/alzabt'
+    } else {
+      navigate(`/${DEMO_SLUG}/reserve`)
+    }
+  }
   const scrollToProof = () => document.getElementById('alzabt-how-it-works')?.scrollIntoView({ behavior: 'smooth' })
 
   return (

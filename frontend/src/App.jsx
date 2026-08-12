@@ -204,6 +204,17 @@ function App() {
             <Route path="/home/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />
           )}
 
+          {/* ── Demo subdomain: /alzabt → direct entry into the isolated alzabt-demo tenant ──
+              salmansaas.com Product IA decision, 2026-08-12: demo.salmansaas.com/alzabt is the
+              dedicated demo surface for the Alzabt product (distinct from /alzabt on the bare
+              domain, which is the marketing page). Redirects straight into the existing,
+              pre-seeded alzabt-demo tenant's reserve flow -- never creates a new tenant, never
+              touches RK. No /smart-order equivalent yet -- that product has no real tenant to
+              redirect to. */}
+          {IS_DEMO_SUBDOMAIN && (
+            <Route path="/alzabt" element={<Navigate to="/alzabt-demo/reserve" replace />} />
+          )}
+
           {/* ── Localhost dev preview: /showcase/* ── */}
           {!IS_SHOWCASE_DOMAIN && !IS_SUBDOMAIN_MODE && (
             <Route path="/showcase/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />

@@ -4,7 +4,7 @@ import { LanguageProvider } from '../pages/showcase/context/LanguageContext';
 import DemoLauncher from '../components/DemoLauncher';
 import '../pages/showcase/showcase.css';
 
-const HomePage            = lazy(() => import('../pages/showcase/pages/HomePage'));
+const ProductShowcaseHome = lazy(() => import('../pages/home/ProductShowcaseHome'));
 const DemoLandingPage     = lazy(() => import('../pages/showcase/pages/DemoLandingPage'));
 const GeneralPrivacyPage  = lazy(() => import('../pages/showcase/pages/GeneralPrivacyPage'));
 const PrivacyTermsPage    = lazy(() => import('../pages/showcase/pages/PrivacyTermsPage'));
@@ -36,7 +36,7 @@ function ShowcaseRoutes() {
   return (
     <Routes>
       <Route element={<ShowcaseLayout />}>
-        <Route index element={<Suspense fallback={<PageFallback />}><HomePage /></Suspense>} />
+        <Route index element={<Suspense fallback={<PageFallback />}><ProductShowcaseHome /></Suspense>} />
         <Route path="home" element={<Suspense fallback={<PageFallback />}><DemoLandingPage /></Suspense>} />
         <Route path="privacy" element={<Suspense fallback={<PageFallback />}><GeneralPrivacyPage /></Suspense>} />
         <Route path="terms" element={<Suspense fallback={<PageFallback />}><PrivacyTermsPage /></Suspense>} />
