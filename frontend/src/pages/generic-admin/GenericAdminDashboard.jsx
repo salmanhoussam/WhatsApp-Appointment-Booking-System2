@@ -506,6 +506,7 @@ export default function GenericAdminDashboard() {
             activeServices={activeServices}
             hasReservations={hasReservations}
             currency={currency}
+            tenantName={tenantName}
           />
         )
       case 'orders':

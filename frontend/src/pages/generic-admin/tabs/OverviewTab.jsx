@@ -467,7 +467,7 @@ function RecentOrders({ orders, color, currency }) {
  *   hasReservations boolean
  *   currency        string
  */
-export default function OverviewTab({ color, activeServices, hasReservations, currency = 'USD' }) {
+export default function OverviewTab({ color, activeServices, hasReservations, currency = 'USD', tenantName }) {
   // Which single order-bearing capability this tenant has, if any -- no real tenant has both
   // Restaurant and Store/Catalog active at once today (Module Resolution Review, 2026-07-28), so
   // this resolves to one endpoint rather than merging; see CAPABILITY_RESOLUTION_PLAN.md's
@@ -576,6 +576,16 @@ export default function OverviewTab({ color, activeServices, hasReservations, cu
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Personalized greeting (Alzabt Master Product Plan, Section D/H) -- Overview
+          previously opened directly into the stat-card grid with no heading at all. Uses the
+          tenant's own name (the only real identity available here -- no per-admin-user name
+          exists in the JWT payload, see security.md), not an invented generic label. */}
+      {tenantName && (
+        <div style={{ fontSize: 20, fontWeight: 800, color: T.textPrimary, fontFamily: FONT }}>
+          أهلاً، {tenantName} 👋
+        </div>
+      )}
 
       {/* ── Stat cards ─────────────────────────────────────────────────── */}
       <div style={{
