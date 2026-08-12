@@ -11,6 +11,37 @@ Clinic is next (gated on a real onboarding fix, see the plan's Section K step 9 
 Estate deferred. **Step 13 (LIVE) is explicitly not executed — requires Salman's fresh, explicit
 approval, never autonomous.**
 
+### ✅ Checkpoint — 2026-08-12, commit `ff38f89`: salmansaas.com Product IA + Alzabt Demo Builder
+
+**Done, do not reopen for polish:**
+- Root `/` = Product Showcase Home (`frontend/src/pages/home/ProductShowcaseHome.jsx`) — Smart
+  Order "قريباً" placeholder (top) + real Alzabt section (below).
+- `/alzabt` (marketing page) + `demo.salmansaas.com/alzabt` (subdomain route) — UNCHANGED, still
+  point at the static `alzabt-demo` reference tenant.
+- Alzabt Demo Builder (`/demo-builder`, reachable only from root's Alzabt CTA) — real per-visitor
+  tenant provisioning: real `Barber` (personalized name), 6 real `CatalogService` rows,
+  `booking`+`reservations` activated, correct `/{slug}/dashboard` admin URL, 14-day trial
+  lifecycle. `name_en` optional with a `demo-barber-{4hex}` slug fallback. Full real-browser
+  verification, 0 console errors end-to-end. Evidence:
+  `.claudedocs/work/alzabt-demo-builder/2026-08-12/summary.md`.
+
+**Do not touch right now:**
+- RK (real production tenant) — no fake bookings, no data changes.
+- The static `alzabt-demo` tenant — stays as-is, reference only.
+- Clinic / Real Estate scope — Barber-only priority stands.
+- Two named, deliberately-deferred gaps — do NOT fix opportunistically just because they're known:
+  (1) no cron consumes `trial_ends_at` yet (pre-existing, shared by every demo/trial tenant type);
+  (2) a fresh tenant's `/reserve` page can flash "no available times" before its first data fetch
+  resolves (pre-existing UX timing gap, not a bug, no console error).
+- **Step 13 (LIVE) / any Railway or production deploy** — stays fully stopped. Everything
+  continues on localhost until Salman gives fresh, explicit approval to go further.
+
+**Next step, agreed 2026-08-12**: a comprehensive LOCAL-ONLY readiness check across all 3 real
+paths (RK / alzabt-demo / demo-builder-created tenants) before any LIVE decision — not opportunistic
+gap-fixing. See the ready-to-use `/bo-hussein` checkpoint prompt in that day's chat transcript for
+the exact scope (Done / Do Not Touch / Must Check Before LIVE) — not yet executed, awaiting
+Salman's go-ahead to run it.
+
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
 Phase 3.5's three-sided Product Review (Customer/Admin/Staff) is ✅ DONE. Salman ratified the final
