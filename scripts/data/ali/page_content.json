@@ -1,0 +1,61 @@
+{
+  "_meta": {
+    "template_key": "barbershop_demo",
+    "label": "صالون حلاقة (Demo)",
+    "service_key": "reservations",
+    "description": "DEMO CONTENT — fictional barbershop showcase, not a real business. Built for the Ali demo tenant to demonstrate the Reservations product convincingly, per market-realistic (not customer-supplied) data. See .claudedocs/work/ali-demo-market-data/2026-08-14/summary.md."
+  },
+  "template_key": "barbershop_demo",
+  "page_type": "generic",
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "hero",
+      "order": 0,
+      "data": {
+        "title_ar": "صالون علي للحلاقة",
+        "subtitle_ar": "حجزك الجاي بلمسة وحدة — قص، دقن، وستايل بإيد خبيرة",
+        "cta_text_ar": "احجز موعدك الآن",
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_story",
+      "type": "story",
+      "order": 1,
+      "data": {
+        "heading_ar": "قصتنا",
+        "body_ar": "صالون علي مكان صغير بس بخبرة كبيرة — نعتني بمظهرك متل ما نعتني بمظهرنا. من القصة الكلاسيكية لحتى أحدث الستايلات، هون بتلاقي الراحة والدقة سوا.",
+        "stats": [
+          { "num": "6", "label": "خدمات" },
+          { "num": "1", "label": "حلاق مخصص" },
+          { "num": "٧ أيام", "label": "بالأسبوع" }
+        ],
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_featured",
+      "type": "featured_items",
+      "order": 2,
+      "data": {
+        "heading_ar": "خدماتنا",
+        "limit": 6,
+        "bg_image_url": "",
+        "bg_type": "color"
+      }
+    },
+    {
+      "id": "s_cta",
+      "type": "cta",
+      "order": 3,
+      "data": {
+        "heading_ar": "جاهز تحجز؟",
+        "body_ar": "اختر الخدمة والوقت المناسب — التأكيد فوري.",
+        "cta_text_ar": "احجز الآن"
+      }
+    }
+  ]
+}
