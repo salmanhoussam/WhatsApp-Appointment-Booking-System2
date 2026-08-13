@@ -36,11 +36,27 @@ approval, never autonomous.**
 - **Step 13 (LIVE) / any Railway or production deploy** — stays fully stopped. Everything
   continues on localhost until Salman gives fresh, explicit approval to go further.
 
-**Next step, agreed 2026-08-12**: a comprehensive LOCAL-ONLY readiness check across all 3 real
-paths (RK / alzabt-demo / demo-builder-created tenants) before any LIVE decision — not opportunistic
-gap-fixing. See the ready-to-use `/bo-hussein` checkpoint prompt in that day's chat transcript for
-the exact scope (Done / Do Not Touch / Must Check Before LIVE) — not yet executed, awaiting
-Salman's go-ahead to run it.
+### ✅ Checkpoint — 2026-08-13: local dev phase CLOSED, RC locked at `cf6f474`, verdict READY
+
+Calendar visual redesign (`cf6f474`) shipped and re-verified — `alzabt-demo` + a fresh Demo
+Builder tenant both confirmed 0 console errors against the redesigned Today/Week views, desktop +
+mobile. Full readiness evidence: `.claudedocs/work/alzabt-pre-live-readiness/2026-08-12/summary.md`
+(pre-redesign) + `.../2026-08-13/summary.md` (post-redesign re-lock). **Do not reopen Calendar,
+Demo Builder, or any other polish** — remaining known items (visual density/"feels flat", pooler
+flakiness, no trial-cleanup cron) are backlog, not blockers.
+
+**Next session — Step 13 (Production Release), as its own dedicated session, Salman's own plan
+(2026-08-13), do not deviate**: (1) Railway deployment, (2) migrations/env verification,
+(3) production smoke test — RK + `alzabt-demo` + a NEW tenant created live through the Demo
+Builder → its booking flow → dashboard, desktop AND mobile, (4) only then decide if a real
+production blocker exists, (5) **if the smoke test PASSES → announce Alzabt LIVE.** Never mix the
+LIVE decision with new work — the next session's only job is launch + production verification.
+
+**The trigger is unchanged and must stay explicit** — a message that describes this plan or asks
+whether to approve moving from READY to LIVE is NOT the trigger, confirmed directly by Salman's
+own 2026-08-13 message laying out this exact plan without launching it. Wait for an explicit
+"Go LIVE" / "Deploy this to production" (or equivalent), stated at the time Step 13 is meant to
+start.
 
 ## 🎯 PRODUCTION DEADLINE: 2026-08-31 — RK + Ali both live
 
