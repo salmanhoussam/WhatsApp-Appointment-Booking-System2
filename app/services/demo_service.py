@@ -57,6 +57,14 @@ _VENUE_TYPE_MAP: dict[str, str] = {
     "barbershop": "barbershop",
 }
 
+# Vertical Registry wiring (2026-08-14) -- business_type -> Client.vertical, additive alongside
+# service_type above, not a replacement yet (ALZABT_VERTICAL_IMPACT_AND_MIGRATION_ANALYSIS.md's
+# Migration Plan Step 3). Only "barbershop" maps to a real, registered vertical ("barber") today --
+# every other business_type maps to None (not yet a Vertical Registry concept; unaffected).
+_VERTICAL_MAP: dict[str, str] = {
+    "barbershop": "barber",
+}
+
 _DEFAULT_CONFIG = {
     "hero": {
         "title_ar":    "مرحباً بكم",
@@ -326,6 +334,8 @@ async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_
     # ── 2. Create Client row ───────────────────────────────────────────────
     trial_ends_at = datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
     service_type  = _VENUE_TYPE_MAP[business_type]
+    # Additive alongside service_type, not a replacement yet -- see _VERTICAL_MAP above.
+    vertical      = _VERTICAL_MAP.get(business_type)
 
     # Client.phone is UNIQUE NOT NULL — use a placeholder unique value.
     # We use the slug itself prefixed with "demo-" so it never clashes with real phones.
@@ -349,6 +359,7 @@ async def create_demo_tenant(db: Prisma, business_type: str, name_ar: str, name_
         "lifecycle_state": "trial",
         "trial_ends_at": trial_ends_at,
         "service_type":  service_type,
+        "vertical":      vertical,
     })
 
     # ── 3. Create TENANT_ADMIN user with temp password ─────────────────────

@@ -134,6 +134,11 @@ export default function TenantRegisterPage() {
       // registry's own documented intent (see template-registry.js's module_key comment block).
       const MODULE_TO_VENUE = { store: 'store', restaurant: 'restaurant', catalog: 'services' }
       const venueType = MODULE_TO_VENUE[template?.module_key] ?? 'real_estate'
+      // Vertical Registry wiring (2026-08-14) -- sent alongside venueType, not replacing it.
+      // Only beauty-barber carries a real `vertical` today (`'barber'`); every other template's
+      // `vertical` is null, so this is a no-op for them -- registration_service.py falls back to
+      // venueType/_SERVICE_SEED_MAP exactly as before whenever `vertical` is null.
+      const vertical = template?.vertical ?? null
 
       setProgress('جاري إنشاء الحساب...')
       const regRes = await authApi.post('/auth/register', {
@@ -145,6 +150,7 @@ export default function TenantRegisterPage() {
         owner_name:       form.owner_name || form.business_name,
         primary_color:    color,
         venue_type:       venueType,
+        vertical:         vertical,
       })
       const token = regRes.data.data.token
       localStorage.setItem('admin_access_token', token)

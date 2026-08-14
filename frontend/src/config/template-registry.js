@@ -44,6 +44,7 @@ export const templateRegistry = {
     primary_color: '#E8E8E8',           // fixed: was #1A1A1A (invisible on dark bg)
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'فساتين',   name_en: 'Dresses',    display_template: 'grid' },
@@ -63,6 +64,7 @@ export const templateRegistry = {
     primary_color: '#C9A96E',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'بدلات',    name_en: 'Suits',      display_template: 'showcase' },
@@ -81,6 +83,7 @@ export const templateRegistry = {
     primary_color: '#FF6B6B',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'بنات',     name_en: 'Girls',      display_template: 'grid' },
@@ -99,6 +102,7 @@ export const templateRegistry = {
     primary_color: '#8B6914',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'عبايات سادة',    name_en: 'Plain Abayas',      display_template: 'showcase' },
@@ -120,6 +124,7 @@ export const templateRegistry = {
     primary_color: '#D4A017',
     module_key:    'restaurant',
     services:      ['restaurant', 'reservations'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'مقبلات',   name_en: 'Starters',   display_template: 'grid' },
@@ -139,6 +144,7 @@ export const templateRegistry = {
     primary_color: '#6B4226',
     module_key:    'restaurant',
     services:      ['restaurant', 'reservations'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'قهوة',     name_en: 'Coffee',     display_template: 'showcase' },
@@ -157,6 +163,7 @@ export const templateRegistry = {
     primary_color: '#E8A87C',
     module_key:    'restaurant',
     services:      ['restaurant'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'خبز',      name_en: 'Bread',      display_template: 'grid' },
@@ -175,6 +182,7 @@ export const templateRegistry = {
     primary_color: '#E63946',
     module_key:    'restaurant',
     services:      ['restaurant'],
+    vertical:      null,
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'برغر',     name_en: 'Burgers',    display_template: 'list' },
@@ -194,6 +202,7 @@ export const templateRegistry = {
     primary_color: '#2ECC71',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'خضروات وفواكه', name_en: 'Produce',    display_template: 'grid' },
@@ -217,6 +226,11 @@ export const templateRegistry = {
     primary_color: '#4A9090',           // fixed: was #2F4F4F (too dark on dark bg)
     module_key:    'catalog',
     services:      ['reservations'],
+    // Alzabt Vertical Registry (2026-08-14) -- the one Reservations-tagged template confirmed
+    // unambiguously Barber-shaped (seedCategories below matches RK/Ali's real service shape).
+    // Wired into TenantRegisterPage.jsx's real registration payload (2026-08-14, self-registration
+    // contract fix -- see ALZABT_SELF_REGISTRATION_CONTRACT_ANALYSIS.md).
+    vertical:      'barber',
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'قص شعر',   name_en: 'Haircut',    display_template: 'list' },
@@ -235,6 +249,7 @@ export const templateRegistry = {
     primary_color: '#E91E8C',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'تسريحات',  name_en: 'Hairstyles',  display_template: 'showcase' },
@@ -253,6 +268,7 @@ export const templateRegistry = {
     primary_color: '#7B9E87',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'مساج',     name_en: 'Massage',    display_template: 'list' },
@@ -271,6 +287,7 @@ export const templateRegistry = {
     primary_color: '#C77DFF',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'عطور',     name_en: 'Perfumes',   display_template: 'grid' },
@@ -293,6 +310,7 @@ export const templateRegistry = {
     primary_color: '#0077B6',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'استشارة عامة',  name_en: 'General Consultation', display_template: 'list' },
@@ -310,6 +328,7 @@ export const templateRegistry = {
     primary_color: '#00B4D8',
     module_key:    'store',
     services:      ['store'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'أدوية',        name_en: 'Medicines',         display_template: 'grid' },
@@ -328,6 +347,7 @@ export const templateRegistry = {
     primary_color: '#FF6B00',
     module_key:    'catalog',
     services:      ['store', 'reservations'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'اشتراكات',     name_en: 'Memberships',      display_template: 'showcase' },
@@ -345,6 +365,7 @@ export const templateRegistry = {
     primary_color: '#52B788',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'برامج تخسيس',  name_en: 'Weight Loss Programs', display_template: 'list' },
@@ -366,6 +387,7 @@ export const templateRegistry = {
     primary_color: '#C0C0C0',           // fixed: was #000000 (invisible on dark bg)
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'showcase',
     seedCategories: [
       { name_ar: 'تصوير أعراس',   name_en: 'Wedding Photography',  display_template: 'showcase' },
@@ -384,6 +406,7 @@ export const templateRegistry = {
     primary_color: '#3A86FF',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'تنظيف منازل',    name_en: 'Home Cleaning',       display_template: 'list' },
@@ -402,6 +425,7 @@ export const templateRegistry = {
     primary_color: '#8338EC',
     module_key:    'catalog',
     services:      ['reservations'],
+    vertical:      null,
     catalogLayout: 'grid',
     seedCategories: [
       { name_ar: 'هوية بصرية',  name_en: 'Brand Identity',    display_template: 'grid' },

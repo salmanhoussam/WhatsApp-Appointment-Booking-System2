@@ -91,6 +91,16 @@ model Client {
   // null = not yet assigned (trial tenants start without a template)
   templateKey String? @map("template_key")
 
+  // -- Vertical (Alzabt Vertical Registry, 2026-08-14) -------------------------
+  // vertical: which business vertical this tenant belongs to (e.g. "barber") -- the canonical
+  // replacement for service_type's own, confirmed-unreliable attempt at the same concept
+  // (service_type carries 3+ disagreeing real values today, plus a misleading "real_estate"
+  // default for any row it was never explicitly set on). Drives default client_services + Section
+  // Repertoire at provisioning via VERTICAL_REGISTRY (app/core/verticals.py) -- never derived from
+  // client_services afterward, never read at render time. null = not yet assigned, same convention
+  // templateKey already uses. See .claudedocs/architecture/ALZABT_VERTICAL_REGISTRY_ARCHITECTURE.md.
+  vertical String? @map("vertical")
+
   // -- Fleet module (Phase 76 - Vicale) ----------------------------------------
   fleetVehicles  FleetVehicle[]
   fleetDrivers   FleetDriver[]

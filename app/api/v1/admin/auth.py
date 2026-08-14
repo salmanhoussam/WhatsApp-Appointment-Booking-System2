@@ -272,6 +272,15 @@ class TenantRegistrationRequest(BaseModel):
     payment_methods:  list[str] = ["cash", "card"]
     primary_color:    str = "#6d28d9"
     services:         list[str] | None = None  # from Validator-corrected pipeline payload
+    # Vertical Registry wiring (2026-08-14) -- optional, sent explicitly by the frontend
+    # (template.vertical, see template-registry.js). None for retail/restaurant templates and any
+    # caller that predates this field (the WhatsApp/n8n onboarding webhook included) --
+    # registration_service.py falls back to its existing venue_type/_SERVICE_SEED_MAP behavior
+    # unchanged whenever this is absent. This is the REAL, live TenantRegistrationRequest --
+    # confirmed via a real browser-driven registration attempt this round (not the same-named,
+    # unused class in app/api/v1/public/registration.py, which a prior round's analysis mistakenly
+    # investigated instead).
+    vertical:         str | None = None
 
     @field_validator("password")
     @classmethod
