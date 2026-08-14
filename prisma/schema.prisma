@@ -101,6 +101,19 @@ model Client {
   // templateKey already uses. See .claudedocs/architecture/ALZABT_VERTICAL_REGISTRY_ARCHITECTURE.md.
   vertical String? @map("vertical")
 
+  // -- Provisioning status (Unified Provisioning Contract, Phase 1, 2026-08-15) ------------------
+  // provisioning_status: "pending" | "complete" | "failed" -- free-form string, no rigid enum,
+  // matching this schema's own existing convention (vertical, service_type, Resource.type all do
+  // the same). null = not tracked by this mechanism (every tenant created before Phase 2/3 wire
+  // this in -- including RK/Ali/alzabt-demo -- correctly stays null; this is NOT the same as
+  // "incomplete," it means "predates this gate," same honesty principle already applied to
+  // vertical's own null convention). The actual readiness gate a future consumer (Dashboard
+  // banner, admin tenant-health view) should check -- never "did the function return without
+  // throwing." See .claudedocs/architecture/ALZABT_UNIFIED_PROVISIONING_CONTRACT_FINAL.md
+  // (Decision 2) for the full reasoning. Nothing writes this field yet -- Phase 1 only adds the
+  // column; Phase 2/3 wire the actual writes in.
+  provisioningStatus String? @map("provisioning_status")
+
   // -- Fleet module (Phase 76 - Vicale) ----------------------------------------
   fleetVehicles  FleetVehicle[]
   fleetDrivers   FleetDriver[]
