@@ -1,15 +1,44 @@
 # Project Todo List — SalmanSaaS
-# Last updated: 2026-08-12
+# Last updated: 2026-08-14
 
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
-Alzabt IS the product (RK is the reference tenant, not a separate project). Master reference:
-`.claudedocs/implementation/ALZABT_MASTER_PRODUCT_PLAN.md` (Revision 2, all decisions resolved).
-Section K Steps 1-9 are DONE, committed, real-browser verified — do not redo them. Full state saved
-in memory (`project_alzabt_master_plan_priority.md`) — read that first on any resume. Barber-first;
-Clinic is next (gated on a real onboarding fix, see the plan's Section K step 9 finding); Real
-Estate deferred. **Step 13 (LIVE) is explicitly not executed — requires Salman's fresh, explicit
-approval, never autonomous.**
+Alzabt IS the product (RK is the reference tenant, not a separate project). **Two separate tracks
+— do not conflate**: (1) Release/LIVE — RC locked at `cf6f474`, READY, Step 13 stays stopped until
+Salman's fresh explicit "Go LIVE"; (2) the active Tenant Website Section System work (below) — 100%
+still planning, zero code written, awaiting approval to start P0.
+
+### ✅ Checkpoint — 2026-08-14: Tenant Website Section System — 6 architecture docs settled, P0-P3 awaiting approval
+
+Salman corrected the mental model: **Alzabt is a general SaaS for any services/staff/booking
+business — Barber is the first proven vertical, not the product's definition.** Full record, read
+in order, do not re-derive: `.claudedocs/architecture/ALZABT_PRODUCT_MODEL.md` →
+`ALZABT_TEMPLATE_REPERTOIRE_MECHANISM.md` → `ALZABT_TEMPLATE_REPERTOIRE_PROPOSAL.md` →
+`ALZABT_VERTICAL_REPERTOIRE_MATRIX.md` (Salman's ratified decisions — **no mandatory universal
+section core across verticals**, each of Barber/Clinic/Beauty gets its own independent Required/
+Recommended/Optional repertoire) → `ALZABT_SECTION_SYSTEM_CONTRACT.md` (per-section spec, grounded
+in real code) → `ALZABT_SECTION_SYSTEM_WORK_SEQUENCE.md` (the P0→P3 plan). Full detail + governing
+principle quote: `project_alzabt_master_plan_priority.md` (memory).
+
+**Start Here, once Salman approves starting**: P0.1 — `FeaturedItemsSection.jsx` calls the wrong
+catalog endpoint (old retail `catalogApi.js`, gated behind `catalog`) instead of the real,
+already-public, reservations-native `/reservations/catalog-services` (gated behind
+`reservations`) — breaks Services (Required in every vertical) for any tenant without separately-
+activated `catalog`/`store`. Confirmed at the code level, RK's own catalog+store activation masks
+it, Ali's real audit exposed it.
+
+**Do not**: re-litigate the rejected universal-core question; touch RK/Ali/`alzabt-demo` real data
+without a fresh explicit instruction; reopen Demo Builder, `/alzabt`, or root IA as part of this
+thread; write any code before Salman's explicit approval.
+
+### ✅ Checkpoint — 2026-08-14: Ali reclassified as demo tenant, populated with real market data
+
+Salman reclassified `ali`: not a real customer awaiting data — a demo tenant, market-realistic
+(research-based) data only, never fabricated as real identity. Commit `d44a9b2`: 6 services
+repriced $8-$40 (was flat $5, sourced from 5 real Beirut barbershops via Fresha),
+`BarberService` assigned, `primary_color` set, demo page_content seeded. Real bug found, not fixed
+(separate from the Section System's own `featured_items` bug above): Ali's admin Staff-tab
+service-assignment panel 403s — shared Alzabt dashboard code, named for later, not touched.
 
 ### ✅ Checkpoint — 2026-08-12, commit `ff38f89`: salmansaas.com Product IA + Alzabt Demo Builder
 
