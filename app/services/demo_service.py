@@ -23,13 +23,13 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
-from prisma import Prisma, Json
+from prisma import Prisma
 
 from app.core.exceptions import ConflictError
 from app.core.security import get_password_hash
 from app.repositories.demo_repo import DemoRepository
 from app.repositories import admin_catalog_repo as catalog_repo
-from app.repositories import barber_repo, catalog_service_repo, barber_service_repo
+from app.services import provisioning_service
 
 logger = logging.getLogger(__name__)
 
@@ -253,44 +253,22 @@ async def _seed_demo_barbershop(client_id: str, name_ar: str = "") -> None:
 
     Personalized barber name (Salman's explicit request): includes the visitor's own business
     name so the booking page feels built for them, not a generic placeholder.
+
+    Unified Provisioning Contract, Phase 2 (2026-08-15): the actual domain-object creation
+    mechanism now lives in provisioning_service.provision_barber_domain() -- this function's own
+    job is only to decide WHAT content to pass (Demo Builder's own placeholder name + the fixed
+    _BARBERSHOP_SEED_SERVICES list), never how the rows get created. Explicit-always, no defaults
+    inside the shared function -- see ALZABT_PHASE2_EXTRACTION_BOUNDARY_FINDING.md for why.
     """
     barber_name = f"الحلاق الرئيسي — {name_ar}" if name_ar else "الحلاق الرئيسي"
-    barber = await barber_repo.create_barber({
-        "clientId":     client_id,
-        "name":         barber_name,
-        "workingHours": Json({"open_time": "09:00", "close_time": "20:00", "closed_days": []}),
-        "sortOrder":    0,
-    })
-
-    category = await catalog_repo.create_category({
-        "clientId":  client_id,
-        "moduleKey": "catalog",
-        "nameAr":    "الخدمات",
-        "nameEn":    "Services",
-        "sortOrder": 0,
-    })
-
-    created_service_ids = []
-    for i, (svc_name_ar, svc_name_en, duration_min, price) in enumerate(_BARBERSHOP_SEED_SERVICES):
-        service = await catalog_service_repo.create_catalog_service({
-            "clientId":    client_id,
-            "categoryId":  category.id,
-            "nameAr":      svc_name_ar,
-            "nameEn":      svc_name_en,
-            "durationMin": duration_min,
-            "price":       price,
-            "currency":    "USD",
-            "isActive":    True,
-            "isFeatured":  True,
-            "sortOrder":   i,
-        })
-        created_service_ids.append(service.id)
-
-    await barber_service_repo.set_services_for_barber(client_id, barber.id, created_service_ids)
-
+    await provisioning_service.provision_barber_domain(
+        client_id=client_id,
+        barber_name=barber_name,
+        services=_BARBERSHOP_SEED_SERVICES,
+    )
     logger.info(
         "Seeded barbershop demo: 1 barber, %d services for client_id=%s",
-        len(created_service_ids), client_id,
+        len(_BARBERSHOP_SEED_SERVICES), client_id,
     )
 
 
