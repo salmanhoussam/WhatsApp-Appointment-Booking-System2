@@ -140,6 +140,12 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "trial_ends_at":   trial_ends_at,
         "service_type":    venue_type,
         "vertical":        vertical if vertical_entry else None,
+        # Unified Provisioning Contract, Phase 3 (2026-08-15): 'pending' only when a real
+        # vertical resolved -- this tenant has a real Step 1.5 to complete. A retail/restaurant
+        # tenant (no vertical) has no domain-objects step to gate, so it correctly stays
+        # untracked (None) by this mechanism, same honesty convention `vertical` itself already
+        # uses for out-of-scope tenants -- never a permanent, meaningless "pending forever".
+        "provisioningStatus": "pending" if vertical_entry else None,
     })
 
     setup_token     = secrets.token_urlsafe(32)

@@ -30,7 +30,10 @@ first writer just because it exists).
 """
 from prisma import Json
 
+from app.core.exceptions import BusinessLogicError
+from app.core.verticals import get_vertical
 from app.repositories import admin_catalog_repo as catalog_repo
+from app.repositories import admin_client_repo
 from app.repositories import barber_repo, catalog_service_repo, barber_service_repo
 
 
@@ -84,3 +87,79 @@ async def provision_barber_domain(
         created_service_ids.append(service.id)
 
     await barber_service_repo.set_services_for_barber(client_id, barber.id, created_service_ids)
+
+
+# ── Orchestration (Unified Provisioning Contract, Phase 3, 2026-08-15) ─────────────────────────
+#
+# provision_vertical_domain_objects() is the retry-safe entrypoint Self-Registration's own
+# provisioning endpoint calls -- distinct from provision_barber_domain() above, which stays the
+# pure, content-free mechanism (Phase 2, unchanged, still Demo Builder's own direct call with no
+# retry semantics, since it has no retry path to protect). This function adds exactly what a real
+# second caller with a real retry path needs: dispatch by staff_backing_model (never a vertical-
+# name string comparison), idempotent no-op if already complete, and delete-then-recreate cleanup
+# of any partial rows a prior failed attempt left behind -- the same "full replace" pattern
+# barber_service_repo.set_services_for_barber() already proves works in this codebase, applied one
+# level up. See .claudedocs/architecture/ALZABT_PHASE3_FINAL_CONTRACT.md for the full reasoning.
+
+async def _current_domain_state(client_id: str) -> dict:
+    barbers = await barber_repo.list_barbers(client_id)
+    catsvcs = await catalog_service_repo.list_catalog_services(client_id)
+    return {
+        "barber_id":   barbers[0].id if barbers else None,
+        "service_ids": [s.id for s in catsvcs],
+    }
+
+
+async def provision_vertical_domain_objects(
+    client_id: str,
+    vertical: str,
+    staff_name: str,
+    services: list[tuple[str, str | None, int, float]],
+) -> dict:
+    """
+    Retry-safe orchestration: provision a tenant's real vertical domain objects from
+    caller-supplied data, exactly once, safely re-callable on failure.
+
+    Returns {"barber_id": ..., "service_ids": [...]}.
+    Raises BusinessLogicError for an unsupported vertical or an unimplemented staff_backing_model.
+    Any other exception during provisioning sets Client.provisioning_status = "failed" before
+    re-raising.
+    """
+    entry = get_vertical(vertical)
+    if entry is None:
+        raise BusinessLogicError(f"Unsupported vertical '{vertical}'.")
+
+    client = await admin_client_repo.find_client_by_id(client_id)
+    if client is None:
+        raise BusinessLogicError(f"Client '{client_id}' not found.")
+
+    if client.provisioningStatus == "complete":
+        # Idempotent no-op -- already provisioned, never re-run. Real state returned so a caller
+        # that retried for no real reason (e.g. a duplicate click) still gets a real, useful
+        # response instead of an ambiguous empty one.
+        return await _current_domain_state(client_id)
+
+    staff_model = entry.get("staff_backing_model")
+    try:
+        if staff_model == "Barber":
+            # Delete-then-recreate: clear any partial rows a prior failed attempt left behind,
+            # using THIS call's fresh data, never stale data from the failed attempt. Cascades
+            # (schema.prisma) handle everything downstream: deleting the Barber cascades to its
+            # BarberService rows; deleting the Category cascades to its CatalogServices, which
+            # cascades to THEIR BarberService rows too -- no separate cleanup call needed for
+            # either.
+            await barber_repo.delete_barbers_by_client(client_id)
+            await catalog_repo.delete_categories_by_client(client_id)
+
+            await provision_barber_domain(client_id, staff_name, services)
+        else:
+            raise BusinessLogicError(
+                f"No provisioning implementation for staff_backing_model={staff_model!r} "
+                f"(vertical={vertical!r})."
+            )
+    except Exception:
+        await admin_client_repo.update_client(client_id, {"provisioningStatus": "failed"})
+        raise
+
+    await admin_client_repo.update_client(client_id, {"provisioningStatus": "complete"})
+    return await _current_domain_state(client_id)

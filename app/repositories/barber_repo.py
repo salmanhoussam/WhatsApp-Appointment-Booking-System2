@@ -36,3 +36,17 @@ async def update_barber(barber_id: str, data: dict):
         where={"id": barber_id},
         data=data,
     )
+
+
+async def delete_barbers_by_client(client_id: str):
+    """
+    Hard-delete ALL Barber rows for a tenant. Provisioning-retry cleanup ONLY (Unified
+    Provisioning Contract, Phase 3) -- not a general admin capability. Deliberately distinct from
+    the admin-facing API's own "no DELETE exposed" policy (this file's own module docstring,
+    unchanged): that policy protects a real, established Barber from orphaning historical
+    Reservation rows. This function is only ever called on rows a *just-failed* provisioning
+    attempt created moments earlier, before any real Reservation could exist against them --
+    schema.prisma's onDelete: Cascade on BarberService (both sides) and onDelete: SetNull on
+    Reservation.barberId make this safe even in principle, not just in practice.
+    """
+    return await prisma_client.barber.delete_many(where={"clientId": client_id})

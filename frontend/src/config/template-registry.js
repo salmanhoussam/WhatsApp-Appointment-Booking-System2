@@ -231,6 +231,11 @@ export const templateRegistry = {
     // Wired into TenantRegisterPage.jsx's real registration payload (2026-08-14, self-registration
     // contract fix -- see ALZABT_SELF_REGISTRATION_CONTRACT_ANALYSIS.md).
     vertical:      'barber',
+    // Phase 3 (2026-08-15) -- registration-form UI copy only, deliberately NOT in the backend
+    // VERTICAL_REGISTRY (see ALZABT_PHASE3_FINAL_CONTRACT.md Decision 3: the Registry's own rule
+    // forbids vertical-facing labels; this is the natural, already-established per-template home
+    // for one instead, same object that already carries `vertical`).
+    staff_label:   { ar: 'الحلاق', en: 'Barber' },
     catalogLayout: 'list',
     seedCategories: [
       { name_ar: 'قص شعر',   name_en: 'Haircut',    display_template: 'list' },

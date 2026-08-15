@@ -5,11 +5,22 @@
  *
  * Flow after submit:
  *   1. POST  /api/v1/auth/register    → creates Client + TENANT_ADMIN user → returns USER JWT directly
+ *   1.5 IF template.vertical is set (Unified Provisioning Contract, Phase 3, 2026-08-15):
+ *      POST /api/v1/admin/provisioning/domain-objects → real Barber + real, priced CatalogService
+ *      rows, from the staff_name/services this page now collects -- never Demo Builder's own
+ *      placeholder content. Retry-safe: calling it again after a failure re-provisions from
+ *      whatever the form currently holds, never duplicates.
  *   2. PATCH /api/v1/admin/settings   → apply template_key + primary_color
- *   3. POST  /api/v1/admin/catalog/seed-from-template → create starter categories
+ *   3. IF template.vertical is NOT set (retail/restaurant, unchanged):
+ *      POST /api/v1/admin/catalog/seed-from-template → create starter categories.
+ *      Skipped for a resolved vertical -- Step 1.5 already provided real domain data; running
+ *      this too would create a second, redundant, generic-labeled category alongside it (see
+ *      ALZABT_PHASE3_FINAL_CONTRACT.md, Decision 4).
  *   4. Redirect → /{slug}/dashboard?welcome=1 (Canonical Admin URL Rule,
  *      .claude/rules/frontend/routing.md §0b — was /dashboard/{slug}, a non-canonical duplicate
- *      path that happened to reach the same GenericAdminDashboard component, fixed 2026-08-07)
+ *      path that happened to reach the same GenericAdminDashboard component, fixed 2026-08-07) --
+ *      only once every step that actually ran has genuinely succeeded (Step 1.5's own
+ *      provisioning_status === 'complete' when it ran), never unconditionally.
  */
 
 import { useState, useEffect } from 'react'
@@ -89,6 +100,12 @@ export default function TenantRegisterPage() {
     email:         '',
     password:      '',
     whatsapp_number: '',
+    // Phase 3 (2026-08-15) -- real vertical-specific data, collected only when
+    // template.vertical is set; never a stand-in for owner_name, never Demo Builder's own
+    // placeholder content. staff_name has no default; services starts with one empty row so the
+    // "add a service" affordance is visible without an extra click.
+    staff_name: '',
+    services:   [{ name_ar: '', price: '', duration_min: '' }],
   })
   const [errors,   setErrors]   = useState({})
   const [step,     setStep]     = useState('idle') // idle | submitting | success
@@ -96,6 +113,21 @@ export default function TenantRegisterPage() {
   const [progress, setProgress] = useState('')
 
   const color = template?.primary_color ?? presetColor
+  const isVerticalTenant = Boolean(template?.vertical)
+  const staffLabel = template?.staff_label?.ar || 'مقدّم الخدمة'
+
+  const updateService = (index, field, value) => {
+    setForm(p => ({
+      ...p,
+      services: p.services.map((s, i) => i === index ? { ...s, [field]: value } : s),
+    }))
+  }
+  const addService = () => {
+    setForm(p => ({ ...p, services: [...p.services, { name_ar: '', price: '', duration_min: '' }] }))
+  }
+  const removeService = (index) => {
+    setForm(p => ({ ...p, services: p.services.filter((_, i) => i !== index) }))
+  }
 
   // Auto-generate slug from business name
   useEffect(() => {
@@ -113,6 +145,23 @@ export default function TenantRegisterPage() {
     if (!form.whatsapp_number.trim()) e.whatsapp_number = 'رقم الواتساب مطلوب'
     if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(form.slug))
       e.slug = 'رابط المتجر: أحرف إنجليزية صغيرة وأرقام وشرطة فقط (3-50 حرف)'
+
+    // Phase 3 -- required only for a resolved vertical (Final Contract's own Validation table).
+    // duration_min is required, not defaulted, deliberately -- same treatment as price, no
+    // unexplained exception (ALZABT_PHASE3_FINAL_CONTRACT.md, Decision 1).
+    if (isVerticalTenant) {
+      if (!form.staff_name.trim()) e.staff_name = `اسم ${staffLabel} مطلوب`
+      const validServices = form.services.filter(s => s.name_ar.trim())
+      if (validServices.length === 0) {
+        e.services = 'أضف خدمة واحدة على الأقل'
+      } else {
+        form.services.forEach((s, i) => {
+          if (!s.name_ar.trim()) return // an all-empty trailing row is silently ignored, not an error
+          if (!(Number(s.price) > 0))        e[`service_${i}_price`] = 'السعر مطلوب'
+          if (!(Number(s.duration_min) > 0)) e[`service_${i}_duration`] = 'المدة مطلوبة'
+        })
+      }
+    }
     return e
   }
 
@@ -155,6 +204,27 @@ export default function TenantRegisterPage() {
       const token = regRes.data.data.token
       localStorage.setItem('admin_access_token', token)
 
+      // Step 1.5 — Provision real vertical domain objects (Phase 3, 2026-08-15). Only when
+      // vertical resolved -- a retail/restaurant template has nothing to provision here, unchanged.
+      // Retry-safe: re-running this call (e.g. the visitor clicks submit again after a failure)
+      // re-provisions from whatever the form holds right now, never duplicates -- the backend's
+      // own delete-then-recreate guard, not this page's concern.
+      let provisioningComplete = true // stays true for a non-vertical tenant -- nothing to gate on
+      if (vertical) {
+        setProgress(`جاري إعداد ${staffLabel} والخدمات...`)
+        const provRes = await adminApi.post('/provisioning/domain-objects', {
+          staff_name: form.staff_name,
+          services: form.services
+            .filter(s => s.name_ar.trim())
+            .map(s => ({
+              name_ar:      s.name_ar,
+              price:        Number(s.price),
+              duration_min: Number(s.duration_min),
+            })),
+        })
+        provisioningComplete = provRes.data?.data?.provisioning_status === 'complete'
+      }
+
       // Step 2 — Apply template settings
       setProgress('جاري تطبيق القالب...')
       await adminApi.patch('/settings', {
@@ -164,8 +234,10 @@ export default function TenantRegisterPage() {
         page_type:     template?.page_type ?? 'normal',
       })
 
-      // Step 3 — Seed categories from template
-      if (template?.seedCategories?.length) {
+      // Step 3 — Seed categories from template. Skipped for a resolved vertical (Decision 4) --
+      // Step 1.5 already provided real domain data; this would only create a second, redundant,
+      // generic-labeled category alongside it.
+      if (!vertical && template?.seedCategories?.length) {
         setProgress('جاري تهيئة الأقسام...')
         await adminApi.post('/catalog/seed-from-template', {
           template_key:   templateKey,
@@ -173,6 +245,15 @@ export default function TenantRegisterPage() {
           categories:     template.seedCategories,
           clear_existing: false,
         })
+      }
+
+      if (!provisioningComplete) {
+        // A real, honest incomplete state -- never a fake "success" redirect. The account and
+        // its capabilities exist (Step 1 succeeded); only the domain-objects step didn't finish.
+        // Resubmitting is safe (retry-safe by design, above) and is literally this same button.
+        setStep('idle')
+        setServerErr('تم إنشاء حسابك لكن لم يكتمل إعداد الخدمات. حاول مرة أخرى.')
+        return
       }
 
       // Step 4 — Redirect
@@ -293,6 +374,86 @@ export default function TenantRegisterPage() {
               onChange={e => setForm(p => ({ ...p, owner_name: e.target.value }))}
             />
           </Field>
+
+          {/* Phase 3 (2026-08-15) -- real vertical-specific data. Shown only for a resolved
+              vertical; a retail/restaurant template never sees this section, unchanged. */}
+          {isVerticalTenant && (
+            <>
+              <Field label={`اسم ${staffLabel} *`} error={errors.staff_name}>
+                <input
+                  style={inputBase}
+                  placeholder={`مثال: ${staffLabel === 'الحلاق' ? 'أحمد' : staffLabel}`}
+                  value={form.staff_name}
+                  onChange={e => setForm(p => ({ ...p, staff_name: e.target.value }))}
+                />
+              </Field>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelBase}>الخدمات التي تقدّمها *</label>
+                {errors.services && (
+                  <div style={{ fontSize: 12, color: '#ff7070', marginBottom: 8 }}>{errors.services}</div>
+                )}
+                {form.services.map((s, i) => (
+                  <div key={i} style={{
+                    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8,
+                    marginBottom: 8, alignItems: 'start',
+                  }}>
+                    <div>
+                      <input
+                        style={inputBase}
+                        placeholder="اسم الخدمة"
+                        value={s.name_ar}
+                        onChange={e => updateService(i, 'name_ar', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        style={{ ...inputBase, direction: 'ltr' }}
+                        placeholder="السعر $"
+                        type="number" min="0" step="0.01"
+                        value={s.price}
+                        onChange={e => updateService(i, 'price', e.target.value)}
+                      />
+                      {errors[`service_${i}_price`] && (
+                        <div style={{ fontSize: 11, color: '#ff7070', marginTop: 3 }}>{errors[`service_${i}_price`]}</div>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        style={{ ...inputBase, direction: 'ltr' }}
+                        placeholder="دقائق"
+                        type="number" min="0" step="1"
+                        value={s.duration_min}
+                        onChange={e => updateService(i, 'duration_min', e.target.value)}
+                      />
+                      {errors[`service_${i}_duration`] && (
+                        <div style={{ fontSize: 11, color: '#ff7070', marginTop: 3 }}>{errors[`service_${i}_duration`]}</div>
+                      )}
+                    </div>
+                    {form.services.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeService(i)}
+                        style={{
+                          background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
+                          cursor: 'pointer', fontSize: 18, padding: '10px 4px',
+                        }}
+                      >×</button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addService}
+                  style={{
+                    background: 'transparent', border: `1px dashed ${color}66`, borderRadius: 8,
+                    color, fontSize: 13, padding: '8px 14px', cursor: 'pointer', width: '100%',
+                    fontFamily: "'Cairo', sans-serif",
+                  }}
+                >+ أضف خدمة</button>
+              </div>
+            </>
+          )}
 
           {/* Error message */}
           {serverErr && (
