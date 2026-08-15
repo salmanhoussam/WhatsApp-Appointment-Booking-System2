@@ -144,7 +144,15 @@ async def list_public_barbers(
 
     return {
         "success": True,
-        "data": [{"id": b.id, "name": b.name} for b in barbers],
+        # P1.1 (2026-08-15, ALZABT_P1_1_STAFF_SECTION_PROPOSAL.md): additive, backward-compatible
+        # extension -- image_url/description already exist on Barber and are already exposed by
+        # the admin endpoint (admin/barbers.py's own _fmt()); this is the first public consumer
+        # that needs them (StaffSection.jsx's showcase list, not the booking picker's own use of
+        # this same endpoint). id/name/ordering/auth are unchanged.
+        "data": [
+            {"id": b.id, "name": b.name, "image_url": b.imageUrl, "description": b.description}
+            for b in barbers
+        ],
     }
 
 

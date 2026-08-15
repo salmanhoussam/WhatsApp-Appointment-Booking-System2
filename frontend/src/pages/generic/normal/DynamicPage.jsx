@@ -41,6 +41,7 @@ import {
   OffersSection,
   TestimonialsSection,
   HoursSection,
+  StaffSection,
   VideoStorySection,
   StoryExperienceSection,
 } from '../../../components/dynamic-sections'
@@ -63,6 +64,7 @@ const SECTION_MAP = {
   offers:          OffersSection,
   testimonials:    TestimonialsSection,
   hours:           HoursSection,
+  staff:           StaffSection,
   video_story:     VideoStorySection,
   story_experience: StoryExperienceSection,
 }
