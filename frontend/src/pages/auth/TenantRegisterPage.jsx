@@ -111,6 +111,13 @@ export default function TenantRegisterPage() {
   const [step,     setStep]     = useState('idle') // idle | submitting | success
   const [serverErr, setServerErr] = useState(null)
   const [progress, setProgress] = useState('')
+  // Phase 3.6 (2026-08-15) -- closes a real, confirmed gap the Phase 3.5 audit found: if Step 1
+  // succeeds but a later step throws, resubmitting used to re-run Step 1 too, which then fails on
+  // the slug/email/phone uniqueness guards (the Client already exists) -- a real dead end with no
+  // path forward. Tracking the token in component state (not localStorage -- a stale token from
+  // an unrelated earlier session must never be reused for a NEW registration) means a retry within
+  // the same page load skips straight past whatever already succeeded.
+  const [registeredToken, setRegisteredToken] = useState(null)
 
   const color = template?.primary_color ?? presetColor
   const isVerticalTenant = Boolean(template?.vertical)
@@ -189,26 +196,34 @@ export default function TenantRegisterPage() {
       // venueType/_SERVICE_SEED_MAP exactly as before whenever `vertical` is null.
       const vertical = template?.vertical ?? null
 
-      setProgress('جاري إنشاء الحساب...')
-      const regRes = await authApi.post('/auth/register', {
-        business_name_ar: form.business_name,
-        slug:             form.slug,
-        email:            form.email,
-        password:         form.password,
-        whatsapp_number:  form.whatsapp_number,
-        owner_name:       form.owner_name || form.business_name,
-        primary_color:    color,
-        venue_type:       venueType,
-        vertical:         vertical,
-      })
-      const token = regRes.data.data.token
-      localStorage.setItem('admin_access_token', token)
+      // Step 1 — Register (SKIPPED if it already succeeded earlier this page-load, Phase 3.6).
+      // Only ever reuses a token this exact form submission produced -- never anything from
+      // localStorage, which could hold a stale token from a completely unrelated earlier session.
+      let token = registeredToken
+      if (!token) {
+        setProgress('جاري إنشاء الحساب...')
+        const regRes = await authApi.post('/auth/register', {
+          business_name_ar: form.business_name,
+          slug:             form.slug,
+          email:            form.email,
+          password:         form.password,
+          whatsapp_number:  form.whatsapp_number,
+          owner_name:       form.owner_name || form.business_name,
+          primary_color:    color,
+          venue_type:       venueType,
+          vertical:         vertical,
+        })
+        token = regRes.data.data.token
+        localStorage.setItem('admin_access_token', token)
+        setRegisteredToken(token) // remembered for the rest of THIS page-load only
+      }
 
       // Step 1.5 — Provision real vertical domain objects (Phase 3, 2026-08-15). Only when
       // vertical resolved -- a retail/restaurant template has nothing to provision here, unchanged.
       // Retry-safe: re-running this call (e.g. the visitor clicks submit again after a failure)
       // re-provisions from whatever the form holds right now, never duplicates -- the backend's
-      // own delete-then-recreate guard, not this page's concern.
+      // own delete-then-recreate guard, not this page's concern. Also safe against a genuine
+      // concurrent double-submit as of Phase 3.6 (backend-side atomic claim).
       let provisioningComplete = true // stays true for a non-vertical tenant -- nothing to gate on
       if (vertical) {
         setProgress(`جاري إعداد ${staffLabel} والخدمات...`)
@@ -237,13 +252,18 @@ export default function TenantRegisterPage() {
       // Step 3 — Seed categories from template. Skipped for a resolved vertical (Decision 4) --
       // Step 1.5 already provided real domain data; this would only create a second, redundant,
       // generic-labeled category alongside it.
+      // clear_existing: true (Phase 3.6, was false) -- makes retrying this specific step safe too:
+      // if a PRIOR attempt partially seeded categories before throwing, resubmitting would
+      // otherwise duplicate whichever ones already landed. Safe unconditionally here (this is the
+      // one and only real caller of this endpoint anywhere in the app, confirmed by a repo-wide
+      // search) -- a fresh Client at this exact point in the flow has no categories to lose.
       if (!vertical && template?.seedCategories?.length) {
         setProgress('جاري تهيئة الأقسام...')
         await adminApi.post('/catalog/seed-from-template', {
           template_key:   templateKey,
           module_key:     template.module_key ?? 'catalog',
           categories:     template.seedCategories,
-          clear_existing: false,
+          clear_existing: true,
         })
       }
 
@@ -271,7 +291,13 @@ export default function TenantRegisterPage() {
     } catch (err) {
       setStep('idle')
       setProgress('')
-      const detail = err?.response?.data?.detail
+      // Phase 3.6 -- app/core/exceptions.py's AppException family (ConflictError,
+      // BusinessLogicError -- what the new provisioning endpoint actually raises) is shaped
+      // {error: {message}} by the global handler, not {detail: ...} (that shape is
+      // StarletteHTTPException's own, e.g. FastAPI's built-in 404/422). Checked here so a real
+      // "provisioning already in progress" conflict shows its real message instead of the
+      // generic fallback.
+      const detail = err?.response?.data?.detail ?? err?.response?.data?.error?.message
       if (typeof detail === 'string') {
         setServerErr(detail)
       } else if (Array.isArray(detail)) {

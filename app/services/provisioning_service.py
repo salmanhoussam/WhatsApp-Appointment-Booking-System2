@@ -22,19 +22,25 @@ working hours are a reasonable starting point any tenant edits afterward via the
 same way its whole config is Content-layer, tenant-owned once created. Flagged here explicitly so
 this judgment call is visible and correctable, not silently made.
 
-Does NOT yet include: a batch-level idempotency guard (deferred to whenever a second real caller
-with a real retry path exists -- Demo Builder has none today, so building one now would be
-speculative infrastructure with nothing to protect) or any provisioning_status write (same reason
--- Phase 1's own column exists, but nothing writes it yet; this module doesn't need to be the
-first writer just because it exists).
+Phase 3 (2026-08-15) added the retry-safe orchestration (provision_vertical_domain_objects(),
+below) once Self-Registration became the real second caller with a real retry path this module's
+own idempotency guard had been deferred for. Phase 3.6 (same day, following the Phase 3.5 audit)
+hardened it further: an atomic claim closing a real concurrency gap, and a real (still no-op)
+apply_page_repertoire() hook matching the Contract's own diagram. provision_barber_domain() above
+remains untouched by any of this -- still the pure, content-free mechanism, still Demo Builder's
+own direct, non-orchestrated call.
 """
+import logging
+
 from prisma import Json
 
-from app.core.exceptions import BusinessLogicError
+from app.core.exceptions import BusinessLogicError, ConflictError
 from app.core.verticals import get_vertical
 from app.repositories import admin_catalog_repo as catalog_repo
 from app.repositories import admin_client_repo
 from app.repositories import barber_repo, catalog_service_repo, barber_service_repo
+
+logger = logging.getLogger(__name__)
 
 
 async def provision_barber_domain(
@@ -89,17 +95,35 @@ async def provision_barber_domain(
     await barber_service_repo.set_services_for_barber(client_id, barber.id, created_service_ids)
 
 
-# ── Orchestration (Unified Provisioning Contract, Phase 3, 2026-08-15) ─────────────────────────
+# ── Orchestration (Unified Provisioning Contract, Phase 3, 2026-08-15; hardened Phase 3.6) ──────
 #
 # provision_vertical_domain_objects() is the retry-safe entrypoint Self-Registration's own
 # provisioning endpoint calls -- distinct from provision_barber_domain() above, which stays the
 # pure, content-free mechanism (Phase 2, unchanged, still Demo Builder's own direct call with no
 # retry semantics, since it has no retry path to protect). This function adds exactly what a real
 # second caller with a real retry path needs: dispatch by staff_backing_model (never a vertical-
-# name string comparison), idempotent no-op if already complete, and delete-then-recreate cleanup
-# of any partial rows a prior failed attempt left behind -- the same "full replace" pattern
+# name string comparison), idempotent no-op if already complete, an atomic claim closing a real
+# concurrency gap (Phase 3.5's own audit finding #3), and delete-then-recreate cleanup of any
+# partial rows a prior failed attempt left behind -- the same "full replace" pattern
 # barber_service_repo.set_services_for_barber() already proves works in this codebase, applied one
 # level up. See .claudedocs/architecture/ALZABT_PHASE3_FINAL_CONTRACT.md for the full reasoning.
+#
+# ── provisioning_status vs. TENANT_LIFECYCLE_PLAN.md -- reconciliation, stated once, here ──────
+# Phase 3.5's audit found provisioning_status sits on the same conceptual axis as
+# TENANT_LIFECYCLE_PLAN.md's own already-designed (2026-07-18, never implemented) "Onboarding
+# Status" (not_started/in_progress/completed), never checked against it before. Stated plainly,
+# so neither this field nor a future real Onboarding Status implementation silently duplicates or
+# contradicts the other:
+#   - provisioning_status is scoped ONLY to this one mechanism: did the vertical's real domain
+#     objects (Barber/CatalogService/BarberService today) get created. Nothing more.
+#   - It is NOT, and must never be read as, a substitute for tenant-onboarding.md's own
+#     Completion Gate ("Client -> User -> Services -> Settings -> Page Content -> Media -> Public
+#     Page renders -> Dashboard renders") -- provisioning_status='complete' certifies only a
+#     subset of that chain (through Domain Data), never Page Content, Media, or rendering.
+#   - If/when TENANT_LIFECYCLE_PLAN.md's own Onboarding Status field is ever actually built, this
+#     field does not get folded into it silently -- that would be a real migration decision (does
+#     "provisioning complete" become one Onboarding Status value among several, or stay a separate,
+#     narrower fact a broader Onboarding Status also reads?), made explicitly then, not assumed now.
 
 async def _current_domain_state(client_id: str) -> dict:
     barbers = await barber_repo.list_barbers(client_id)
@@ -139,6 +163,22 @@ async def provision_vertical_domain_objects(
         # response instead of an ambiguous empty one.
         return await _current_domain_state(client_id)
 
+    # Atomic claim (Phase 3.6) -- a single conditional UPDATE, not a separate read-then-write, so
+    # two genuinely concurrent calls for the same client_id can't both pass a check and both
+    # proceed to create duplicate rows. Only one caller ever wins this.
+    claimed = await admin_client_repo.claim_provisioning(client_id)
+    if not claimed:
+        # Someone else either just finished (status is now 'complete' -- a real, harmless race
+        # with the no-op check above, not a bug: return the real result instead of erroring) or is
+        # actively provisioning right now (status is 'provisioning' -- a genuine conflict, told to
+        # the caller honestly rather than silently retried into a duplicate).
+        refreshed = await admin_client_repo.find_client_by_id(client_id)
+        if refreshed and refreshed.provisioningStatus == "complete":
+            return await _current_domain_state(client_id)
+        raise ConflictError(
+            f"Provisioning for client '{client_id}' is already in progress. Please wait and retry."
+        )
+
     staff_model = entry.get("staff_backing_model")
     try:
         if staff_model == "Barber":
@@ -152,6 +192,7 @@ async def provision_vertical_domain_objects(
             await catalog_repo.delete_categories_by_client(client_id)
 
             await provision_barber_domain(client_id, staff_name, services)
+            await apply_page_repertoire(client_id, vertical)
         else:
             raise BusinessLogicError(
                 f"No provisioning implementation for staff_backing_model={staff_model!r} "
@@ -163,3 +204,34 @@ async def provision_vertical_domain_objects(
 
     await admin_client_repo.update_client(client_id, {"provisioningStatus": "complete"})
     return await _current_domain_state(client_id)
+
+
+async def apply_page_repertoire(client_id: str, vertical: str) -> None:
+    """
+    Real, documented extension point for Section System P3's own future work -- named explicitly
+    in ALZABT_UNIFIED_PROVISIONING_CONTRACT_FINAL.md's own contract diagram, but never actually
+    built as code until now (Phase 3.5's audit found it existed only as a paragraph).
+
+    Reads VERTICAL_REGISTRY[vertical]["page_template"] -- today always None, for every real
+    vertical, because no real page_templates/{vertical}.json exists yet (Section System P3's own
+    job, not built here). When a real template path does exist, this is where it gets applied,
+    via the same mechanism scripts/seed_page_content.py already proves works, automated instead
+    of run by hand. Deliberately does nothing today rather than faking a guarantee -- the same
+    "no fake step" principle ALZABT_PHASE3_FINAL_CONTRACT.md's own Decision 1 already applied to
+    self-registration's data collection, applied here to this hook instead.
+    """
+    entry = get_vertical(vertical)
+    page_template = entry.get("page_template") if entry else None
+    if page_template is None:
+        logger.info(
+            "apply_page_repertoire: no page_template registered for vertical=%r yet -- no-op.",
+            vertical,
+        )
+        return
+    # Not reachable today -- no real vertical has a page_template yet. Left unimplemented on
+    # purpose, failing loudly rather than silently, so whoever adds the first real template also
+    # decides what "applying" it actually means (Section System P3's own scope, not this file's).
+    raise NotImplementedError(
+        f"page_template application not yet built (vertical={vertical!r}, "
+        f"page_template={page_template!r})."
+    )

@@ -36,3 +36,29 @@ async def update_client(client_id: str, data: dict):
         where={"id": client_id},
         data=data,
     )
+
+
+async def claim_provisioning(client_id: str) -> bool:
+    """
+    Atomically claim a client for provisioning (Unified Provisioning Contract, Phase 3.6,
+    2026-08-15 -- closes a real concurrency gap found in Phase 3.5's audit). Flips
+    provisioningStatus to "provisioning" ONLY if it isn't already "provisioning" or "complete" --
+    a single conditional UPDATE, not a separate read-then-write, so two genuinely simultaneous
+    calls for the same client can't both pass a check and both proceed to create duplicate rows.
+
+    Returns True if this call won the claim (proceed with provisioning). Returns False if another
+    call already holds it -- the caller must then re-check the real current status to tell "someone
+    else just finished" from "someone else is actively working" (see provisioning_service.py).
+
+    update_many() returns a plain int (the row count) in this prisma-client-py version (0.15.0),
+    not an object with a .count attribute -- same fix already documented in reservation_repo.py's
+    update_status()/update_fields(), confirmed directly in venv/lib/.../prisma/actions.py.
+    """
+    updated_count = await prisma_client.client.update_many(
+        where={
+            "id": client_id,
+            "provisioningStatus": {"not_in": ["provisioning", "complete"]},
+        },
+        data={"provisioningStatus": "provisioning"},
+    )
+    return updated_count == 1
