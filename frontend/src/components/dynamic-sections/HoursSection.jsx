@@ -1,11 +1,45 @@
 /**
  * HoursSection — Dynamic Section Renderer
  * data: { heading_ar, rows: [{ day_ar, open_ar, close_ar, closed }] }
+ *
+ * P0.2 (2026-08-15, ALZABT_P0_2_HOURS_SECTION_PROPOSAL.md, Option A): `Client.config.working_hours`
+ * (the same real, structured field ReservePage.jsx/ReservationsTab.jsx already read) is the default
+ * source whenever it's genuinely configured (open_time + close_time set). `data.rows` -- the
+ * authored/seeded content this section always used before -- is now only a fallback for a tenant
+ * with no real working_hours at all (every retail/restaurant tenant today, since no live editor
+ * writes this field for them; per the proposal, this is their real, intended authoring model, not
+ * a gap). Same weekday vocabulary (lowercase English keys) reservation_service.py's own
+ * _check_working_hours() and get_available_slots() already use for `closed_days` -- no new format
+ * invented. No tenant data is modified by this change; only what gets computed at render time.
  */
 import { motion } from 'framer-motion'
 
-export default function HoursSection({ data, accent }) {
-  const rows = data.rows ?? []
+// Same order/spelling as useReservationBooking.js's own AR_WEEKDAYS -- Arabic-week (Sunday-first),
+// already the established convention on the public booking page.
+const WEEKDAYS = [
+  { key: 'sunday',    label_ar: 'الأحد' },
+  { key: 'monday',    label_ar: 'الإثنين' },
+  { key: 'tuesday',   label_ar: 'الثلاثاء' },
+  { key: 'wednesday', label_ar: 'الأربعاء' },
+  { key: 'thursday',  label_ar: 'الخميس' },
+  { key: 'friday',    label_ar: 'الجمعة' },
+  { key: 'saturday',  label_ar: 'السبت' },
+]
+
+function buildRowsFromWorkingHours(workingHours) {
+  if (!workingHours?.open_time || !workingHours?.close_time) return null
+  const closedDays = workingHours.closed_days ?? []
+  return WEEKDAYS.map(({ key, label_ar }) => ({
+    day_ar:   label_ar,
+    open_ar:  workingHours.open_time,
+    close_ar: workingHours.close_time,
+    closed:   closedDays.includes(key),
+  }))
+}
+
+export default function HoursSection({ data, accent, config }) {
+  const liveRows = buildRowsFromWorkingHours(config?.config?.working_hours)
+  const rows = liveRows ?? (data.rows ?? [])
 
   if (rows.length === 0) return null
 
