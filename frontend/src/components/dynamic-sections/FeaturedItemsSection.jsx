@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchAllCategories, fetchItems } from '../../services/catalogApi'
+import publicApi from '../../utils/publicApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
 
 function SkeletonCard() {
@@ -22,7 +23,7 @@ function SkeletonCard() {
   )
 }
 
-export default function FeaturedItemsSection({ data, accent, slug, onAddToCart }) {
+export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, config }) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
@@ -42,6 +43,31 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart }
     if (!slug) { setLoading(false); return }
 
     const limit = data.limit ?? 6
+
+    // P0.1 fix (2026-08-15, ALZABT_SECTION_SYSTEM_WORK_SEQUENCE.md): a Reservations-vertical
+    // tenant (e.g. Ali) has real CatalogService rows but no separately-activated "catalog"
+    // service -- the old catalogApi.js path 403s on such a tenant (its real backend route is
+    // gated behind require_service("catalog")). GET /reservations/catalog-services is the
+    // already-real, already-public, reservations-native endpoint (already proven working by
+    // useReservationBooking.js's own booking-page fetch) gated behind "reservations" instead.
+    // Branch on the ACTUAL gate the old path depends on ("catalog"), not merely on whether
+    // "reservations" is present -- a tenant can genuinely have both (e.g. RK: real Services
+    // AND real Store categories), and such a tenant must keep its existing, already-working
+    // multi-category walk below untouched, not be narrowed down to reservations-only services.
+    const activeServices = config?.active_services ?? []
+    if (activeServices.includes('reservations') && !activeServices.includes('catalog')) {
+      publicApi.get('/reservations/catalog-services', { params: { client_slug: slug } })
+        .then(res => {
+          if (!mountedRef.current) return
+          const allItems = res.data?.data ?? []
+          const featured = allItems.filter(i => i.is_featured)
+          const pool     = featured.length >= 3 ? featured : allItems
+          setItems(pool.slice(0, limit))
+        })
+        .catch(() => { if (mountedRef.current) setItems([]) })
+        .finally(() => { if (mountedRef.current) setLoading(false) })
+      return
+    }
 
     // Fetch every real category (no tenant-wide moduleKey collapse -- TOS-004), then pool items
     // across ALL of them, each routed by its own real module_key. A tenant with more than one
@@ -65,7 +91,7 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart }
       })
       .catch(() => { if (mountedRef.current) setItems([]) })
       .finally(() => { if (mountedRef.current) setLoading(false) })
-  }, [slug, data.limit])
+  }, [slug, data.limit, config])
 
   if (!loading && items.length === 0) return null
 
