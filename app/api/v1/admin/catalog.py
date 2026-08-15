@@ -4,9 +4,37 @@ from typing import Optional
 
 from app.core.tenant import require_roles
 from app.core.services import require_service
+from app.core.db_resilience import with_db_resilience
+from app.db.client import prisma_client
+from app.db.dependencies import get_current_tenant
 from app.services import catalog_service
 
 router = APIRouter()
+
+
+# ALZABT_ALI_403_CATEGORIES_GATE_PROPOSAL.md (2026-08-16): scoped to list_categories() ONLY --
+# every other route in this file stays catalog-only, unchanged. A Barber-vertical tenant has real
+# CatalogCategory data (provision_barber_domain() in provisioning_service.py creates it via this
+# same repository) but is gated behind "reservations", not "catalog" -- this one read-only route
+# needs to accept either. Not folded into the shared require_service() (used by dozens of
+# single-service routes app-wide) -- kept local to this file to hold the blast radius to exactly
+# the one route the real, confirmed bug is in.
+async def _require_catalog_or_reservations(tenant: dict = Depends(get_current_tenant)) -> None:
+    svc = await with_db_resilience(
+        lambda: prisma_client.clientservice.find_first(
+            where={
+                "clientId": tenant["id"],
+                "serviceKey": {"in": ["catalog", "reservations"]},
+                "isActive": True,
+            }
+        ),
+        label="require_service:catalog_or_reservations",
+    )
+    if not svc:
+        raise HTTPException(
+            status_code=403,
+            detail="Service 'catalog' or 'reservations' is not activated for this tenant.",
+        )
 
 # Staff Scoped Access (Phase B, 2026-08-09, .claudedocs/implementation/STAFF_SCOPED_ACCESS_CONTRACT.md):
 # this file previously had NO require_roles() gate at all -- any authenticated admin, any role,
@@ -83,7 +111,7 @@ async def list_categories(
     parent_id:        Optional[str] = Query(None),
     include_inactive: bool          = Query(False),
     user = Depends(require_roles(*CATALOG_ROLES)),
-    _svc = Depends(require_service("catalog")),
+    _svc = Depends(_require_catalog_or_reservations),
 ):
     data = await catalog_service.admin_list_categories(
         client_id=user.clientId,
