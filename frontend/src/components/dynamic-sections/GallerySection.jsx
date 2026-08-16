@@ -1,9 +1,43 @@
 /**
  * GallerySection — Dynamic Section Renderer
  * data: { heading_ar, images: [{url, caption_ar}] }
+ *
+ * Placeholder tiles (2026-08-16): an `images[]` entry with no `url` renders as an honest, clearly-
+ * empty placeholder square (dashed border + icon) instead of being filtered out -- ready for a
+ * real photo to be dropped in from the Dashboard. This is a visually-obvious empty *design*, not
+ * placeholder *text* pretending to be real content, so it doesn't conflict with the P2 honesty
+ * rule (`ALZABT_P2_EMPTY_STATE_LOCATION_STORY_PROPOSAL.md`) -- that rule is about text content
+ * being indistinguishable from real data, not about a UI affordance that's obviously a slot to
+ * fill. The section still collapses entirely (`return null`) when `images` is empty/absent, same
+ * as before -- placeholders only render for explicitly-seeded empty slots, never invented from
+ * nothing.
  */
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+function PlaceholderTile({ accent, delay }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 24, delay }}
+      style={{
+        position: 'relative',
+        aspectRatio: '4/3',
+        borderRadius: 12,
+        border: `1.5px dashed ${accent}45`,
+        background: 'rgba(255,255,255,0.02)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4 }}>
+        <rect x="3" y="5" width="18" height="14" rx="2" stroke={accent} strokeWidth="1.5" />
+        <circle cx="8.5" cy="10" r="1.5" stroke={accent} strokeWidth="1.5" />
+        <path d="M3 16l5-4 4 3 4-5 5 6" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </motion.div>
+  )
+}
 
 function Lightbox({ images, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex)
@@ -91,9 +125,10 @@ function Lightbox({ images, startIndex, onClose }) {
 
 export default function GallerySection({ data, accent }) {
   const [lightboxIdx, setLightboxIdx] = useState(null)
-  const images = (data.images ?? []).filter(img => img?.url)
+  const slots  = data.images ?? []
+  const images = slots.filter(img => img?.url)
 
-  if (images.length === 0) return null
+  if (slots.length === 0) return null
 
   return (
     <section style={{ marginBottom: 56, direction: 'rtl' }}>
@@ -118,10 +153,13 @@ export default function GallerySection({ data, accent }) {
         gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
         gap: 10,
       }}>
-        {images.map((img, i) => (
+        {slots.map((img, i) => (
+          !img?.url ? (
+            <PlaceholderTile key={i} accent={accent} delay={i * 0.05} />
+          ) : (
           <motion.button
             key={i}
-            onClick={() => setLightboxIdx(i)}
+            onClick={() => setLightboxIdx(images.indexOf(img))}
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 24, delay: i * 0.05 }}
@@ -159,6 +197,7 @@ export default function GallerySection({ data, accent }) {
               </div>
             )}
           </motion.button>
+          )
         ))}
       </div>
 

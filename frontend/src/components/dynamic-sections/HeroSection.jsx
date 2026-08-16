@@ -67,8 +67,13 @@ export default function HeroSection({ data, accent, reserveHref }) {
         ) : (
           <div style={{
             position: 'absolute', inset: 0,
-            background: `radial-gradient(ellipse at 60% 40%, ${accent}28 0%, transparent 70%),
-                         linear-gradient(160deg, oklch(0.13 0.03 280) 0%, oklch(0.08 0.01 260) 100%)`,
+            // Purple-into-black dark theme base, deliberately more saturated than the previous
+            // near-invisible tint -- a real, visible "purple + gold dark theme" (2026-08-16,
+            // per Salman's reference), not a per-tenant color (Layer 1 locked, built once). The
+            // radial accent glow stays tenant-driven (gold for Mister H) so the two colors read
+            // as distinct, not blended into one muddy tone.
+            background: `radial-gradient(ellipse at 60% 40%, ${accent}30 0%, transparent 65%),
+                         linear-gradient(160deg, oklch(0.19 0.09 295) 0%, oklch(0.07 0.02 265) 100%)`,
           }} />
         )}
       </EditableRegion>
