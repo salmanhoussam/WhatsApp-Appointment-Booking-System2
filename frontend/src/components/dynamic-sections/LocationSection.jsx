@@ -1,16 +1,30 @@
 /**
  * LocationSection — Dynamic Section Renderer
  * data: { heading_ar, para_ar, maps_url, tags: string[] }
+ *
+ * P2 empty-state remediation (2026-08-16, ALZABT_P2_EMPTY_STATE_LOCATION_STORY_PROPOSAL.md,
+ * Option A, approved by Salman): a literal placeholder string ("قريباً") seeded as real content
+ * is treated as no real content at all -- same "never render placeholder text indistinguishable
+ * from real data" principle HoursSection.jsx already applies, extended here rather than
+ * reinvented. When there's no real paragraph, no tags, and no map, the section renders nothing
+ * (same mechanism GallerySection/TestimonialsSection already use) instead of a bare heading.
  */
 import { motion } from 'framer-motion'
 import { useInView } from 'framer-motion'
 import { useRef } from 'react'
+
+// Known seeded placeholder values that must never render as if they were real location content.
+const PLACEHOLDER_PARA_VALUES = new Set(['قريباً', 'قريبا'])
 
 export default function LocationSection({ data, accent }) {
   const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
 
   const tags = (data.tags ?? []).filter(Boolean)
+  const paraText   = (data.para_ar ?? '').trim()
+  const hasRealPara = paraText.length > 0 && !PLACEHOLDER_PARA_VALUES.has(paraText)
+
+  if (!hasRealPara && tags.length === 0 && !data.maps_url) return null
 
   return (
     <section ref={ref} style={{ marginBottom: 56, direction: 'rtl' }}>
@@ -35,7 +49,7 @@ export default function LocationSection({ data, accent }) {
       </div>
 
       {/* Paragraph */}
-      {data.para_ar && (
+      {hasRealPara && (
         <motion.p
           initial={{ opacity: 0, y: 12 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -49,7 +63,7 @@ export default function LocationSection({ data, accent }) {
             whiteSpace: 'pre-line',
           }}
         >
-          {data.para_ar}
+          {paraText}
         </motion.p>
       )}
 

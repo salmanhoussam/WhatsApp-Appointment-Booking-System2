@@ -53,7 +53,13 @@ export default function StorySection({ data, accent }) {
   const ref   = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-80px' })
 
-  const stats = (data.stats ?? []).filter(s => s.num)
+  const stats  = (data.stats ?? []).filter(s => s.num)
+  // P2 empty-state remediation (2026-08-16, ALZABT_P2_EMPTY_STATE_LOCATION_STORY_PROPOSAL.md) --
+  // defensive hardening only, no observed bug on RK/Ali (both have real body_ar today). Protects a
+  // future tenant with a genuinely empty story from showing a bare heading with nothing beneath it.
+  const hasBody = Boolean((data.body_ar ?? '').trim())
+
+  if (!hasBody && stats.length === 0) return null
 
   return (
     <section ref={ref} style={{ marginBottom: 56, direction: 'rtl' }}>
