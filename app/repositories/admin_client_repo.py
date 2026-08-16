@@ -54,10 +54,15 @@ async def claim_provisioning(client_id: str) -> bool:
     not an object with a .count attribute -- same fix already documented in reservation_repo.py's
     update_status()/update_fields(), confirmed directly in venv/lib/.../prisma/actions.py.
     """
+    # P0 wipe-guard (2026-08-16, ALZABT_PROVISIONING_DOMAIN_OBJECTS_P0_WIPE_GUARD_PROPOSAL.md):
+    # allowlist, not the original blocklist -- a client with provisioningStatus=None (a legacy or
+    # Demo-Builder-provisioned tenant this orchestration never owns) must never win this claim,
+    # even if provisioning_service.py's own earlier explicit check were ever bypassed. Same
+    # single atomic conditional UPDATE as before, no new read-then-write window.
     updated_count = await prisma_client.client.update_many(
         where={
             "id": client_id,
-            "provisioningStatus": {"not_in": ["provisioning", "complete"]},
+            "provisioningStatus": {"in": ["pending", "failed"]},
         },
         data={"provisioningStatus": "provisioning"},
     )

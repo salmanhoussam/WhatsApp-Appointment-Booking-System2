@@ -163,6 +163,23 @@ async def provision_vertical_domain_objects(
         # response instead of an ambiguous empty one.
         return await _current_domain_state(client_id)
 
+    # P0 wipe-guard (2026-08-16, ALZABT_PROVISIONING_DOMAIN_OBJECTS_P0_WIPE_GUARD_PROPOSAL.md):
+    # allowlist, not a blocklist. provisioningStatus=None is the real, structural resting state of
+    # ANY tenant whose Barber domain objects exist through a path other than this one orchestration
+    # function -- a legacy-backfilled tenant (rk, ali) or a Demo-Builder-provisioned one
+    # (alzabt-demo and any future one, which calls provision_barber_domain() directly and never
+    # touches this field). Registration_service.py always sets "pending" for a resolved vertical,
+    # so this never rejects a real, correctly-lifecycled caller -- only a tenant this orchestration
+    # never actually owns.
+    if client.provisioningStatus not in ("pending", "failed"):
+        raise BusinessLogicError(
+            f"Client '{client_id}' is not in a provisioning-eligible state "
+            f"(provisioningStatus={client.provisioningStatus!r}). Domain-object provisioning only "
+            f"applies to a tenant created through the Unified Provisioning Contract's own "
+            f"registration flow, in a pending or previously-failed state -- not a tenant whose "
+            f"domain objects already exist through a different path."
+        )
+
     # Atomic claim (Phase 3.6) -- a single conditional UPDATE, not a separate read-then-write, so
     # two genuinely concurrent calls for the same client_id can't both pass a check and both
     # proceed to create duplicate rows. Only one caller ever wins this.
