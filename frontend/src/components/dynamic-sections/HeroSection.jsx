@@ -1,6 +1,16 @@
 /**
  * HeroSection — Dynamic Section Renderer
- * data: { title_ar, subtitle_ar, cta_text_ar, bg_image_url, bg_type }
+ * data: { title_ar, subtitle_ar, cta_text_ar, bg_image_url, bg_type, framed_video_url, framed_video_caption_ar }
+ *
+ * `framed_video_url` (2026-08-16, additive, optional) -- a small, bordered, rounded video card
+ * shown beside the text instead of a full-bleed background video. Added after real evidence a
+ * full-bleed autoplay hero video read poorly for this tenant; a real, cross-referenced pattern
+ * (dribbble.com/shots/26013685 -- "Barber Shop Landing Page", dark bg + single accent + a framed
+ * "See Video" card) showed this framed-card treatment is a real, recurring pattern in this
+ * category, not invented. When set, the section always uses the dark gradient background (never
+ * the old full-bleed video/image mode) and splits into text + framed card on desktop, stacks on
+ * mobile. `bg_image_url`'s full-bleed video/image mode is untouched for any tenant not using this
+ * new field -- purely additive, no existing tenant's rendering changes.
  */
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -11,6 +21,7 @@ import { mediaSchema } from '../../tenant-os/schemas/media'
 const S_TITLE  = { type: 'spring', stiffness: 80,  damping: 18, mass: 1.2 }
 const S_BODY   = { type: 'spring', stiffness: 70,  damping: 18, mass: 1.2, delay: 0.12 }
 const S_CTA    = { type: 'spring', stiffness: 280, damping: 24, mass: 0.6, delay: 0.26 }
+const S_CARD   = { type: 'spring', stiffness: 70,  damping: 20, mass: 1.2, delay: 0.18 }
 
 // reserveHref (optional) -- injected by DynamicPage.jsx only when this tenant has
 // "reservations" active. Without it every tenant keeps the original scroll-down behavior
@@ -18,8 +29,9 @@ const S_CTA    = { type: 'spring', stiffness: 280, damping: 24, mass: 0.6, delay
 // instead of just scrolling (confirmed via real Browser Verification, 2026-08-02 -- the button
 // existed and rendered, but clicking it never reached the reservation page).
 export default function HeroSection({ data, accent, reserveHref }) {
-  const isVideo = data.bg_image_url?.match(/\.(mp4|webm|mov)$/i)
-  const hasBg   = !!data.bg_image_url
+  const hasFramedVideo = !!data.framed_video_url
+  const isVideo = !hasFramedVideo && data.bg_image_url?.match(/\.(mp4|webm|mov)$/i)
+  const hasBg   = !hasFramedVideo && !!data.bg_image_url
   const navigate = useNavigate()
 
   const scrollDown = () => window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' })
@@ -61,7 +73,7 @@ export default function HeroSection({ data, accent, reserveHref }) {
         )}
       </EditableRegion>
 
-      {/* Overlay — stronger on bg-media, subtle on color-only */}
+      {/* Overlay — stronger on bg-media, subtle on color-only/framed-video */}
       <div style={{
         position: 'absolute', inset: 0,
         background: hasBg || isVideo
@@ -79,10 +91,20 @@ export default function HeroSection({ data, accent, reserveHref }) {
       {/* Content */}
       <div style={{
         position: 'relative', zIndex: 1,
-        textAlign: 'center',
-        padding: '100px 32px 80px',
-        maxWidth: 800, margin: '0 auto',
+        direction: 'rtl',
+        width: hasFramedVideo ? '100%' : undefined,
+        display: hasFramedVideo ? 'flex' : 'block',
+        flexDirection: hasFramedVideo ? 'row' : undefined,
+        flexWrap: hasFramedVideo ? 'wrap' : undefined,
+        alignItems: hasFramedVideo ? 'center' : undefined,
+        justifyContent: hasFramedVideo ? 'center' : undefined,
+        gap: hasFramedVideo ? 48 : undefined,
+        textAlign: hasFramedVideo ? 'start' : 'center',
+        padding: hasFramedVideo ? '80px 32px' : '100px 32px 80px',
+        maxWidth: hasFramedVideo ? 1100 : 800,
+        margin: '0 auto',
       }}>
+        <div style={{ flex: hasFramedVideo ? '1 1 380px' : undefined, maxWidth: hasFramedVideo ? 460 : undefined }}>
         <EditableRegion capability="content" fieldKey="hero.title" schema={contentSchema['hero.title']}>
           <motion.h1
             initial={{ opacity: 0, y: 32 }}
@@ -90,7 +112,7 @@ export default function HeroSection({ data, accent, reserveHref }) {
             transition={S_TITLE}
             style={{
               margin: '0 0 20px',
-              fontSize: 'clamp(32px, 6vw, 68px)',
+              fontSize: hasFramedVideo ? 'clamp(30px, 5vw, 54px)' : 'clamp(32px, 6vw, 68px)',
               fontWeight: 900,
               color: '#fff',
               lineHeight: 1.15,
@@ -114,7 +136,9 @@ export default function HeroSection({ data, accent, reserveHref }) {
               color: 'rgba(255,255,255,0.72)',
               lineHeight: 1.7,
               fontFamily: "'Cairo', 'Segoe UI', sans-serif",
-              maxWidth: 580, marginLeft: 'auto', marginRight: 'auto',
+              maxWidth: hasFramedVideo ? 460 : 580,
+              marginLeft: hasFramedVideo ? 0 : 'auto',
+              marginRight: hasFramedVideo ? 0 : 'auto',
             }}
           >
             {data.subtitle_ar}
@@ -146,6 +170,64 @@ export default function HeroSection({ data, accent, reserveHref }) {
           >
             {data.cta_text_ar}
           </motion.button>
+        )}
+        </div>
+
+        {/* Framed video card — small, bordered, contained, per real evidenced pattern
+            (dribbble.com/shots/26013685) instead of a full-bleed background video */}
+        {hasFramedVideo && (
+          <motion.div
+            initial={{ opacity: 0, y: 28, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={S_CARD}
+            style={{
+              flex: '1 1 320px',
+              maxWidth: 420,
+              aspectRatio: '9 / 14',
+              borderRadius: 24,
+              overflow: 'hidden',
+              position: 'relative',
+              border: `1px solid ${accent}55`,
+              boxShadow: `0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)`,
+            }}
+          >
+            <video
+              src={data.framed_video_url}
+              autoPlay muted loop playsInline
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 40%)',
+            }} />
+            {data.framed_video_caption_ar && (
+              <div style={{
+                position: 'absolute', bottom: 18, insetInline: 18,
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{
+                  width: 34, height: 34, borderRadius: '50%',
+                  border: `1px solid ${accent}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.35)', flexShrink: 0,
+                }}>
+                  <span style={{
+                    width: 0, height: 0,
+                    borderTop: '6px solid transparent', borderBottom: '6px solid transparent',
+                    borderInlineStart: `9px solid ${accent}`,
+                    marginInlineStart: 2,
+                  }} />
+                </span>
+                <span style={{
+                  fontSize: 13, fontWeight: 700, color: '#fff',
+                  fontFamily: "'Cairo', sans-serif",
+                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+                }}>
+                  {data.framed_video_caption_ar}
+                </span>
+              </div>
+            )}
+          </motion.div>
         )}
       </div>
     </section>
