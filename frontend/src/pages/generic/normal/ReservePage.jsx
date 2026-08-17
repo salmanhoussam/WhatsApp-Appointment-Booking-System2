@@ -13,12 +13,28 @@ import TenantModuleNav        from '../../../design-system/organisms/TenantModul
 import { hasCapability }      from '../../../utils/capabilities'
 import { T, FONT }            from '../../../theme'
 
-// Light design tokens (T, FONT) now imported from the shared source (frontend/src/theme.js) --
-// previously a local, byte-identical duplicate of the same object also kept in
-// pages/generic-admin/theme.js (Alzabt Master Product Plan, Section K step 1: token-sharing
-// refactor, zero visual change). Scoped to `mode === 'booking'` only -- the legacy generic
-// date/time form (other tenant types, out of this Pilot's scope) keeps its original dark styling
-// untouched below.
+// Light design tokens (T, FONT) imported from the shared source (frontend/src/theme.js) -- used
+// only by the legacy generic date/time form now (LegacyPage, below). The booking-mode UI (real
+// Barber-vertical flow) was a fully separate hardcoded light theme (white cards, green accent),
+// never wired to the tenant's own `primary_color` at all -- confirmed by reading the code, not
+// assumed. Replaced 2026-08-16 with DT (dark tokens), driven by the tenant's real `accent` prop
+// for every selected/active state, plus a single restrained secondary highlight color (GOLD) used
+// sparingly (today-marker ring, price text, confirmation icon) -- never as a dominant fill, per
+// the explicit "purple primary + restrained gold" identity brief.
+const GOLD = '#D9A441'
+
+const DT = {
+  pageBg:      '#08070C',
+  cardBg:      'rgba(255,255,255,0.035)',
+  cardBorder:  'rgba(255,255,255,0.09)',
+  borderSoft:  'rgba(255,255,255,0.06)',
+  textPrimary: '#F5F3FA',
+  textSecond:  'rgba(245,243,250,0.62)',
+  textMuted:   'rgba(245,243,250,0.38)',
+  shadow:      '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)',
+  shadowLg:    '0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
+  whatsapp:    '#25D366',
+}
 
 const SERVICE_ICONS = {
   'شعر':            Scissors,
@@ -94,11 +110,11 @@ function SuccessScreen({ accent, reservationId, onBack }) {
 
 // ── Light-theme atoms (booking mode) ─────────────────────────────────────────────────────────────
 
-function LightLoadingDot() {
+function LightLoadingDot({ accent = GOLD }) {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
       <div style={{
-        width: 8, height: 8, borderRadius: '50%', background: T.green,
+        width: 8, height: 8, borderRadius: '50%', background: accent,
         margin: '0 auto', animation: 'rwdot 1.4s ease-in-out infinite',
       }} />
       <style>{`@keyframes rwdot{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}`}</style>
@@ -111,10 +127,10 @@ function NumberedSection({ index, title, children }) {
     <div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8,
-        fontSize: 15, fontWeight: 800, color: T.textPrimary, marginBottom: 16,
+        fontSize: 15, fontWeight: 800, color: DT.textPrimary, marginBottom: 16,
       }}>
         {title}
-        <span style={{ color: T.textMuted, fontWeight: 700 }}>.{index}</span>
+        <span style={{ color: DT.textMuted, fontWeight: 700 }}>.{index}</span>
       </div>
       {children}
     </div>
@@ -126,7 +142,7 @@ function NumberedSection({ index, title, children }) {
 // check badge for selected state, no size jump on select). Same selection semantics as the prior
 // ServiceCard (selected/onClick), only the visual presentation changed -- chooseService/
 // selectedServiceId, the API shape, and every other part of the booking flow are untouched.
-function ServiceCircle({ item, selected, onClick }) {
+function ServiceCircle({ item, selected, onClick, accent }) {
   const Icon = serviceIconFor(item.name_ar)
   const size = 72
   return (
@@ -141,38 +157,40 @@ function ServiceCircle({ item, selected, onClick }) {
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
         <div style={{
           width: size, height: size, borderRadius: '50%', overflow: 'hidden',
-          background: T.greenSoft, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: selected ? `0 0 0 3px ${T.green}` : `0 0 0 1px ${T.border}`,
+          background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: selected ? `0 0 0 3px ${accent}` : `0 0 0 1px ${DT.cardBorder}`,
           transition: 'box-shadow 0.15s ease',
         }}>
           {item.image_url
             ? <img src={item.image_url} alt={item.name_ar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <Icon size={26} color={T.green} strokeWidth={1.75} />}
+            : <Icon size={26} color={accent} strokeWidth={1.75} />}
         </div>
         {selected && (
           <span style={{
             position: 'absolute', top: -2, insetInlineStart: -2, width: 20, height: 20, borderRadius: '50%',
-            background: T.green, border: '2px solid #fff',
+            background: accent, border: `2px solid ${DT.pageBg}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Check size={10} color="#fff" strokeWidth={3} />
           </span>
         )}
       </div>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: T.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: DT.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>
         {item.name_ar}
       </span>
       {/* Price (Alzabt Master Product Plan, Section D/E's confirmed content gap -- the reference
           set's own booking-widget image showed price alongside duration on every service; this
           page previously showed duration only, even though CatalogService.price/currency were
           already returned by the API, just never rendered). Same duration+price combined-line
-          convention already used in StaffTab.jsx's service cards, not a new format invented here. */}
-      <span style={{ fontSize: 10.5, color: T.textSecond, textAlign: 'center', lineHeight: 1.3 }}>
+          convention already used in StaffTab.jsx's service cards, not a new format invented here.
+          Price rendered in the restrained secondary GOLD accent -- a deliberate, sparing highlight,
+          not the dominant selected-state color (that's `accent`). */}
+      <span style={{ fontSize: 10.5, color: DT.textSecond, textAlign: 'center', lineHeight: 1.3 }}>
         {item.duration_min} دقيقة
         {item.price != null && (
           <>
             {' · '}
-            <span style={{ color: T.green, fontWeight: 700 }}>{item.price} {item.currency}</span>
+            <span style={{ color: GOLD, fontWeight: 700 }}>{item.price} {item.currency}</span>
           </>
         )}
       </span>
@@ -188,7 +206,7 @@ function ServicesScrollStyle() {
   return <style>{`.rw-services-scroll::-webkit-scrollbar{display:none}`}</style>
 }
 
-function StaffCarousel({ barbers, selectedBarberId, onChoose }) {
+function StaffCarousel({ barbers, selectedBarberId, onChoose, accent }) {
   const [offset, setOffset] = useState(0)
   const visible = barbers[offset] ?? null
   const canPrev = offset > 0
@@ -196,18 +214,20 @@ function StaffCarousel({ barbers, selectedBarberId, onChoose }) {
 
   if (!visible) return null
 
+  const isSelected = selectedBarberId === visible.id
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
       <button
         onClick={() => canPrev && setOffset((o) => o - 1)}
         disabled={!canPrev}
         style={{
-          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${T.border}`,
-          background: T.cardBg, cursor: canPrev ? 'pointer' : 'not-allowed', opacity: canPrev ? 1 : 0.3,
+          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${DT.cardBorder}`,
+          background: DT.cardBg, cursor: canPrev ? 'pointer' : 'not-allowed', opacity: canPrev ? 1 : 0.3,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <ChevronRight size={16} color={T.textPrimary} />
+        <ChevronRight size={16} color={DT.textPrimary} />
       </button>
 
       <button
@@ -215,38 +235,40 @@ function StaffCarousel({ barbers, selectedBarberId, onChoose }) {
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer',
           padding: '16px 32px', borderRadius: 16,
-          background: selectedBarberId === visible.id ? T.greenSoft : T.cardBg,
-          border: `1.5px solid ${selectedBarberId === visible.id ? T.green : T.border}`,
-          boxShadow: selectedBarberId === visible.id ? 'none' : T.shadow, position: 'relative',
+          background: isSelected ? `${accent}18` : DT.cardBg,
+          border: `1.5px solid ${isSelected ? accent : DT.cardBorder}`,
+          boxShadow: isSelected ? 'none' : DT.shadow, position: 'relative',
         }}
       >
-        {selectedBarberId === visible.id && (
+        {isSelected && (
           <span style={{
             position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: '50%',
-            background: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Check size={12} color="#fff" strokeWidth={3} />
           </span>
         )}
         <div style={{
-          width: 48, height: 48, borderRadius: '50%', background: T.borderSoft,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 48, height: 48, borderRadius: '50%', overflow: 'hidden',
+          background: DT.borderSoft, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <UserRound size={26} color={T.textSecond} strokeWidth={1.5} />
+          {visible.image_url
+            ? <img src={visible.image_url} alt={visible.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <UserRound size={26} color={DT.textSecond} strokeWidth={1.5} />}
         </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, fontFamily: FONT }}>{visible.name}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: DT.textPrimary, fontFamily: FONT }}>{visible.name}</span>
       </button>
 
       <button
         onClick={() => canNext && setOffset((o) => o + 1)}
         disabled={!canNext}
         style={{
-          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${T.border}`,
-          background: T.cardBg, cursor: canNext ? 'pointer' : 'not-allowed', opacity: canNext ? 1 : 0.3,
+          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${DT.cardBorder}`,
+          background: DT.cardBg, cursor: canNext ? 'pointer' : 'not-allowed', opacity: canNext ? 1 : 0.3,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <ChevronLeft size={16} color={T.textPrimary} />
+        <ChevronLeft size={16} color={DT.textPrimary} />
       </button>
     </div>
   )
@@ -261,7 +283,7 @@ function isTodayIso(iso) {
   return iso === todayIso
 }
 
-function CalendarPanel({ booking }) {
+function CalendarPanel({ booking, accent }) {
   const {
     monthGrid, goPrevMonth, goNextMonth, monthOffset, weekdaysShort,
     selectedDate, chooseDate, slots, slotsLoading, slotsError, retrySlots, selectedSlot, chooseSlot,
@@ -280,38 +302,44 @@ function CalendarPanel({ booking }) {
   }, [slotsLoading, slots, selectedDate])
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20,
+      background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 20, padding: '22px 22px',
+    }}>
       {/* Calendar grid */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button
             onClick={goPrevMonth} disabled={monthOffset === 0}
             style={{
-              width: 30, height: 30, borderRadius: 10, border: `1px solid ${T.border}`, background: T.cardBg,
+              width: 30, height: 30, borderRadius: 10, border: `1px solid ${DT.cardBorder}`, background: 'transparent',
               cursor: monthOffset === 0 ? 'not-allowed' : 'pointer', opacity: monthOffset === 0 ? 0.3 : 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <ChevronRight size={15} color={T.textPrimary} />
+            <ChevronRight size={15} color={DT.textPrimary} />
           </button>
-          <div style={{ fontSize: 15, fontWeight: 800, color: T.textPrimary }}>{monthGrid.label}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: DT.textPrimary }}>{monthGrid.label}</div>
           <button
             onClick={goNextMonth}
             style={{
-              width: 30, height: 30, borderRadius: 10, border: `1px solid ${T.border}`, background: T.cardBg,
+              width: 30, height: 30, borderRadius: 10, border: `1px solid ${DT.cardBorder}`, background: 'transparent',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <ChevronLeft size={15} color={T.textPrimary} />
+            <ChevronLeft size={15} color={DT.textPrimary} />
           </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 6 }}>
           {weekdaysShort.map((w) => (
-            <div key={w} style={{ textAlign: 'center', fontSize: 11, color: T.textMuted, fontWeight: 700 }}>{w}</div>
+            <div key={w} style={{ textAlign: 'center', fontSize: 11, color: DT.textMuted, fontWeight: 700 }}>{w}</div>
           ))}
         </div>
 
+        {/* Selected day = accent (purple). Today (unselected) = restrained gold ring -- the two
+            colors read as distinct signals, not blended, per the explicit "purple selected state,
+            restrained gold accent" spec. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
           {monthGrid.cells.map((cell, i) => {
             if (!cell) return <div key={`pad-${i}`} />
@@ -323,11 +351,11 @@ function CalendarPanel({ booking }) {
                 onClick={() => chooseDate(cell.iso)}
                 style={{
                   aspectRatio: '1', borderRadius: '50%', cursor: cell.isPast ? 'not-allowed' : 'pointer',
-                  background: active ? T.green : 'transparent',
-                  border: cell.isToday && !active ? `1px solid ${T.green}` : '1px solid transparent',
-                  color: active ? '#fff' : cell.isPast ? T.textMuted : T.textPrimary,
+                  background: active ? accent : 'transparent',
+                  border: cell.isToday && !active ? `1px solid ${GOLD}` : '1px solid transparent',
+                  color: active ? '#fff' : cell.isPast ? DT.textMuted : DT.textPrimary,
                   fontSize: 13, fontWeight: active ? 800 : 500, fontFamily: FONT,
-                  opacity: cell.isPast ? 0.4 : 1,
+                  opacity: cell.isPast ? 0.35 : 1,
                 }}
               >
                 {cell.dayNum}
@@ -336,33 +364,33 @@ function CalendarPanel({ booking }) {
           })}
         </div>
 
-        <p style={{ marginTop: 12, fontSize: 11, color: T.textMuted, textAlign: 'center' }}>
-          الأيام المتاحة باللون الأسود
+        <p style={{ marginTop: 12, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>
+          الأيام المتاحة قابلة للاختيار
         </p>
       </div>
 
       {/* Time slots */}
-      <div style={{ borderInlineStart: `1px solid ${T.borderSoft}`, paddingInlineStart: 20 }}>
+      <div style={{ borderInlineStart: `1px solid ${DT.borderSoft}`, paddingInlineStart: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <CalendarDays size={16} color={T.textSecond} />
-          <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary }}>{formatArabicDate(selectedDate)}</span>
+          <CalendarDays size={16} color={DT.textSecond} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: DT.textPrimary }}>{formatArabicDate(selectedDate)}</span>
         </div>
 
-        {slotsLoading && <LightLoadingDot />}
+        {slotsLoading && <LightLoadingDot accent={accent} />}
         {/* Bug fix (2026-08-10): a failed availability request used to render the identical "no
             appointments today" copy as a real, confirmed empty day -- a customer hitting a bad
             backend moment saw what looked like a fully-booked shop on every date they tried, with
             no way to tell the difference. slotsError keeps that distinct, with a real retry. */}
         {!slotsLoading && slotsError && (
           <div style={{ textAlign: 'center', padding: '30px 0' }}>
-            <p style={{ color: T.textMuted, fontSize: 13, marginBottom: 12 }}>
+            <p style={{ color: DT.textMuted, fontSize: 13, marginBottom: 12 }}>
               حدث خطأ أثناء تحميل المواعيد. يرجى المحاولة مجدداً.
             </p>
             <button
               onClick={retrySlots}
               style={{
-                padding: '9px 22px', borderRadius: 999, border: `1px solid ${T.border}`,
-                background: T.cardBg, color: T.textPrimary, fontSize: 13, fontWeight: 700,
+                padding: '9px 22px', borderRadius: 999, border: `1px solid ${DT.cardBorder}`,
+                background: 'transparent', color: DT.textPrimary, fontSize: 13, fontWeight: 700,
                 cursor: 'pointer', fontFamily: FONT,
               }}
             >
@@ -371,36 +399,54 @@ function CalendarPanel({ booking }) {
           </div>
         )}
         {!slotsLoading && !slotsError && slots.length === 0 && (
-          <p style={{ color: T.textMuted, fontSize: 13, textAlign: 'center', padding: '30px 0' }}>
+          <p style={{ color: DT.textMuted, fontSize: 13, textAlign: 'center', padding: '30px 0' }}>
             لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
           </p>
         )}
+        {/* Horizontal-scroll pill strip (2026-08-16, explicit spec: "horizontal time-slot pills on
+            mobile") -- same scroll-snap + edge-fade mask pattern the services carousel already
+            uses, applied here too rather than inventing a second pattern. Works identically on
+            desktop (a natural, common pattern for a bounded list of time choices, not just a
+            mobile-only special case). */}
         {!slotsLoading && slots.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
-            {slots.map((s, i) => {
-              const active = selectedSlot?.time === s.time
-              return (
-                <button
-                  key={s.time}
-                  ref={i === 0 ? firstSlotRef : undefined}
-                  onClick={() => chooseSlot(s)}
-                  style={{
-                    padding: '10px 0', borderRadius: 10, cursor: 'pointer',
-                    background: active ? T.green : T.cardBg,
-                    border: `1px solid ${active ? T.green : T.border}`,
-                    color: active ? '#fff' : T.textPrimary,
-                    fontSize: 13, fontWeight: 600, fontFamily: FONT,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                  }}
-                >
-                  {active && <Check size={12} strokeWidth={3} />}
-                  {s.time}
-                </button>
-              )
-            })}
-          </div>
+          <>
+            <ServicesScrollStyle />
+            <div
+              className="rw-services-scroll"
+              style={{
+                display: 'flex', gap: 8, overflowX: 'auto',
+                scrollSnapType: 'x proximity', WebkitOverflowScrolling: 'touch',
+                paddingBottom: 4, scrollbarWidth: 'none',
+                WebkitMaskImage: 'linear-gradient(to left, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%)',
+                maskImage: 'linear-gradient(to left, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%)',
+              }}
+            >
+              {slots.map((s, i) => {
+                const active = selectedSlot?.time === s.time
+                return (
+                  <button
+                    key={s.time}
+                    ref={i === 0 ? firstSlotRef : undefined}
+                    onClick={() => chooseSlot(s)}
+                    style={{
+                      padding: '10px 18px', borderRadius: 999, cursor: 'pointer', flexShrink: 0,
+                      scrollSnapAlign: 'start',
+                      background: active ? accent : 'transparent',
+                      border: `1px solid ${active ? accent : DT.cardBorder}`,
+                      color: active ? '#fff' : DT.textPrimary,
+                      fontSize: 13, fontWeight: 600, fontFamily: FONT,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    }}
+                  >
+                    {active && <Check size={12} strokeWidth={3} />}
+                    {s.time}
+                  </button>
+                )
+              })}
+            </div>
+          </>
         )}
-        <p style={{ marginTop: 14, fontSize: 11, color: T.textMuted, textAlign: 'center' }}>
+        <p style={{ marginTop: 14, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>
           التوقيت المحلي (GMT+3)
         </p>
       </div>
@@ -419,28 +465,28 @@ function SummaryCard({ booking }) {
     // Price row (Alzabt Master Product Plan, Section D/E) -- same confirmed content gap as
     // ServiceCircle above; shown here too so the price is visible through the whole flow, not
     // just at the initial service-picking step.
-    { icon: Tag, label: 'السعر', value: selectedService?.price != null ? `${selectedService.price} ${selectedService.currency}` : null },
+    { icon: Tag, label: 'السعر', value: selectedService?.price != null ? `${selectedService.price} ${selectedService.currency}` : null, gold: true },
   ]
   return (
     <div style={{
-      background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 18, padding: '20px 22px',
-      boxShadow: T.shadow, display: 'flex', flexDirection: 'column', gap: 14,
+      background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 18, padding: '20px 22px',
+      boxShadow: DT.shadow, display: 'flex', flexDirection: 'column', gap: 14,
     }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: T.textPrimary }}>ملخص الحجز</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: DT.textPrimary }}>ملخص الحجز</div>
       {rows.map((r) => (
         <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSecond, fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
             <r.icon size={15} />
             {r.label}
           </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary }}>{r.value ?? '—'}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: r.gold && r.value ? GOLD : DT.textPrimary }}>{r.value ?? '—'}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function ConfirmPanel({ booking }) {
+function ConfirmPanel({ booking, accent }) {
   const {
     showLocalForm, toggleLocalForm, customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, canConfirm, confirmViaWhatsApp, confirmLocally,
@@ -448,15 +494,15 @@ function ConfirmPanel({ booking }) {
 
   return (
     <div style={{
-      background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 18, padding: '22px 22px',
-      boxShadow: T.shadow, display: 'flex', flexDirection: 'column', gap: 12,
+      background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 18, padding: '22px 22px',
+      boxShadow: DT.shadow, display: 'flex', flexDirection: 'column', gap: 12,
     }}>
-      <p style={{ margin: 0, fontSize: 11, color: T.textMuted, textAlign: 'center' }}>طريقة سريعة ومريحة</p>
+      <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>طريقة سريعة ومريحة</p>
 
       {submitError && (
         <div style={{
-          padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.2)', color: '#dc2626', fontSize: 13,
+          padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)',
+          border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 13,
         }}>
           {submitError}
         </div>
@@ -467,7 +513,7 @@ function ConfirmPanel({ booking }) {
         disabled={submitting || !canConfirm}
         whileTap={{ scale: 0.97 }}
         style={{
-          padding: '15px 0', background: submitting ? '#93d3ab' : T.whatsapp, border: 'none', borderRadius: 14,
+          padding: '15px 0', background: submitting ? `${DT.whatsapp}88` : DT.whatsapp, border: 'none', borderRadius: 14,
           color: '#fff', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
           opacity: !canConfirm ? 0.5 : 1, fontFamily: FONT,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -478,9 +524,9 @@ function ConfirmPanel({ booking }) {
       </motion.button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
-        <div style={{ flex: 1, height: 1, background: T.borderSoft }} />
-        <span style={{ fontSize: 11, color: T.textMuted }}>أو</span>
-        <div style={{ flex: 1, height: 1, background: T.borderSoft }} />
+        <div style={{ flex: 1, height: 1, background: DT.borderSoft }} />
+        <span style={{ fontSize: 11, color: DT.textMuted }}>أو</span>
+        <div style={{ flex: 1, height: 1, background: DT.borderSoft }} />
       </div>
 
       {!showLocalForm ? (
@@ -490,8 +536,8 @@ function ConfirmPanel({ booking }) {
             onClick={toggleLocalForm}
             disabled={!canConfirm}
             style={{
-              padding: '13px 0', background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 14,
-              color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: FONT,
+              padding: '13px 0', background: 'transparent', border: `1px solid ${accent}`, borderRadius: 14,
+              color: accent, fontSize: 14, fontWeight: 700, fontFamily: FONT,
               cursor: canConfirm ? 'pointer' : 'not-allowed', opacity: canConfirm ? 1 : 0.5,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -499,7 +545,7 @@ function ConfirmPanel({ booking }) {
             <UserRound size={16} />
             أكمل الحجز من الموقع
           </button>
-          <p style={{ margin: 0, fontSize: 11, color: T.textMuted, textAlign: 'center' }}>سيتم تأكيد الحجز فوراً</p>
+          <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>سيتم تأكيد الحجز فوراً</p>
         </>
       ) : (
         <form onSubmit={confirmLocally} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -507,20 +553,22 @@ function ConfirmPanel({ booking }) {
             required placeholder="الاسم" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
             style={{
               width: '100%', padding: '11px 14px', boxSizing: 'border-box', borderRadius: 10,
-              border: `1px solid ${T.border}`, background: T.pageBg, fontSize: 14, fontFamily: FONT, outline: 'none',
+              border: `1px solid ${DT.cardBorder}`, background: DT.pageBg, color: DT.textPrimary,
+              fontSize: 14, fontFamily: FONT, outline: 'none',
             }}
           />
           <input
             required type="tel" placeholder="رقم الهاتف" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
             style={{
               width: '100%', padding: '11px 14px', boxSizing: 'border-box', borderRadius: 10,
-              border: `1px solid ${T.border}`, background: T.pageBg, fontSize: 14, fontFamily: FONT, outline: 'none',
+              border: `1px solid ${DT.cardBorder}`, background: DT.pageBg, color: DT.textPrimary,
+              fontSize: 14, fontFamily: FONT, outline: 'none',
             }}
           />
           <motion.button
             type="submit" disabled={submitting || !customerName || !customerPhone} whileTap={{ scale: 0.97 }}
             style={{
-              padding: '13px 0', background: T.textPrimary, border: 'none', borderRadius: 14,
+              padding: '13px 0', background: accent, border: 'none', borderRadius: 14,
               color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: FONT,
               cursor: submitting ? 'not-allowed' : 'pointer', opacity: (!customerName || !customerPhone) ? 0.5 : 1,
             }}
@@ -533,29 +581,29 @@ function ConfirmPanel({ booking }) {
   )
 }
 
-function InlineConfirmation({ booking }) {
+function InlineConfirmation({ booking, accent }) {
   const { reservationId, confirmMethod, whatsappUrl } = booking
   return (
     <div style={{
-      background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 20, padding: '48px 24px',
-      boxShadow: T.shadowLg, textAlign: 'center',
+      background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 20, padding: '48px 24px',
+      boxShadow: DT.shadowLg, textAlign: 'center',
     }}>
       <div style={{
-        width: 60, height: 60, borderRadius: '50%', margin: '0 auto 18px', background: T.greenSoft,
-        border: `2px solid ${T.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 60, height: 60, borderRadius: '50%', margin: '0 auto 18px', background: `${accent}1c`,
+        border: `2px solid ${GOLD}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Check size={26} color={T.green} strokeWidth={3} />
+        <Check size={26} color={GOLD} strokeWidth={3} />
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 19, fontWeight: 800, color: T.textPrimary }}>تم إنشاء حجزك</h2>
-      <p style={{ margin: 0, fontSize: 14, color: T.textSecond, maxWidth: 380, marginInline: 'auto' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 19, fontWeight: 800, color: DT.textPrimary }}>تم إنشاء حجزك</h2>
+      <p style={{ margin: 0, fontSize: 14, color: DT.textSecond, maxWidth: 380, marginInline: 'auto' }}>
         {confirmMethod === 'whatsapp'
           ? 'فتحنا لك واتساب برسالة جاهزة — أرسلها لصاحب المحل لتأكيد الحجز نهائياً.'
           : 'تم تسجيل حجزك — سيتواصل معك صاحب المحل لتأكيد الموعد.'}
-        {' '}رقم الحجز: <span style={{ color: T.green, fontWeight: 700 }}>{reservationId.slice(0, 8)}</span>
+        {' '}رقم الحجز: <span style={{ color: accent, fontWeight: 700 }}>{reservationId.slice(0, 8)}</span>
       </p>
       {confirmMethod === 'whatsapp' && whatsappUrl && (
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
-          style={{ display: 'inline-block', marginTop: 16, fontSize: 13, color: T.whatsapp, fontWeight: 700, fontFamily: FONT }}>
+          style={{ display: 'inline-block', marginTop: 16, fontSize: 13, color: DT.whatsapp, fontWeight: 700, fontFamily: FONT }}>
           لم تفتح صفحة واتساب؟ اضغط هنا
         </a>
       )}
@@ -565,7 +613,7 @@ function InlineConfirmation({ booking }) {
 
 // ── Booking page (light theme) ───────────────────────────────────────────────────────────────────
 
-function BookingPage({ booking, config }) {
+function BookingPage({ booking, config, accent }) {
   const {
     services, servicesLoading, selectedServiceId, chooseService,
     barbers, barbersLoading, selectedBarberId, chooseBarber,
@@ -579,29 +627,34 @@ function BookingPage({ booking, config }) {
     : null
 
   return (
-    <div style={{ minHeight: '100vh', background: T.pageBg }}>
+    <div style={{
+      minHeight: '100vh',
+      // Same purple-into-black system background as HeroSection.jsx's default gradient (2026-08-16)
+      // -- the booking flow now reads as a continuation of the homepage, not a separate light form.
+      background: `radial-gradient(ellipse at 70% 0%, ${accent}1c 0%, transparent 55%), ${DT.pageBg}`,
+    }}>
       <TenantModuleNav />
 
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '96px 20px 60px', direction: 'rtl' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, color: T.textPrimary, fontFamily: FONT }}>
+          <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, color: DT.textPrimary, fontFamily: FONT }}>
             احجز موعدك
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: T.textSecond, fontFamily: FONT }}>
+          <p style={{ margin: 0, fontSize: 14, color: DT.textSecond, fontFamily: FONT }}>
             اختر الخدمة والحلاق والوقت المناسب لك
           </p>
         </div>
 
         {reservationId ? (
-          <InlineConfirmation booking={booking} />
+          <InlineConfirmation booking={booking} accent={accent} />
         ) : (
           <>
             <div style={{
-              background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, boxShadow: T.shadowLg,
+              background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 22, boxShadow: DT.shadowLg,
               padding: '28px 26px', display: 'flex', flexDirection: 'column', gap: 26,
             }}>
               <NumberedSection index={1} title="اختر الخدمة">
-                {servicesLoading ? <LightLoadingDot /> : (
+                {servicesLoading ? <LightLoadingDot accent={accent} /> : (
                   <>
                     <ServicesScrollStyle />
                     <div
@@ -615,14 +668,14 @@ function BookingPage({ booking, config }) {
                       }}
                     >
                       {services.map((s) => (
-                        <ServiceCircle key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} />
+                        <ServiceCircle key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} accent={accent} />
                       ))}
                     </div>
                   </>
                 )}
               </NumberedSection>
 
-              <div style={{ borderTop: `1px solid ${T.borderSoft}` }} />
+              <div style={{ borderTop: `1px solid ${DT.borderSoft}` }} />
 
               {/* key={selectedServiceId} on StaffCarousel below -- Phase 3.7C (2026-08-08):
                   `barbers` now legitimately changes at runtime (re-filtered by selected service,
@@ -634,20 +687,20 @@ function BookingPage({ booking, config }) {
                   when an external input changes" (react.dev/learn/you-might-not-need-an-effect),
                   not a manual useEffect(() => setOffset(0), [barbers]). */}
               <NumberedSection index={2} title="اختر الحلاق">
-                {barbersLoading ? <LightLoadingDot /> : (
-                  <StaffCarousel key={selectedServiceId} barbers={barbers} selectedBarberId={selectedBarberId} onChoose={chooseBarber} />
+                {barbersLoading ? <LightLoadingDot accent={accent} /> : (
+                  <StaffCarousel key={selectedServiceId} barbers={barbers} selectedBarberId={selectedBarberId} onChoose={chooseBarber} accent={accent} />
                 )}
               </NumberedSection>
 
-              <div style={{ borderTop: `1px solid ${T.borderSoft}` }} />
+              <div style={{ borderTop: `1px solid ${DT.borderSoft}` }} />
 
               <NumberedSection index={3} title="اختر اليوم والوقت">
-                <CalendarPanel booking={booking} />
+                <CalendarPanel booking={booking} accent={accent} />
               </NumberedSection>
             </div>
 
             <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-              <ConfirmPanel booking={booking} />
+              <ConfirmPanel booking={booking} accent={accent} />
               <SummaryCard booking={booking} />
             </div>
           </>
@@ -655,21 +708,21 @@ function BookingPage({ booking, config }) {
 
         {(whatsappNumber || hoursText) && (
           <div style={{
-            marginTop: 40, paddingTop: 24, borderTop: `1px solid ${T.borderSoft}`,
+            marginTop: 40, paddingTop: 24, borderTop: `1px solid ${DT.borderSoft}`,
             display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 32,
           }}>
             {whatsappNumber && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSecond, fontSize: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
                 <Phone size={15} />
                 <span>دعم العملاء +{whatsappNumber}</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSecond, fontSize: 13 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
               <MapPin size={15} />
               <span>موقعنا لبنان</span>
             </div>
             {hoursText && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textSecond, fontSize: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
                 <Clock size={15} />
                 <span>ساعات العمل {hoursText}</span>
               </div>
@@ -816,6 +869,7 @@ export default function ReservePage() {
   const navigate = useNavigate()
   const booking  = useReservationBooking()
   const { config, configLoading, mode } = booking
+  const accent   = config?.primary_color ?? GOLD
 
   // Loading must be checked BEFORE the "unavailable" branch below -- config is undefined while
   // the fetch is in flight, so active_services defaults to [] and hasReservations reads false
@@ -825,9 +879,9 @@ export default function ReservePage() {
   // real device-emulated Browser Verification hitting it reliably on a fresh, uncached session.
   if (configLoading || mode === 'loading') {
     return (
-      <div style={{ minHeight: '100vh', background: T.pageBg }}>
+      <div style={{ minHeight: '100vh', background: DT.pageBg }}>
         <TenantModuleNav />
-        <div style={{ paddingTop: 160 }}><LightLoadingDot /></div>
+        <div style={{ paddingTop: 160 }}><LightLoadingDot accent={accent} /></div>
       </div>
     )
   }
@@ -854,20 +908,20 @@ export default function ReservePage() {
   // === 'error' keeps that distinct -- see useReservationBooking.js's barbersError comment.
   if (mode === 'error') {
     return (
-      <div style={{ minHeight: '100vh', background: T.pageBg }}>
+      <div style={{ minHeight: '100vh', background: DT.pageBg }}>
         <TenantModuleNav />
         <div style={{
           maxWidth: 420, margin: '160px auto 0', padding: '0 20px', textAlign: 'center',
           direction: 'rtl', fontFamily: FONT,
         }}>
-          <p style={{ fontSize: 15, color: T.textSecond, marginBottom: 18 }}>
+          <p style={{ fontSize: 15, color: DT.textSecond, marginBottom: 18 }}>
             حدث خطأ أثناء تحميل صفحة الحجز. يرجى المحاولة مجدداً.
           </p>
           <button
             onClick={booking.retryBarbers}
             style={{
               padding: '12px 28px', borderRadius: 999, border: 'none',
-              background: T.green, color: '#fff', fontSize: 14, fontWeight: 700,
+              background: accent, color: '#fff', fontSize: 14, fontWeight: 700,
               cursor: 'pointer', fontFamily: FONT,
             }}
           >
@@ -879,7 +933,7 @@ export default function ReservePage() {
   }
 
   if (mode === 'booking') {
-    return <BookingPage booking={booking} config={config} />
+    return <BookingPage booking={booking} config={config} accent={accent} />
   }
 
   return <LegacyPage config={config} slug={slug} base={base} navigate={navigate} />
