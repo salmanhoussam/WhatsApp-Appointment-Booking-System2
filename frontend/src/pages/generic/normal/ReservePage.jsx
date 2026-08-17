@@ -206,71 +206,89 @@ function ServicesScrollStyle() {
   return <style>{`.rw-services-scroll::-webkit-scrollbar{display:none}`}</style>
 }
 
+// Barber selection card -- rectangular portrait card (real photo fills most of the card, name
+// label strip below), matching the real reference layout (2026-08-17) rather than a small round
+// avatar. Purple ring + checkmark badge when selected, same convention as ServiceCircle.
+function BarberCard({ barber, selected, onClick, accent }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        cursor: 'pointer', border: 'none', padding: 0, position: 'relative',
+        width: 100, flexShrink: 0, fontFamily: FONT,
+        borderRadius: 16, overflow: 'hidden',
+        boxShadow: selected ? `0 0 0 2.5px ${accent}` : `0 0 0 1px ${DT.cardBorder}`,
+        transition: 'box-shadow 0.15s ease',
+      }}
+    >
+      <div style={{
+        width: '100%', aspectRatio: '3/4', background: DT.borderSoft,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {barber.image_url
+          ? <img src={barber.image_url} alt={barber.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <UserRound size={34} color={DT.textSecond} strokeWidth={1.5} />}
+      </div>
+      <div style={{
+        padding: '8px 6px', background: selected ? `${accent}20` : DT.cardBg,
+        textAlign: 'center',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: DT.textPrimary }}>{barber.name}</span>
+      </div>
+      {selected && (
+        <span style={{
+          position: 'absolute', top: 8, insetInlineStart: 8, width: 22, height: 22, borderRadius: '50%',
+          background: accent, border: `2px solid ${DT.pageBg}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Check size={11} color="#fff" strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  )
+}
+
+// Real reference (2026-08-17): a short barber list should show every barber at once, in a row --
+// not force single-focus paging. Paging/scroll is only appropriate once the list is genuinely
+// long enough to need it ("لا تجعل المستخدم يضطر للـ horizontal scrolling بدون سبب" -- don't make
+// the user scroll without a reason). Below the threshold: a centered wrapping row. At/above it: the
+// same horizontal-scroll pattern already used for services/time-slots, so scrolling is always the
+// same, clearly-swipeable pattern across the page, never a bespoke prev/next control.
+const BARBER_ROW_THRESHOLD = 4
+
 function StaffCarousel({ barbers, selectedBarberId, onChoose, accent }) {
-  const [offset, setOffset] = useState(0)
-  const visible = barbers[offset] ?? null
-  const canPrev = offset > 0
-  const canNext = offset < barbers.length - 1
+  if (barbers.length === 0) return null
 
-  if (!visible) return null
-
-  const isSelected = selectedBarberId === visible.id
+  if (barbers.length <= BARBER_ROW_THRESHOLD) {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
+        {barbers.map((b) => (
+          <BarberCard key={b.id} barber={b} selected={selectedBarberId === b.id} onClick={() => onChoose(b.id)} accent={accent} />
+        ))}
+      </div>
+    )
+  }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-      <button
-        onClick={() => canPrev && setOffset((o) => o - 1)}
-        disabled={!canPrev}
+    <>
+      <ServicesScrollStyle />
+      <div
+        className="rw-services-scroll"
         style={{
-          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${DT.cardBorder}`,
-          background: DT.cardBg, cursor: canPrev ? 'pointer' : 'not-allowed', opacity: canPrev ? 1 : 0.3,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', gap: 14, overflowX: 'auto',
+          scrollSnapType: 'x proximity', WebkitOverflowScrolling: 'touch',
+          paddingBottom: 4, paddingInlineEnd: 8, scrollbarWidth: 'none',
+          WebkitMaskImage: 'linear-gradient(to left, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)',
+          maskImage: 'linear-gradient(to left, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)',
         }}
       >
-        <ChevronRight size={16} color={DT.textPrimary} />
-      </button>
-
-      <button
-        onClick={() => onChoose(visible.id)}
-        style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer',
-          padding: '16px 32px', borderRadius: 16,
-          background: isSelected ? `${accent}18` : DT.cardBg,
-          border: `1.5px solid ${isSelected ? accent : DT.cardBorder}`,
-          boxShadow: isSelected ? 'none' : DT.shadow, position: 'relative',
-        }}
-      >
-        {isSelected && (
-          <span style={{
-            position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: '50%',
-            background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Check size={12} color="#fff" strokeWidth={3} />
-          </span>
-        )}
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%', overflow: 'hidden',
-          background: DT.borderSoft, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {visible.image_url
-            ? <img src={visible.image_url} alt={visible.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <UserRound size={26} color={DT.textSecond} strokeWidth={1.5} />}
-        </div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: DT.textPrimary, fontFamily: FONT }}>{visible.name}</span>
-      </button>
-
-      <button
-        onClick={() => canNext && setOffset((o) => o + 1)}
-        disabled={!canNext}
-        style={{
-          width: 34, height: 34, borderRadius: '50%', border: `1px solid ${DT.cardBorder}`,
-          background: DT.cardBg, cursor: canNext ? 'pointer' : 'not-allowed', opacity: canNext ? 1 : 0.3,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <ChevronLeft size={16} color={DT.textPrimary} />
-      </button>
-    </div>
+        {barbers.map((b) => (
+          <div key={b.id} style={{ scrollSnapAlign: 'start' }}>
+            <BarberCard barber={b} selected={selectedBarberId === b.id} onClick={() => onChoose(b.id)} accent={accent} />
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -303,7 +321,12 @@ function CalendarPanel({ booking, accent }) {
 
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20,
+      // min(280px,100%) -- not a bare 280px minimum -- fixes a real, confirmed horizontal-overflow
+      // bug (document.documentElement.scrollWidth measured 400px against a 390px viewport): the
+      // old bare 280px minimum forced overflow once padding left less than 280px of real available
+      // width. On any container narrower than 280px this now collapses to 100%, never overflowing;
+      // wider layouts (desktop) are byte-identical to before.
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 20,
       background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 20, padding: '22px 22px',
     }}>
       {/* Calendar grid */}
@@ -640,8 +663,20 @@ function BookingPage({ booking, config, accent }) {
           <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, color: DT.textPrimary, fontFamily: FONT }}>
             احجز موعدك
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: DT.textSecond, fontFamily: FONT }}>
-            اختر الخدمة والحلاق والوقت المناسب لك
+          {/* Compact breadcrumb subtitle (2026-08-17, real reference) -- states the whole 4-step
+              flow in one glance instead of one paraphrased sentence, so the user always knows
+              what's coming next without having to scroll ahead first. */}
+          <p style={{
+            margin: 0, fontSize: 12.5, color: DT.textMuted, fontFamily: FONT,
+            letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>
+            <span>اختر الخدمة</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span>اختر الحلاق</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span>اختر الموعد</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span>تأكيد</span>
           </p>
         </div>
 
@@ -699,7 +734,7 @@ function BookingPage({ booking, config, accent }) {
               </NumberedSection>
             </div>
 
-            <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+            <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 20 }}>
               <ConfirmPanel booking={booking} accent={accent} />
               <SummaryCard booking={booking} />
             </div>
