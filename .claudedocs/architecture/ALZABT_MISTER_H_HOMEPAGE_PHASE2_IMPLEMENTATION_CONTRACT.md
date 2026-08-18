@@ -146,10 +146,19 @@ out of scope for this phase).
 
 **Precondition**: 2.1, 2.2 complete and merged.
 
-| Component | File | Change |
-|---|---|---|
-| Hero | `frontend/src/components/dynamic-sections/HeroSection.jsx` | Add the full-bleed background-media composition mode (§5.1's chosen default), preserving the existing framed-card mode as a still-valid alternate (not deleted) |
-| Services | `frontend/src/components/dynamic-sections/FeaturedItemsSection.jsx` | Photo-as-hero-of-card treatment (dark gradient overlay, name at bottom) — real gap already named in the Expansion Proposal §1 item 7 |
+**Real mechanism discovered while implementing Hero, applies to every row below**: every
+`dynamic-sections/*` component is shared across all tenants rendering via `DynamicPage.jsx` — RK
+included. §5.2's black+gold homepage theme cannot be hardcoded into these shared components without
+silently changing RK's rendering too. Fixed with a real, additive, per-tenant `Client.config.
+homepage_theme` flag (`"black_gold"` or absent — absent for every tenant except Mister H),
+threaded from `DynamicPage.jsx` as a `homepageTheme` prop. Every component below branches on this
+prop; absent means byte-identical output to before Phase 2.3 existed. Not a `slug ===` check — real
+tenant config data, same sanctioned pattern as `reserveHref`'s existing `active_services` gate.
+
+| Component | File | Change | Status |
+|---|---|---|---|
+| Hero | `frontend/src/components/dynamic-sections/HeroSection.jsx` | Add the full-bleed background-media composition mode (§5.1's chosen default), preserving the existing framed-card mode as a still-valid alternate (not deleted); `themeAccent`/`homepageTokens` used when `homepageTheme === 'black_gold'` | **DONE** — commit pending, evidence: `.claudedocs/work/homepage-phase2/2026-08-18/phase2.3-hero-evidence.md` |
+| Services | `frontend/src/components/dynamic-sections/FeaturedItemsSection.jsx` | Photo-as-hero-of-card treatment (dark gradient overlay, name at bottom) — real gap already named in the Expansion Proposal §1 item 7 | Not started |
 | Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography |
 | CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document) |
 | Gallery | `frontend/src/components/dynamic-sections/GallerySection.jsx` | Add `data.limit` + `data.gallery_link` preview mode (Expansion Proposal §2) |

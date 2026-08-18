@@ -7,16 +7,26 @@
  * full-bleed autoplay hero video read poorly for this tenant; a real, cross-referenced pattern
  * (dribbble.com/shots/26013685 -- "Barber Shop Landing Page", dark bg + single accent + a framed
  * "See Video" card) showed this framed-card treatment is a real, recurring pattern in this
- * category, not invented. When set, the section always uses the dark gradient background (never
- * the old full-bleed video/image mode) and splits into text + framed card on desktop, stacks on
- * mobile. `bg_image_url`'s full-bleed video/image mode is untouched for any tenant not using this
- * new field -- purely additive, no existing tenant's rendering changes.
+ * category, not invented. Still a valid mode -- kept, not deleted -- for any tenant/data that sets
+ * `framed_video_url`.
+ *
+ * `homepageTheme` prop (2026-08-18, Homepage Phase 2.3, §5.1/§5.2 of
+ * ALZABT_MISTER_H_HOMEPAGE_PHASE2_IMPLEMENTATION_CONTRACT.md): when `homepageTheme ===
+ * 'black_gold'` (real, per-tenant `Client.config.homepage_theme` opt-in -- Mister H today, nobody
+ * else), full-bleed background media becomes the section's real default composition (image or
+ * video, detected via `bg_type`), and colors/fonts come from `homepageTokens` instead of the
+ * tenant's `accent` prop (`primary_color`) -- the ratified decision that the homepage uses a fixed
+ * black+gold palette while the booking flow keeps the tenant's own accent color, as two
+ * deliberately separate visual registers. Absent for any other tenant (RK included), so every
+ * other tenant's rendering -- including the purple-into-black default background -- is byte-
+ * identical to before this existed.
  */
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import EditableRegion from '../../tenant-os/EditableRegion'
 import { contentSchema } from '../../tenant-os/schemas/content'
 import { mediaSchema } from '../../tenant-os/schemas/media'
+import { homepageTokens } from './homepageTokens'
 
 const S_TITLE  = { type: 'spring', stiffness: 80,  damping: 18, mass: 1.2 }
 const S_BODY   = { type: 'spring', stiffness: 70,  damping: 18, mass: 1.2, delay: 0.12 }
@@ -28,9 +38,17 @@ const S_CARD   = { type: 'spring', stiffness: 70,  damping: 20, mass: 1.2, delay
 // unchanged; with it, a hero CTA that promises "Book an appointment" actually navigates there
 // instead of just scrolling (confirmed via real Browser Verification, 2026-08-02 -- the button
 // existed and rendered, but clicking it never reached the reservation page).
-export default function HeroSection({ data, accent, reserveHref }) {
+export default function HeroSection({ data, accent, homepageTheme, reserveHref }) {
+  const useBlackGold = homepageTheme === 'black_gold'
+  // Real gold (homepageTokens.accent) for the black+gold homepage theme, the tenant's own
+  // primary_color-driven accent otherwise -- unchanged default for every tenant not opted in.
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
+
   const hasFramedVideo = !!data.framed_video_url
-  const isVideo = !hasFramedVideo && data.bg_image_url?.match(/\.(mp4|webm|mov)$/i)
+  // Prefer the real, explicit `bg_type` (set by the Media Foundation's page_hero injection,
+  // GalleryImage.mediaType) over extension-sniffing -- falls back to the old heuristic for any
+  // tenant/data that never had `bg_type` set, so no existing rendering changes.
+  const isVideo = !hasFramedVideo && (data.bg_type === 'video' || data.bg_image_url?.match(/\.(mp4|webm|mov)$/i))
   const hasBg   = !hasFramedVideo && !!data.bg_image_url
   const navigate = useNavigate()
 
@@ -64,6 +82,16 @@ export default function HeroSection({ data, accent, reserveHref }) {
             backgroundImage: `url(${data.bg_image_url})`,
             backgroundSize: 'cover', backgroundPosition: 'center',
           }} />
+        ) : useBlackGold ? (
+          <div style={{
+            position: 'absolute', inset: 0,
+            // Homepage Phase 2.3, §5.2: fixed black+gold fallback for the black_gold theme --
+            // never derived from the tenant's own primary_color, deliberately distinct from the
+            // purple-into-black default below (which stays exactly as every other tenant already
+            // has it).
+            background: `radial-gradient(ellipse at 60% 40%, ${homepageTokens.accent}26 0%, transparent 65%),
+                         linear-gradient(160deg, ${homepageTokens.surface} 0%, ${homepageTokens.background} 100%)`,
+          }} />
         ) : (
           <div style={{
             position: 'absolute', inset: 0,
@@ -82,15 +110,15 @@ export default function HeroSection({ data, accent, reserveHref }) {
       <div style={{
         position: 'absolute', inset: 0,
         background: hasBg || isVideo
-          ? 'linear-gradient(to bottom, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.65) 100%)'
+          ? (useBlackGold ? homepageTokens.overlay : 'linear-gradient(to bottom, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.65) 100%)')
           : `linear-gradient(135deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 100%)`,
       }} />
 
       {/* Accent horizontal rule */}
       <div style={{
         position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: 80, height: 2, background: accent,
-        boxShadow: `0 0 16px ${accent}88`,
+        width: 80, height: 2, background: themeAccent,
+        boxShadow: `0 0 16px ${themeAccent}88`,
       }} />
 
       {/* Content */}
@@ -119,10 +147,10 @@ export default function HeroSection({ data, accent, reserveHref }) {
               margin: '0 0 20px',
               fontSize: hasFramedVideo ? 'clamp(30px, 5vw, 54px)' : 'clamp(32px, 6vw, 68px)',
               fontWeight: 900,
-              color: '#fff',
+              color: useBlackGold ? homepageTokens.text : '#fff',
               lineHeight: 1.15,
               letterSpacing: '-0.02em',
-              fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+              fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', 'Segoe UI', sans-serif",
               textShadow: '0 2px 20px rgba(0,0,0,0.4)',
             }}
           >
@@ -138,9 +166,9 @@ export default function HeroSection({ data, accent, reserveHref }) {
             style={{
               margin: '0 0 40px',
               fontSize: 'clamp(15px, 2.2vw, 22px)',
-              color: 'rgba(255,255,255,0.72)',
+              color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.72)',
               lineHeight: 1.7,
-              fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', 'Segoe UI', sans-serif",
               maxWidth: hasFramedVideo ? 460 : 580,
               marginLeft: hasFramedVideo ? 0 : 'auto',
               marginRight: hasFramedVideo ? 0 : 'auto',
@@ -162,14 +190,14 @@ export default function HeroSection({ data, accent, reserveHref }) {
               display: 'inline-flex', alignItems: 'center', gap: 10,
               padding: '14px 40px',
               borderRadius: 999,
-              background: accent,
-              color: '#fff',
+              background: themeAccent,
+              color: useBlackGold ? homepageTokens.background : '#fff',
               border: 'none',
               cursor: 'pointer',
               fontSize: 15,
               fontWeight: 700,
-              fontFamily: "'Cairo', 'Segoe UI', sans-serif",
-              boxShadow: `0 8px 32px ${accent}55`,
+              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', 'Segoe UI', sans-serif",
+              boxShadow: `0 8px 32px ${themeAccent}55`,
               letterSpacing: '0.02em',
             }}
           >
@@ -192,7 +220,7 @@ export default function HeroSection({ data, accent, reserveHref }) {
               borderRadius: 24,
               overflow: 'hidden',
               position: 'relative',
-              border: `1px solid ${accent}55`,
+              border: `1px solid ${themeAccent}55`,
               boxShadow: `0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)`,
             }}
           >
@@ -212,14 +240,14 @@ export default function HeroSection({ data, accent, reserveHref }) {
               }}>
                 <span style={{
                   width: 34, height: 34, borderRadius: '50%',
-                  border: `1px solid ${accent}`,
+                  border: `1px solid ${themeAccent}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(0,0,0,0.35)', flexShrink: 0,
                 }}>
                   <span style={{
                     width: 0, height: 0,
                     borderTop: '6px solid transparent', borderBottom: '6px solid transparent',
-                    borderInlineStart: `9px solid ${accent}`,
+                    borderInlineStart: `9px solid ${themeAccent}`,
                     marginInlineStart: 2,
                   }} />
                 </span>

@@ -270,6 +270,11 @@ export default function DynamicPage() {
   const accent   = tenantConfig.primary_color || '#6d28d9'
   const currency = tenantConfig.currency      || 'USD'
   const pageType = tenantConfig.page_type     || 'normal'
+  // Real, per-tenant, data-driven opt-in (Client.config.homepage_theme) -- NOT a slug check.
+  // Absent for every tenant except Mister H today, so every other tenant's homepage keeps
+  // rendering with its own accent-driven look exactly as before this existed (Homepage Phase 2.3,
+  // ALZABT_MISTER_H_HOMEPAGE_PHASE2_IMPLEMENTATION_CONTRACT.md §5.2).
+  const homepageTheme = tenantConfig.config?.homepage_theme || null
 
   const activeServices = tenantConfig.active_services ?? []
 
@@ -289,6 +294,7 @@ export default function DynamicPage() {
   const sectionProps = {
     slug,
     accent,
+    homepageTheme,
     currency,
     config: tenantConfig,
     onAddToCart: addItem,
