@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate }           from 'react-router-dom'
 import { motion }                from 'framer-motion'
 import {
-  Scissors, UserRound, ScissorsLineDashed, Wind, Sparkles, Paintbrush,
+  Scissors, UserRound,
   ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, CalendarDays, Timer, MessageCircle, Tag,
 } from 'lucide-react'
 import publicApi              from '../../../utils/publicApi'
@@ -11,6 +11,7 @@ import { useTenantBase }      from '../../../hooks/useTenantSlug'
 import useReservationBooking  from '../../../hooks/useReservationBooking'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
 import { hasCapability }      from '../../../utils/capabilities'
+import { serviceIconFor }     from '../../../utils/serviceIcons'
 import { T, FONT }            from '../../../theme'
 
 // Light design tokens (T, FONT) imported from the shared source (frontend/src/theme.js) -- used
@@ -34,19 +35,6 @@ const DT = {
   shadow:      '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)',
   shadowLg:    '0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
   whatsapp:    '#25D366',
-}
-
-const SERVICE_ICONS = {
-  'شعر':            Scissors,
-  'دقن':            UserRound,
-  'شعر ودقن':       ScissorsLineDashed,
-  'تمشيط أو تسريح': Wind,
-  'كرياتين':        Sparkles,
-  'حنة أو صبغة':    Paintbrush,
-}
-
-function serviceIconFor(nameAr) {
-  return SERVICE_ICONS[nameAr] ?? Scissors
 }
 
 // ── Shared dark-theme atoms (legacy form only) ───────────────────────────────────────────────────

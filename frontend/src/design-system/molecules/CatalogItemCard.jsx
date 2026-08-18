@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { colors, radius } from '../tokens'
+import { serviceIconFor } from '../../utils/serviceIcons'
 
 const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
 
@@ -29,6 +30,13 @@ const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 
 export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick }) {
   const [imgHovered, setImgHovered] = useState(false)
   const available = item.is_available !== false && item.is_active !== false
+  // Richer generic fallback for real bookable services with no photo yet -- a gradient + the
+  // service's own matched icon, editable the moment a real photo is uploaded (this is just the
+  // fallback path; `item.image_url` still wins the instant it's set). Scoped to onBookNow only
+  // (2026-08-18) -- store/restaurant items without a photo keep the original plain "◈" mark,
+  // unchanged, since serviceIconFor's mapping is barber-service-specific and would be wrong for
+  // e.g. a food item.
+  const ServiceIcon = onBookNow ? serviceIconFor(item.name_ar) : null
 
   return (
     <motion.div
@@ -62,7 +70,11 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             flexShrink: 0,
             position: 'relative',
             overflow: 'hidden',
-            background: item.image_url ? undefined : `${accent}12`,
+            background: item.image_url
+              ? undefined
+              : (ServiceIcon
+                  ? `radial-gradient(ellipse at 50% 30%, ${accent}2a 0%, transparent 70%), linear-gradient(160deg, ${accent}1c 0%, rgba(0,0,0,0.25) 100%)`
+                  : `${accent}12`),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -82,6 +94,8 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                 transform: imgHovered ? 'scale(1.06)' : 'scale(1)',
               }}
             />
+          ) : ServiceIcon ? (
+            <ServiceIcon size={44} color={accent} strokeWidth={1.25} style={{ opacity: 0.85 }} />
           ) : (
             <span style={{ fontSize: 36, opacity: 0.2 }}>◈</span>
           )}
