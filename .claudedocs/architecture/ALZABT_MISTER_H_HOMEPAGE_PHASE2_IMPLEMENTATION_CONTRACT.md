@@ -239,31 +239,42 @@ Runs in parallel with 2.1-2.4 — gated on Salman/Ali providing material, not on
 
 ---
 
-## Phase 2.6 — Dashboard Settings Surface
+## Phase 2.5/2.6 — Status: DONE (2026-08-18), scope expanded per Salman's own later direction
 
-**Precondition**: 2.1 (enabled/reorder routes exist), 2.4 (`page_gallery` exists to manage).
+**Scope note**: Phase 2.5 originally meant "Asset Pack Sourcing" (content work, §-above, still a
+real separate open item, unaffected by this). After Phase 2.3 closed, Salman gave a second,
+explicit "Phase 2.5/2.6" instruction with a different meaning — the section data-model foundation
++ Dashboard control surface — governed by its own dedicated Contract,
+`ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md` (built first, per his explicit "don't build
+everything without a clear contract" instruction). That Contract's own work is what's recorded
+DONE here — exceeding this section's original narrower scope ("enable/disable/reorder... not a
+rebuild of every content editor") since Salman's later direction explicitly asked for real
+per-section field editing too, with array-field editing (stats/tags/items) and Logo/Nav named as
+explicit, deliberate exclusions rather than being pulled in un-scoped.
 
-**Files**: extends the real pattern Phase 1 already proved (`SettingsTab.jsx`'s `HeroMediaSection`)
-— a new `SectionManager` area in the same file (or a new tab, TBD at implementation time) reading
-`GET /admin/content/sections` (new, list all sections with type/enabled/order) and writing to the
-Phase 2.1 routes. Per-section content editors (Story/Gallery/Hours/Location — already-named gaps
-from earlier this session) are **not** re-scoped here; this phase is specifically the
-enable/disable/reorder control surface, not a rebuild of every content editor.
+**Delivered**: `GET /admin/content/sections` (list), `PATCH .../fields` (generic per-section text/
+settings editor, replacing what would have been 9 near-identical hand-written routes — a real,
+named Dispatcher decision, see the Section Settings Contract), the real `SectionSettingsArea`
+Dashboard UI (enable/disable, reorder, per-section field forms), and a real `working_hours` editor
+(a genuine, separately-confirmed gap — zero editing surface existed anywhere before this). Also
+found and fixed a real, pre-existing bug: the old "Hero Text" card wrote to a field
+`HeroSection.jsx` never read (`Client.config.hero`, confirmed dead via a full codebase grep).
 
-**Success Criteria**: a real end-to-end browser test — toggle a section off in the Dashboard,
-confirm it disappears from the real public page, toggle it back on, confirm it returns — same
-verification rigor as Phase 1's real file-upload proof (`.claudedocs/work/media-content-foundation/
-2026-08-18/evidence.md`), not a script.
+Evidence: `phase2.6-generic-field-update-evidence.md`, `phase2.6-section-settings-ui-evidence.md`.
 
 ---
 
-## Phase 2.7 — Verification
+## Phase 2.7 — Verification — Status: DONE for the delivered scope (2026-08-18)
 
 The real test Salman named explicitly: **the tenant owner changes the homepage — content, media,
 which sections show, their order — entirely through the Dashboard, with zero code edit and zero
-deploy.** Evidence must be a real browser session performing exactly that sequence, following
-`browser-verification-protocol.md`'s evidence checklist (DOM state, console, network, screenshot,
-final URL) — not a claim.
+deploy.** Verified end-to-end via a real browser session (`phase2.6-section-settings-ui-evidence.md`):
+hid a section (confirmed absent from the real public page), reordered sections (confirmed the new
+order publicly), edited real text content via the real Dashboard form (confirmed the edit visible
+publicly), replacing media already proven in the Gallery/Hero work — all four verbs Salman named,
+each independently confirmed, then fully reverted. **Not covered by this verification**: array-field
+editing (stats/tags/items, deliberately deferred) and Logo/Nav (deliberately out of scope) — named
+explicitly, not silently folded into a "Phase 2 complete" claim.
 
 ---
 
