@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import publicApi from '../../utils/publicApi'
+import { homepageTokens } from './homepageTokens'
 
 const CARD_SURFACE = 'rgba(255,255,255,0.025)'
 
@@ -46,10 +47,12 @@ function Avatar({ imageUrl, name, accent }) {
   )
 }
 
-export default function StaffSection({ data, accent, slug, config }) {
+export default function StaffSection({ data, accent, slug, config, homepageTheme }) {
   const [barbers, setBarbers] = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   // Same StrictMode dev-mode double-invoke guard already established in
   // FeaturedItemsSection.jsx/HoursSection.jsx's siblings.
@@ -86,13 +89,13 @@ export default function StaffSection({ data, accent, slug, config }) {
           margin: 0,
           fontSize: 'clamp(20px, 3vw, 30px)',
           fontWeight: 800,
-          color: '#f0f0f5',
+          color: useBlackGold ? homepageTokens.text : '#f0f0f5',
           letterSpacing: '-0.01em',
-          fontFamily: "'Cairo', sans-serif",
+          fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
         }}>
           {data.heading_ar || 'فريقنا'}
         </h2>
-        <div style={{ width: 36, height: 3, background: accent, borderRadius: 2 }} />
+        <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
       <AnimatePresence mode="wait">
@@ -141,27 +144,29 @@ export default function StaffSection({ data, accent, slug, config }) {
                   alignItems: 'center',
                   textAlign: 'center',
                   gap: 10,
-                  background: CARD_SURFACE,
-                  border: `1px solid rgba(255,255,255,0.08)`,
+                  background: useBlackGold ? homepageTokens.surface : CARD_SURFACE,
+                  border: `1px solid ${useBlackGold ? homepageTokens.border : 'rgba(255,255,255,0.08)'}`,
                 }}
               >
-                <Avatar imageUrl={barber.image_url} name={barber.name} accent={accent} />
+                <Avatar imageUrl={barber.image_url} name={barber.name} accent={themeAccent} />
                 <span style={{
-                  fontSize: 14.5, fontWeight: 700, color: '#f0f0f5',
-                  fontFamily: "'Cairo', sans-serif",
+                  fontSize: 14.5, fontWeight: 700,
+                  color: useBlackGold ? homepageTokens.text : '#f0f0f5',
+                  fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
                 }}>
                   {barber.name}
                 </span>
                 {/* Missing description degrades honestly -- omitted entirely, never invented text. */}
                 {barber.description && (
                   <p style={{
-                    margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.55)',
+                    margin: 0, fontSize: 12,
+                    color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.55)',
                     lineHeight: 1.6,
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
-                    fontFamily: "'Cairo', sans-serif",
+                    fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
                   }}>
                     {barber.description}
                   </p>
