@@ -44,6 +44,7 @@ import {
   StaffSection,
   VideoStorySection,
   StoryExperienceSection,
+  WhyChooseUsSection,
 } from '../../../components/dynamic-sections'
 
 // ── Section component registry ────────────────────────────────────────────────
@@ -67,6 +68,7 @@ const SECTION_MAP = {
   staff:           StaffSection,
   video_story:     VideoStorySection,
   story_experience: StoryExperienceSection,
+  why_choose_us:   WhyChooseUsSection,
 }
 
 // ── Page type → catalog-module list ──────────────────────────────────────────
