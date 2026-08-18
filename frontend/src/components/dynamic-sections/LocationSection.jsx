@@ -51,74 +51,84 @@ export default function LocationSection({ data, accent, homepageTheme }) {
         <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
-      {/* Paragraph */}
-      {hasRealPara && (
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ type: 'spring', stiffness: 100, damping: 20, delay: 0.08 }}
-          style={{
-            margin: '0 0 20px',
-            fontSize: 15,
-            color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.55)',
-            lineHeight: 1.85,
-            fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
-            whiteSpace: 'pre-line',
-          }}
-        >
-          {paraText}
-        </motion.p>
-      )}
+      {/* Info-vs-map asymmetry (2026-08-18, Design Spec SS3.5): a small, quiet info column next to
+          a visually larger map -- not a stacked list. flex (not a fixed-breakpoint grid) so it
+          naturally stacks on narrow viewports once the two blocks no longer fit side by side,
+          same responsive-without-breakpoints convention already used elsewhere in this codebase.
+          Info column alone (no map) just takes the full width, unchanged from before. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32 }}>
+        <div style={{ flex: data.maps_url ? '1 1 260px' : '1 1 100%' }}>
+          {/* Paragraph */}
+          {hasRealPara && (
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ type: 'spring', stiffness: 100, damping: 20, delay: 0.08 }}
+              style={{
+                margin: '0 0 20px',
+                fontSize: 15,
+                color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.55)',
+                lineHeight: 1.85,
+                fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
+                whiteSpace: 'pre-line',
+              }}
+            >
+              {paraText}
+            </motion.p>
+          )}
 
-      {/* Tags */}
-      {tags.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ type: 'spring', stiffness: 100, damping: 20, delay: 0.14 }}
-          style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: data.maps_url ? 20 : 0 }}
-        >
-          {tags.map((tag, i) => (
-            <span key={i} style={{
-              padding: '5px 14px',
-              borderRadius: 999,
-              border: `1px solid ${themeAccent}55`,
-              color: themeAccent,
-              fontSize: 12,
-              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
-              fontWeight: 600,
-            }}>
-              {tag}
-            </span>
-          ))}
-        </motion.div>
-      )}
+          {/* Tags */}
+          {tags.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ type: 'spring', stiffness: 100, damping: 20, delay: 0.14 }}
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
+            >
+              {tags.map((tag, i) => (
+                <span key={i} style={{
+                  padding: '5px 14px',
+                  borderRadius: 999,
+                  border: `1px solid ${themeAccent}55`,
+                  color: themeAccent,
+                  fontSize: 12,
+                  fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
+                  fontWeight: 600,
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </motion.div>
+          )}
+        </div>
 
-      {/* Map embed */}
-      {data.maps_url && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ type: 'spring', stiffness: 80, damping: 20, delay: 0.2 }}
-          style={{
-            borderRadius: 16,
-            overflow: 'hidden',
-            border: `1px solid ${useBlackGold ? homepageTokens.border : 'rgba(255,255,255,0.07)'}`,
-            height: 300,
-          }}
-        >
-          <iframe
-            src={data.maps_url}
-            width="100%"
-            height="300"
-            style={{ border: 0, display: 'block' }}
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            title="location-map"
-          />
-        </motion.div>
-      )}
+        {/* Map embed -- flex: 2 gives it the larger visual weight the Design Spec calls for */}
+        {data.maps_url && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ type: 'spring', stiffness: 80, damping: 20, delay: 0.2 }}
+            style={{
+              flex: '2 1 320px',
+              borderRadius: 16,
+              overflow: 'hidden',
+              border: `1px solid ${useBlackGold ? homepageTokens.border : 'rgba(255,255,255,0.07)'}`,
+              height: 300,
+            }}
+          >
+            <iframe
+              src={data.maps_url}
+              width="100%"
+              height="300"
+              style={{ border: 0, display: 'block' }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="location-map"
+            />
+          </motion.div>
+        )}
+      </div>
     </section>
   )
 }

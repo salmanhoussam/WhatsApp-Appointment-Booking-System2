@@ -163,7 +163,7 @@ tenant config data, same sanctioned pattern as `reserveHref`'s existing `active_
 | Gallery | `frontend/src/components/dynamic-sections/GallerySection.jsx` | Black+gold theme + `data.limit`/`data.gallery_link` preview mode (Expansion Proposal §2) | **DONE** — evidence: `phase2.3-gallery-evidence.md`, `phase2.3-gallery-preview-evidence.md` |
 | Story | `frontend/src/components/dynamic-sections/StorySection.jsx` | Black+gold theme only (not originally scoped, added at Salman's direction) | **DONE** — evidence: `phase2.3-story-evidence.md` |
 | Hours | `frontend/src/components/dynamic-sections/HoursSection.jsx` | Black+gold theme only (not originally scoped, added at Salman's direction) | **DONE** — evidence: `phase2.3-hours-evidence.md` |
-| Location | `frontend/src/components/dynamic-sections/LocationSection.jsx` | Black+gold theme done this pass; two-column info-vs-map asymmetry tightening (Design Spec §3.5) still not done | **Theme DONE**, layout tightening not started — evidence: `phase2.3-location-evidence.md` |
+| Location | `frontend/src/components/dynamic-sections/LocationSection.jsx` | Black+gold theme + two-column info-vs-map asymmetry (Design Spec §3.5) | **DONE** — evidence: `phase2.3-location-evidence.md`, `phase2.3-location-layout-evidence.md`. Real map content (a real `maps_url`) is a content gap, not a code gap — verified via a temporary test value, then reverted |
 | Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography; real content seeded for Mister H, placed right after Services (own placement judgment call, not explicitly specified) | **DONE** — evidence: `phase2.3-why-choose-us-evidence.md` |
 | CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document); found+fixed a real pre-existing bug along the way (Mister H's cta data used field names the component never read, rendering completely empty since it went live) | **DONE** — evidence: `phase2.3-cta-evidence.md` |
 | Footer | `frontend/src/components/Footer.jsx` (new, site-wide, not in `dynamic-sections/`) | Rendered once by `DynamicPage.jsx`, outside the sections loop, sourced from real `Client` fields; found `instagram_url` already exists (no migration needed, §4's "gap" claim was stale) and a real lucide-react bug (no brand icons in this version) | **DONE** — evidence: `phase2.3-footer-evidence.md` |
@@ -181,6 +181,14 @@ regression-check discipline Phase 1 already established).
 **Rollback**: each row above is its own independently revertable file; per this project's
 one-commit-per-phase convention (`feedback_migration_manifest_structure.md`), each component change
 lands as its own commit so a single bad component can be reverted without touching the rest.
+
+**Phase 2.3 — Status: DONE (2026-08-18).** Every row in the table above is done, each independently
+verified live and committed. Real, incidental findings along the way (not the point of any single
+pass, but real): the Add-to-Cart-on-services bug (found on both `mr-h` and `rk`), Mister H's `cta`
+section rendering completely empty since it went live (field-name mismatch), `instagram_url`
+already existing as a real column (no migration needed), and `lucide-react` having zero brand icons
+in this project's installed version. All fixed as found, each with its own evidence file under
+`.claudedocs/work/homepage-phase2/2026-08-18/`.
 
 ---
 
