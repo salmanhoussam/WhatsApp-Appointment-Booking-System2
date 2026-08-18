@@ -80,7 +80,13 @@ export default function useReservationBooking() {
 
   const [services, setServices] = useState([])
   const [servicesLoading, setServicesLoading] = useState(false)
-  const [selectedServiceId, setSelectedServiceId] = useState(null)
+  // Deep-link support (2026-08-18, Homepage Phase 2.3): a Services card's "احجز الآن" button
+  // links to `/{slug}/reserve?service={id}` so the visitor lands with that service already
+  // chosen instead of picking again. Read once, lazily -- the services-loaded effect below
+  // preserves this instead of overwriting it with the default first-service selection.
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    () => new URLSearchParams(window.location.search).get('service') || null
+  )
 
   const [monthOffset, setMonthOffset] = useState(0)
   const monthGrid = useMemo(() => buildMonthGrid(monthOffset), [monthOffset])
@@ -146,7 +152,14 @@ export default function useReservationBooking() {
         if (!mountedRef.current) return
         const list = data?.data ?? []
         setServices(list)
-        if (list.length) setSelectedServiceId(list[0].id)
+        // Keep a deep-linked selection (from the URL's `?service=` param) instead of
+        // overwriting it -- only default to the first service when nothing was pre-selected,
+        // or when the pre-selected id turns out not to be a real service on this tenant.
+        if (list.length) {
+          setSelectedServiceId((prev) =>
+            prev && list.some((s) => s.id === prev) ? prev : list[0].id
+          )
+        }
       })
       .catch(() => { if (mountedRef.current) setServices([]) })
       .finally(() => { if (mountedRef.current) setServicesLoading(false) })

@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { fetchAllCategories, fetchItems } from '../../services/catalogApi'
 import publicApi from '../../utils/publicApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
@@ -27,6 +28,8 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  const navigate = useNavigate()
+  const handleBookNow = (item) => navigate(`/${slug}/reserve?service=${item.id}`)
 
   // Same real bug already found/fixed in useCatalog.js (2026-07-21, see
   // .claude/memory.md): a cleanup-only effect never resets mountedRef back to
@@ -140,14 +143,24 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
               gap: 16,
             }}
           >
-            {items.map(item => (
-              <CatalogItemCard
-                key={item.id}
-                item={item}
-                accent={accent}
-                onAddToCart={onAddToCart}
-              />
-            ))}
+            {items.map(item => {
+              // Real, existing per-item signal (CatalogItem.metadata.requires_booking, already
+              // set on every real bookable service via the Reservation Pilot's catalog/service
+              // bridge -- confirmed present on BOTH fetch paths above, live). More correct than a
+              // tenant-level toggle: a tenant can have both real bookable services AND real
+              // cart-purchasable products in the same section (e.g. RK: "الخدمات" category is
+              // requires_booking, "منتجات العناية" is not) -- this decides per item, not per tenant.
+              const requiresBooking = item.metadata?.requires_booking === true
+              return (
+                <CatalogItemCard
+                  key={item.id}
+                  item={item}
+                  accent={accent}
+                  onAddToCart={requiresBooking ? undefined : onAddToCart}
+                  onBookNow={requiresBooking ? handleBookNow : undefined}
+                />
+              )
+            })}
           </motion.div>
         )}
       </AnimatePresence>

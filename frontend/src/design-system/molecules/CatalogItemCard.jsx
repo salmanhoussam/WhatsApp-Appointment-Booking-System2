@@ -13,14 +13,20 @@ const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 
  * Props:
  *   item         — CatalogItem API response (id, name_ar, name_en, price, image_url, ...)
  *   accent       — tenant primary color (default: gold)
- *   onAddToCart  — optional, renders add-to-cart overlay when provided
+ *   onAddToCart  — optional, renders an "أضف للسلة" overlay when provided — cart/checkout
+ *                  items only (store, restaurant). Mutually exclusive with onBookNow.
+ *   onBookNow    — optional (2026-08-18, Homepage Phase 2.3), renders "احجز الآن" instead —
+ *                  reservations-native services (no cart concept at all, confirmed in
+ *                  ALZABT_MISTER_H_HOMEPAGE_DESIGN_SPECIFICATION.md's own booking-UX research:
+ *                  Alzabt's Service -> Barber -> Slot -> Reservation model has no cart). A
+ *                  caller passes at most one of onAddToCart/onBookNow, never both.
  *   onItemClick  — optional, additive only. When provided, clicking the card
- *                  (outside the add-to-cart overlay) calls onItemClick(item).
+ *                  (outside the overlay) calls onItemClick(item).
  *                  Omitted by default everywhere except where a real product
  *                  detail route exists (beit-al-fakhar) — every other tenant's
  *                  behavior is unchanged since this prop is simply never passed.
  */
-export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onItemClick }) {
+export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick }) {
   const [imgHovered, setImgHovered] = useState(false)
   const available = item.is_available !== false && item.is_active !== false
 
@@ -80,8 +86,8 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             <span style={{ fontSize: 36, opacity: 0.2 }}>◈</span>
           )}
 
-          {/* Add-to-cart hover overlay */}
-          {onAddToCart && (
+          {/* Add-to-cart OR Book-Now hover overlay — mutually exclusive, never both */}
+          {(onAddToCart || onBookNow) && (
             <div style={{
               position: 'absolute',
               inset: 0,
@@ -95,7 +101,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
               pointerEvents: imgHovered ? 'auto' : 'none',
             }}>
               <motion.button
-                onClick={(e) => { e.stopPropagation(); onAddToCart(item) }}
+                onClick={(e) => { e.stopPropagation(); (onBookNow || onAddToCart)(item) }}
                 whileTap={{ scale: 0.92 }}
                 style={{
                   padding: '10px 26px',
@@ -110,7 +116,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                   boxShadow: `0 4px 20px ${accent}66`,
                 }}
               >
-                + أضف للسلة
+                {onBookNow ? 'احجز الآن' : '+ أضف للسلة'}
               </motion.button>
             </div>
           )}
