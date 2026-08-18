@@ -10,6 +10,10 @@ Context-based path routing (matches storage-tenant.md FOLDER_MAP):
   page_logo     → pages/home/logo/
   page_story    → pages/home/story/
   page_demo     → pages/demo/
+  page_gallery  → pages/home/gallery/ (Homepage Phase 2.4, 2026-08-18) -- falls through the
+                   if/elif below unchanged, same as page_hero/page_logo/page_story/page_demo
+                   (storage only; the real GalleryImage row is created by the second step,
+                   POST /api/v1/admin/media/gallery-images, same 2-step pattern page_hero uses)
   unit_cover    → units/{unit_id}/cover/
   unit_gallery  → units/{unit_id}/gallery/
   barber        → staff/{barber_id}/ (Phase 3.7A, 2026-08-07) -- Barber.imageUrl is a plain field,
@@ -49,6 +53,7 @@ FOLDER_MAP = {
     "page_hero":      "pages/home/hero",
     "page_logo":      "pages/home/logo",
     "page_story":     "pages/home/story",
+    "page_gallery":   "pages/home/gallery",
     "page_demo":      "pages/demo",
     "unit_cover":     "units/{unit_id}/cover",
     "unit_gallery":   "units/{unit_id}/gallery",
@@ -61,6 +66,7 @@ IMAGE_TYPE_MAP = {
     "page_hero":      "page_hero",
     "page_logo":      "page_logo",
     "page_story":     "gallery",
+    "page_gallery":   "page_gallery",
     "page_demo":      "gallery",
     "unit_cover":     "cover",
     "unit_gallery":   "gallery",

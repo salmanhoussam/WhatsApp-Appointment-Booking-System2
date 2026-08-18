@@ -49,3 +49,42 @@ async def get_page_media(client_id: str, image_type: str):
     if not row:
         return None
     return {"url": row.url, "media_type": row.mediaType, "alt_text": row.altText}
+
+
+# ── Homepage Phase 2.4 (2026-08-18) — collection-shaped page media (page_gallery, ...) ─────────
+# Same Capability, a different Operation shape: AddMedia/RemoveMedia/ReorderMedia on a collection,
+# not ReplaceMedia on a singleton. Kept in this same Service file (one Capability, one Service),
+# backed by gallery_repo.py's new collection functions.
+
+async def list_page_media(client_id: str, image_type: str):
+    rows = await _gallery.list_page_media(client_id, image_type)
+    return [
+        {
+            "id": row.id,
+            "url": row.url,
+            "media_type": row.mediaType,
+            "alt_text": row.altText,
+            "caption_ar": row.caption_ar,
+            "sort_order": row.sort_order,
+        }
+        for row in rows
+    ]
+
+
+async def add_page_media(
+    client_id: str,
+    image_type: str,
+    url: str,
+    media_type: str = "image",
+    alt_text: Optional[str] = None,
+    caption_ar: Optional[str] = None,
+):
+    return await _gallery.add_page_media(client_id, image_type, url, media_type, alt_text, caption_ar)
+
+
+async def remove_page_media(client_id: str, media_id: str):
+    return await _gallery.remove_page_media(client_id, media_id)
+
+
+async def reorder_page_media(client_id: str, image_type: str, ordered_ids: list[str]):
+    return await _gallery.reorder_page_media(client_id, image_type, ordered_ids)

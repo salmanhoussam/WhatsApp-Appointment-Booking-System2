@@ -264,6 +264,36 @@ async def _inject_page_hero_media(client_id: str, result: Dict[str, Any]) -> Non
         data["bg_type"] = media["media_type"]
 
 
+async def _inject_page_gallery_media(client_id: str, result: Dict[str, Any]) -> None:
+    """
+    Homepage Phase 2.4 (2026-08-18): same additive-injection pattern as
+    `_inject_page_hero_media` above, for the gallery's `images[]` collection instead of a
+    singleton. If real `page_gallery` GalleryImage rows exist for this tenant, they override
+    `content.sections[gallery].data.images[]` entirely -- mutates `result` in place. A tenant
+    with zero such rows (every tenant today, including RK and Mister H's own placeholder slots
+    until real photos are uploaded) is completely unaffected. GallerySection.jsx needs zero
+    changes -- it already reads `images: [{url, caption_ar}]` from this exact section data.
+    """
+    from app.services import media_service  # local import -- avoids a circular import at module load
+
+    try:
+        images = await media_service.list_page_media(client_id, "page_gallery")
+    except Exception as e:
+        logger.error(f"🔥 page_gallery media lookup failed for client {client_id}: {e}", exc_info=True)
+        return  # never let a media lookup failure break the whole public config response
+    if not images:
+        return
+
+    content = (result.get("config") or {}).get("content") or {}
+    sections = content.get("sections") or []
+    gallery = next((s for s in sections if s.get("type") == "gallery"), None)
+    if gallery is None:
+        return
+
+    data = gallery.setdefault("data", {})
+    data["images"] = [{"url": img["url"], "caption_ar": img["caption_ar"] or ""} for img in images]
+
+
 async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
     """
     Fetch tenant public config from the clients table.
@@ -292,6 +322,7 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
 
         result = _record_to_dict(record)
         await _inject_page_hero_media(record.id, result)
+        await _inject_page_gallery_media(record.id, result)
         return result
     except Exception as e:
         logger.error(f"🔥 DB error fetching tenant config for '{slug}': {e}", exc_info=True)

@@ -71,3 +71,77 @@ async def update_hero_image(
     except Exception as e:
         logger.error(f"🔥 DB error updating hero media for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+# ── Homepage Phase 2.4 (2026-08-18) — gallery, a collection not a singleton ────────────────────
+# AddMedia/RemoveMedia/ReorderMedia on imageType="page_gallery" -- distinct Operation shape from
+# hero's ReplaceMedia above (delete-then-create), same reasoning as media_service.py's own split.
+
+class GalleryImageAdd(BaseModel):
+    image_url: str
+    media_type: str = "image"
+    alt_text: Optional[str] = None
+    caption_ar: Optional[str] = None
+
+
+class GalleryReorder(BaseModel):
+    ordered_ids: list[str]
+
+
+@router.get("/gallery-images")
+async def list_gallery_images(
+    tenant: dict = Depends(get_current_tenant),
+):
+    """Real rows for imageType=page_gallery -- what the admin Renderer shows as current state."""
+    images = await media_service.list_page_media(tenant["id"], "page_gallery")
+    return {"success": True, "data": images}
+
+
+@router.post("/gallery-images")
+async def add_gallery_image(
+    body: GalleryImageAdd,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    try:
+        await media_service.add_page_media(
+            tenant["id"], "page_gallery", body.image_url, body.media_type, body.alt_text, body.caption_ar
+        )
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Media: gallery image added for tenant '%s'", tenant["slug"])
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"🔥 DB error adding gallery image for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.delete("/gallery-images/{image_id}")
+async def delete_gallery_image(
+    image_id: str,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    try:
+        await media_service.remove_page_media(tenant["id"], image_id)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Media: gallery image %s removed for tenant '%s'", image_id, tenant["slug"])
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"🔥 DB error removing gallery image for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.patch("/gallery-images/reorder")
+async def reorder_gallery_images(
+    body: GalleryReorder,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    try:
+        await media_service.reorder_page_media(tenant["id"], "page_gallery", body.ordered_ids)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Media: gallery images reordered for tenant '%s'", tenant["slug"])
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"🔥 DB error reordering gallery images for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
