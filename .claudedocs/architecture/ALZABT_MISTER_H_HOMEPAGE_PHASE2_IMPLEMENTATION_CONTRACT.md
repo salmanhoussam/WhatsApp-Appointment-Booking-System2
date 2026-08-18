@@ -192,12 +192,35 @@ in this project's installed version. All fixed as found, each with its own evide
 
 ---
 
+**Scope correction, 2026-08-18 (Salman's explicit direction, right after Phase 2.3 closed)**:
+Phase 2.3's completion does **not** mean Phase 2 is complete — a visually redesigned homepage was
+never the actual goal, a Dashboard-controllable one was. Explicit instruction: "ابدأ 2.4، ولا تضف
+sections جديدة حالياً؛ خلينا نحول اللي بنيناه إلى Homepage حقيقية قابلة للإدارة من الـ Dashboard"
+(start 2.4, add no new sections right now — turn what's built into a homepage genuinely manageable
+from the Dashboard). The 4 bugs found during 2.3 stay recorded exactly as they were — incidental
+findings during 2.3, not a reason to re-scope that phase — per the same explicit instruction.
+
 ## Phase 2.4 — Media Foundation Phase 2
 
 Already fully scoped in `ALZABT_MEDIA_CONTENT_FOUNDATION_PROPOSAL.md` §7 (`page_gallery`,
-`page_logo`, extending the exact `imageType`/`mediaType` pattern Phase 1 proved). Not restated here
-— cited so this Contract's phase numbering stays complete. Gallery's real content (§3 above) is
-blocked on this phase, per the Media binding rule (Design Spec §5).
+`page_logo`, extending the exact `imageType`/`mediaType` pattern Phase 1 proved). Gallery's real
+content (§3 above) is blocked on this phase, per the Media binding rule (Design Spec §5).
+
+**Concrete scope, per Salman's own list (2026-08-18)**: wire every image/video actually used on
+the redesigned homepage to the real Media Foundation — no URL/filename specific to Mister H inside
+React, ever. Named surfaces, each investigated before any code was written (per the Service
+Execution Constitution — never assume, check the real schema/code first):
+
+| Surface | Real state found | Action |
+|---|---|---|
+| Hero video/image | Already done, Phase 1 | None needed |
+| Gallery images | **Real gap, confirmed** — `content.sections[gallery].data.images[]` was pure JSON-blob content, no `GalleryImage` backing at all | **Built this phase** — full backend (`page_gallery` collection: add/remove/reorder) + real Dashboard UI (`GalleryMediaSection`) + public injection, verified end-to-end via a real browser upload |
+| Services photos | **Not a gap** — confirmed `StaffTab.jsx` already has a real, working `catalog_service` upload path (`svcUpload` → `PATCH /catalog-services/{id}` → `image_url`), and `FeaturedItemsSection.jsx`/`CatalogItemCard.jsx` already read `item.image_url` live. Already exactly "Dashboard → Replace → Save → Homepage" | None needed |
+| Story media | **Confirmed absent, not invented** — `StorySection.jsx`'s data shape has no image field at all (`heading_ar`/`body_ar`/`stats` only), confirmed via a real grep of the component and its content schema entry | Nothing to wire — there is no media here to bind |
+| Logo/brand media | **Real, more consequential finding** — `Client.logo_url` is not a real column at all (zero matches in `prisma/schema.prisma`); `TenantHeader.jsx` reads `config?.logo_url` but that field is always `undefined` for any real tenant (dead code path). More importantly: `DynamicPage.jsx` — what Mister H's homepage actually renders — mounts **neither** `TenantHeader` nor `TenantModuleNav` at all. There is no nav bar, no header, no logo placement anywhere on this page today | **Not built** — this is a new chrome/nav decision, not a media-binding task, and directly overlaps with the desktop nav bar already named as its own deferred item in `ALZABT_HOMEPAGE_SECTION_EXPANSION_PROPOSAL.md` §6 ("a legitimate future item... deserves its own scoped proposal"). Building a nav+logo now would also be a new structural addition, which Salman's own instruction this round explicitly said not to add |
+| Other background images | None found beyond Hero (already Phase 1) | None needed |
+
+No new sections were added in this phase — matches Salman's explicit instruction.
 
 ---
 
