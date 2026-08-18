@@ -7,8 +7,9 @@ import { useInView } from 'framer-motion'
 import { useRef } from 'react'
 import EditableRegion from '../../tenant-os/EditableRegion'
 import { contentSchema } from '../../tenant-os/schemas/content'
+import { homepageTokens } from './homepageTokens'
 
-function StatCard({ num, label, accent, delay }) {
+function StatCard({ num, label, accent, delay, useBlackGold }) {
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
   return (
@@ -21,8 +22,8 @@ function StatCard({ num, label, accent, delay }) {
         textAlign: 'center',
         padding: '20px 24px',
         borderRadius: 14,
-        background: 'rgba(255,255,255,0.03)',
-        border: `1px solid rgba(255,255,255,0.07)`,
+        background: useBlackGold ? homepageTokens.surface : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${useBlackGold ? homepageTokens.border : 'rgba(255,255,255,0.07)'}`,
         flex: '1 1 120px',
         minWidth: 100,
       }}
@@ -33,14 +34,14 @@ function StatCard({ num, label, accent, delay }) {
         color: accent,
         lineHeight: 1,
         marginBottom: 8,
-        fontFamily: "'Cairo', sans-serif",
+        fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
       }}>
         {num}
       </div>
       <div style={{
         fontSize: 13,
-        color: 'rgba(255,255,255,0.5)',
-        fontFamily: "'Cairo', sans-serif",
+        color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.5)',
+        fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
         lineHeight: 1.4,
       }}>
         {label}
@@ -49,9 +50,11 @@ function StatCard({ num, label, accent, delay }) {
   )
 }
 
-export default function StorySection({ data, accent }) {
+export default function StorySection({ data, accent, homepageTheme }) {
   const ref   = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-80px' })
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   const stats  = (data.stats ?? []).filter(s => s.num)
   // P2 empty-state remediation (2026-08-16, ALZABT_P2_EMPTY_STATE_LOCATION_STORY_PROPOSAL.md) --
@@ -64,7 +67,7 @@ export default function StorySection({ data, accent }) {
   return (
     <section ref={ref} style={{ marginBottom: 56, direction: 'rtl' }}>
       {/* Thin accent line */}
-      <div style={{ width: 36, height: 3, background: accent, borderRadius: 2, marginBottom: 20 }} />
+      <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2, marginBottom: 20 }} />
 
       <EditableRegion capability="content" fieldKey="story.heading" schema={contentSchema['story.heading']}>
         <motion.h2
@@ -75,9 +78,9 @@ export default function StorySection({ data, accent }) {
             margin: '0 0 16px',
             fontSize: 'clamp(22px, 3.5vw, 36px)',
             fontWeight: 800,
-            color: '#f0f0f5',
+            color: useBlackGold ? homepageTokens.text : '#f0f0f5',
             letterSpacing: '-0.01em',
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
           }}
         >
           {data.heading_ar || 'قصتنا'}
@@ -92,10 +95,10 @@ export default function StorySection({ data, accent }) {
           style={{
             margin: '0 0 36px',
             fontSize: 16,
-            color: 'rgba(255,255,255,0.55)',
+            color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.55)',
             lineHeight: 1.85,
             maxWidth: 700,
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
             whiteSpace: 'pre-line',
           }}
         >
@@ -110,8 +113,9 @@ export default function StorySection({ data, accent }) {
               key={i}
               num={st.num}
               label={st.label}
-              accent={accent}
+              accent={themeAccent}
               delay={i * 0.07}
+              useBlackGold={useBlackGold}
             />
           ))}
         </div>
