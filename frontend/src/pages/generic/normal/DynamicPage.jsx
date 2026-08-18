@@ -273,8 +273,10 @@ export default function DynamicPage() {
 
   const activeServices = tenantConfig.active_services ?? []
 
+  // `enabled` defaults to true when absent -- every tenant's existing sections (none of which
+  // have this field yet) keep rendering exactly as before Phase 2.1 introduced it.
   const sections = (tenantConfig.config?.content?.sections ?? [])
-    .filter(s => s?.type)
+    .filter(s => s?.type && s.enabled !== false)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   const cartCount = totalItems()

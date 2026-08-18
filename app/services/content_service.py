@@ -46,3 +46,11 @@ async def update_story_heading(
 
 async def get_story_heading(client_id: str):
     return await _sections.get_section_field(client_id, "story", "heading_ar")
+
+
+async def set_section_enabled(client_id: str, section_type: str, enabled: bool):
+    return await _sections.set_section_enabled(client_id, section_type, enabled)
+
+
+async def reorder_sections(client_id: str, ordered_types: list[str]):
+    return await _sections.reorder_sections(client_id, ordered_types)

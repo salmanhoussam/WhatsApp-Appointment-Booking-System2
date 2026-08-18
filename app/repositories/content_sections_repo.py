@@ -60,3 +60,60 @@ async def update_section_field(client_id: str, section_type: str, **fields):
     config["content"] = content
 
     return await _client_repo.update_client(client_id, {"config": Json(config)})
+
+
+async def set_section_enabled(client_id: str, section_type: str, enabled: bool):
+    """
+    Find a section by `type`, set its top-level `enabled` flag (sibling to `type`/`order`/`data`,
+    not a `data` field -- rendering visibility, not content). `DynamicPage.jsx` treats a missing
+    `enabled` as `true`, so every tenant with no sections ever touched by this function keeps
+    rendering exactly as before it existed.
+    """
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+
+    section = next((s for s in sections if s.get("type") == section_type), None)
+    if section is None:
+        raise ValueError(f"This tenant's page has no {section_type} section to update")
+
+    section["enabled"] = enabled
+    content["sections"] = sections
+    config["content"] = content
+
+    return await _client_repo.update_client(client_id, {"config": Json(config)})
+
+
+async def reorder_sections(client_id: str, ordered_types: list[str]):
+    """
+    Re-assign `order` (0-based, matching `ordered_types`' own sequence) to every section named in
+    `ordered_types`. Any section on the tenant's page whose type is NOT in `ordered_types` keeps
+    its existing `order` value untouched -- a caller reordering only the sections it knows about
+    never silently displaces one it doesn't.
+    """
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+
+    existing_types = {s.get("type") for s in sections}
+    unknown = [t for t in ordered_types if t not in existing_types]
+    if unknown:
+        raise ValueError(f"This tenant's page has no section(s): {', '.join(unknown)}")
+
+    order_map = {t: i for i, t in enumerate(ordered_types)}
+    for section in sections:
+        if section.get("type") in order_map:
+            section["order"] = order_map[section["type"]]
+
+    content["sections"] = sections
+    config["content"] = content
+
+    return await _client_repo.update_client(client_id, {"config": Json(config)})

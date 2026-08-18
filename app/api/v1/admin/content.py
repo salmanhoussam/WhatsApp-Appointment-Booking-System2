@@ -32,6 +32,14 @@ class StoryHeadingUpdate(BaseModel):
     heading_en: Optional[str] = None
 
 
+class SectionEnabledUpdate(BaseModel):
+    enabled: bool
+
+
+class SectionsReorderBody(BaseModel):
+    ordered_types: list[str]
+
+
 @router.get("/hero-title")
 async def get_hero_title(
     tenant: dict = Depends(get_current_tenant),
@@ -98,4 +106,46 @@ async def update_story_heading(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"🔥 DB error updating story heading for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.patch("/sections/{section_type}/enabled")
+async def update_section_enabled(
+    section_type: str,
+    body: SectionEnabledUpdate,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """Phase 2.1 (Homepage Section System) -- toggle one section's public-page visibility."""
+    try:
+        await content_service.set_section_enabled(tenant["id"], section_type, body.enabled)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info(
+            "Content: section '%s' enabled=%s for tenant '%s'",
+            section_type, body.enabled, tenant["slug"],
+        )
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error updating section enabled for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.patch("/sections/reorder")
+async def reorder_sections(
+    body: SectionsReorderBody,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """Phase 2.1 -- re-assign `order` for the given section types, in the given sequence."""
+    try:
+        await content_service.reorder_sections(tenant["id"], body.ordered_types)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: sections reordered for tenant '%s'", tenant["slug"])
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error reordering sections for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")
