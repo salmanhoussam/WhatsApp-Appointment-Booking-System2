@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { fetchAllCategories, fetchItems } from '../../services/catalogApi'
 import publicApi from '../../utils/publicApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
+import { homepageTokens } from './homepageTokens'
 
 function SkeletonCard() {
   return (
@@ -24,12 +25,14 @@ function SkeletonCard() {
   )
 }
 
-export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, config }) {
+export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, config, homepageTheme }) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
   const navigate = useNavigate()
   const handleBookNow = (item) => navigate(`/${slug}/reserve?service=${item.id}`)
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   // Same real bug already found/fixed in useCatalog.js (2026-07-21, see
   // .claude/memory.md): a cleanup-only effect never resets mountedRef back to
@@ -108,13 +111,13 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
           margin: 0,
           fontSize: 'clamp(20px, 3vw, 30px)',
           fontWeight: 800,
-          color: '#f0f0f5',
+          color: useBlackGold ? homepageTokens.text : '#f0f0f5',
           letterSpacing: '-0.01em',
-          fontFamily: "'Cairo', sans-serif",
+          fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
         }}>
           {data.heading_ar || 'منتجات مميزة'}
         </h2>
-        <div style={{ width: 36, height: 3, background: accent, borderRadius: 2 }} />
+        <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
       {/* Grid */}
@@ -156,6 +159,7 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
                   key={item.id}
                   item={item}
                   accent={accent}
+                  homepageTheme={homepageTheme}
                   onAddToCart={requiresBooking ? undefined : onAddToCart}
                   onBookNow={requiresBooking ? handleBookNow : undefined}
                 />

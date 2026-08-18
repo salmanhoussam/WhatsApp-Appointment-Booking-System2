@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { colors, radius } from '../tokens'
 import { serviceIconFor } from '../../utils/serviceIcons'
+import { homepageTokens } from '../../components/dynamic-sections/homepageTokens'
 
 const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
 
@@ -26,10 +27,18 @@ const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 
  *                  Omitted by default everywhere except where a real product
  *                  detail route exists (beit-al-fakhar) — every other tenant's
  *                  behavior is unchanged since this prop is simply never passed.
+ *   homepageTheme — optional (2026-08-18, Homepage Phase 2.3). When `'black_gold'` (real,
+ *                  per-tenant `Client.config.homepage_theme` opt-in — Mister H today, nobody
+ *                  else), surface/border/text colors come from `homepageTokens` and the accent
+ *                  used throughout is the fixed gold, not the tenant's own `accent` prop. Absent
+ *                  for any other tenant, so this card's rendering elsewhere is byte-identical to
+ *                  before this prop existed.
  */
-export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick }) {
+export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick, homepageTheme }) {
   const [imgHovered, setImgHovered] = useState(false)
   const available = item.is_available !== false && item.is_active !== false
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
   // Richer generic fallback for real bookable services with no photo yet -- a gradient + the
   // service's own matched icon, editable the moment a real photo is uploaded (this is just the
   // fallback path; `item.image_url` still wins the instant it's set). Scoped to onBookNow only
@@ -56,12 +65,12 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          background: colors.surface,
-          border: `1px solid ${colors.border}`,
+          background: useBlackGold ? homepageTokens.surface : colors.surface,
+          border: `1px solid ${useBlackGold ? homepageTokens.border : colors.border}`,
           transition: 'border-color 0.25s',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}44` }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${themeAccent}44` }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = useBlackGold ? homepageTokens.border : colors.border }}
       >
         {/* Image */}
         <div
@@ -73,8 +82,8 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             background: item.image_url
               ? undefined
               : (ServiceIcon
-                  ? `radial-gradient(ellipse at 50% 30%, ${accent}2a 0%, transparent 70%), linear-gradient(160deg, ${accent}1c 0%, rgba(0,0,0,0.25) 100%)`
-                  : `${accent}12`),
+                  ? `radial-gradient(ellipse at 50% 30%, ${themeAccent}2a 0%, transparent 70%), linear-gradient(160deg, ${themeAccent}1c 0%, rgba(0,0,0,0.25) 100%)`
+                  : `${themeAccent}12`),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -95,7 +104,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
               }}
             />
           ) : ServiceIcon ? (
-            <ServiceIcon size={44} color={accent} strokeWidth={1.25} style={{ opacity: 0.85 }} />
+            <ServiceIcon size={44} color={themeAccent} strokeWidth={1.25} style={{ opacity: 0.85 }} />
           ) : (
             <span style={{ fontSize: 36, opacity: 0.2 }}>◈</span>
           )}
@@ -120,14 +129,14 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                 style={{
                   padding: '10px 26px',
                   borderRadius: 999,
-                  background: accent,
-                  color: '#fff',
+                  background: themeAccent,
+                  color: useBlackGold ? homepageTokens.background : '#fff',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: 13,
                   fontWeight: 700,
-                  fontFamily: "'Cairo', sans-serif",
-                  boxShadow: `0 4px 20px ${accent}66`,
+                  fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
+                  boxShadow: `0 4px 20px ${themeAccent}66`,
                 }}
               >
                 {onBookNow ? 'احجز الآن' : '+ أضف للسلة'}
@@ -147,15 +156,15 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
           }}>
             {item.is_featured && (
               <span style={{
-                background: accent,
-                color: '#fff',
+                background: themeAccent,
+                color: useBlackGold ? homepageTokens.background : '#fff',
                 fontSize: 9,
                 fontWeight: 800,
                 letterSpacing: '0.08em',
                 padding: '3px 9px',
                 borderRadius: 999,
                 textTransform: 'uppercase',
-                fontFamily: "'Cairo', sans-serif",
+                fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
               }}>
                 مميز
               </span>
@@ -190,9 +199,9 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             margin: 0,
             fontSize: 15,
             fontWeight: 600,
-            color: colors.textPrimary,
+            color: useBlackGold ? homepageTokens.text : colors.textPrimary,
             lineHeight: 1.4,
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
           }}>
             {item.name_ar || item.name_en}
           </h3>
@@ -201,13 +210,13 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             <p style={{
               margin: 0,
               fontSize: 12,
-              color: colors.textMuted,
+              color: useBlackGold ? homepageTokens.mutedText : colors.textMuted,
               lineHeight: 1.65,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              fontFamily: "'Cairo', sans-serif",
+              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
             }}>
               {item.description_ar || item.description_en}
             </p>
@@ -215,11 +224,11 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
 
           {item.price != null && (
             <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: accent }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: themeAccent }}>
                 {Number(item.price).toLocaleString('ar-SA')}
               </span>
               {item.currency && (
-                <span style={{ fontSize: 10, color: colors.textDim }}>
+                <span style={{ fontSize: 10, color: useBlackGold ? homepageTokens.mutedText : colors.textDim }}>
                   {item.currency}
                 </span>
               )}

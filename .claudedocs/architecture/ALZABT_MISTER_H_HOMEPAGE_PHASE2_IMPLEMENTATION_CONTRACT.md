@@ -158,7 +158,7 @@ tenant config data, same sanctioned pattern as `reserveHref`'s existing `active_
 | Component | File | Change | Status |
 |---|---|---|---|
 | Hero | `frontend/src/components/dynamic-sections/HeroSection.jsx` | Add the full-bleed background-media composition mode (§5.1's chosen default), preserving the existing framed-card mode as a still-valid alternate (not deleted); `themeAccent`/`homepageTokens` used when `homepageTheme === 'black_gold'` | **DONE** — commit pending, evidence: `.claudedocs/work/homepage-phase2/2026-08-18/phase2.3-hero-evidence.md` |
-| Services | `frontend/src/components/dynamic-sections/FeaturedItemsSection.jsx` | Photo-as-hero-of-card treatment (dark gradient overlay, name at bottom) — real gap already named in the Expansion Proposal §1 item 7 | Not started |
+| Services | `frontend/src/components/dynamic-sections/FeaturedItemsSection.jsx`, `design-system/molecules/CatalogItemCard.jsx` | Photo-as-hero-of-card treatment + black+gold theme; also fixed a real bug found live (Add-to-Cart shown on bookable services, on both `mr-h` and `rk`) and added a richer generic service-icon placeholder | **DONE** — commits pending, evidence: `phase2.3-services-evidence.md`, `service-cta-fix-evidence.md`, `service-placeholder-evidence.md` |
 | Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography |
 | CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document) |
 | Gallery | `frontend/src/components/dynamic-sections/GallerySection.jsx` | Add `data.limit` + `data.gallery_link` preview mode (Expansion Proposal §2) |
