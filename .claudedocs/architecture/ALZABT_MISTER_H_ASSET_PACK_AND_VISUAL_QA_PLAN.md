@@ -3,7 +3,15 @@
 **Status: Asset Pack Sourcing is a pending content dependency, not actively worked.** Per Salman's
 explicit instruction (2026-08-19): don't leave this as an open-ended wait — record it as blocked,
 continue with everything that doesn't need real assets, and use the wait to prepare (not execute)
-the Visual QA methodology so it's ready to run the moment real files land.
+the Visual QA methodology so it's ready to run the moment real files land. Blocked because of
+missing real material from Ali, never because of missing engineering — the receiving side is done.
+
+**Execution order once Ali's material lands (Salman's own sequence, binding)**:
+```
+Upload → Mapping → Provenance evidence → Public verification → Visual QA → Fixes (if needed) → final evidence/commit
+```
+A real photo of the shop/services from Ali is the only accepted source — never stock, never
+generated, never presented as if it were Mister H's own.
 
 ---
 
