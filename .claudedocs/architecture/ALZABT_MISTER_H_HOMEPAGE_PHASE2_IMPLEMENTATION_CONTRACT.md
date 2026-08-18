@@ -224,18 +224,43 @@ No new sections were added in this phase — matches Salman's explicit instructi
 
 ---
 
-## Phase 2.5 — Asset Pack Sourcing (content, not engineering)
+## Phase 2.5 — Asset Pack Sourcing (content, not engineering) — current active step (2026-08-18)
 
-Refines the Design Specification's §6 checklist with the explicit **no-photo-needed** list from
-Salman's latest message — worth stating plainly since every other section in this document leans on
-real photography and it's easy to over-collect:
+Refined and re-prioritized by Salman right after Phase 2.5/2.6 closed, now the explicit next step
+(re-selected over array-field editing and Logo/Nav, both deliberately deferred as separate
+workstreams). **Content work — gated on Salman/Ali providing real material, not on engineering.**
+The receiving architecture is already fully built and verified (Hero media Phase 1, Gallery media
+this session, Services photos already real via `StaffTab.jsx`) — nothing more to build before real
+files exist.
 
-**Needs real photography**: Hero (fallback image; video already exists), Services (1 per service,
-~6), Gallery (6-12 to start).
-**Does NOT need photography**: Why Choose Us, CTA (both variants), Testimonials, Footer, Location
-(map is not a photo, it's the embedded map itself).
+**Priority 1**:
+- Hero fallback image (the real video already exists and stays primary; this is the still-image
+  fallback for whenever no video is set)
+- 4–6 real service photos (one per real `CatalogService`, uploaded via the already-real
+  `catalog_service` context in `StaffTab.jsx`)
+- 8–12 real gallery photos (uploaded via `GalleryMediaSection`, built this session)
 
-Runs in parallel with 2.1-2.4 — gated on Salman/Ali providing material, not on engineering sequence.
+**Priority 2**:
+- Staff/barber portraits — only if a real decision is made to use them visually on the page (not
+  yet decided)
+- Story/experience media — only if a real decision is made to add a media field to Story later
+  (confirmed this session: no such field exists in `StorySection.jsx` today, nothing to wire until
+  that decision is made)
+
+**Binding rule, restated**: no synthetic/fabricated testimonial photos, no random filler images
+used just to occupy a slot. Art direction stays exactly as already established (Design Spec §2.3):
+dark, cinematic, premium, black + warm gold, one coherent photography set — not several unrelated
+styles mixed together.
+
+**Next after real assets land**: a real Visual QA pass — Mister H against the reference image set,
+judged on composition/crop/contrast/typography/spacing/hierarchy, not merely "does the section
+render." Explicitly not judged on "does the section exist" alone, per Salman's own distinction.
+
+**After the Visual QA pass**: Logo/Nav and array-field editors (Story stats, Location tags, Why
+Choose Us items) become their own separate, independently-scoped workstreams — neither is a
+prerequisite for the other, and neither should be pulled into a shared "editor" without its own UX
+and data-contract decision first (Salman's explicit concern: avoid the generic field editor turning
+into an unplanned "monster form").
 
 ---
 
