@@ -126,17 +126,21 @@ function Lightbox({ images, startIndex, onClose }) {
 
 export default function GallerySection({ data, accent, homepageTheme }) {
   const [lightboxIdx, setLightboxIdx] = useState(null)
-  const slots  = data.images ?? []
+  const allSlots = data.images ?? []
+  // Preview mode (2026-08-18, Expansion Proposal SS2): when `limit` is set, show only the first N
+  // slots + an optional "See All" link; unset (every tenant today) behaves exactly as before --
+  // same convention `featured_items.limit` already establishes.
+  const slots  = data.limit ? allSlots.slice(0, data.limit) : allSlots
   const images = slots.filter(img => img?.url)
   const useBlackGold = homepageTheme === 'black_gold'
   const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
-  if (slots.length === 0) return null
+  if (allSlots.length === 0) return null
 
   return (
     <section style={{ marginBottom: 56, direction: 'rtl' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
         <h2 style={{
           margin: 0,
           fontSize: 'clamp(20px, 3vw, 30px)',
@@ -147,7 +151,21 @@ export default function GallerySection({ data, accent, homepageTheme }) {
         }}>
           {data.heading_ar || 'معرض الصور'}
         </h2>
-        <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {data.gallery_link && (
+            <a
+              href={data.gallery_link}
+              style={{
+                fontSize: 13, fontWeight: 600, color: themeAccent, textDecoration: 'none',
+                fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
+                whiteSpace: 'nowrap',
+              }}
+            >
+              عرض الكل ←
+            </a>
+          )}
+          <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2, flexShrink: 0 }} />
+        </div>
       </div>
 
       {/* Grid */}
