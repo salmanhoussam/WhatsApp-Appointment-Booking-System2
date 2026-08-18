@@ -1,16 +1,22 @@
 """
-app/api/v1/admin/content.py — Content Capability routes (hero.title, story.heading).
+app/api/v1/admin/content.py — Content Capability routes (hero.title, story.heading, + generic
+section field updates, section list/enabled/reorder).
 
-Tenant OS: each route is a direct call site for one "UpdateField" Operation -- not a generic
-Dispatcher endpoint (.claudedocs/reviews/editing-engine-review.md S1a/Q7: a Dispatcher abstraction
-is deferred until a second real Capability/Operation proves the routing shape actually repeats).
-Deliberately not merged into one generic route either, per
-.claudedocs/reviews/content-capability-review.md -- that's the same Dispatcher question, not a
-separate one, and stays deferred with it.
+Tenant OS: `hero-title`/`story-heading` are direct call sites for one "UpdateField" Operation
+each -- not a generic Dispatcher (.claudedocs/reviews/editing-engine-review.md S1a/Q7: deferred
+"until a second real Capability/Operation proves the routing shape actually repeats"). Those two
+routes are kept as-is, unchanged.
+
+`PATCH /sections/{type}/fields` (2026-08-18, Homepage Phase 2.6) IS the Dispatcher that deferral
+was waiting on -- the threshold is met for real now: `ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md`
+names 9 real sections needing the identical "update named text fields on a named section" shape.
+Writing 9 near-identical hero-title-style routes would itself be the real duplication this
+project's own Abstraction Rule warns against once evidence (not prediction) shows the shape
+repeats. Named explicitly here, not a silent reversal of the file's own stated design principle.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -38,6 +44,10 @@ class SectionEnabledUpdate(BaseModel):
 
 class SectionsReorderBody(BaseModel):
     ordered_types: list[str]
+
+
+class SectionFieldsUpdate(BaseModel):
+    fields: dict[str, Any]
 
 
 @router.get("/hero-title")
@@ -148,4 +158,43 @@ async def reorder_sections(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"🔥 DB error reordering sections for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.get("/sections")
+async def list_sections(
+    tenant: dict = Depends(get_current_tenant),
+):
+    """Phase 2.6 -- every real section for this tenant, what the Dashboard's Section Settings
+    view renders as a list (type/order/enabled/data)."""
+    sections = await content_service.list_sections(tenant["id"])
+    return {"success": True, "data": sections}
+
+
+@router.patch("/sections/{section_type}/fields")
+async def update_section_fields(
+    section_type: str,
+    body: SectionFieldsUpdate,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """
+    Phase 2.6 -- the generic "UpdateField" Operation, one route for every section's real text/
+    settings fields named in ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md (title_ar, body_ar,
+    limit, variant, maps_url, ...). Media fields with their own dedicated Renderer (hero, gallery)
+    are deliberately excluded from this route's real usage by the Contract, not by a code-level
+    restriction here -- the underlying mechanic doesn't distinguish field kinds, the Dashboard UI
+    does, per the Contract's own "excluded from the generic editor" column.
+    """
+    if not body.fields:
+        raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+    try:
+        await content_service.update_section_fields(tenant["id"], section_type, body.fields)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: section '%s' fields updated for tenant '%s'", section_type, tenant["slug"])
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error updating section fields for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")

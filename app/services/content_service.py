@@ -54,3 +54,23 @@ async def set_section_enabled(client_id: str, section_type: str, enabled: bool):
 
 async def reorder_sections(client_id: str, ordered_types: list[str]):
     return await _sections.reorder_sections(client_id, ordered_types)
+
+
+async def list_sections(client_id: str):
+    """Read side for the Dashboard's Section Settings view (Homepage Phase 2.6, 2026-08-18)."""
+    return await _sections.list_sections(client_id)
+
+
+# ── Generic field update (Homepage Phase 2.6, 2026-08-18) ──────────────────────────────────────
+# This file's own header says content.py's routes call named wrappers "by name, not a generic
+# Dispatcher" -- a real, deliberate design decision from editing-engine-review.md S1a/Q7, deferred
+# "until a second real Capability/Operation proves the routing shape actually repeats." That
+# threshold is now met for real: ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md names 9 real
+# sections needing the identical "update named text fields on a named section" shape -- writing 9
+# near-identical hero-title-style functions/routes would itself be the anti-pattern this project's
+# own Abstraction Rule warns about (duplication that IS costly, not merely present). The underlying
+# repo function (update_section_field) was already fully generic; this wrapper is the first place
+# that's actually exercised as one.
+
+async def update_section_fields(client_id: str, section_type: str, fields: dict):
+    return await _sections.update_section_field(client_id, section_type, **fields)

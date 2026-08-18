@@ -18,6 +18,20 @@ from prisma import Json
 from app.repositories import admin_client_repo as _client_repo
 
 
+async def list_sections(client_id: str):
+    """
+    Every real section for this tenant, as stored (Homepage Phase 2.6, 2026-08-18) -- the read
+    side the Dashboard's Section Settings view needs to render a list at all. Raw section objects
+    (type/order/enabled/data), not filtered or sorted here -- that's the Service/route's call.
+    """
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    return list(content.get("sections") or [])
+
+
 async def get_section_field(client_id: str, section_type: str, field: str):
     """Find a section by `type`, return one of its `data` fields (or None)."""
     client = await _client_repo.find_client_by_id(client_id)
