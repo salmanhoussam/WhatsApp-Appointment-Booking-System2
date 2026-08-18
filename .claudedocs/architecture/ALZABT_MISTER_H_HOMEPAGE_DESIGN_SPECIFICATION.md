@@ -1,5 +1,10 @@
 # Mister H Homepage — Design Specification (Visual Language + Section Data Model)
 
+**Slug note (2026-08-18)**: the tenant's real routing slug is `mr-h` (renamed from `mister-h` —
+a `.` is not URL-safe, and "mr-h" is the closest URL-safe form of "Mr. H"). "Mister H" throughout
+this document refers to the brand/tenant, not the URL — every real endpoint/route below uses
+`mr-h`.
+
 **Status: Design Specification / Proposal. No code, no DB, no Contract file edited.** This document
 converts a visual reference (a barber-studio landing page — "URBANCUT") into a binding brief for
 implementation, per Salman's explicit instruction: *"نحوّل الصورة إلى Design Specification واضحة
@@ -12,7 +17,7 @@ system to extract grammar from**, not a screenshot to clone. Extends, and does n
 before Phase 2 content work starts.
 
 **Governing rule, restated and binding (unchanged from the Media Foundation Proposal)**: no
-hardcoded media URLs, no tenant-conditional code (`if slug == "mister-h"`), no per-tenant hardcoded
+hardcoded media URLs, no tenant-conditional code (`if slug == "mr-h"`), no per-tenant hardcoded
 homepage composition. Every section is a component; every section's content — text, media,
 buttons, and (new, per this document) its very presence and position on the page — is tenant data,
 editable from the Dashboard with zero code/deploy.

@@ -1,5 +1,8 @@
 # Mister H Homepage — Phase 2 Implementation Contract
 
+**Slug note (2026-08-18)**: real routing slug is `mr-h` (renamed from `mister-h` — `.` isn't
+URL-safe). "Mister H" here means the brand; every real URL/endpoint uses `mr-h`.
+
 **Status: Implementation Contract. No code written yet.** Operationalizes
 `ALZABT_MISTER_H_HOMEPAGE_DESIGN_SPECIFICATION.md` (ratified as a direction) into checkable,
 file-level phases, per `documentation-policy.md`'s workflow — "no code is written without an
