@@ -159,12 +159,19 @@ tenant config data, same sanctioned pattern as `reserveHref`'s existing `active_
 |---|---|---|---|
 | Hero | `frontend/src/components/dynamic-sections/HeroSection.jsx` | Add the full-bleed background-media composition mode (§5.1's chosen default), preserving the existing framed-card mode as a still-valid alternate (not deleted); `themeAccent`/`homepageTokens` used when `homepageTheme === 'black_gold'` | **DONE** — commit pending, evidence: `.claudedocs/work/homepage-phase2/2026-08-18/phase2.3-hero-evidence.md` |
 | Services | `frontend/src/components/dynamic-sections/FeaturedItemsSection.jsx`, `design-system/molecules/CatalogItemCard.jsx` | Photo-as-hero-of-card treatment + black+gold theme; also fixed a real bug found live (Add-to-Cart shown on bookable services, on both `mr-h` and `rk`) and added a richer generic service-icon placeholder | **DONE** — commits pending, evidence: `phase2.3-services-evidence.md`, `service-cta-fix-evidence.md`, `service-placeholder-evidence.md` |
-| Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography |
-| CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document) |
-| Gallery | `frontend/src/components/dynamic-sections/GallerySection.jsx` | Add `data.limit` + `data.gallery_link` preview mode (Expansion Proposal §2) |
-| Location | `frontend/src/components/dynamic-sections/LocationSection.jsx` | Confirm/tighten the two-column info-vs-map asymmetry (Design Spec §3.5) — no new data fields |
-| Footer | `frontend/src/components/Footer.jsx` (new, site-wide, not in `dynamic-sections/`) | Per Expansion Proposal §3 — rendered once by `DynamicPage.jsx`, outside the sections loop, sourced from already-real `Client` fields + the one real gap (`instagram_url`, see §4 below) |
-| `DynamicPage.jsx` | same file as Phase 2.1 | Register `why_choose_us` in `SECTION_MAP`, mount `<Footer>` after the sections loop |
+| Staff/Team | `frontend/src/components/dynamic-sections/StaffSection.jsx` | Black+gold theme only (not originally scoped, added at Salman's direction alongside the section reorder below) | **DONE** — evidence: `phase2.3-staff-evidence.md` |
+| Gallery | `frontend/src/components/dynamic-sections/GallerySection.jsx` | Black+gold theme done this pass; `data.limit`/`data.gallery_link` preview mode (Expansion Proposal §2) still not done | **Theme DONE**, preview mode not started — evidence: `phase2.3-gallery-evidence.md` |
+| Story | `frontend/src/components/dynamic-sections/StorySection.jsx` | Black+gold theme only (not originally scoped, added at Salman's direction) | **DONE** — evidence: `phase2.3-story-evidence.md` |
+| Hours | `frontend/src/components/dynamic-sections/HoursSection.jsx` | Black+gold theme only (not originally scoped, added at Salman's direction) | **DONE** — evidence: `phase2.3-hours-evidence.md` |
+| Location | `frontend/src/components/dynamic-sections/LocationSection.jsx` | Black+gold theme done this pass; two-column info-vs-map asymmetry tightening (Design Spec §3.5) still not done | **Theme DONE**, layout tightening not started — evidence: `phase2.3-location-evidence.md` |
+| Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography | Not started |
+| CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document) | Not started |
+| Footer | `frontend/src/components/Footer.jsx` (new, site-wide, not in `dynamic-sections/`) | Per Expansion Proposal §3 — rendered once by `DynamicPage.jsx`, outside the sections loop, sourced from already-real `Client` fields + the one real gap (`instagram_url`, see §4 below) | Not started |
+| `DynamicPage.jsx` | same file as Phase 2.1 | Register `why_choose_us` in `SECTION_MAP`, mount `<Footer>` after the sections loop | Not started |
+
+**Section order, changed 2026-08-18 (Salman's explicit instruction)**: Hero → Services →
+Staff/Team → Gallery → Story → Hours → Location → CTA. Executed via the real Phase 2.1 reorder
+endpoint, evidence: `section-reorder-evidence.md`.
 
 **Success Criteria**: every new/changed component verified live on Mister H via real browser
 screenshot at 390px and desktop width (per `browser-verification-protocol.md` — DOM state, console,

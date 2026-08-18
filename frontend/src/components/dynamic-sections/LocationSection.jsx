@@ -12,13 +12,16 @@
 import { motion } from 'framer-motion'
 import { useInView } from 'framer-motion'
 import { useRef } from 'react'
+import { homepageTokens } from './homepageTokens'
 
 // Known seeded placeholder values that must never render as if they were real location content.
 const PLACEHOLDER_PARA_VALUES = new Set(['قريباً', 'قريبا'])
 
-export default function LocationSection({ data, accent }) {
+export default function LocationSection({ data, accent, homepageTheme }) {
   const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   const tags = (data.tags ?? []).filter(Boolean)
   const paraText   = (data.para_ar ?? '').trim()
@@ -38,14 +41,14 @@ export default function LocationSection({ data, accent }) {
             margin: 0,
             fontSize: 'clamp(20px, 3vw, 30px)',
             fontWeight: 800,
-            color: '#f0f0f5',
+            color: useBlackGold ? homepageTokens.text : '#f0f0f5',
             letterSpacing: '-0.01em',
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
           }}
         >
           {data.heading_ar || 'الموقع'}
         </motion.h2>
-        <div style={{ width: 36, height: 3, background: accent, borderRadius: 2 }} />
+        <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
       {/* Paragraph */}
@@ -57,9 +60,9 @@ export default function LocationSection({ data, accent }) {
           style={{
             margin: '0 0 20px',
             fontSize: 15,
-            color: 'rgba(255,255,255,0.55)',
+            color: useBlackGold ? homepageTokens.mutedText : 'rgba(255,255,255,0.55)',
             lineHeight: 1.85,
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
             whiteSpace: 'pre-line',
           }}
         >
@@ -79,10 +82,10 @@ export default function LocationSection({ data, accent }) {
             <span key={i} style={{
               padding: '5px 14px',
               borderRadius: 999,
-              border: `1px solid ${accent}55`,
-              color: accent,
+              border: `1px solid ${themeAccent}55`,
+              color: themeAccent,
               fontSize: 12,
-              fontFamily: "'Cairo', sans-serif",
+              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
               fontWeight: 600,
             }}>
               {tag}
@@ -100,7 +103,7 @@ export default function LocationSection({ data, accent }) {
           style={{
             borderRadius: 16,
             overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.07)',
+            border: `1px solid ${useBlackGold ? homepageTokens.border : 'rgba(255,255,255,0.07)'}`,
             height: 300,
           }}
         >
