@@ -14,6 +14,7 @@
  */
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { homepageTokens } from './homepageTokens'
 
 function PlaceholderTile({ accent, delay }) {
   return (
@@ -123,10 +124,12 @@ function Lightbox({ images, startIndex, onClose }) {
   )
 }
 
-export default function GallerySection({ data, accent }) {
+export default function GallerySection({ data, accent, homepageTheme }) {
   const [lightboxIdx, setLightboxIdx] = useState(null)
   const slots  = data.images ?? []
   const images = slots.filter(img => img?.url)
+  const useBlackGold = homepageTheme === 'black_gold'
+  const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   if (slots.length === 0) return null
 
@@ -138,13 +141,13 @@ export default function GallerySection({ data, accent }) {
           margin: 0,
           fontSize: 'clamp(20px, 3vw, 30px)',
           fontWeight: 800,
-          color: '#f0f0f5',
+          color: useBlackGold ? homepageTokens.text : '#f0f0f5',
           letterSpacing: '-0.01em',
-          fontFamily: "'Cairo', sans-serif",
+          fontFamily: useBlackGold ? homepageTokens.headingFont : "'Cairo', sans-serif",
         }}>
           {data.heading_ar || 'معرض الصور'}
         </h2>
-        <div style={{ width: 36, height: 3, background: accent, borderRadius: 2 }} />
+        <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
       {/* Grid */}
@@ -155,7 +158,7 @@ export default function GallerySection({ data, accent }) {
       }}>
         {slots.map((img, i) => (
           !img?.url ? (
-            <PlaceholderTile key={i} accent={accent} delay={i * 0.05} />
+            <PlaceholderTile key={i} accent={themeAccent} delay={i * 0.05} />
           ) : (
           <motion.button
             key={i}
@@ -173,7 +176,7 @@ export default function GallerySection({ data, accent }) {
               border: 'none',
               cursor: 'pointer',
               padding: 0,
-              background: 'rgba(255,255,255,0.04)',
+              background: useBlackGold ? homepageTokens.surface : 'rgba(255,255,255,0.04)',
             }}
           >
             <img
