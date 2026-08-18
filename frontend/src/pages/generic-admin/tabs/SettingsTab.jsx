@@ -360,11 +360,235 @@ function GalleryMediaSection({ color }) {
   )
 }
 
+// ── Section Settings (Homepage Phase 2.6, 2026-08-18) ─────────────────────────
+// Per ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md's own inventory -- field lists here are a
+// direct transcription of that Contract's table, not invented independently. Media fields with
+// their own dedicated Renderer (hero.bg_image_url, gallery.images) are deliberately absent from
+// these lists -- HeroMediaSection/GalleryMediaSection above already own those.
+
+const SECTION_LABELS = {
+  hero: 'الصفحة الرئيسية (Hero)',
+  story: 'قصتنا',
+  staff: 'فريقنا',
+  gallery: 'معرض الصور',
+  featured_items: 'الخدمات',
+  hours: 'ساعات العمل',
+  location: 'الموقع',
+  cta: 'دعوة الحجز (CTA)',
+  why_choose_us: 'ليش تختارنا',
+  categories_grid: 'التصنيفات',
+  offers: 'العروض',
+  testimonials: 'آراء العملاء',
+  video_story: 'فيديو القصة',
+  story_experience: 'تجربة القصة',
+}
+
+const SECTION_FIELDS = {
+  hero: [
+    { key: 'title_ar', label: 'العنوان الرئيسي', type: 'text' },
+    { key: 'subtitle_ar', label: 'النص التوضيحي', type: 'text' },
+    { key: 'cta_text_ar', label: 'نص زر الحجز', type: 'text' },
+  ],
+  story: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+    { key: 'body_ar', label: 'النص', type: 'textarea' },
+  ],
+  staff: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+  ],
+  gallery: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+    { key: 'limit', label: 'عدد الصور المعروضة (اتركه فارغاً لعرض الكل)', type: 'number' },
+    { key: 'gallery_link', label: 'رابط "عرض الكل"', type: 'text' },
+  ],
+  featured_items: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+    { key: 'limit', label: 'عدد الخدمات المعروضة', type: 'number' },
+  ],
+  hours: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+  ],
+  location: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+    { key: 'para_ar', label: 'النص', type: 'textarea' },
+    { key: 'maps_url', label: 'رابط الخريطة (Google Maps Embed)', type: 'text' },
+  ],
+  cta: [
+    { key: 'text_ar', label: 'العنوان', type: 'text' },
+    { key: 'subtext_ar', label: 'النص التوضيحي', type: 'text' },
+    { key: 'button_ar', label: 'نص الزر', type: 'text' },
+    { key: 'link', label: 'رابط الزر', type: 'text' },
+    {
+      key: 'variant', label: 'شكل القسم', type: 'select',
+      options: [
+        { value: '', label: 'عادي' },
+        { value: 'banner', label: 'بانر ذهبي كامل' },
+        { value: 'promo-strip', label: 'شريط مضغوط' },
+      ],
+    },
+  ],
+  why_choose_us: [
+    { key: 'heading_ar', label: 'العنوان', type: 'text' },
+  ],
+}
+
+function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
+  const [expanded, setExpanded] = useState(false)
+  const fieldsConfig = SECTION_FIELDS[section.type] ?? []
+  const [values, setValues] = useState(() => {
+    const initial = {}
+    fieldsConfig.forEach(f => { initial[f.key] = section.data?.[f.key] ?? '' })
+    return initial
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState(null)
+
+  const setField = (key) => (e) => {
+    setValues(prev => ({ ...prev, [key]: e.target.value }))
+    setSaved(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      // Numbers stored as real numbers, not strings; empty string clears the field
+      const fields = {}
+      fieldsConfig.forEach(f => {
+        const raw = values[f.key]
+        fields[f.key] = f.type === 'number' && raw !== '' ? Number(raw) : (raw === '' ? null : raw)
+      })
+      await adminApi.patch(`/content/sections/${section.type}/fields`, { fields })
+      setSaved(true)
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر الحفظ')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const enabled = section.enabled !== false
+
+  return (
+    <div style={{ borderBottom: `1px solid ${T.borderSoft}`, padding: '14px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={enabled} onChange={(e) => onToggleEnabled(section.type, e.target.checked)} />
+          </label>
+          <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, opacity: enabled ? 1 : 0.45 }}>
+            {SECTION_LABELS[section.type] ?? section.type}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0}
+            style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: index === 0 ? 0.3 : 1, fontSize: 14 }}>↑</button>
+          <button type="button" onClick={() => onMove(index, 1)} disabled={index === total - 1}
+            style={{ background: 'none', border: 'none', cursor: index === total - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: index === total - 1 ? 0.3 : 1, fontSize: 14 }}>↓</button>
+          {fieldsConfig.length > 0 && (
+            <button type="button" onClick={() => setExpanded(e => !e)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color, fontSize: 12, fontWeight: 700 }}>
+              {expanded ? 'إخفاء' : 'تعديل'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {expanded && fieldsConfig.length > 0 && (
+        <div style={{ marginTop: 12, paddingInlineStart: 26 }}>
+          {fieldsConfig.map(f => (
+            <Field key={f.key} label={f.label}>
+              {f.type === 'textarea' ? (
+                <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={values[f.key]} onChange={setField(f.key)} />
+              ) : f.type === 'select' ? (
+                <select style={inputStyle} value={values[f.key]} onChange={setField(f.key)}>
+                  {f.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              ) : (
+                <input type={f.type === 'number' ? 'number' : 'text'} style={inputStyle} value={values[f.key]} onChange={setField(f.key)} />
+              )}
+            </Field>
+          ))}
+          <Button onClick={handleSave} disabled={saving} style={{ marginTop: 4 }}>
+            {saving ? 'جاري الحفظ...' : 'حفظ'}
+          </Button>
+          {saved && <span style={{ marginInlineStart: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ</span>}
+          {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SectionSettingsArea({ color }) {
+  const [sections, setSections] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    adminApi.get('/content/sections')
+      .then(({ data }) => {
+        if (data.success) setSections([...data.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load]) // eslint-disable-line
+
+  const handleToggleEnabled = async (type, enabled) => {
+    setSections(prev => prev.map(s => s.type === type ? { ...s, enabled } : s)) // optimistic
+    try {
+      await adminApi.patch(`/content/sections/${type}/enabled`, { enabled })
+    } catch {
+      load() // revert to real state on failure
+    }
+  }
+
+  const handleMove = async (index, direction) => {
+    const target = index + direction
+    if (target < 0 || target >= sections.length) return
+    const reordered = [...sections]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    setSections(reordered) // optimistic
+    try {
+      await adminApi.patch('/content/sections/reorder', { ordered_types: reordered.map(s => s.type) })
+    } catch {
+      load() // revert to real state on failure
+    }
+  }
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={sectionTitle}>إعدادات الأقسام</div>
+      <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 16 }}>
+        إخفاء/إظهار كل قسم، ترتيبه، وتعديل نصوصه — يظهر التغيير مباشرة على موقعك العام
+      </div>
+      {loading ? (
+        <div style={{ fontSize: 13, color: T.textMuted }}>جاري التحميل...</div>
+      ) : (
+        sections.map((s, i) => (
+          <SectionRow
+            key={s.id ?? s.type}
+            section={s}
+            index={i}
+            total={sections.length}
+            onToggleEnabled={handleToggleEnabled}
+            onMove={handleMove}
+            color={color}
+          />
+        ))
+      )}
+    </Card>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsTab({ settings, onUpdated, color, onFormChange }) {
-  const existingHero   = settings?.config?.hero ?? {}
   const existingConfig = settings?.config ?? {}
+  const existingHours   = existingConfig.working_hours ?? {}
 
   const [form, setForm] = useState({
     name_ar:          settings?.name_ar         ?? '',
@@ -375,10 +599,11 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
     page_type:        settings?.page_type       ?? 'normal',
     catalog_layout:   existingConfig.catalog_layout ?? 'grid',
     font:             existingConfig.font           ?? 'Cairo',
-    // hero text
-    hero_title_ar:    existingHero.title_ar     ?? '',
-    hero_subtitle_ar: existingHero.subtitle_ar  ?? '',
-    hero_cta_ar:      existingHero.cta_ar       ?? '',
+    // working hours (Homepage Phase 2.6, 2026-08-18) -- the real field HoursSection.jsx actually
+    // prioritizes; previously had zero Dashboard editing surface anywhere, confirmed via a real
+    // grep of every admin tab (ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md SS3)
+    working_hours_open:  existingHours.open_time  ?? '',
+    working_hours_close: existingHours.close_time ?? '',
   })
 
   const [saving,  setSaving]  = useState(false)
@@ -410,11 +635,13 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
           ...existingConfig,
           catalog_layout: form.catalog_layout,
           font:           form.font,
-          hero: {
-            title_ar:    form.hero_title_ar    || undefined,
-            subtitle_ar: form.hero_subtitle_ar || undefined,
-            cta_ar:      form.hero_cta_ar      || undefined,
-          },
+          // Real field HoursSection.jsx prioritizes (Homepage Phase 2.6) -- only written when
+          // both times are actually set, so an empty form never wipes a real existing value.
+          working_hours: (form.working_hours_open && form.working_hours_close) ? {
+            ...existingConfig.working_hours,
+            open_time:  form.working_hours_open,
+            close_time: form.working_hours_close,
+          } : existingConfig.working_hours,
         },
       }
       await adminApi.patch('/settings', payload)
@@ -530,21 +757,28 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
       {/* ── Gallery Media ─────────────────────────────────────────────── */}
       <GalleryMediaSection color={form.primary_color} />
 
-      {/* ── Hero Text ─────────────────────────────────────────────────── */}
+      {/* ── Working Hours (Homepage Phase 2.6) ───────────────────────────
+          Real field HoursSection.jsx actually prioritizes -- previously had zero editing
+          surface anywhere in the Dashboard, confirmed via a real grep of every admin tab. */}
       <Card style={{ marginBottom: 20 }}>
-        <div style={sectionTitle}>نصوص الصفحة الرئيسية</div>
-        <Field label="العنوان الرئيسي" hint="يظهر بدلاً من اسم المتجر">
-          <input style={inputStyle} value={form.hero_title_ar} onChange={set('hero_title_ar')} placeholder="مثال: اكتشفي عالم الجمال" />
-        </Field>
-
-        <Field label="النص التوضيحي" hint="وصف قصير تحت العنوان">
-          <input style={inputStyle} value={form.hero_subtitle_ar} onChange={set('hero_subtitle_ar')} placeholder="مثال: خدمات تجميل احترافية بأسعار مناسبة" />
-        </Field>
-
-        <Field label="نص زر التواصل">
-          <input style={inputStyle} value={form.hero_cta_ar} onChange={set('hero_cta_ar')} placeholder="تواصل معنا" />
-        </Field>
+        <div style={sectionTitle}>ساعات العمل</div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Field label="من">
+            <input type="time" style={inputStyle} value={form.working_hours_open} onChange={set('working_hours_open')} dir="ltr" />
+          </Field>
+          <Field label="إلى">
+            <input type="time" style={inputStyle} value={form.working_hours_close} onChange={set('working_hours_close')} dir="ltr" />
+          </Field>
+        </div>
       </Card>
+
+      {/* ── Section Settings (Homepage Phase 2.6) ────────────────────────
+          Per ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md -- show/hide, reorder, and the real
+          text/settings fields for every live section. Hero/Gallery text fields (title_ar,
+          heading_ar, ...) live here now too, correcting the removed "Hero Text" card above,
+          which wrote to config.hero -- a field HeroSection.jsx never read (confirmed real,
+          pre-existing, dead since it shipped; nothing else in the codebase referenced it). */}
+      <SectionSettingsArea color={form.primary_color} />
 
       {/* ── Feedback + Save ───────────────────────────────────────────── */}
       {error && (
