@@ -229,6 +229,41 @@ def _record_to_dict(record) -> Dict[str, Any]:
     }
 
 
+async def _inject_page_hero_media(client_id: str, result: Dict[str, Any]) -> None:
+    """
+    Media/Content Foundation (2026-08-17): if a real page_hero GalleryImage row exists for this
+    tenant, its URL overrides whatever's already in content.sections[hero].data -- mutates
+    `result` in place. A tenant with no such row (e.g. RK, not yet migrated) is completely
+    unaffected -- purely additive. HeroSection.jsx needs zero changes: it already reads
+    bg_image_url/framed_video_url from this exact section data, regardless of where the value
+    came from. This is the real fix for the Media Capability's own documented dual write-path
+    (.claudedocs/maturity/media.md) -- the JSON-blob field stops being the source of truth the
+    moment a real media row exists, without anyone needing to edit the JSON blob again.
+    """
+    from app.services import media_service  # local import -- avoids a circular import at module load
+
+    try:
+        media = await media_service.get_page_media(client_id, "page_hero")
+    except Exception as e:
+        logger.error(f"🔥 page_hero media lookup failed for client {client_id}: {e}", exc_info=True)
+        return  # never let a media lookup failure break the whole public config response
+    if not media:
+        return
+
+    content = (result.get("config") or {}).get("content") or {}
+    sections = content.get("sections") or []
+    hero = next((s for s in sections if s.get("type") == "hero"), None)
+    if hero is None:
+        return
+
+    data = hero.setdefault("data", {})
+    if "framed_video_url" in data:
+        data["framed_video_url"] = media["url"]
+    else:
+        data["bg_image_url"] = media["url"]
+        data["bg_type"] = media["media_type"]
+
+
 async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
     """
     Fetch tenant public config from the clients table.
@@ -255,7 +290,9 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
         if not record:
             return None
 
-        return _record_to_dict(record)
+        result = _record_to_dict(record)
+        await _inject_page_hero_media(record.id, result)
+        return result
     except Exception as e:
         logger.error(f"🔥 DB error fetching tenant config for '{slug}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")

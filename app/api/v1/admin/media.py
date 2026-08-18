@@ -23,15 +23,28 @@ router = APIRouter(prefix="/media", tags=["Admin Media"])
 
 class HeroImageUpdate(BaseModel):
     image_url: str
+    # Additive (2026-08-17, Media/Content Foundation) -- defaults to "image" so any existing
+    # caller of this route (none confirmed real yet, per TOS-002's own maturity review, but kept
+    # safe regardless) is unaffected. "video" is the real, new case this field exists for.
+    media_type: str = "image"
 
 
 @router.get("/hero-image")
 async def get_hero_image(
     tenant: dict = Depends(get_current_tenant),
 ):
+    """
+    Media/Content Foundation (2026-08-17): now backed by a real GalleryImage row
+    (imageType="page_hero") instead of the JSON-blob field -- see media_service.get_page_media.
+    Falls back to the legacy JSON-blob field for any tenant that hasn't been migrated yet, so no
+    existing tenant's admin UI breaks.
+    """
+    media = await media_service.get_page_media(tenant["id"], "page_hero")
+    if media:
+        return {"success": True, "data": {"image_url": media["url"], "media_type": media["media_type"]}}
     try:
         image_url = await media_service.get_hero_image(tenant["id"])
-        return {"success": True, "data": {"image_url": image_url}}
+        return {"success": True, "data": {"image_url": image_url, "media_type": "image"}}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -42,14 +55,19 @@ async def update_hero_image(
     tenant: dict = Depends(get_current_tenant),
     _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
-    """The one real Operation Sprint 2 supports: ReplaceMedia on media.hero.bg_image."""
+    """
+    Media/Content Foundation (2026-08-17): ReplaceMedia on the tenant's hero media (image OR
+    video), now writing a real GalleryImage row (imageType="page_hero") instead of the old
+    JSON-blob field -- the actual fix for the Media Capability's own documented "dual write-path
+    never unified" finding (.claudedocs/maturity/media.md, Review 1).
+    """
     try:
-        await media_service.replace_hero_image(tenant["id"], body.image_url)
+        await media_service.replace_page_media(tenant["id"], "page_hero", body.image_url, body.media_type)
         invalidate_tenant_cache(tenant["slug"])
-        logger.info("Media: hero image replaced for tenant '%s'", tenant["slug"])
+        logger.info("Media: hero %s replaced for tenant '%s'", body.media_type, tenant["slug"])
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"🔥 DB error updating hero image for tenant {tenant}: {e}", exc_info=True)
+        logger.error(f"🔥 DB error updating hero media for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")

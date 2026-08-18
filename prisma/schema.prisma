@@ -382,8 +382,18 @@ model GalleryImage {
   unitId        String?      @map("unit_id") @db.Uuid
   catalogItemId String?      @map("catalog_item_id") @db.Uuid
   imageType     String       @default("gallery") @map("image_type")
-  // image_type values: gallery | cover | catalog | page_hero | page_logo
+  // image_type values: gallery | cover | catalog | page_hero | page_logo | page_gallery | experience
+  // page_hero/page_logo/page_gallery/experience (2026-08-17, Media/Content Foundation): a row with
+  // these values is scoped by clientId only (unitId/catalogItemId both null) -- already legal per
+  // this model's own optional FKs, not a schema change. At most one isActive row should exist per
+  // (clientId, imageType) for the singleton kinds (page_hero, page_logo) -- enforced at the
+  // Service layer (replace = delete old + create new), not a DB constraint.
+  mediaType     String       @default("image") @map("media_type")
+  // mediaType values: image | video -- decides HOW a row is rendered; imageType decides WHERE it's
+  // used. The same uploaded file can move between page_hero/page_gallery/experience by changing
+  // only imageType, never re-uploaded.
   url           String       @map("url")
+  altText       String?      @map("alt_text")
   sort_order    Int          @default(0) @map("sort_order")
   span_size     String       @default("small") @map("span_size")
   caption_ar    String?      @map("caption_ar")

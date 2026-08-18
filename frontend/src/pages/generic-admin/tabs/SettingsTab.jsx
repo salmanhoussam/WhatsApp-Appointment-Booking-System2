@@ -151,6 +151,93 @@ function StoreQRSection({ color }) {
   )
 }
 
+// ── Hero Media — real Dashboard Renderer (Media/Content Foundation, 2026-08-17) ────────────────
+// The first real "Renderer" for the Tenant OS Editing Engine's media.hero.bg_image Contract
+// (previously only a discovery wrapper, EditableRegion, existed -- nothing rendered an actual
+// upload UI). Two-step, matching the already-established pattern: (1) POST /admin/upload/
+// (context=page_hero) uploads the real file to Supabase Storage and returns a URL; (2)
+// PATCH /admin/media/hero-image writes that URL into a real GalleryImage row. No hardcoded URLs,
+// no tenant-conditional code -- this is the one real control every reservations tenant uses.
+function HeroMediaSection({ color }) {
+  const [current, setCurrent] = useState(null) // { url, media_type } | null
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    adminApi.get('/media/hero-image')
+      .then(({ data }) => { if (data.success) setCurrent(data.data) })
+      .catch(() => {}) // no hero media set yet -- not an error state
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load]) // eslint-disable-line
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    setSuccess(false)
+    try {
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+      const form = new FormData()
+      form.append('file', file)
+      form.append('context', 'page_hero')
+      const { data: uploadRes } = await adminApi.post('/upload/', form)
+      await adminApi.patch('/media/hero-image', { image_url: uploadRes.url, media_type: mediaType })
+      setCurrent({ url: uploadRes.url, media_type: mediaType })
+      setSuccess(true)
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر رفع الملف')
+    } finally {
+      setUploading(false)
+      e.target.value = '' // allow re-selecting the same file
+    }
+  }
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={sectionTitle}>وسائط الصفحة الرئيسية (Hero)</div>
+      <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 16 }}>
+        صورة أو فيديو خلفية الصفحة الرئيسية — يظهر مباشرة على موقعك العام بعد الرفع، بدون الحاجة لأي تعديل تقني
+      </div>
+
+      {loading ? (
+        <div style={{ fontSize: 13, color: T.textMuted }}>جاري التحميل...</div>
+      ) : current ? (
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
+          {current.media_type === 'video' ? (
+            <video src={current.url} muted style={{ width: 90, height: 64, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.border}` }} />
+          ) : (
+            <img src={current.url} alt="hero" style={{ width: 90, height: 64, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.border}` }} />
+          )}
+          <div style={{ fontSize: 12, color: T.textSecond }}>
+            الحالي: {current.media_type === 'video' ? 'فيديو' : 'صورة'}
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 16 }}>لا يوجد وسائط مرفوعة بعد</div>
+      )}
+
+      <label style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer',
+        padding: '10px 18px', borderRadius: 8, border: `1.5px solid ${color}`,
+        color: color, fontSize: 13, fontWeight: 700, fontFamily: FONT,
+        opacity: uploading ? 0.5 : 1,
+      }}>
+        {uploading ? 'جاري الرفع...' : (current ? 'استبدال الملف' : 'رفع صورة أو فيديو')}
+        <input type="file" accept="image/*,video/*" onChange={handleFile} disabled={uploading} style={{ display: 'none' }} />
+      </label>
+
+      {error && <div style={{ marginTop: 10, fontSize: 12, color: T.danger }}>{error}</div>}
+      {success && <div style={{ marginTop: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ — الصفحة العامة ستتحدث خلال ثوانٍ</div>}
+    </Card>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsTab({ settings, onUpdated, color, onFormChange }) {
@@ -314,6 +401,9 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
           </div>
         </div>
       </Card>
+
+      {/* ── Hero Media ────────────────────────────────────────────────── */}
+      <HeroMediaSection color={form.primary_color} />
 
       {/* ── Hero Text ─────────────────────────────────────────────────── */}
       <Card style={{ marginBottom: 20 }}>
