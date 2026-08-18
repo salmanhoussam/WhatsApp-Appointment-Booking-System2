@@ -166,8 +166,8 @@ tenant config data, same sanctioned pattern as `reserveHref`'s existing `active_
 | Location | `frontend/src/components/dynamic-sections/LocationSection.jsx` | Black+gold theme done this pass; two-column info-vs-map asymmetry tightening (Design Spec §3.5) still not done | **Theme DONE**, layout tightening not started — evidence: `phase2.3-location-evidence.md` |
 | Why Choose Us | `frontend/src/components/dynamic-sections/WhyChooseUsSection.jsx` (new) | Per Expansion Proposal §2 — 4 icon+title+body cards, no photography; real content seeded for Mister H, placed right after Services (own placement judgment call, not explicitly specified) | **DONE** — evidence: `phase2.3-why-choose-us-evidence.md` |
 | CTA | `frontend/src/components/dynamic-sections/CtaSection.jsx` | Add `variant: "banner"` (Expansion Proposal §2) and `variant: "promo-strip"` (§1.1 correction, this document); found+fixed a real pre-existing bug along the way (Mister H's cta data used field names the component never read, rendering completely empty since it went live) | **DONE** — evidence: `phase2.3-cta-evidence.md` |
-| Footer | `frontend/src/components/Footer.jsx` (new, site-wide, not in `dynamic-sections/`) | Per Expansion Proposal §3 — rendered once by `DynamicPage.jsx`, outside the sections loop, sourced from already-real `Client` fields + the one real gap (`instagram_url`, see §4 below) | Not started |
-| `DynamicPage.jsx` | same file as Phase 2.1 | Register `why_choose_us` in `SECTION_MAP`, mount `<Footer>` after the sections loop | Not started |
+| Footer | `frontend/src/components/Footer.jsx` (new, site-wide, not in `dynamic-sections/`) | Rendered once by `DynamicPage.jsx`, outside the sections loop, sourced from real `Client` fields; found `instagram_url` already exists (no migration needed, §4's "gap" claim was stale) and a real lucide-react bug (no brand icons in this version) | **DONE** — evidence: `phase2.3-footer-evidence.md` |
+| `DynamicPage.jsx` | same file as Phase 2.1 | Register `why_choose_us` in `SECTION_MAP`, mount `<Footer>` after the sections loop | **DONE** (both done as part of their own rows above) |
 
 **Section order, changed 2026-08-18 (Salman's explicit instruction)**: Hero → Services →
 Staff/Team → Gallery → Story → Hours → Location → CTA. Executed via the real Phase 2.1 reorder
@@ -245,10 +245,13 @@ absorbed silently.
 
 ---
 
-## 4. Small Named Gap, Carried Forward Unchanged
+## 4. Small Named Gap — Resolved (was stale, not actually a gap)
 
-`instagram_url` on `Client` — one additive field, already named in the Expansion Proposal §3, real
-but trivial, folded into Phase 2.3's Footer work rather than its own phase.
+`instagram_url` on `Client` — the Expansion Proposal §3 named this as needing "one small additive
+field." Checked the real schema before building the Footer: the column already exists
+(`prisma/schema.prisma`, `@map("instagram_url")`), same as `whatsapp_number`/`maps_url`. No
+migration was needed — only a real value, set for Mister H as part of Footer's implementation
+(`scripts/set_mrh_social_contact.py`). Closed, not carried forward.
 
 ---
 

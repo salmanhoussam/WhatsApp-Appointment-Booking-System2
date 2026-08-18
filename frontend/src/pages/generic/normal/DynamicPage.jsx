@@ -29,6 +29,7 @@ import { hasOrderCapability } from '../../../utils/capabilities'
 import CartBadge      from '../../../design-system/molecules/CartBadge'
 import CartDrawer     from '../../../design-system/organisms/CartDrawer'
 import ConfigurableHero from '../../../components/ConfigurableHero'
+import Footer from '../../../components/Footer'
 
 import {
   HeroSection,
@@ -342,6 +343,8 @@ export default function DynamicPage() {
           />
         )}
       </div>
+
+      <Footer config={tenantConfig} accent={accent} slug={slug} homepageTheme={homepageTheme} />
 
       {/* Floating cart badge */}
       {showCart && (
