@@ -224,42 +224,24 @@ No new sections were added in this phase — matches Salman's explicit instructi
 
 ---
 
-## Phase 2.5 — Asset Pack Sourcing (content, not engineering) — current active step (2026-08-18)
+## Phase 2.5 — Asset Pack Sourcing — Status: BLOCKED, pending real content (2026-08-19)
 
-Refined and re-prioritized by Salman right after Phase 2.5/2.6 closed, now the explicit next step
-(re-selected over array-field editing and Logo/Nav, both deliberately deferred as separate
-workstreams). **Content work — gated on Salman/Ali providing real material, not on engineering.**
-The receiving architecture is already fully built and verified (Hero media Phase 1, Gallery media
-this session, Services photos already real via `StaffTab.jsx`) — nothing more to build before real
-files exist.
+**Not an open-ended wait — a real, named content dependency**, per Salman's explicit instruction
+(2026-08-19): don't let this stall other work; record it as blocked, keep doing everything that
+doesn't need real assets, and use the wait to prepare (not execute) the Visual QA pass. Full detail
+— the exact Priority 1/2 ask, the asset provenance record format required for every real upload
+going forward, and the ready-to-run Visual QA rubric — now lives in its own document:
+`ALZABT_MISTER_H_ASSET_PACK_AND_VISUAL_QA_PLAN.md`. Not restated here.
 
-**Priority 1**:
-- Hero fallback image (the real video already exists and stays primary; this is the still-image
-  fallback for whenever no video is set)
-- 4–6 real service photos (one per real `CatalogService`, uploaded via the already-real
-  `catalog_service` context in `StaffTab.jsx`)
-- 8–12 real gallery photos (uploaded via `GalleryMediaSection`, built this session)
+**Content work — gated on Salman/Ali providing real material, not on engineering.** The receiving
+architecture is already fully built and verified (Hero media Phase 1, Gallery media this session,
+Services photos already real via `StaffTab.jsx`) — the moment real files exist, the work is
+upload + mapping + verification, not new engineering.
 
-**Priority 2**:
-- Staff/barber portraits — only if a real decision is made to use them visually on the page (not
-  yet decided)
-- Story/experience media — only if a real decision is made to add a media field to Story later
-  (confirmed this session: no such field exists in `StorySection.jsx` today, nothing to wire until
-  that decision is made)
-
-**Binding rule, restated**: no synthetic/fabricated testimonial photos, no random filler images
-used just to occupy a slot. Art direction stays exactly as already established (Design Spec §2.3):
-dark, cinematic, premium, black + warm gold, one coherent photography set — not several unrelated
-styles mixed together.
-
-**Next after real assets land**: a real Visual QA pass — Mister H against the reference image set,
-judged on composition/crop/contrast/typography/spacing/hierarchy, not merely "does the section
-render." Explicitly not judged on "does the section exist" alone, per Salman's own distinction.
-
-**After the Visual QA pass**: Logo/Nav and array-field editors (Story stats, Location tags, Why
-Choose Us items) become their own separate, independently-scoped workstreams — neither is a
-prerequisite for the other, and neither should be pulled into a shared "editor" without its own UX
-and data-contract decision first (Salman's explicit concern: avoid the generic field editor turning
+**Sequencing, unchanged**: real assets land → Visual QA pass (rubric ready, not yet run) → only
+then Logo/Nav and array-field editors as their own separate, independently-scoped workstreams —
+neither a prerequisite for the other, neither pulled into a shared "editor" without its own UX and
+data-contract decision first (Salman's explicit concern: avoid the generic field editor turning
 into an unplanned "monster form").
 
 ---
