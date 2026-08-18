@@ -105,22 +105,37 @@ safe default) — revert is a plain `git revert` of this phase's commit, no data
 
 ---
 
-## Phase 2.2 — Design Tokens: freeze the Visual Language into a shared form
+## Phase 2.2 — Design Tokens: freeze the Visual Language into a shared form — Status: DONE (2026-08-18)
 
-**Precondition**: §5.1 and §5.2 below resolved — token values depend on both.
+**File**: `frontend/src/components/dynamic-sections/homepageTokens.js` — placed alongside the
+section components themselves (not `design-system/`, which is cross-tenant/global per
+`feature-structure.md`), matching §5.3's resolved "homepage-scoped, not a global redesign" scope.
+No component files touched in this phase, per the Contract's own stated boundary — this phase only
+produces the token source of truth.
 
-**Files**: a new shared module (exact location TBD at implementation time — candidates:
-`frontend/src/design-system/tokens/barber-luxury.js` per the existing `design-system/` bucket
-`feature-structure.md` already establishes, or scoped directly under `pages/generic/` if this
-palette turns out Mister-H-specific rather than a general vertical treatment — **this choice itself
-is an Open Decision**, not decided here, see §5.3). No component files are touched in this phase —
-this phase only produces the token source of truth that Phase 2.3's components will consume.
+**Values** (all traceable to §0's confirmed findings and the two ratified briefs, none invented):
+`background: '#080808'`, `surface: '#141414'`, `text: '#F3EEE4'` (warm off-white, never pure
+white per Design Spec §2.1), `mutedText: '#A79E8E'`, `accent: '#D9A441'` (reused verbatim from
+`ReservePage.jsx`'s existing `GOLD` constant — one real brand gold, not two subtly different
+ones), `border: 'rgba(217,164,65,0.22)'`, `overlay` (a dark bottom-fade gradient — the "photo
+fades into black" treatment both briefs named repeatedly), a `spacing` scale (96px/56px/24px/12px)
+for the reference's "breathing room."
 
-**Success Criteria**: token values match §0's confirmed findings exactly (near-black background,
-warm off-white text, gold accent used only per the §2.1 restraint rule) — reviewed against the
-reference images before Phase 2.3 starts, not after.
+**Real finding during implementation**: fonts were checked against what's *actually* loaded
+(`frontend/index.html`'s Google Fonts link: Cairo, Tajawal, Playfair Display, Space Mono) rather
+than assuming a new webfont was needed. Playfair Display (the obvious "editorial display font"
+choice) has **no Arabic glyphs** — unusable for this tenant's real Arabic content. `headingFont`
+uses `'Tajawal', 'Cairo'` (Tajawal already loaded at weight 800/900, the closest real match to
+"condensed, bold, tall, editorial" that still renders Arabic correctly); `bodyFont` reuses
+`'Cairo'` (already `DynamicPage.jsx`'s own default). No separate label font: Arabic has no
+uppercase transform, so the label/eyebrow register is `bodyFont` at smaller size + `accent` color
++ wider letter-spacing, not a distinct family — Space Mono has no Arabic glyphs and would silently
+fall back for Arabic label text.
 
-**Rollback**: new file, trivially removable, nothing depends on it yet within this phase.
+**Success Criteria**: met — values traceable to §0, 0 eslint errors, no component wiring (correctly
+out of scope for this phase).
+
+**Rollback**: new, standalone file — nothing in the codebase imports it yet, trivially removable.
 
 ---
 
