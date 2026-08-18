@@ -238,6 +238,128 @@ function HeroMediaSection({ color }) {
   )
 }
 
+// ── Gallery Media (Homepage Phase 2.4, 2026-08-18) ────────────────────────────
+// Same 2-step upload pattern as HeroMediaSection above, but a real collection (add/delete/
+// reorder), not a singleton replace -- matches the real backend shape
+// (app/api/v1/admin/media.py's gallery-images routes, gallery_repo.py's collection functions).
+
+function GalleryMediaSection({ color }) {
+  const [images, setImages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    adminApi.get('/media/gallery-images')
+      .then(({ data }) => { if (data.success) setImages(data.data) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load]) // eslint-disable-line
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+      const form = new FormData()
+      form.append('file', file)
+      form.append('context', 'page_gallery')
+      const { data: uploadRes } = await adminApi.post('/upload/', form)
+      await adminApi.post('/media/gallery-images', { image_url: uploadRes.url, media_type: mediaType })
+      await load()
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر رفع الملف')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleDelete = async (id) => {
+    setError(null)
+    try {
+      await adminApi.delete(`/media/gallery-images/${id}`)
+      setImages(prev => prev.filter(img => img.id !== id))
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر حذف الصورة')
+    }
+  }
+
+  const handleMove = async (index, direction) => {
+    const target = index + direction
+    if (target < 0 || target >= images.length) return
+    const reordered = [...images]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    setImages(reordered) // optimistic
+    try {
+      await adminApi.patch('/media/gallery-images/reorder', { ordered_ids: reordered.map(img => img.id) })
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر إعادة الترتيب')
+      load() // revert to real state on failure
+    }
+  }
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={sectionTitle}>معرض الصور</div>
+      <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 16 }}>
+        الصور التي تظهر في قسم "معرض الصور" بالصفحة العامة — يظهر كل تعديل مباشرة بعد الرفع
+      </div>
+
+      {loading ? (
+        <div style={{ fontSize: 13, color: T.textMuted }}>جاري التحميل...</div>
+      ) : images.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10, marginBottom: 16 }}>
+          {images.map((img, i) => (
+            <div key={img.id} style={{ position: 'relative' }}>
+              {img.media_type === 'video' ? (
+                <video src={img.url} muted style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.border}` }} />
+              ) : (
+                <img src={img.url} alt={img.caption_ar || ''} style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${T.border}` }} />
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={() => handleMove(i, -1)} disabled={i === 0}
+                    style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: i === 0 ? 0.3 : 1, fontSize: 13 }}>
+                    ↑
+                  </button>
+                  <button type="button" onClick={() => handleMove(i, 1)} disabled={i === images.length - 1}
+                    style={{ background: 'none', border: 'none', cursor: i === images.length - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: i === images.length - 1 ? 0.3 : 1, fontSize: 13 }}>
+                    ↓
+                  </button>
+                </div>
+                <button type="button" onClick={() => handleDelete(img.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.danger, fontSize: 12 }}>
+                  حذف
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 16 }}>لا توجد صور بعد</div>
+      )}
+
+      <label style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer',
+        padding: '10px 18px', borderRadius: 8, border: `1.5px solid ${color}`,
+        color: color, fontSize: 13, fontWeight: 700, fontFamily: FONT,
+        opacity: uploading ? 0.5 : 1,
+      }}>
+        {uploading ? 'جاري الرفع...' : 'إضافة صورة'}
+        <input type="file" accept="image/*,video/*" onChange={handleFile} disabled={uploading} style={{ display: 'none' }} />
+      </label>
+
+      {error && <div style={{ marginTop: 10, fontSize: 12, color: T.danger }}>{error}</div>}
+    </Card>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsTab({ settings, onUpdated, color, onFormChange }) {
@@ -404,6 +526,9 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
 
       {/* ── Hero Media ────────────────────────────────────────────────── */}
       <HeroMediaSection color={form.primary_color} />
+
+      {/* ── Gallery Media ─────────────────────────────────────────────── */}
+      <GalleryMediaSection color={form.primary_color} />
 
       {/* ── Hero Text ─────────────────────────────────────────────────── */}
       <Card style={{ marginBottom: 20 }}>
