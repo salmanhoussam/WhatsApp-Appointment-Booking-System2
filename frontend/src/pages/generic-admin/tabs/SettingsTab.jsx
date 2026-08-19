@@ -361,28 +361,31 @@ function GalleryMediaSection({ color }) {
 }
 
 // ── Section Settings (Homepage Phase 2.6, 2026-08-18; schema-driven since TOS-005 Phase B,
-// 2026-08-19; repeatable groups since TOS-005 Phase D, 2026-08-19) ────────────────────────────
+// 2026-08-19; repeatable groups since TOS-005 Phase D, 2026-08-19; media-kind fields since
+// Tenant OS Section Editor Phase 4, 2026-08-20) ───────────────────────────────────────────
 // The field/label lists that used to live here as hardcoded SECTION_FIELDS/SECTION_LABELS
 // objects are retired -- app/schemas/section_schemas.py is now the one real source of truth
 // (TOS-005-cms-generic-engine.md §4.1), fetched once via GET /content/sections/schema
 // (SectionSettingsArea below) and passed down. No independent copy exists here anymore --
 // divergence between this form and the backend's own validation is structurally impossible,
-// not merely discouraged. Media fields (hero.bg_image_url, gallery.images) are absent from the
-// fetched schema's non-repeatable fields for the same reason they were absent here before --
-// HeroMediaSection/GalleryMediaSection above already own those. Repeatable-kind fields
-// (story.stats, location.tags, why_choose_us.items, ...) render via the one generic
+// not merely discouraged. Media-kind fields (hero.bg_image_url, gallery.images) are excluded
+// from fieldsConfig's scalar loop and rendered instead via MediaField, which mounts
+// HeroMediaSection/GalleryMediaSection -- the field's real value is still written exclusively
+// through those components' own dedicated endpoints, never through this form's generic
+// fields PATCH (the backend rejects it, section_schemas.py's `_validate_value`). Repeatable-kind
+// fields (story.stats, location.tags, why_choose_us.items, ...) render via the one generic
 // RepeatableGroupEditor below -- never a per-section editor (StoryEditor/LocationEditor/
 // WhyChooseUsEditor never exist).
 
 // One shared input renderer for both scalar fields (SectionRow) and repeatable sub-fields
 // (RepeatableGroupEditor) -- the same kind -> input-type switch, written once.
 //
-// Tenant OS Section Editor Phase 2 (2026-08-20) adds `media`/`group` branches -- ready, but not
-// yet reachable by any real schema field: Salman's explicit Phase 2 scope is schema + validation
-// only, no wiring of hero.bg_image_url/gallery.images into SECTION_SCHEMAS yet (avoids a real
-// duplicate-UI period against HeroMediaSection/GalleryMediaSection, which still live in General
-// Settings below). These two branches will get their first live exercise once a real schema field
-// declares that kind -- Phase 4 for `media`, whenever a real `group` field is authored.
+// Tenant OS Section Editor Phase 2 (2026-08-20) added a `group` branch here. `media` deliberately
+// has no branch in FieldInput -- same as `repeatable`, a media-kind field is never a value/onChange
+// pair rendered inline; it's excluded from SectionEditorPanel's fieldsConfig and rendered instead
+// via the dedicated MediaField dispatcher below (Phase 4), which mounts a real, self-contained,
+// already-correct component (HeroMediaSection/GalleryMediaSection) -- consistent with how
+// featured_items/staff already link out to StaffTab.jsx's own editor rather than rendering inline.
 function FieldInput({ kind, value, onChange, options, fields }) {
   if (kind === 'textarea') {
     return <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -399,16 +402,6 @@ function FieldInput({ kind, value, onChange, options, fields }) {
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
       </label>
-    )
-  }
-  if (kind === 'media') {
-    // Declared for discovery only -- the backend rejects writing this kind via section fields
-    // (app/schemas/section_schemas.py's `_validate_value`). Real editing stays on its own
-    // dedicated component (HeroMediaSection/GalleryMediaSection today) until Phase 4.
-    return (
-      <div style={{ fontSize: 12, color: T.textMuted, padding: '8px 0' }}>
-        حقل وسائط — يُدار من قسم مخصص
-      </div>
     )
   }
   if (kind === 'group') {
@@ -470,13 +463,27 @@ function SectionListRow({ section, index, total, schema, selected, onSelect, onT
   )
 }
 
+// Tenant OS Section Editor Phase 4 (2026-08-20) -- one dispatcher for every media-kind field.
+// `pipeline` (declared in section_schemas.py) decides which existing, unchanged component owns
+// it: `singleton` -> HeroMediaSection, `collection` -> GalleryMediaSection. Never a third, generic
+// upload implementation (TOS-005 §8.1's own reconciliation) -- the same "delegate to a real,
+// already-correct editor" shape featured_items/staff already use via StaffTab.jsx.
+function MediaField({ pipeline, color }) {
+  if (pipeline === 'singleton') return <HeroMediaSection color={color} />
+  if (pipeline === 'collection') return <GalleryMediaSection color={color} />
+  return null
+}
+
 function SectionEditorPanel({ section, schema, color }) {
   const fieldsConfig = Object.entries(schema?.fields ?? {})
-    .filter(([, f]) => f.kind !== 'repeatable')
-    .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options }))
+    .filter(([, f]) => f.kind !== 'repeatable' && f.kind !== 'media')
+    .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options, fields: f.fields }))
   const repeatableFields = Object.entries(schema?.fields ?? {})
     .filter(([, f]) => f.kind === 'repeatable')
     .map(([key, f]) => ({ key, schema: f }))
+  const mediaFields = Object.entries(schema?.fields ?? {})
+    .filter(([, f]) => f.kind === 'media')
+    .map(([key, f]) => ({ key, pipeline: f.pipeline }))
   const [values, setValues] = useState(() => {
     const initial = {}
     fieldsConfig.forEach(f => { initial[f.key] = section.data?.[f.key] ?? (f.type === 'boolean' ? false : '') })
@@ -507,7 +514,7 @@ function SectionEditorPanel({ section, schema, color }) {
     }
   }
 
-  if (fieldsConfig.length === 0 && repeatableFields.length === 0) {
+  if (fieldsConfig.length === 0 && repeatableFields.length === 0 && mediaFields.length === 0) {
     return (
       <div style={{ fontSize: 12, color: T.textMuted, padding: '4px 2px' }}>
         لا توجد عناصر قابلة للتعديل لهذا القسم بعد.
@@ -520,11 +527,14 @@ function SectionEditorPanel({ section, schema, color }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 12 }}>
         {schema?.label_ar ?? section.type}
       </div>
+      {mediaFields.map(mf => (
+        <MediaField key={mf.key} pipeline={mf.pipeline} color={color} />
+      ))}
       {fieldsConfig.length > 0 && (
         <>
           {fieldsConfig.map(f => (
             <Field key={f.key} label={f.label}>
-              <FieldInput kind={f.type} value={values[f.key]} onChange={(v) => setValues(prev => { setSaved(false); return { ...prev, [f.key]: v } })} options={f.options} />
+              <FieldInput kind={f.type} value={values[f.key]} onChange={(v) => setValues(prev => { setSaved(false); return { ...prev, [f.key]: v } })} options={f.options} fields={f.fields} />
             </Field>
           ))}
           <Button onClick={handleSave} disabled={saving} color={color} style={{ marginTop: 4 }}>
@@ -926,11 +936,9 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
         </div>
       </Card>
 
-      {/* ── Hero Media ────────────────────────────────────────────────── */}
-      <HeroMediaSection color={form.primary_color} />
-
-      {/* ── Gallery Media ─────────────────────────────────────────────── */}
-      <GalleryMediaSection color={form.primary_color} />
+      {/* Hero/Gallery media moved into the Section Editor below (Tenant OS Section Editor
+          Phase 4, 2026-08-20) -- HeroMediaSection/GalleryMediaSection now render only inside
+          SectionEditorPanel's own MediaField dispatcher, never duplicated here. */}
 
       {/* ── Working Hours (Homepage Phase 2.6) ───────────────────────────
           Real field HoursSection.jsx actually prioritizes -- previously had zero editing

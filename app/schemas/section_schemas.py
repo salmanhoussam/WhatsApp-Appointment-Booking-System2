@@ -26,19 +26,22 @@ own sub-shape, e.g. a hypothetical `hero.cta = {label, url}` — not yet used by
 Tenant OS Section Editor Phase 2, 2026-08-20) | `media` (declared for schema/discovery purposes
 only — see below). `select`'s `options` is a list of `{value, label_ar}`.
 
-Media fields (`hero.bg_image_url`/`bg_type`/`framed_video_url`, `gallery.images`, staff members)
-are deliberately absent from `SECTION_SCHEMAS` itself — each has its own dedicated Renderer/
-pipeline (`TOS-002-editing-engine.md` S4.5's ReplaceMedia Processing Pipeline), not a generic
-scalar/repeatable field. `kind: media` exists in the vocabulary (Phase 2) so a future schema entry
-can *declare* such a field for discovery (`GET /content/sections/schema`) without being writable
-through this generic path — `_validate_value` below rejects any attempt to set a `media`-kind field
-via `update_section_fields`, on purpose: the reconciliation Tenant OS Section Editor Phase 2
-establishes is "declared in the schema, still written through its own dedicated media endpoint,"
-never a second write path for media data. Scoped deliberately narrow, Salman's own explicit
-instruction (2026-08-20): Phase 2 adds the `media`/`group` kind vocabulary and validation only — no
-real `SECTION_SCHEMAS` entry is added for `hero.bg_image_url`/`gallery.images` yet, and
-`HeroMediaSection`/`GalleryMediaSection` are not moved or duplicated. That live wiring (and
-removing the old General Settings placement so nothing is ever duplicated) is Phase 4's job.
+`hero.bg_image_url` (`pipeline: singleton`) and `gallery.images` (`pipeline: collection`) are now
+declared below (Tenant OS Section Editor Phase 4, 2026-08-20) — `bg_type`/`framed_video_url` and
+staff members' own photos are still absent, each with its own separate, not-yet-schema-driven
+Renderer. Declaring a `media` field here is a different layer than *how* the upload happens: the
+schema entry says "this section has a media field, here's its real reference (a `GalleryImage` row,
+singleton or collection)"; the Dashboard's `MediaField` (`SettingsTab.jsx`) reads the `pipeline`
+value and mounts the correct existing, unchanged upload flow (`HeroMediaSection`/
+`GalleryMediaSection`) — never a third, generic upload implementation. `_validate_value` below still
+rejects any attempt to set a `media`-kind field via `update_section_fields` — declaring it here is
+for discovery (`GET /content/sections/schema`) only; the real value is still written exclusively
+through its own dedicated media endpoint (`PATCH /admin/media/hero-image`,
+`POST /admin/media/gallery-images`), never a second write path. Phase 2 (2026-08-20) added the
+`media`/`group` kind vocabulary and validation without wiring either field live, specifically to
+avoid a real duplicate-UI window; Phase 4 (same day, Salman's explicit go-ahead) does the actual
+wiring and, in the same change, removes `HeroMediaSection`/`GalleryMediaSection`'s old General
+Settings placement so the field is only ever editable from one place at a time.
 
 Going-forward convention (2026-08-19, Salman's explicit instruction): page content must only ever
 change through this validated path -- `content_service.py`'s `update_section_fields`/
@@ -58,6 +61,7 @@ SECTION_SCHEMAS = {
     "hero": {
         "label_ar": "الصفحة الرئيسية (Hero)",
         "fields": {
+            "bg_image_url":            {"kind": "media", "pipeline": "singleton", "label_ar": "خلفية الصفحة الرئيسية (صورة أو فيديو)"},
             "title_ar":               {"kind": "text", "label_ar": "العنوان الرئيسي"},
             "subtitle_ar":             {"kind": "text", "label_ar": "النص التوضيحي"},
             "cta_text_ar":             {"kind": "text", "label_ar": "نص زر الحجز"},
@@ -86,11 +90,13 @@ SECTION_SCHEMAS = {
     "gallery": {
         "label_ar": "معرض الصور",
         "fields": {
+            "images":       {"kind": "media", "pipeline": "collection", "label_ar": "صور المعرض"},
             "heading_ar":   {"kind": "text",   "label_ar": "العنوان"},
             "limit":        {"kind": "number", "label_ar": "عدد الصور المعروضة (اتركه فارغاً لعرض الكل)"},
             "gallery_link": {"kind": "url",     "label_ar": "رابط \"عرض الكل\""},
         },
-        # images[] has its own dedicated Renderer (GalleryMediaSection) -- not a schema field here.
+        # images[] is declared above for discovery only -- its real value is still written
+        # exclusively through GalleryMediaSection's own dedicated endpoints (Phase 4).
     },
     "featured_items": {
         "label_ar": "الخدمات",
