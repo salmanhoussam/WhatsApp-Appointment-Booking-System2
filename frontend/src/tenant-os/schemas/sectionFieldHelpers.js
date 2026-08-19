@@ -34,3 +34,12 @@ export function getSectionFieldPreviewPatch(updatedSettings) {
   // directly.
   return { config: updatedSettings.config }
 }
+
+// TOS-005 Phase A (2026-08-19): a schema entry whose write path is the generic
+// PATCH /content/sections/{type}/fields route (SectionFieldsUpdate's body shape,
+// `{fields: {...}}`) supplies this as its `buildPatchBody`, instead of saveFieldValue's default
+// flat `{[apiField]: newValue}` (still correct, unchanged, for entries with their own dedicated
+// route — e.g. Media's hero.bg_image via /media/hero-image).
+export function buildSectionFieldPatchBody(field, newValue) {
+  return { fields: { [field.dataField]: newValue } }
+}

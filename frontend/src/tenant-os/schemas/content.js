@@ -19,9 +19,20 @@
  * local state and the live preview — `saveFieldValue` in `GenericAdminDashboard.jsx` calls these
  * generically and never branches on which Capability/field it's handling. See
  * `.claudedocs/evolution/capability-operations-model.md`.
+ *
+ * `apiPath`/`buildPatchBody` (TOS-005 Phase A, 2026-08-19): both fields now write through the
+ * same generic PATCH /content/sections/{type}/fields route the Dashboard's own Section Settings
+ * form uses (`ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md`) -- previously each had its own
+ * dedicated route (/content/hero-title, /content/story-heading), a real second Contract for the
+ * same field, retired per .claudedocs/adr/TOS-005-cms-generic-engine.md §4.3. This is a pure
+ * migration of which endpoint the Inline Interface calls -- the Inline UI itself (EditableRegion,
+ * the click-capture prompt in GenericAdminDashboard.jsx) is unchanged.
  */
 
-import { getSectionFieldValue, applySectionFieldUpdate, getSectionFieldPreviewPatch } from './sectionFieldHelpers'
+import {
+  getSectionFieldValue, applySectionFieldUpdate, getSectionFieldPreviewPatch,
+  buildSectionFieldPatchBody,
+} from './sectionFieldHelpers'
 
 export const contentSchema = {
   'hero.title': {
@@ -30,12 +41,12 @@ export const contentSchema = {
     operations: ['UpdateField'],
     sectionType: 'hero',
     dataField:   'title_ar',
-    apiField:    'title_ar', // content.py's PATCH body key -- happens to match dataField here
-    apiPath:     '/content/hero-title',
+    apiPath:     '/content/sections/hero/fields',
     promptLabel: 'عنوان الهيرو (Content Capability — hero.title):',
     getCurrentValue:  getSectionFieldValue,
     applyLocalUpdate: applySectionFieldUpdate,
     getPreviewPatch:  getSectionFieldPreviewPatch,
+    buildPatchBody:   buildSectionFieldPatchBody,
   },
   'story.heading': {
     type: 'text',
@@ -43,11 +54,11 @@ export const contentSchema = {
     operations: ['UpdateField'],
     sectionType: 'story',
     dataField:   'heading_ar',
-    apiField:    'heading_ar', // content.py's PATCH body key -- happens to match dataField here
-    apiPath:     '/content/story-heading',
+    apiPath:     '/content/sections/story/fields',
     promptLabel: 'عنوان قسم القصة (Content Capability — story.heading):',
     getCurrentValue:  getSectionFieldValue,
     applyLocalUpdate: applySectionFieldUpdate,
     getPreviewPatch:  getSectionFieldPreviewPatch,
+    buildPatchBody:   buildSectionFieldPatchBody,
   },
 }

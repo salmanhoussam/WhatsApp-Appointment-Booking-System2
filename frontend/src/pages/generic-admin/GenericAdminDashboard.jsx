@@ -394,7 +394,11 @@ export default function GenericAdminDashboard() {
   // capability-keyed branch here is exactly how a Switchboard/dispatcher forms unnoticed).
   const saveFieldValue = useCallback(async (field, newValue) => {
     try {
-      await adminApi.patch(field.apiPath, { [field.apiField]: newValue })
+      // TOS-005 Phase A: a field whose write path is the generic sections/{type}/fields route
+      // supplies buildPatchBody (its body needs `{fields: {...}}` nesting); everything else keeps
+      // the flat `{[apiField]: newValue}` shape unchanged (e.g. Media's own dedicated routes).
+      const body = field.buildPatchBody ? field.buildPatchBody(field, newValue) : { [field.apiField]: newValue }
+      await adminApi.patch(field.apiPath, body)
 
       const updatedSettings = field.applyLocalUpdate(settings, field, newValue)
       setSettings(updatedSettings)

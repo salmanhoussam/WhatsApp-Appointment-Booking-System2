@@ -18,34 +18,14 @@ field) and its own public function names; content.py's routes still call these b
 generic Dispatcher.
 """
 
-from typing import Optional
-
 from app.repositories import content_sections_repo as _sections
 
 
-async def update_hero_title(
-    client_id: str,
-    title_ar: Optional[str] = None,
-    title_en: Optional[str] = None,
-):
-    return await _sections.update_section_field(client_id, "hero", title_ar=title_ar, title_en=title_en)
-
-
-async def get_hero_title(client_id: str):
-    """Read-side helper for Discovery/verification -- not itself a write path."""
-    return await _sections.get_section_field(client_id, "hero", "title_ar")
-
-
-async def update_story_heading(
-    client_id: str,
-    heading_ar: Optional[str] = None,
-    heading_en: Optional[str] = None,
-):
-    return await _sections.update_section_field(client_id, "story", heading_ar=heading_ar, heading_en=heading_en)
-
-
-async def get_story_heading(client_id: str):
-    return await _sections.get_section_field(client_id, "story", "heading_ar")
+# hero.title/story.heading's dedicated update_hero_title/get_hero_title/update_story_heading/
+# get_story_heading wrappers were retired here (TOS-005 Phase A, 2026-08-19) -- both fields go
+# through update_section_fields below now, the same as every other section's scalar fields. Both
+# always wrote/read the identical content_sections_repo.update_section_field/get_section_field
+# calls this file's generic wrapper already makes, so removing them changes no data path.
 
 
 async def set_section_enabled(client_id: str, section_type: str, enabled: bool):
