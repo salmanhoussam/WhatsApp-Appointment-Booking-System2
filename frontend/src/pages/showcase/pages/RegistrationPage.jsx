@@ -93,17 +93,25 @@ const RegistrationPage = () => {
       showToast(
         'success',
         isAr
-          ? `🎉 تم إنشاء مساحتك! جاري التوجيه إلى ${data.data.slug}.salmansaas.com…`
-          : `🎉 Your space is live! Redirecting to ${data.data.slug}.salmansaas.com…`
+          ? `🎉 تم إنشاء مساحتك! جاري التوجيه إلى لوحة التحكم…`
+          : `🎉 Your space is live! Redirecting to your dashboard…`
       );
 
       setTimeout(() => {
-        const isProd = window.location.hostname !== 'localhost'
-          && !window.location.hostname.startsWith('127.');
+        // Canonical Admin URL Rule (.claude/rules/frontend/routing.md §0b, 2026-08-07): the only
+        // two real targets are the dev/LAN path and the current production strategy
+        // (demo.salmansaas.com/{slug}/dashboard) -- tenant subdomains are intentionally deferred
+        // until multi-subdomain deployment is officially adopted, so this never redirects to
+        // {slug}.salmansaas.com. isLocal mirrors useTenantSlug.js's own local-detection check
+        // (including the 192.168.* LAN case) instead of a fourth independent copy that disagrees
+        // with it -- the previous version here missed that case, sending LAN test registrations to
+        // a real production domain that isn't running the dev build.
+        const h = window.location.hostname;
+        const isLocal = h === 'localhost' || h.startsWith('127.') || h.startsWith('192.168.');
 
-        window.location.href = isProd
-          ? `https://${data.data.slug}.salmansaas.com/dashboard`
-          : `/${data.data.slug}/admin`;
+        window.location.href = isLocal
+          ? `/${data.data.slug}/dashboard`
+          : `https://demo.salmansaas.com/${data.data.slug}/dashboard`;
       }, 1800);
 
     } catch (err) {
