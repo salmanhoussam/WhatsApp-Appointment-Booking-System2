@@ -21,12 +21,24 @@ their labels entirely.
 
 `kind` vocabulary: `text`, `textarea`, `url`, `number`, `boolean`, `select` (all scalar) |
 `repeatable` (structural — `fields` for an array of objects, or `item_kind` for an array of bare
-scalars, e.g. `location.tags`). `select`'s `options` is a list of `{value, label_ar}`.
+scalars, e.g. `location.tags`) | `group` (structural — a single nested object, `fields` for its
+own sub-shape, e.g. a hypothetical `hero.cta = {label, url}` — not yet used by any real section,
+Tenant OS Section Editor Phase 2, 2026-08-20) | `media` (declared for schema/discovery purposes
+only — see below). `select`'s `options` is a list of `{value, label_ar}`.
 
 Media fields (`hero.bg_image_url`/`bg_type`/`framed_video_url`, `gallery.images`, staff members)
-are deliberately absent — each has its own dedicated Renderer/pipeline
-(`TOS-002-editing-engine.md` S4.5's ReplaceMedia Processing Pipeline), not a generic scalar/
-repeatable field.
+are deliberately absent from `SECTION_SCHEMAS` itself — each has its own dedicated Renderer/
+pipeline (`TOS-002-editing-engine.md` S4.5's ReplaceMedia Processing Pipeline), not a generic
+scalar/repeatable field. `kind: media` exists in the vocabulary (Phase 2) so a future schema entry
+can *declare* such a field for discovery (`GET /content/sections/schema`) without being writable
+through this generic path — `_validate_value` below rejects any attempt to set a `media`-kind field
+via `update_section_fields`, on purpose: the reconciliation Tenant OS Section Editor Phase 2
+establishes is "declared in the schema, still written through its own dedicated media endpoint,"
+never a second write path for media data. Scoped deliberately narrow, Salman's own explicit
+instruction (2026-08-20): Phase 2 adds the `media`/`group` kind vocabulary and validation only — no
+real `SECTION_SCHEMAS` entry is added for `hero.bg_image_url`/`gallery.images` yet, and
+`HeroMediaSection`/`GalleryMediaSection` are not moved or duplicated. That live wiring (and
+removing the old General Settings placement so nothing is ever duplicated) is Phase 4's job.
 
 Going-forward convention (2026-08-19, Salman's explicit instruction): page content must only ever
 change through this validated path -- `content_service.py`'s `update_section_fields`/
@@ -268,4 +280,26 @@ def _validate_value(key: str, value, field_schema: dict) -> str | None:
                 err = _validate_value(f"{key}[{i}]", item, {"kind": item_kind})
                 if err:
                     return err
+    elif kind == "group":
+        # A single nested object, not a list -- e.g. a hypothetical hero.cta = {label, url}.
+        # Recurses through the same _validate_value used everywhere else, so a group's sub-fields
+        # get the identical type checking any top-level or repeatable-item field gets.
+        sub_fields = field_schema.get("fields", {})
+        if not isinstance(value, dict):
+            return f"Field '{key}' must be an object with fields: {list(sub_fields.keys())}"
+        for sub_key, sub_value in value.items():
+            sub_schema = sub_fields.get(sub_key)
+            if sub_schema is None:
+                return f"Field '{sub_key}' is not declared for group field '{key}'"
+            err = _validate_value(f"{key}.{sub_key}", sub_value, sub_schema)
+            if err:
+                return err
+    elif kind == "media":
+        # Declared for discovery only (GET /content/sections/schema) -- never writable through
+        # this generic path. A media field's real value always goes through its own dedicated
+        # upload endpoint (e.g. PATCH /admin/media/hero-image), never `update_section_fields`.
+        return (
+            f"Field '{key}' is a media field and cannot be set via section fields -- "
+            f"it is managed by its own dedicated media endpoint"
+        )
     return None

@@ -376,7 +376,14 @@ function GalleryMediaSection({ color }) {
 
 // One shared input renderer for both scalar fields (SectionRow) and repeatable sub-fields
 // (RepeatableGroupEditor) -- the same kind -> input-type switch, written once.
-function FieldInput({ kind, value, onChange, options }) {
+//
+// Tenant OS Section Editor Phase 2 (2026-08-20) adds `media`/`group` branches -- ready, but not
+// yet reachable by any real schema field: Salman's explicit Phase 2 scope is schema + validation
+// only, no wiring of hero.bg_image_url/gallery.images into SECTION_SCHEMAS yet (avoids a real
+// duplicate-UI period against HeroMediaSection/GalleryMediaSection, which still live in General
+// Settings below). These two branches will get their first live exercise once a real schema field
+// declares that kind -- Phase 4 for `media`, whenever a real `group` field is authored.
+function FieldInput({ kind, value, onChange, options, fields }) {
   if (kind === 'textarea') {
     return <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={value} onChange={(e) => onChange(e.target.value)} />
   }
@@ -392,6 +399,34 @@ function FieldInput({ kind, value, onChange, options }) {
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
       </label>
+    )
+  }
+  if (kind === 'media') {
+    // Declared for discovery only -- the backend rejects writing this kind via section fields
+    // (app/schemas/section_schemas.py's `_validate_value`). Real editing stays on its own
+    // dedicated component (HeroMediaSection/GalleryMediaSection today) until Phase 4.
+    return (
+      <div style={{ fontSize: 12, color: T.textMuted, padding: '8px 0' }}>
+        حقل وسائط — يُدار من قسم مخصص
+      </div>
+    )
+  }
+  if (kind === 'group') {
+    const subFields = fields ?? {}
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', border: `1px solid ${T.border}`, borderRadius: 8 }}>
+        {Object.entries(subFields).map(([subKey, subSchema]) => (
+          <Field key={subKey} label={subSchema.label_ar}>
+            <FieldInput
+              kind={subSchema.kind}
+              value={value?.[subKey] ?? (subSchema.kind === 'boolean' ? false : '')}
+              onChange={(v) => onChange({ ...(value ?? {}), [subKey]: v })}
+              options={subSchema.options}
+              fields={subSchema.fields}
+            />
+          </Field>
+        ))}
+      </div>
     )
   }
   return <input type={kind === 'number' ? 'number' : 'text'} style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)} />
