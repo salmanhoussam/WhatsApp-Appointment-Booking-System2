@@ -84,3 +84,99 @@ Logo/Nav (out of scope per Salman's own call).
 Verified end-to-end, real browser, real data, at minimum one full real example covering every verb
 (hide, reorder, edit text, replace media) before this phase is called done — not a claim, an
 evidence file per the same discipline as every phase so far.
+
+---
+
+## 7. CMS Readiness Gate — Unified Section Schema + Repeatable-Group Design (2026-08-19, pre-CMS)
+
+**Status: schema + API contract design only. No code written.** Per Salman's explicit instruction
+before any CMS Implementation Contract is drafted: fix the section model into one canonical shape,
+and design repeatable-group (array-field) editing as part of that shape from day one — not a
+bolt-on per-section special case, and not built twice (once now, once inside a future CMS).
+
+### 7.1 The canonical Section shape — source of truth going forward
+
+Every section, regardless of type, is exactly this shape. No section-specific backend model —
+only section-specific *data* inside these generic slots:
+
+```
+Section
+├── type                — fixed key (hero, story, staff, gallery, featured_items, hours,
+│                          location, cta, why_choose_us, ...) — selects the frontend Renderer and
+│                          which columns below are populated, per §2's table
+├── order                — int — Phase 2.1, PATCH /admin/content/sections/reorder
+├── enabled              — bool — Phase 2.1, PATCH /admin/content/sections/{type}/enabled
+├── scalar fields        — text/number/enum values in `data` — Phase 2.5/2.6's generic
+│                          PATCH /admin/content/sections/{type}/fields
+├── media fields         — image/video; never a raw `data` field — always a real GalleryImage row
+│                          (singleton for hero, collection for gallery) — Phase 1/2.4's dedicated
+│                          Renderer, never the generic field editor
+├── repeatable fields    — lists of small objects (`stats[]`, `tags[]`, `items[]`) — §7.3 below
+└── section-specific settings — scalar fields meaningful to one section type only
+                           (`gallery.limit`, `cta.variant`) — mechanically identical to scalar
+                           fields, kept as its own bucket only because §2's table already names it
+                           separately; no separate backend mechanism needed
+```
+
+This is not a new model — it restates Phase 2.1 (`enabled`/`order`) + Phase 2.5/2.6 (scalar
+fields) + Phase 1/2.4 (media) as one shape, with the one real gap (repeatable fields) named and
+closed by design in §7.3, not left as a silent hole. **No CMS Implementation Contract should
+introduce a 7th bucket or a per-section-type backend model** — a future section needing something
+outside these six slots is a signal to revisit this schema explicitly, not to special-case around
+it.
+
+### 7.2 Array-field contract — confirmed source of truth
+
+§2/§4 above already fix the exact shape of every real repeatable field in production today; this
+table is repeated here as the CMS's one confirmed source of truth (the CMS Contract reads from
+here, not from re-deriving shapes out of the components a second time):
+
+| Section | Repeatable field | Item shape |
+|---|---|---|
+| `story` | `stats[]` | `{num, label}` |
+| `location` | `tags[]` | `string` (not an object — simplest real case) |
+| `why_choose_us` | `items[]` | `{icon_key, title_ar, body_ar}` |
+
+No change to these shapes from what §2/§4 already documented.
+
+### 7.3 Repeatable-group editing — designed once, generic
+
+Per Salman's explicit instruction: **not a separate deliverable, not built twice.** Scoped now as
+part of the CMS Implementation Contract, reusing the same Dispatcher justification already applied
+once for scalar fields (`content.py`'s own documented decision, Phase 2.5/2.6 — a generic routing
+shape is only justified once real repetition across sections proves it, not before; 3 real array
+fields across 3 real sections meets the same bar the 9 scalar fields met).
+
+**Backend — one generic contract, not one per section:**
+```
+GET    /admin/content/sections/{type}/repeatable/{field}          — list current items, ordered
+POST   /admin/content/sections/{type}/repeatable/{field}          — append one item
+PATCH  /admin/content/sections/{type}/repeatable/{field}/{index}  — edit one item's sub-fields
+DELETE /admin/content/sections/{type}/repeatable/{field}/{index}  — remove one item
+PATCH  /admin/content/sections/{type}/repeatable/{field}/reorder  — reorder, same pattern as
+                                                                     Phase 2.1's section reorder
+```
+`{field}` is validated server-side against §7.2's table — never an arbitrary client-supplied key.
+Item shape is validated per-field against the same table (a `tags[]` PATCH accepts a bare string;
+a `stats[]`/`items[]` PATCH accepts only the named sub-object keys).
+
+**Frontend — one generic Dashboard component, not one per section:** a `RepeatableGroupEditor`
+taking `{sectionType, field, itemShape}` (itemShape drawn from §7.2), rendering add/edit/delete/
+reorder rows generically — the same relationship `SectionRow`'s existing scalar-field form already
+has to §2's Text fields column, extended to cover §7.2's rows. `tags[]` renders as a single-input
+row (a bare string, not a sub-object); `stats[]`/`items[]` render a small per-row form (2-3
+sub-fields each).
+
+**What this closes**: exactly the gap §4 named as deferred — Story stats, Location tags, Why
+Choose Us items become fully Dashboard-editable, without a second, separately-designed editor
+built later. This section supersedes §4's deferral notice for design purposes; §4 itself is left
+unedited as historical record of the original, deliberate Phase 2.6 scoping decision.
+
+### 7.4 What this Gate does NOT decide
+
+- No code from this section has been written — schema + API contract design only, per Salman's
+  explicit "لا تكتب كود CMS قبل موافقتي على الـ Contract."
+- Repository hygiene (Track 3) is tracked separately, own evidence path, not folded into this
+  document — different concern entirely.
+- The actual CMS Implementation Contract (real backend route file, real Dashboard component file,
+  any migration) is the next deliverable, gated on Salman's explicit approval of this §7 shape.
