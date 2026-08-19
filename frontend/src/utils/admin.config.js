@@ -4,7 +4,7 @@ import { getTenantSlug } from './tenant.config';
 
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/v1/admin`
-  : 'http://127.0.0.1:8000/api/v1/admin';
+  : '/api/v1/admin';
 
 const adminApi = axios.create({ baseURL: BASE_URL });
 
