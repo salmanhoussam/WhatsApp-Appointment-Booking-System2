@@ -159,6 +159,46 @@ def get_section_schema(section_type: str) -> dict | None:
     return SECTION_SCHEMAS.get(section_type)
 
 
+def get_repeatable_field_schema(section_type: str, field: str) -> dict | None:
+    """Returns the field's own schema dict if it's a declared `kind: repeatable` field on that
+    section, else None. TOS-005 Phase C's own gate before any repeatable-group route touches a
+    field -- `{field}` is never trusted as arbitrary client input."""
+    schema = SECTION_SCHEMAS.get(section_type)
+    if schema is None:
+        return None
+    field_schema = schema["fields"].get(field)
+    if field_schema is None or field_schema.get("kind") != "repeatable":
+        return None
+    return field_schema
+
+
+def validate_repeatable_item(section_type: str, field: str, item) -> str | None:
+    """Validates one item against its repeatable field's declared item shape -- `fields` for an
+    object item (e.g. why_choose_us.items' {icon_key, title_ar, body_ar}), or `item_kind` for a
+    bare-scalar item (e.g. location.tags' plain strings). Server-side, independent of any client,
+    same discipline as validate_fields above (TOS-005 §4.1, Salman's condition 4)."""
+    field_schema = get_repeatable_field_schema(section_type, field)
+    if field_schema is None:
+        return f"'{field}' is not a declared repeatable field on section '{section_type}'"
+    sub_fields = field_schema.get("fields")
+    item_kind = field_schema.get("item_kind")
+    if sub_fields is not None:
+        if not isinstance(item, dict):
+            return f"Item must be an object with fields: {list(sub_fields.keys())}"
+        for sub_key, sub_value in item.items():
+            sub_schema = sub_fields.get(sub_key)
+            if sub_schema is None:
+                return f"Field '{sub_key}' is not declared for '{section_type}.{field}' items"
+            err = _validate_value(sub_key, sub_value, sub_schema)
+            if err:
+                return err
+    elif item_kind is not None:
+        err = _validate_value(field, item, {"kind": item_kind})
+        if err:
+            return err
+    return None
+
+
 def validate_fields(section_type: str, fields: dict) -> str | None:
     """Returns an error message if invalid, else None. Server-side enforcement, independent of
     any client (TOS-005 S4.1, Salman's condition 4) -- called from content.py's

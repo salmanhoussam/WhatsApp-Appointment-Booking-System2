@@ -32,7 +32,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles
-from app.schemas.section_schemas import SECTION_SCHEMAS, validate_fields
+from app.schemas.section_schemas import (
+    SECTION_SCHEMAS,
+    get_repeatable_field_schema,
+    validate_fields,
+    validate_repeatable_item,
+)
 from app.services import content_service
 
 logger = logging.getLogger(__name__)
@@ -49,6 +54,15 @@ class SectionsReorderBody(BaseModel):
 
 class SectionFieldsUpdate(BaseModel):
     fields: dict[str, Any]
+
+
+class RepeatableItemBody(BaseModel):
+    item: Any  # dict for object-shaped repeatables (why_choose_us.items), or a bare scalar
+               # (e.g. str) for item_kind ones (location.tags)
+
+
+class RepeatableReorderBody(BaseModel):
+    ordered_indices: list[int]
 
 
 @router.patch("/sections/{section_type}/enabled")
@@ -146,4 +160,132 @@ async def update_section_fields(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"🔥 DB error updating section fields for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+# ── Repeatable groups (TOS-005 Phase C, 2026-08-19) ─────────────────────────────────────────────
+# One generic route family for every repeatable field on every section (story.stats,
+# location.tags, why_choose_us.items, ...) -- never a section-specific add/edit/delete/reorder
+# route. `{field}` and every item's shape are validated against section_schemas.py before any
+# write, independent of the Dashboard (Salman's condition 4) -- a raw API call is rejected exactly
+# the same way a Dashboard-originated one would be. The literal `/reorder` route is registered
+# before the `/{index}` (int) route below it so it is never shadowed by that route's own path
+# matching.
+
+@router.get("/sections/{section_type}/repeatable/{field}")
+async def list_repeatable_items(
+    section_type: str,
+    field: str,
+    tenant: dict = Depends(get_current_tenant),
+):
+    if get_repeatable_field_schema(section_type, field) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{field}' is not a declared repeatable field on section '{section_type}'",
+        )
+    try:
+        items = await content_service.list_repeatable_items(tenant["id"], section_type, field)
+        return {"success": True, "data": items}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/sections/{section_type}/repeatable/{field}")
+async def add_repeatable_item(
+    section_type: str,
+    field: str,
+    body: RepeatableItemBody,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    error = validate_repeatable_item(section_type, field, body.item)
+    if error:
+        raise HTTPException(status_code=422, detail=error)
+    try:
+        items = await content_service.add_repeatable_item(tenant["id"], section_type, field, body.item)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: item added to '%s.%s' for tenant '%s'", section_type, field, tenant["slug"])
+        return {"success": True, "data": items}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error adding repeatable item for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.patch("/sections/{section_type}/repeatable/{field}/reorder")
+async def reorder_repeatable_items(
+    section_type: str,
+    field: str,
+    body: RepeatableReorderBody,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    if get_repeatable_field_schema(section_type, field) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{field}' is not a declared repeatable field on section '{section_type}'",
+        )
+    try:
+        items = await content_service.reorder_repeatable_items(
+            tenant["id"], section_type, field, body.ordered_indices
+        )
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: '%s.%s' reordered for tenant '%s'", section_type, field, tenant["slug"])
+        return {"success": True, "data": items}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error reordering repeatable items for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.patch("/sections/{section_type}/repeatable/{field}/{index}")
+async def update_repeatable_item(
+    section_type: str,
+    field: str,
+    index: int,
+    body: RepeatableItemBody,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    error = validate_repeatable_item(section_type, field, body.item)
+    if error:
+        raise HTTPException(status_code=422, detail=error)
+    try:
+        items = await content_service.update_repeatable_item(
+            tenant["id"], section_type, field, index, body.item
+        )
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: '%s.%s[%d]' updated for tenant '%s'", section_type, field, index, tenant["slug"])
+        return {"success": True, "data": items}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error updating repeatable item for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.delete("/sections/{section_type}/repeatable/{field}/{index}")
+async def delete_repeatable_item(
+    section_type: str,
+    field: str,
+    index: int,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    if get_repeatable_field_schema(section_type, field) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{field}' is not a declared repeatable field on section '{section_type}'",
+        )
+    try:
+        items = await content_service.delete_repeatable_item(tenant["id"], section_type, field, index)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: '%s.%s[%d]' deleted for tenant '%s'", section_type, field, index, tenant["slug"])
+        return {"success": True, "data": items}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error deleting repeatable item for tenant {tenant}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")

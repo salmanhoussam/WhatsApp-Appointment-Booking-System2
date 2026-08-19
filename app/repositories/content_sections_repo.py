@@ -102,6 +102,79 @@ async def set_section_enabled(client_id: str, section_type: str, enabled: bool):
     return await _client_repo.update_client(client_id, {"config": Json(config)})
 
 
+# ── Repeatable-group fields (TOS-005 Phase C, 2026-08-19) ──────────────────────────────────────
+# Same read-merge-write shape as the functions above, applied to one `data[field]` array instead
+# of a scalar `data[field]` value. Shape-agnostic on purpose -- an "item" here is whatever Python
+# value the caller passes (a dict for object-shaped repeatables like why_choose_us.items, a bare
+# string for location.tags); validating that shape against the section's own schema is the
+# Route/Service layer's job (app/schemas/section_schemas.py), not this Repository's.
+
+async def _load_section_data(client_id: str, section_type: str):
+    """Shared helper: real client/config/content/sections/section/data, ready for a repeatable
+    field's items list to be read out of or written back into."""
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+    section = next((s for s in sections if s.get("type") == section_type), None)
+    if section is None:
+        raise ValueError(f"This tenant's page has no {section_type} section")
+    data = dict(section.get("data") or {})
+    return config, content, sections, section, data
+
+
+async def _save_repeatable_items(client_id, config, content, sections, section, data, field, items):
+    data[field] = items
+    section["data"] = data
+    content["sections"] = sections
+    config["content"] = content
+    await _client_repo.update_client(client_id, {"config": Json(config)})
+    return items
+
+
+async def list_repeatable_items(client_id: str, section_type: str, field: str):
+    _config, _content, _sections, _section, data = await _load_section_data(client_id, section_type)
+    return list(data.get(field) or [])
+
+
+async def add_repeatable_item(client_id: str, section_type: str, field: str, item):
+    config, content, sections, section, data = await _load_section_data(client_id, section_type)
+    items = list(data.get(field) or [])
+    items.append(item)
+    return await _save_repeatable_items(client_id, config, content, sections, section, data, field, items)
+
+
+async def update_repeatable_item(client_id: str, section_type: str, field: str, index: int, item):
+    config, content, sections, section, data = await _load_section_data(client_id, section_type)
+    items = list(data.get(field) or [])
+    if index < 0 or index >= len(items):
+        raise ValueError(f"Index {index} out of range for {section_type}.{field} ({len(items)} items)")
+    items[index] = item
+    return await _save_repeatable_items(client_id, config, content, sections, section, data, field, items)
+
+
+async def delete_repeatable_item(client_id: str, section_type: str, field: str, index: int):
+    config, content, sections, section, data = await _load_section_data(client_id, section_type)
+    items = list(data.get(field) or [])
+    if index < 0 or index >= len(items):
+        raise ValueError(f"Index {index} out of range for {section_type}.{field} ({len(items)} items)")
+    items.pop(index)
+    return await _save_repeatable_items(client_id, config, content, sections, section, data, field, items)
+
+
+async def reorder_repeatable_items(client_id: str, section_type: str, field: str, ordered_indices: list[int]):
+    config, content, sections, section, data = await _load_section_data(client_id, section_type)
+    items = list(data.get(field) or [])
+    if sorted(ordered_indices) != list(range(len(items))):
+        raise ValueError(
+            f"ordered_indices must be a permutation of 0..{len(items) - 1} for {section_type}.{field}"
+        )
+    reordered = [items[i] for i in ordered_indices]
+    return await _save_repeatable_items(client_id, config, content, sections, section, data, field, reordered)
+
+
 async def reorder_sections(client_id: str, ordered_types: list[str]):
     """
     Re-assign `order` (0-based, matching `ordered_types`' own sequence) to every section named in

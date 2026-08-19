@@ -54,3 +54,28 @@ async def list_sections(client_id: str):
 
 async def update_section_fields(client_id: str, section_type: str, fields: dict):
     return await _sections.update_section_field(client_id, section_type, **fields)
+
+
+# ── Repeatable-group fields (TOS-005 Phase C, 2026-08-19) ──────────────────────────────────────
+# Thin wrappers, same relationship to content_sections_repo.py as every function above -- field/
+# item validation against app/schemas/section_schemas.py happens in content.py's routes, before
+# these are ever called, not duplicated here.
+
+async def list_repeatable_items(client_id: str, section_type: str, field: str):
+    return await _sections.list_repeatable_items(client_id, section_type, field)
+
+
+async def add_repeatable_item(client_id: str, section_type: str, field: str, item):
+    return await _sections.add_repeatable_item(client_id, section_type, field, item)
+
+
+async def update_repeatable_item(client_id: str, section_type: str, field: str, index: int, item):
+    return await _sections.update_repeatable_item(client_id, section_type, field, index, item)
+
+
+async def delete_repeatable_item(client_id: str, section_type: str, field: str, index: int):
+    return await _sections.delete_repeatable_item(client_id, section_type, field, index)
+
+
+async def reorder_repeatable_items(client_id: str, section_type: str, field: str, ordered_indices: list[int]):
+    return await _sections.reorder_repeatable_items(client_id, section_type, field, ordered_indices)
