@@ -27,6 +27,19 @@ Media fields (`hero.bg_image_url`/`bg_type`/`framed_video_url`, `gallery.images`
 are deliberately absent — each has its own dedicated Renderer/pipeline
 (`TOS-002-editing-engine.md` S4.5's ReplaceMedia Processing Pipeline), not a generic scalar/
 repeatable field.
+
+Going-forward convention (2026-08-19, Salman's explicit instruction): page content must only ever
+change through this validated path -- `content_service.py`'s `update_section_fields`/
+`add_repeatable_item`/`update_repeatable_item` call `validate_fields`/`validate_repeatable_item`
+internally now, not only `content.py`'s routes, so any future script/AI action that imports and
+calls the canonical Service directly is refused bad data too, the same as a Dashboard request.
+Real, honest limit: a script that writes to `Client.config` via raw Prisma (`db.client.update`),
+bypassing this Service entirely, is not something this file can prevent -- that boundary is Python
+import discipline, not a technical guard. 3 real historical scripts do exactly this
+(`scripts/fix_cta_mrh.py`, `scripts/add_why_choose_us_mrh.py`, `scripts/set_mrh_social_contact.py`,
+all dated 2026-08-18, all one-off and already executed, all predating this file) -- not rewritten
+retroactively (repository-hygiene.md's own norm), but any *future* script touching section content
+must call `content_service.py`, never raw Prisma, to stay inside this Contract.
 """
 
 SECTION_SCHEMAS = {

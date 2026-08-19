@@ -19,6 +19,7 @@ generic Dispatcher.
 """
 
 from app.repositories import content_sections_repo as _sections
+from app.schemas.section_schemas import validate_fields, validate_repeatable_item
 
 
 # hero.title/story.heading's dedicated update_hero_title/get_hero_title/update_story_heading/
@@ -53,6 +54,17 @@ async def list_sections(client_id: str):
 # that's actually exercised as one.
 
 async def update_section_fields(client_id: str, section_type: str, fields: dict):
+    """
+    TOS-005 §4.1's binding requirement, enforced HERE too, not only in content.py's route
+    (2026-08-19, Salman's explicit instruction: page content must only ever change through a
+    validated path, not any script that reaches this Service directly). content.py's route also
+    validates before calling this -- redundant for a normal HTTP request, but this Service is the
+    real boundary a future script/AI action would call into, and it must refuse bad data on its
+    own, not rely on every caller remembering to check first.
+    """
+    error = validate_fields(section_type, fields)
+    if error:
+        raise ValueError(error)
     return await _sections.update_section_field(client_id, section_type, **fields)
 
 
@@ -66,10 +78,16 @@ async def list_repeatable_items(client_id: str, section_type: str, field: str):
 
 
 async def add_repeatable_item(client_id: str, section_type: str, field: str, item):
+    error = validate_repeatable_item(section_type, field, item)
+    if error:
+        raise ValueError(error)
     return await _sections.add_repeatable_item(client_id, section_type, field, item)
 
 
 async def update_repeatable_item(client_id: str, section_type: str, field: str, index: int, item):
+    error = validate_repeatable_item(section_type, field, item)
+    if error:
+        raise ValueError(error)
     return await _sections.update_repeatable_item(client_id, section_type, field, index, item)
 
 

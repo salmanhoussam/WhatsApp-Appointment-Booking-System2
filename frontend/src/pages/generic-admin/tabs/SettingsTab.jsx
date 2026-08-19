@@ -361,7 +361,7 @@ function GalleryMediaSection({ color }) {
 }
 
 // ── Section Settings (Homepage Phase 2.6, 2026-08-18; schema-driven since TOS-005 Phase B,
-// 2026-08-19) ───────────────────────────────────────────────────────────────────────────────
+// 2026-08-19; repeatable groups since TOS-005 Phase D, 2026-08-19) ────────────────────────────
 // The field/label lists that used to live here as hardcoded SECTION_FIELDS/SECTION_LABELS
 // objects are retired -- app/schemas/section_schemas.py is now the one real source of truth
 // (TOS-005-cms-generic-engine.md §4.1), fetched once via GET /content/sections/schema
@@ -370,14 +370,41 @@ function GalleryMediaSection({ color }) {
 // not merely discouraged. Media fields (hero.bg_image_url, gallery.images) are absent from the
 // fetched schema's non-repeatable fields for the same reason they were absent here before --
 // HeroMediaSection/GalleryMediaSection above already own those. Repeatable-kind fields
-// (story.stats, location.tags, why_choose_us.items, ...) are filtered out of this generic
-// scalar-field form too -- their own editor is TOS-005 Phase D, not yet built.
+// (story.stats, location.tags, why_choose_us.items, ...) render via the one generic
+// RepeatableGroupEditor below -- never a per-section editor (StoryEditor/LocationEditor/
+// WhyChooseUsEditor never exist).
+
+// One shared input renderer for both scalar fields (SectionRow) and repeatable sub-fields
+// (RepeatableGroupEditor) -- the same kind -> input-type switch, written once.
+function FieldInput({ kind, value, onChange, options }) {
+  if (kind === 'textarea') {
+    return <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={value} onChange={(e) => onChange(e.target.value)} />
+  }
+  if (kind === 'select') {
+    return (
+      <select style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label_ar}</option>)}
+      </select>
+    )
+  }
+  if (kind === 'boolean') {
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+      </label>
+    )
+  }
+  return <input type={kind === 'number' ? 'number' : 'text'} style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)} />
+}
 
 function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, color }) {
   const [expanded, setExpanded] = useState(false)
   const fieldsConfig = Object.entries(schema?.fields ?? {})
     .filter(([, f]) => f.kind !== 'repeatable')
     .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options }))
+  const repeatableFields = Object.entries(schema?.fields ?? {})
+    .filter(([, f]) => f.kind === 'repeatable')
+    .map(([key, f]) => ({ key, schema: f }))
   const [values, setValues] = useState(() => {
     const initial = {}
     fieldsConfig.forEach(f => { initial[f.key] = section.data?.[f.key] ?? (f.type === 'boolean' ? false : '') })
@@ -432,7 +459,7 @@ function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, co
             style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: index === 0 ? 0.3 : 1, fontSize: 14 }}>↑</button>
           <button type="button" onClick={() => onMove(index, 1)} disabled={index === total - 1}
             style={{ background: 'none', border: 'none', cursor: index === total - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: index === total - 1 ? 0.3 : 1, fontSize: 14 }}>↓</button>
-          {fieldsConfig.length > 0 && (
+          {(fieldsConfig.length > 0 || repeatableFields.length > 0) && (
             <button type="button" onClick={() => setExpanded(e => !e)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color, fontSize: 12, fontWeight: 700 }}>
               {expanded ? 'إخفاء' : 'تعديل'}
@@ -441,31 +468,151 @@ function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, co
         </div>
       </div>
 
-      {expanded && fieldsConfig.length > 0 && (
+      {expanded && (fieldsConfig.length > 0 || repeatableFields.length > 0) && (
         <div style={{ marginTop: 12, paddingInlineStart: 26 }}>
-          {fieldsConfig.map(f => (
-            <Field key={f.key} label={f.label}>
-              {f.type === 'textarea' ? (
-                <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={values[f.key]} onChange={setField(f.key)} />
-              ) : f.type === 'select' ? (
-                <select style={inputStyle} value={values[f.key]} onChange={setField(f.key)}>
-                  {f.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label_ar}</option>)}
-                </select>
-              ) : f.type === 'boolean' ? (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!values[f.key]} onChange={setField(f.key, 'boolean')} />
-                </label>
-              ) : (
-                <input type={f.type === 'number' ? 'number' : 'text'} style={inputStyle} value={values[f.key]} onChange={setField(f.key)} />
-              )}
-            </Field>
+          {fieldsConfig.length > 0 && (
+            <>
+              {fieldsConfig.map(f => (
+                <Field key={f.key} label={f.label}>
+                  <FieldInput kind={f.type} value={values[f.key]} onChange={(v) => setValues(prev => { setSaved(false); return { ...prev, [f.key]: v } })} options={f.options} />
+                </Field>
+              ))}
+              <Button onClick={handleSave} disabled={saving} style={{ marginTop: 4 }}>
+                {saving ? 'جاري الحفظ...' : 'حفظ'}
+              </Button>
+              {saved && <span style={{ marginInlineStart: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ</span>}
+              {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
+            </>
+          )}
+          {repeatableFields.map(rf => (
+            <RepeatableGroupEditor key={rf.key} sectionType={section.type} field={rf.key} fieldSchema={rf.schema} color={color} />
           ))}
-          <Button onClick={handleSave} disabled={saving} style={{ marginTop: 4 }}>
-            {saving ? 'جاري الحفظ...' : 'حفظ'}
-          </Button>
-          {saved && <span style={{ marginInlineStart: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ</span>}
-          {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
         </div>
+      )}
+    </div>
+  )
+}
+
+// One generic editor for every repeatable field on every section -- {sectionType, field}, its
+// item shape read from the fetched schema (never a per-section StoryEditor/LocationEditor/
+// WhyChooseUsEditor). `fieldSchema.fields` present -> array of objects (why_choose_us.items,
+// story.stats); `fieldSchema.item_kind` present -> array of bare scalars (location.tags).
+function RepeatableGroupEditor({ sectionType, field, fieldSchema, color }) {
+  const [items, setItems] = useState(null) // null = loading; server-confirmed state
+  // Local editable copy, one entry per item -- edits only touch this until an explicit "حفظ"
+  // per row, same convention SectionRow's own scalar fields already use. Never fires a request
+  // per keystroke: typing quickly can't race two overlapping PATCHes against the same index.
+  const [drafts, setDrafts] = useState([])
+  const [savingIndex, setSavingIndex] = useState(null) // which row (or 'add'/'move') is in flight
+  const [error, setError] = useState(null)
+  const subFields = fieldSchema.fields ?? null
+  const isScalar = subFields === null
+  const emptyItem = () => isScalar ? '' : Object.fromEntries(Object.keys(subFields).map(k => [k, '']))
+  const [newItem, setNewItem] = useState(emptyItem)
+
+  const load = useCallback(() => {
+    adminApi.get(`/content/sections/${sectionType}/repeatable/${field}`)
+      .then(({ data }) => {
+        if (data.success) { setItems(data.data); setDrafts(data.data) }
+      })
+      .catch(() => { setItems([]); setDrafts([]) })
+  }, [sectionType, field])
+
+  useEffect(() => { load() }, [load])
+
+  const setDraft = (i, item) => setDrafts(prev => prev.map((d, idx) => idx === i ? item : d))
+
+  const run = async (key, action) => {
+    setSavingIndex(key)
+    setError(null)
+    try {
+      const { data } = await action()
+      if (data.success) { setItems(data.data); setDrafts(data.data) }
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر الحفظ')
+    } finally {
+      setSavingIndex(null)
+    }
+  }
+
+  const handleAdd = () => run('add', async () => {
+    const res = await adminApi.post(`/content/sections/${sectionType}/repeatable/${field}`, { item: newItem })
+    setNewItem(emptyItem())
+    return res
+  })
+
+  const handleSaveRow = (i) => run(i, () =>
+    adminApi.patch(`/content/sections/${sectionType}/repeatable/${field}/${i}`, { item: drafts[i] }))
+
+  const handleDelete = (i) => run(i, () =>
+    adminApi.delete(`/content/sections/${sectionType}/repeatable/${field}/${i}`))
+
+  const handleMove = (i, direction) => {
+    if (!items) return
+    const target = i + direction
+    if (target < 0 || target >= items.length) return
+    const orderedIndices = items.map((_, idx) => idx)
+    ;[orderedIndices[i], orderedIndices[target]] = [orderedIndices[target], orderedIndices[i]]
+    run('move', () => adminApi.patch(`/content/sections/${sectionType}/repeatable/${field}/reorder`, { ordered_indices: orderedIndices }))
+  }
+
+  const rowDirty = (i) => JSON.stringify(drafts[i]) !== JSON.stringify(items[i])
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px dashed ${T.borderSoft}` }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.textSecond, marginBottom: 8 }}>{fieldSchema.label_ar}</div>
+
+      {items === null ? (
+        <div style={{ fontSize: 12, color: T.textMuted }}>جاري التحميل...</div>
+      ) : (
+        <>
+          {items.map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: isScalar ? 'center' : 'flex-start', gap: 8, marginBottom: 8, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ flex: 1 }}>
+                {isScalar ? (
+                  <FieldInput kind={fieldSchema.item_kind} value={drafts[i] ?? ''} onChange={(v) => setDraft(i, v)} />
+                ) : (
+                  Object.entries(subFields).map(([subKey, subSchema]) => (
+                    <Field key={subKey} label={subSchema.label_ar}>
+                      <FieldInput kind={subSchema.kind} value={drafts[i]?.[subKey] ?? ''} options={subSchema.options}
+                        onChange={(v) => setDraft(i, { ...drafts[i], [subKey]: v })} />
+                    </Field>
+                  ))
+                )}
+                {rowDirty(i) && (
+                  <Button onClick={() => handleSaveRow(i)} disabled={savingIndex !== null} color={color} size="sm" style={{ marginTop: 4 }}>
+                    {savingIndex === i ? 'جاري الحفظ...' : 'حفظ'}
+                  </Button>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button type="button" onClick={() => handleMove(i, -1)} disabled={i === 0 || savingIndex !== null}
+                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: i === 0 ? 0.3 : 1, fontSize: 14 }}>↑</button>
+                <button type="button" onClick={() => handleMove(i, 1)} disabled={i === items.length - 1 || savingIndex !== null}
+                  style={{ background: 'none', border: 'none', cursor: i === items.length - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: i === items.length - 1 ? 0.3 : 1, fontSize: 14 }}>↓</button>
+                <button type="button" onClick={() => handleDelete(i)} disabled={savingIndex !== null}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.danger, fontSize: 12 }}>حذف</button>
+              </div>
+            </div>
+          ))}
+
+          <div style={{ padding: 10, borderRadius: 8, border: `1px dashed ${T.border}` }}>
+            {isScalar ? (
+              <FieldInput kind={fieldSchema.item_kind} value={newItem} onChange={setNewItem} />
+            ) : (
+              Object.entries(subFields).map(([subKey, subSchema]) => (
+                <Field key={subKey} label={subSchema.label_ar}>
+                  <FieldInput kind={subSchema.kind} value={newItem[subKey] ?? ''} options={subSchema.options}
+                    onChange={(v) => setNewItem(prev => ({ ...prev, [subKey]: v }))} />
+                </Field>
+              ))
+            )}
+            <Button onClick={handleAdd} disabled={savingIndex !== null} color={color} style={{ marginTop: 4 }}>
+              {savingIndex === 'add' ? '...' : '+ إضافة'}
+            </Button>
+          </div>
+          {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
+        </>
       )}
     </div>
   )
