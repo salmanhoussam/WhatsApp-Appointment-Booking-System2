@@ -231,6 +231,32 @@ function FullScreenSpinner({ color }) {
   )
 }
 
+// dashboard-old-ui-flash-investigation, 2026-08-19 -- the loading race's own fix (condition 8):
+// the spinner must never spin forever if a real data source fails, and the shell must never
+// render on incomplete/wrong data either. A real failure gets its own honest state instead of
+// either of those.
+function DashboardErrorState({ color, message }) {
+  return (
+    <div style={{
+      width: '100vw', height: '100vh', background: T.pageBg,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14,
+      fontFamily: FONT,
+    }}>
+      <span style={{ fontSize: 14, color: T.textSecond }}>{message || 'تعذّر تحميل لوحة التحكم'}</span>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        style={{
+          padding: '9px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: color, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: FONT,
+        }}
+      >
+        إعادة المحاولة
+      </button>
+    </div>
+  )
+}
+
 function ComingSoonTab({ label, color }) {
   return (
     <div style={{
@@ -339,9 +365,15 @@ export default function GenericAdminDashboard() {
   const { upload: uploadImage } = useImageUpload()
 
   // ── Public config — for active_services (admin/settings doesn't return it) ──
-  const { config } = useTenantConfig()
+  // isLoading/error also pulled here now (dashboard-old-ui-flash-investigation, 2026-08-19) --
+  // this query and the /settings fetch below were previously ungated from each other: `loading`
+  // only ever tracked /settings, so the shell (NAV computed from this hook's own config) could
+  // render before this query settled, showing the short non-reservations NAV for real tenants
+  // that do have reservations, purely because this fetch hadn't caught up yet.
+  const { config, isLoading: configLoading, error: configError } = useTenantConfig()
 
   // ── Admin branding fetch ────────────────────────────────────────────────────
+  const [settingsError, setSettingsError] = useState(null)
   useEffect(() => {
     adminApi.get('/settings')
       .then(r => setSettings(r.data?.data ?? r.data))
@@ -351,7 +383,12 @@ export default function GenericAdminDashboard() {
           window.location.href = '/login'
           return
         }
+        // Fallback values unchanged (dashboard-old-ui-flash-investigation, 2026-08-19 --
+        // explicitly not touched) -- only the fact that this was a real failure, not a real
+        // success, is now tracked separately, so the render below can show a real error state
+        // instead of silently proceeding as if this generic fallback were real tenant data.
         setSettings({ name_ar: 'لوحة التحكم', primary_color: '#6366f1' })
+        setSettingsError(err?.response?.data?.detail ?? 'تعذّر تحميل بيانات المتجر')
       })
       .finally(() => setLoading(false))
   }, [])
@@ -543,7 +580,15 @@ export default function GenericAdminDashboard() {
     }
   }
 
-  if (loading) return <FullScreenSpinner color={color} />
+  // dashboard-old-ui-flash-investigation, 2026-08-19 -- gate on BOTH real async sources
+  // (/settings and useTenantConfig()'s own query), not just /settings alone. Previously `loading`
+  // only tracked /settings, so the shell below (whose NAV depends on useTenantConfig()'s config)
+  // could render before that query settled -- showing the short, non-reservations NAV for a real
+  // reservations tenant purely because this fetch hadn't caught up yet, not because the tenant
+  // genuinely lacks that capability. A real, permanent failure on either source now shows a real
+  // error state instead of either spinning forever or silently rendering the wrong shell.
+  if (loading || configLoading) return <FullScreenSpinner color={color} />
+  if (settingsError || configError) return <DashboardErrorState color={color} message={settingsError || configError} />
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
