@@ -31,7 +31,10 @@ Your only job: keep memory accurate, current, and non-redundant.
 Read these files in order:
 
 ```
-1. C:\Users\Lenovo\.claude\projects\c--Users-Lenovo-Desktop-WhatsApp-Appointment-Booking-System\memory\MEMORY.md
+1. `~/.claude/projects/<slugified-project-path>/memory/MEMORY.md` — auto-generated per machine/
+   project by Claude Code's own memory system. Verify the real path for the current environment
+   (do not assume a fixed one) — this replaces a stale hardcoded Windows path
+   (`C:\Users\Lenovo\...`) found and corrected 2026-08-16, Track 3 governance cleanup.
    → شوف المداخل الموجودة — ما تكرر
 
 2. .claudedocs/sessions/[today's date].md

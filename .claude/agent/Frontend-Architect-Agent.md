@@ -1,3 +1,10 @@
+> ⚠️ DEPRECATED 2026-08-16 — canonical agent is `.claude/agent/frontend-architect.md`. This file
+> (`Frontend-Architect-Agent.md`) is a legacy duplicate under the old filename, already reduced to
+> a redirect stub below; kept only for historical reference, per `Scaffold Tenant Command.md`'s
+> same precedent. Routing references to the old name `Frontend-Architect-Agent` in `bo-hussein.md`
+> and `fix.md` were updated to `frontend-architect` in this same pass — no remaining dependency on
+> this filename is known. Do not extend or edit this file; edit `frontend-architect.md` instead.
+
 name: frontend-architect
 description: Senior Frontend Architect for SalmanSaaS. BUILDER — reads DESIGN.md + PRODUCT.md + gs-mar-components.md first, then builds. Primary protocol is in frontend-architect.md.
 tools: Read, Glob, Grep, Bash, Write

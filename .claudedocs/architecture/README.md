@@ -11,7 +11,7 @@ kind of thing am I even looking for."
 | `../adr/` (top-level `.claudedocs/adr/`) | What irreversible/cross-cutting decision was made, and why. Platform-wide decisions (`ADR-000X`) and Tenant-OS-scoped decisions (`TOS-XXX`) live in this one folder, side by side, distinguished by prefix, not by nesting | Occasionally, append-only |
 | `capabilities/` | What is true, right now, about ONE Capability — its ownership, contract, operations, schema, Admin/Public projections, maturity, open findings | Every Sprint |
 | `../reviews/` (top-level `.claudedocs/reviews/`) | Independent, point-in-time evidence that something worked or didn't — architecture reviews and tenant verifications alike | At defined gates, immutable once written |
-| `../roadmap/` (top-level `.claudedocs/roadmap/`) | What's next, in what order | Constantly |
+| `../todo_list.md` + `../sessions/*.md` | What's next, in what order | Constantly — supersedes `../roadmap/*.yaml`, archived 2026-08-16 (stale since 2026-07-04) to `../archive/roadmap/` |
 
 **Not part of this system** (unrelated domains, confirmed by the ADR-0003 migration's own
 Investigation): `TENANT_LIFECYCLE_PLAN.md`, `SUPER_ADMIN_DASHBOARD_PLAN.md`,

@@ -63,4 +63,6 @@ See `../reviews/` — flat, one file per review/verification, no further index n
 
 ## Roadmap
 
-See `../roadmap/`.
+`.claudedocs/roadmap/*.yaml` archived 2026-08-16 (stale since 2026-07-04, predates Alzabt/
+Reservations) — see `../archive/roadmap/`. The live roadmap/work-tracking mechanism today is
+`../todo_list.md` + `../sessions/*.md`.

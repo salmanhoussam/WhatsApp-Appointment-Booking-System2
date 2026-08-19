@@ -1,5 +1,5 @@
 # DESIGN.md — SalmanSaaS Design System
-# Read by /impeccable and Frontend-Architect-Agent.
+# Read by /impeccable and frontend-architect (canonical name — see .claude/agent/frontend-architect.md).
 # Last updated: 2026-07-01
 
 ---

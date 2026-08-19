@@ -39,10 +39,12 @@ Search these files (in order) for the issue ID:
 ```bash
 FILES=(
   ".claudedocs/roadmap_audit_may.md"
-  ".claudedocs/roadmap/upcoming.yaml"
+  ".claudedocs/archive/roadmap/upcoming.yaml"  # archived 2026-08-16, historical only — see .claudedocs/todo_list.md for live items
   ".claudedocs/architecture/database_report.md"
   ".claudedocs/sessions/"  # last 3 session files
-  ".claude/memory/MEMORY.md"
+  ".claude/memory/MEMORY.md"  # NOTE: this path does not exist (confirmed 2026-08-16) — pre-existing
+                               # broken reference, unrelated to this pass's roadmap move; left as-is,
+                               # see Track 3 cleanup report's Open Decisions
 )
 
 # Grep for the issue ID across all these locations
@@ -62,14 +64,14 @@ Based on the prefix:
 | `ARCH-*` | Architecture | `backend-architect` |
 | `BUG-*` | Bug / Runtime | Domain-specific (see below) |
 | `PERF-*` | Performance | `backend-architect` |
-| `UI-*` | Frontend UI | `Frontend-Architect-Agent` |
-| `FM-*` | Framer Motion / React | `Frontend-Architect-Agent` |
+| `UI-*` | Frontend UI | `frontend-architect` |
+| `FM-*` | Framer Motion / React | `frontend-architect` |
 | `SCHEMA-*` | DB Schema | `backend-architect` |
-| `ROUTE-*` | Routing | `Frontend-Architect-Agent` |
+| `ROUTE-*` | Routing | `frontend-architect` |
 
 For `BUG-*`, determine agent from the file path in the issue description:
 - `app/` or `prisma/` → `backend-architect`
-- `frontend/src/` → `Frontend-Architect-Agent`
+- `frontend/src/` → `frontend-architect`
 
 ### Step 4 — Build Fix Brief
 

@@ -57,6 +57,9 @@ start_dev.bat              -- Start FastAPI + Prisma + React locally
 /architecture-review [topic] [--window N] -- Recurring maturity review of a Capability/Interface/
                            System (default window: last 14 sessions) — evidence-only, appends to
                            .claudedocs/maturity/[topic].md
+/fix [ISSUE-ID]            -- Looks up a known issue by ID, assigns the right specialist agent, fixes it
+/polish                    -- Syncs memory, todos, session report, schema docs in one command
+/seed [slug]                -- Seeds catalog data for a tenant from a local JSON file
 
 ## Rules (Path-Scoped — auto-loaded)
 rules/global.md                  -- Always: multi-tenancy, 4-layer, session protocol
@@ -67,6 +70,11 @@ rules/service-execution-constitution.md -- Always: how every independent Service
 rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention; Bo Hussein's repo-trustworthiness AND architecture-review-due checks
 rules/investigation-protocol.md  -- Always: bug/root-cause investigations write evidence files, report in Confirmed/Side Findings/Unknowns, separate Recommendation from Decision from Execution
 rules/architecture-review-loop.md -- Always: recurring maturity review per Capability/Interface/System (.claudedocs/maturity/<topic>.md), distinct from the one-shot Post-Implementation Review; pattern-escalation rule (2nd independent finding → ADR/Review candidate)
+rules/context-recovery-protocol.md -- Always: after a Compact/"Continue"/new session/long pause, run
+                           Automatic Context Recovery (planning docs, latest evidence, capability
+                           refs, implementation plan, memory, git branch/commit/status) and produce
+                           a short recovery report BEFORE any implementation work — repository always
+                           wins over memory on conflict; wait for explicit approval before resuming
 rules/backend/architecture.md    -- 4-Layer strict, Supabase ports, JWT roles
 rules/backend/api-rules.md       -- Routes: zero DB, zero logic, Pydantic only
 rules/backend/service-system.md  -- client_services table + require_service() pattern
@@ -80,14 +88,25 @@ rules/frontend/browser-verification-protocol.md -- Real Playwright MCP browser e
                            from console/network/curl alone (established 2026-08-01)
 rules/smar-tenant.md                -- Smar-specific complete reference
 
-## Agents (.claude/agent/)
+## Agents (.claude/agent/) — inventory verified against filesystem 2026-08-16
 bo-hussein             -- CEO Orchestrator: strategic planning, web search, delegates to all agents
-memory-keeper          -- Updates memory.md without duplication (called by /session-close)
+memory-keeper          -- Updates the auto-memory system (~/.claude/projects/<project>/memory/)
+                           without duplication (called by /session-close); .claude/memory.md is
+                           legacy/deprecated — see its own header
 system-auditor         -- Full codebase scan (called by /audit)
 code-reviewer          -- Architecture + multi-tenancy compliance
 backend-architect      -- FastAPI / Prisma / module design
-Frontend-Architect-Agent -- React 19 / Framer Motion / GS MAR
+frontend-architect     -- React 19 / Framer Motion / GS MAR builder (canonical name;
+                           Frontend-Architect-Agent.md is a deprecated duplicate filename, kept
+                           only for historical reference — see its own header)
 cyber-sentinel         -- Security engineer: multi-tenancy leaks, auth, race conditions, secrets (10 threat classes)
+dashboard-builder      -- Admin dashboard v2: sidebar layout, stats, orders kanban, reservations tab
+generic-page-builder   -- Generic frontend pages (CatalogPage/CartPage/ReservePage) driven by module_key
+page-builder-polish    -- Builds a new tenant's page content, then applies visual polish for production
+tenant-seeder          -- Creates new tenants from one JSON: ordered API calls, catalog seed, demo link
+كونان (المحقق كونان.md) -- Extracts onboarding data from WhatsApp conversations into tenant-ready
+                           JSON for tenant-seeder; reads konaan-onboarding-schema.md as its own
+                           schema reference (not a separate agent — that file has no agent frontmatter)
 
 ## Skills (.claude/skills/)
 backend/  -- database-architecture, supabase-prisma, n8n-automation
@@ -99,7 +118,17 @@ frontend/ -- gs-mar-design-system, admin-dashboard-builder, awwwards-animations,
              browser-verification-capability (real Playwright MCP browser proof — not yet an
              Agent, see architecture/ENGINEERING_ORGANIZATION.md)
 shared/   -- auto-reporting, project-health, motion-design (Higgsfield video ads — /motion-design)
-general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, + more
+general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, mcp-builder,
+             safe-refactor (behavior-preserving structural cleanup only — moves logic between
+             layers, dedups, simplifies; any behavior/authorization/data-model/architecture change
+             found along the way escalates to an Implementation Contract/ADR instead, never
+             absorbed silently — established 2026-08-09), + more
+top-level (not yet categorized under backend/frontend/shared/general, but real and tracked in git,
+confirmed 2026-08-16): impeccable/ (craft/polish/animate — referenced directly by
+frontend-architect.md), seeding/, supabase-ref/. NOTE: ~20 other top-level `.claude/skills/*`
+folders exist on disk (animation-vocabulary, apple-design, brandkit, higgsfield-*, gpt-taste,
+etc.) but are untracked in git as of 2026-08-16 — not part of this project's committed skill set,
+intentionally not indexed here; see Track 3 cleanup report's Open Decisions.
 
 ## Critical Rules (always in mind)
 1. كل DB query فيها clientId — لا استثناء

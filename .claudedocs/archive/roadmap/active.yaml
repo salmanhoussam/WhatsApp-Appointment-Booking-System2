@@ -1,3 +1,7 @@
+# ARCHIVED 2026-08-16 — legacy roadmap mechanism, last real content 2026-07-04 (pre-Alzabt/
+# Reservations). Superseded by .claudedocs/todo_list.md + .claudedocs/sessions/*.md as the live
+# roadmap/work-tracking mechanism. Kept for historical reference only, per repository-hygiene.md's
+# "archive, don't delete" precedent. See .claudedocs/architecture/INDEX.md's Roadmap section.
 project: Smar 3D Scrollytelling Experience
 tenant: smar + SaaS PLG
 last_updated: 2026-04-26

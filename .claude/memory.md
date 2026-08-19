@@ -1,4 +1,13 @@
 
+> ⚠️ **DEPRECATED 2026-08-16 — this file is legacy.** Last real entry: 2026-07-25. Since then, all
+> session memory has been written to this project's auto-memory system
+> (`~/.claude/projects/<slugified-project-path>/memory/MEMORY.md`, per-machine/per-project,
+> auto-managed by Claude Code) instead — confirmed via `git log`, this file has received zero real
+> updates in 3+ weeks while that system stayed live. Kept for historical reference only, per
+> `repository-hygiene.md`'s "archive, don't delete" precedent — do not write new entries here. See
+> `CLAUDE.md`'s Agents section (`memory-keeper`) and `.claude/agent/memory-keeper.md` for the
+> current, correct memory-write target.
+
 # ⏱️ Health Monitor Script (CREATED 2026-04-20)
 - **File:** `scripts/monitor_health.py`
 - **Purpose:** Synthetic login test against SSO (`api.salmansaas.com`)

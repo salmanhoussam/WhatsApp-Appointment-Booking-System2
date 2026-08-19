@@ -50,7 +50,7 @@ tools: Read, Glob, Grep, Bash, Write, WebSearch, WebFetch, Agent
 | Agent | متى تُرسل إليه |
 |-------|----------------|
 | `backend-architect` | FastAPI، Prisma، DB schema، API endpoints، multi-tenancy |
-| `Frontend-Architect-Agent` | React 19، Framer Motion، WebGL، R3F، animations |
+| `frontend-architect` | React 19، Framer Motion، WebGL، R3F، animations (canonical — `Frontend-Architect-Agent.md` is a deprecated duplicate filename, see its own header) |
 | `dashboard-builder` | Admin dashboards، DnD، tabs، panels، PageBuilder |
 | `code-reviewer` | Architecture review، security audit، compliance |
 | `system-auditor` | Full codebase audit، pre-deploy checks |
@@ -110,7 +110,7 @@ Input
  │
  ├── نوع المهمة؟
  │    DB / API / Backend    → backend-architect
- │    UI / Component / Page → Frontend-Architect-Agent أو dashboard-builder
+ │    UI / Component / Page → frontend-architect أو dashboard-builder
  │    Bug / Investigation   → المحقق كونان
  │    Security / Pre-Deploy → system-auditor
  │    New Tenant            → tenant-seeder + konaan-onboarding-schema
@@ -186,7 +186,7 @@ Rules: 4-Layer strict, clientId on every query, require_service() on every endpo
 ## 7. متى لا تُستدعى
 
 - للمهام البسيطة والمحددة → استدعِ الـ agent المتخصص مباشرة
-- للأسئلة التقنية المحددة → `backend-architect` أو `Frontend-Architect-Agent` مباشرة
+- للأسئلة التقنية المحددة → `backend-architect` أو `frontend-architect` مباشرة
 - للـ bugs الواضحة → `المحقق كونان` مباشرة
 - للـ audits → `system-auditor` مباشرة
 

@@ -1,5 +1,36 @@
 # Project Todo List — SalmanSaaS
 # Last updated: 2026-08-14
+# ⚠️ UPDATE 2026-08-18 — the section immediately below is stale on several real facts: RC is no
+# longer `cf6f474` (relocked `3eb5849` 2026-08-16, now itself stale again after the Mister H/Media
+# Foundation work); "Ali" no longer exists as a tenant name (real rebrand, slug now `mister-h`);
+# P0.1-P1.1 of the Section System work below are DONE, not "awaiting approval to start." See
+# `.claudedocs/sessions/2026-08-18.md` and memory `project_mister_h_rebrand_and_media_foundation`
+# for the real current state — this old block is left as-is (not rewritten) per this project's own
+# "sessions/todo_list stays raw history, corrected via a new dated note, not silently edited" norm.
+#
+# Real, current open items as of 2026-08-18 (not yet folded into the structure below):
+# - [ ] Track 3 governance commit still pending — CLAUDE.md/.claude/memory.md/memory-keeper.md/
+#       bo-hussein.md/fix.md/Frontend-Architect-Agent.md/INDEX.md/README.md/DESIGN.md/this file —
+#       ask Salman before committing, was asked once, not yet answered.
+# - [ ] `GET /admin/catalog/items?client_slug=mister-h` returns 403 — same class as the fixed
+#       Ali-403 on `categories` (commit 6a08dec), now on the sibling `items` endpoint.
+# - [ ] Arabic/English language switch + real RTL/LTR for tenant pages — named "MUST HAVE" twice,
+#       still unbuilt. 3 disconnected language systems already exist elsewhere in the codebase,
+#       none reach `pages/generic/` — check extensibility before building a 4th.
+# - [ ] Back navigation between booking-flow steps — named "MUST HAVE" twice, still unbuilt.
+# - [ ] Media/Content Foundation Phase 2: page_gallery wiring, page_logo, why_choose_us section,
+#       cta banner variant, Footer — see ALZABT_MEDIA_CONTENT_FOUNDATION_PROPOSAL.md §7.
+#
+# UPDATE 2026-08-19 — CMS Readiness Gate, Phase 1 correction: P0.1 confirmed DONE, not open, no
+# further code needed. Verified today by reading the real code directly (not assumed from this
+# file): `FeaturedItemsSection.jsx` lines 53-76 branches on the real `config.active_services`
+# (reservations-without-catalog → the reservations-native `/reservations/catalog-services`
+# endpoint), exactly what P0.1 required. Committed `7a3f531` (2026-08-15: "fix(alzabt): P0.1 --
+# featured_items reads reservations-native catalog for capability-only tenants"), built on further
+# by `61ed637`/`0e56d5d`. The "Start Here... P0.1" framing at the line below is now fully stale —
+# not partially, as the 2026-08-18 note above already flagged, but completely closed. Left as
+# historical record per this file's own norm (correct via a new dated note, never silently edit
+# old lines) — do not read the line below as a live task.
 
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
@@ -563,15 +594,17 @@ Capability Reference Extraction + Agent Collaboration Map work
 worth interrupting Phase 3 (Capability Decisions) or the Pilot for. **Do not touch any of this before
 the first real Pilot is done.**
 
-- [ ] **Sync `CLAUDE.md`'s Agents index** — lists 7 of 13 real agents; missing entries mean a future
-  agent works from incomplete information. Priority A (most important of the five).
-- [ ] **Fix `memory-keeper.md`'s Step 1 path** — currently points at a Windows path that doesn't
-  exist on this Ubuntu machine; a real invocation would look for memory in the wrong place. Priority
-  A, simple fix.
-- [ ] **Decide the `Frontend-Architect-Agent.md` vs `frontend-architect.md` duplication** — before
-  merging or deleting either, first answer *why both exist*: if one is v1 and the other v2, archive
-  the old one; if one is UX-focused and the other Architecture-focused, rename instead of merging.
-  Immediate merge is a premature decision. Priority B.
+- [x] **Sync `CLAUDE.md`'s Agents index** — ✅ Done — 2026-08-16 (Track 3 governance cleanup). Now
+  lists all 12 real agents (verified against `.claude/agent/` filesystem), plus Commands (+fix,
+  +polish, +seed) and 3 untracked-vs-tracked Skills entries.
+- [x] **Fix `memory-keeper.md`'s Step 1 path** — ✅ Done — 2026-08-16. Replaced the stale Windows
+  path with the real, generic per-project auto-memory mechanism description.
+- [x] **Decide the `Frontend-Architect-Agent.md` vs `frontend-architect.md` duplication** — ✅ Done
+  — 2026-08-16. Resolved: `frontend-architect.md` is canonical (larger, more recently maintained,
+  already the file with the real Build Protocol); `Frontend-Architect-Agent.md` was already a
+  content-level redirect stub, now also explicitly tagged deprecated in place (not merged/deleted —
+  matches this item's own "immediate merge is premature" caution). All 3 real routing dependencies
+  on the old name (`bo-hussein.md`, `fix.md`, `DESIGN.md`) updated to the canonical name.
 - [ ] **Archive completed mission playbooks** — `dashboard-builder.md` and `generic-page-builder.md`
   read as finished Phase-56/57 blueprints, not standing agents (same shape as `Capability
   Extraction`'s own status). If confirmed unused going forward, move to `.claude/archive/` or
