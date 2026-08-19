@@ -397,8 +397,45 @@ function FieldInput({ kind, value, onChange, options }) {
   return <input type={kind === 'number' ? 'number' : 'text'} style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)} />
 }
 
-function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, color }) {
-  const [expanded, setExpanded] = useState(false)
+// TOS-005 Phase 1 (Section Shell, 2026-08-19) -- SectionRow split into two pieces, same logic,
+// new arrangement: SectionListRow (the compact list line -- checkbox/label/reorder/select) and
+// SectionEditorPanel (the field/repeatable editor, now a dedicated panel instead of an inline
+// accordion). No field-saving/validation logic changed -- this is a pure layout move, per
+// Salman's own Phase 1 constraint ("لا refactor كبير... فقط طريقة عرضه في Dashboard تتغير").
+
+function SectionListRow({ section, index, total, schema, selected, onSelect, onToggleEnabled, onMove }) {
+  const enabled = section.enabled !== false
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+      padding: '10px 8px', borderRadius: 8, cursor: 'pointer',
+      background: selected ? `${T.green}14` : 'transparent',
+    }} onClick={() => onSelect(section.type)}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <input
+          type="checkbox" checked={enabled}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onToggleEnabled(section.type, e.target.checked)}
+        />
+        <span style={{
+          fontSize: 13, fontWeight: selected ? 700 : 600,
+          color: selected ? T.green : T.textPrimary, opacity: enabled ? 1 : 0.45,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {schema?.label_ar ?? section.type}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onMove(index, -1) }} disabled={index === 0}
+          style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: index === 0 ? 0.3 : 1, fontSize: 13 }}>↑</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onMove(index, 1) }} disabled={index === total - 1}
+          style={{ background: 'none', border: 'none', cursor: index === total - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: index === total - 1 ? 0.3 : 1, fontSize: 13 }}>↓</button>
+      </div>
+    </div>
+  )
+}
+
+function SectionEditorPanel({ section, schema, color }) {
   const fieldsConfig = Object.entries(schema?.fields ?? {})
     .filter(([, f]) => f.kind !== 'repeatable')
     .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options }))
@@ -413,12 +450,6 @@ function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, co
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
-
-  const setField = (key, kind) => (e) => {
-    const raw = kind === 'boolean' ? e.target.checked : e.target.value
-    setValues(prev => ({ ...prev, [key]: raw }))
-    setSaved(false)
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -441,54 +472,36 @@ function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, co
     }
   }
 
-  const enabled = section.enabled !== false
+  if (fieldsConfig.length === 0 && repeatableFields.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: T.textMuted, padding: '4px 2px' }}>
+        لا توجد عناصر قابلة للتعديل لهذا القسم بعد.
+      </div>
+    )
+  }
 
   return (
-    <div style={{ borderBottom: `1px solid ${T.borderSoft}`, padding: '14px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={enabled} onChange={(e) => onToggleEnabled(section.type, e.target.checked)} />
-          </label>
-          <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, opacity: enabled ? 1 : 0.45 }}>
-            {schema?.label_ar ?? section.type}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0}
-            style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', color: T.textMuted, opacity: index === 0 ? 0.3 : 1, fontSize: 14 }}>↑</button>
-          <button type="button" onClick={() => onMove(index, 1)} disabled={index === total - 1}
-            style={{ background: 'none', border: 'none', cursor: index === total - 1 ? 'default' : 'pointer', color: T.textMuted, opacity: index === total - 1 ? 0.3 : 1, fontSize: 14 }}>↓</button>
-          {(fieldsConfig.length > 0 || repeatableFields.length > 0) && (
-            <button type="button" onClick={() => setExpanded(e => !e)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color, fontSize: 12, fontWeight: 700 }}>
-              {expanded ? 'إخفاء' : 'تعديل'}
-            </button>
-          )}
-        </div>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 12 }}>
+        {schema?.label_ar ?? section.type}
       </div>
-
-      {expanded && (fieldsConfig.length > 0 || repeatableFields.length > 0) && (
-        <div style={{ marginTop: 12, paddingInlineStart: 26 }}>
-          {fieldsConfig.length > 0 && (
-            <>
-              {fieldsConfig.map(f => (
-                <Field key={f.key} label={f.label}>
-                  <FieldInput kind={f.type} value={values[f.key]} onChange={(v) => setValues(prev => { setSaved(false); return { ...prev, [f.key]: v } })} options={f.options} />
-                </Field>
-              ))}
-              <Button onClick={handleSave} disabled={saving} style={{ marginTop: 4 }}>
-                {saving ? 'جاري الحفظ...' : 'حفظ'}
-              </Button>
-              {saved && <span style={{ marginInlineStart: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ</span>}
-              {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
-            </>
-          )}
-          {repeatableFields.map(rf => (
-            <RepeatableGroupEditor key={rf.key} sectionType={section.type} field={rf.key} fieldSchema={rf.schema} color={color} />
+      {fieldsConfig.length > 0 && (
+        <>
+          {fieldsConfig.map(f => (
+            <Field key={f.key} label={f.label}>
+              <FieldInput kind={f.type} value={values[f.key]} onChange={(v) => setValues(prev => { setSaved(false); return { ...prev, [f.key]: v } })} options={f.options} />
+            </Field>
           ))}
-        </div>
+          <Button onClick={handleSave} disabled={saving} color={color} style={{ marginTop: 4 }}>
+            {saving ? 'جاري الحفظ...' : 'حفظ'}
+          </Button>
+          {saved && <span style={{ marginInlineStart: 10, fontSize: 12, color: T.green }}>✓ تم الحفظ</span>}
+          {error && <div style={{ marginTop: 8, fontSize: 12, color: T.danger }}>{error}</div>}
+        </>
       )}
+      {repeatableFields.map(rf => (
+        <RepeatableGroupEditor key={rf.key} sectionType={section.type} field={rf.key} fieldSchema={rf.schema} color={color} />
+      ))}
     </div>
   )
 }
@@ -622,6 +635,10 @@ function SectionSettingsArea({ color }) {
   const [sections, setSections] = useState([])
   const [schemas, setSchemas] = useState(null) // TOS-005 Phase B -- fetched once, not hardcoded
   const [loading, setLoading] = useState(true)
+  // TOS-005 Phase 1 (Section Shell) -- which section's editor shows on the opposite side.
+  // Defaults to the first real section once the list loads, so the editor is never empty on
+  // first open.
+  const [selectedType, setSelectedType] = useState(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -631,7 +648,9 @@ function SectionSettingsArea({ color }) {
     ])
       .then(([sectionsRes, schemaRes]) => {
         if (sectionsRes.data.success) {
-          setSections([...sectionsRes.data.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+          const sorted = [...sectionsRes.data.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          setSections(sorted)
+          setSelectedType(prev => (prev && sorted.some(s => s.type === prev)) ? prev : (sorted[0]?.type ?? null))
         }
         if (schemaRes.data.success) setSchemas(schemaRes.data.data)
       })
@@ -663,27 +682,43 @@ function SectionSettingsArea({ color }) {
     }
   }
 
+  const selectedSection = sections.find(s => s.type === selectedType) ?? null
+
   return (
     <Card style={{ marginBottom: 20 }}>
       <div style={sectionTitle}>إعدادات الأقسام</div>
       <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 16 }}>
-        إخفاء/إظهار كل قسم، ترتيبه، وتعديل نصوصه — يظهر التغيير مباشرة على موقعك العام
+        اختر قسماً لتعديله، أخفِه أو أظهره، رتّبه — يظهر التغيير مباشرة على موقعك العام
       </div>
       {loading ? (
         <div style={{ fontSize: 13, color: T.textMuted }}>جاري التحميل...</div>
       ) : (
-        sections.map((s, i) => (
-          <SectionRow
-            key={s.id ?? s.type}
-            section={s}
-            index={i}
-            total={sections.length}
-            schema={schemas?.[s.type]}
-            onToggleEnabled={handleToggleEnabled}
-            onMove={handleMove}
-            color={color}
-          />
-        ))
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          {/* List side */}
+          <div style={{ width: 150, flexShrink: 0, borderInlineEnd: `1px solid ${T.borderSoft}`, paddingInlineEnd: 10 }}>
+            {sections.map((s, i) => (
+              <SectionListRow
+                key={s.id ?? s.type}
+                section={s}
+                index={i}
+                total={sections.length}
+                schema={schemas?.[s.type]}
+                selected={s.type === selectedType}
+                onSelect={setSelectedType}
+                onToggleEnabled={handleToggleEnabled}
+                onMove={handleMove}
+              />
+            ))}
+          </div>
+          {/* Editor side -- the "opposite side" panel for whichever section is selected */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {selectedSection ? (
+              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} />
+            ) : (
+              <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد أقسام بعد.</div>
+            )}
+          </div>
+        </div>
       )}
     </Card>
   )
