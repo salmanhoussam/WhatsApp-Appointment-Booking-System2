@@ -266,3 +266,12 @@ __marimo__/
 # DB Dumps — never commit real data
 _db_dump.json
 *.db_dump.json
+
+# Repository Hygiene (2026-08-19, CMS Readiness Gate Track 3) — prevent browser-verification/
+# tool-output clutter from recurring at repo root; real evidence belongs under
+# .claudedocs/work/{investigation-slug}/{date}/, never loose at root
+# (see .claudedocs/work/root-screenshot-cleanup/2026-08-19/evidence.md for the one-time cleanup)
+.playwright-mcp/
+/*.png
+/*.jpg
+/*.jpeg
