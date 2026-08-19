@@ -17,6 +17,12 @@ This route became the real Dispatcher `editing-engine-review.md` S1a/Q7 deferred
 real Capability/Operation proves the routing shape actually repeats" -- `ALZABT_HOMEPAGE_
 SECTION_SETTINGS_CONTRACT.md` named 9 real sections needing the identical shape (Homepage Phase
 2.6, 2026-08-18); TOS-005 Phase A is what actually retires the last two per-field holdouts onto it.
+
+`GET /sections/schema` and `update_section_fields`'s server-side validation are TOS-005 Phase B,
+2026-08-19 -- `app/schemas/section_schemas.py` is now the single real source of truth for which
+fields exist on which section and what kind they are; this route imports it directly rather than
+re-declaring anything, and the Dashboard fetches the same file's content via this new route rather
+than hand-keeping a parallel copy (per TOS-005 §4.1's binding single-source-of-truth mechanics).
 """
 
 import logging
@@ -26,6 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles
+from app.schemas.section_schemas import SECTION_SCHEMAS, validate_fields
 from app.services import content_service
 
 logger = logging.getLogger(__name__)
@@ -96,6 +103,20 @@ async def list_sections(
     return {"success": True, "data": sections}
 
 
+@router.get("/sections/schema")
+async def get_sections_schema(
+    tenant: dict = Depends(get_current_tenant),
+):
+    """
+    TOS-005 Phase B -- the Dashboard's only path to learn which fields exist on which section and
+    what kind they are. No auth-scoped filtering: the schema is the same for every tenant (it
+    describes what the *system* supports, not tenant-owned data); tenant resolution is required
+    here only for consistency with every other route in this router, not because the response
+    varies per tenant.
+    """
+    return {"success": True, "data": SECTION_SCHEMAS}
+
+
 @router.patch("/sections/{section_type}/fields")
 async def update_section_fields(
     section_type: str,
@@ -113,6 +134,9 @@ async def update_section_fields(
     """
     if not body.fields:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+    validation_error = validate_fields(section_type, body.fields)
+    if validation_error:
+        raise HTTPException(status_code=422, detail=validation_error)
     try:
         await content_service.update_section_fields(tenant["id"], section_type, body.fields)
         invalidate_tenant_cache(tenant["slug"])

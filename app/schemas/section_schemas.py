@@ -1,0 +1,218 @@
+"""
+app/schemas/section_schemas.py — TOS-005 Phase B: the single, canonical declaration of every
+Homepage section type's editable shape.
+
+Per TOS-005-cms-generic-engine.md S4.1's binding mechanics: this is the ONE real file this
+information lives in. `app/api/v1/admin/content.py` imports it directly for server-side
+validation; the Dashboard fetches it via `GET /content/sections/schema` (added alongside this
+file) instead of hand-keeping a parallel copy — `SettingsTab.jsx`'s old `SECTION_FIELDS`/
+`SECTION_LABELS` objects are retired in this same change, not left running beside this file.
+
+Scope (matches TOS-005 Contract Phase B, not expanded beyond it): full editable field schemas for
+the 9 sections `ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md` S2 already inventoried, transcribed
+from that table (hero's two fields already unified with the Inline Interface in Phase A). The
+other 5 real section types `SECTION_MAP` (`DynamicPage.jsx`) renders — `categories_grid`, `offers`,
+`testimonials`, `video_story`, `story_experience`, all real in RK's live config — get a `label_ar`
+only, `fields: {}`, deliberately preserving their exact current behavior (labeled row, no edit
+button, since the Dashboard's `SectionRow` already only renders an edit button when `fields` is
+non-empty). Declaring real, generically-editable field schemas for those 5 is a separate future
+decision, not silently done here while retiring `SECTION_LABELS` would otherwise have dropped
+their labels entirely.
+
+`kind` vocabulary: `text`, `textarea`, `url`, `number`, `boolean`, `select` (all scalar) |
+`repeatable` (structural — `fields` for an array of objects, or `item_kind` for an array of bare
+scalars, e.g. `location.tags`). `select`'s `options` is a list of `{value, label_ar}`.
+
+Media fields (`hero.bg_image_url`/`bg_type`/`framed_video_url`, `gallery.images`, staff members)
+are deliberately absent — each has its own dedicated Renderer/pipeline
+(`TOS-002-editing-engine.md` S4.5's ReplaceMedia Processing Pipeline), not a generic scalar/
+repeatable field.
+"""
+
+SECTION_SCHEMAS = {
+    "hero": {
+        "label_ar": "الصفحة الرئيسية (Hero)",
+        "fields": {
+            "title_ar":               {"kind": "text", "label_ar": "العنوان الرئيسي"},
+            "subtitle_ar":             {"kind": "text", "label_ar": "النص التوضيحي"},
+            "cta_text_ar":             {"kind": "text", "label_ar": "نص زر الحجز"},
+            "framed_video_caption_ar": {"kind": "text", "label_ar": "نص توضيحي للفيديو المؤطر (وضع الفيديو المؤطر فقط)"},
+        },
+    },
+    "story": {
+        "label_ar": "قصتنا",
+        "fields": {
+            "heading_ar": {"kind": "text",     "label_ar": "العنوان"},
+            "body_ar":    {"kind": "textarea", "label_ar": "النص"},
+            "stats": {
+                "kind": "repeatable", "label_ar": "الأرقام (مثلاً: عدد الخدمات)",
+                "fields": {
+                    "num":   {"kind": "text", "label_ar": "الرقم"},
+                    "label": {"kind": "text", "label_ar": "الوصف"},
+                },
+            },
+        },
+    },
+    "staff": {
+        "label_ar": "فريقنا",
+        # members[] are live Barber API data, not authored `data` -- never part of this schema.
+        "fields": {"heading_ar": {"kind": "text", "label_ar": "العنوان"}},
+    },
+    "gallery": {
+        "label_ar": "معرض الصور",
+        "fields": {
+            "heading_ar":   {"kind": "text",   "label_ar": "العنوان"},
+            "limit":        {"kind": "number", "label_ar": "عدد الصور المعروضة (اتركه فارغاً لعرض الكل)"},
+            "gallery_link": {"kind": "url",     "label_ar": "رابط \"عرض الكل\""},
+        },
+        # images[] has its own dedicated Renderer (GalleryMediaSection) -- not a schema field here.
+    },
+    "featured_items": {
+        "label_ar": "الخدمات",
+        "fields": {
+            "heading_ar": {"kind": "text",   "label_ar": "العنوان"},
+            "limit":      {"kind": "number", "label_ar": "عدد الخدمات المعروضة"},
+        },
+    },
+    "hours": {
+        "label_ar": "ساعات العمل",
+        "fields": {
+            "heading_ar": {"kind": "text", "label_ar": "العنوان"},
+            "rows": {
+                "kind": "repeatable", "label_ar": "أيام العمل (احتياطي — يُتجاهل إذا كانت ساعات العمل مضبوطة)",
+                "fields": {
+                    "day_ar":   {"kind": "text",    "label_ar": "اليوم"},
+                    "open_ar":  {"kind": "text",    "label_ar": "من"},
+                    "close_ar": {"kind": "text",    "label_ar": "إلى"},
+                    "closed":   {"kind": "boolean", "label_ar": "مغلق"},
+                },
+            },
+            # Real, structural -- but dead for any tenant with Client.config.working_hours set
+            # (HoursSection.jsx prioritizes that), per
+            # ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md S3. Declared for schema completeness,
+            # not because a Dashboard editor for it is currently planned.
+        },
+    },
+    "location": {
+        "label_ar": "الموقع",
+        "fields": {
+            "heading_ar": {"kind": "text",     "label_ar": "العنوان"},
+            "para_ar":    {"kind": "textarea", "label_ar": "النص"},
+            "maps_url":   {"kind": "url",       "label_ar": "رابط الخريطة (Google Maps Embed)"},
+            "tags":       {"kind": "repeatable", "item_kind": "text", "label_ar": "الوسوم (مثلاً: موقف سيارات، قرب المول)"},
+        },
+    },
+    "cta": {
+        "label_ar": "دعوة الحجز (CTA)",
+        "fields": {
+            "text_ar":    {"kind": "text", "label_ar": "العنوان"},
+            "subtext_ar": {"kind": "text", "label_ar": "النص التوضيحي"},
+            "button_ar":  {"kind": "text", "label_ar": "نص الزر"},
+            "link":       {"kind": "url",  "label_ar": "رابط الزر"},
+            "variant": {
+                "kind": "select", "label_ar": "شكل القسم",
+                "options": [
+                    {"value": "",             "label_ar": "عادي"},
+                    {"value": "banner",       "label_ar": "بانر ذهبي كامل"},
+                    {"value": "promo-strip",  "label_ar": "شريط مضغوط"},
+                ],
+            },
+        },
+    },
+    "why_choose_us": {
+        "label_ar": "ليش تختارنا",
+        "fields": {
+            "heading_ar": {"kind": "text", "label_ar": "العنوان"},
+            "items": {
+                "kind": "repeatable", "label_ar": "العناصر",
+                "fields": {
+                    "icon_key": {
+                        "kind": "select", "label_ar": "الأيقونة",
+                        "options": [
+                            {"value": "classic",       "label_ar": "قص عصري وكلاسيكي"},
+                            {"value": "quick_booking", "label_ar": "حجز سريع"},
+                            {"value": "pro_stylists",  "label_ar": "حلاقين محترفين"},
+                            {"value": "luxury",        "label_ar": "أجواء فاخرة"},
+                            {"value": "trusted",       "label_ar": "موثوق"},
+                        ],
+                    },
+                    "title_ar": {"kind": "text",     "label_ar": "العنوان"},
+                    "body_ar":  {"kind": "textarea", "label_ar": "النص"},
+                },
+            },
+        },
+    },
+    # The 5 section types below are real (SECTION_MAP, DynamicPage.jsx) and real in RK's live
+    # config (categories_grid/offers/testimonials/video_story/story_experience were never in
+    # ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md's 9-section inventory) -- `label_ar` only,
+    # preserving exactly their current Dashboard behavior (labeled row, no edit button). A real
+    # field schema for any of these is a separate future decision, not implied by this Phase.
+    "categories_grid":  {"label_ar": "التصنيفات",       "fields": {}},
+    "offers":            {"label_ar": "العروض",           "fields": {}},
+    "testimonials":      {"label_ar": "آراء العملاء",     "fields": {}},
+    "video_story":       {"label_ar": "فيديو القصة",      "fields": {}},
+    "story_experience":  {"label_ar": "تجربة القصة",      "fields": {}},
+}
+
+
+def get_section_schema(section_type: str) -> dict | None:
+    return SECTION_SCHEMAS.get(section_type)
+
+
+def validate_fields(section_type: str, fields: dict) -> str | None:
+    """Returns an error message if invalid, else None. Server-side enforcement, independent of
+    any client (TOS-005 S4.1, Salman's condition 4) -- called from content.py's
+    update_section_fields before any write, so a raw API call bypassing the Dashboard entirely is
+    rejected exactly the same way a Dashboard-originated one would be."""
+    schema = SECTION_SCHEMAS.get(section_type)
+    if schema is None:
+        return f"Unknown section type: {section_type}"
+    declared = schema["fields"]
+    for key, value in fields.items():
+        field_schema = declared.get(key)
+        if field_schema is None:
+            return f"Field '{key}' is not declared for section '{section_type}'"
+        err = _validate_value(key, value, field_schema)
+        if err:
+            return err
+    return None
+
+
+def _validate_value(key: str, value, field_schema: dict) -> str | None:
+    if value is None:
+        return None  # clearing a field is always allowed
+    kind = field_schema["kind"]
+    if kind in ("text", "textarea", "url"):
+        if not isinstance(value, str):
+            return f"Field '{key}' must be a string"
+    elif kind == "number":
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return f"Field '{key}' must be a number"
+    elif kind == "boolean":
+        if not isinstance(value, bool):
+            return f"Field '{key}' must be a boolean"
+    elif kind == "select":
+        options = [opt["value"] for opt in field_schema.get("options", [])]
+        if options and value not in options:
+            return f"Field '{key}' must be one of {options}"
+    elif kind == "repeatable":
+        if not isinstance(value, list):
+            return f"Field '{key}' must be a list"
+        sub_fields = field_schema.get("fields")
+        item_kind = field_schema.get("item_kind")
+        for i, item in enumerate(value):
+            if sub_fields is not None:
+                if not isinstance(item, dict):
+                    return f"Field '{key}[{i}]' must be an object"
+                for sub_key, sub_value in item.items():
+                    sub_schema = sub_fields.get(sub_key)
+                    if sub_schema is None:
+                        return f"Field '{key}[{i}].{sub_key}' is not declared"
+                    err = _validate_value(f"{key}[{i}].{sub_key}", sub_value, sub_schema)
+                    if err:
+                        return err
+            elif item_kind is not None:
+                err = _validate_value(f"{key}[{i}]", item, {"kind": item_kind})
+                if err:
+                    return err
+    return None

@@ -360,92 +360,36 @@ function GalleryMediaSection({ color }) {
   )
 }
 
-// ── Section Settings (Homepage Phase 2.6, 2026-08-18) ─────────────────────────
-// Per ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md's own inventory -- field lists here are a
-// direct transcription of that Contract's table, not invented independently. Media fields with
-// their own dedicated Renderer (hero.bg_image_url, gallery.images) are deliberately absent from
-// these lists -- HeroMediaSection/GalleryMediaSection above already own those.
+// ── Section Settings (Homepage Phase 2.6, 2026-08-18; schema-driven since TOS-005 Phase B,
+// 2026-08-19) ───────────────────────────────────────────────────────────────────────────────
+// The field/label lists that used to live here as hardcoded SECTION_FIELDS/SECTION_LABELS
+// objects are retired -- app/schemas/section_schemas.py is now the one real source of truth
+// (TOS-005-cms-generic-engine.md §4.1), fetched once via GET /content/sections/schema
+// (SectionSettingsArea below) and passed down. No independent copy exists here anymore --
+// divergence between this form and the backend's own validation is structurally impossible,
+// not merely discouraged. Media fields (hero.bg_image_url, gallery.images) are absent from the
+// fetched schema's non-repeatable fields for the same reason they were absent here before --
+// HeroMediaSection/GalleryMediaSection above already own those. Repeatable-kind fields
+// (story.stats, location.tags, why_choose_us.items, ...) are filtered out of this generic
+// scalar-field form too -- their own editor is TOS-005 Phase D, not yet built.
 
-const SECTION_LABELS = {
-  hero: 'الصفحة الرئيسية (Hero)',
-  story: 'قصتنا',
-  staff: 'فريقنا',
-  gallery: 'معرض الصور',
-  featured_items: 'الخدمات',
-  hours: 'ساعات العمل',
-  location: 'الموقع',
-  cta: 'دعوة الحجز (CTA)',
-  why_choose_us: 'ليش تختارنا',
-  categories_grid: 'التصنيفات',
-  offers: 'العروض',
-  testimonials: 'آراء العملاء',
-  video_story: 'فيديو القصة',
-  story_experience: 'تجربة القصة',
-}
-
-const SECTION_FIELDS = {
-  hero: [
-    { key: 'title_ar', label: 'العنوان الرئيسي', type: 'text' },
-    { key: 'subtitle_ar', label: 'النص التوضيحي', type: 'text' },
-    { key: 'cta_text_ar', label: 'نص زر الحجز', type: 'text' },
-  ],
-  story: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-    { key: 'body_ar', label: 'النص', type: 'textarea' },
-  ],
-  staff: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-  ],
-  gallery: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-    { key: 'limit', label: 'عدد الصور المعروضة (اتركه فارغاً لعرض الكل)', type: 'number' },
-    { key: 'gallery_link', label: 'رابط "عرض الكل"', type: 'text' },
-  ],
-  featured_items: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-    { key: 'limit', label: 'عدد الخدمات المعروضة', type: 'number' },
-  ],
-  hours: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-  ],
-  location: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-    { key: 'para_ar', label: 'النص', type: 'textarea' },
-    { key: 'maps_url', label: 'رابط الخريطة (Google Maps Embed)', type: 'text' },
-  ],
-  cta: [
-    { key: 'text_ar', label: 'العنوان', type: 'text' },
-    { key: 'subtext_ar', label: 'النص التوضيحي', type: 'text' },
-    { key: 'button_ar', label: 'نص الزر', type: 'text' },
-    { key: 'link', label: 'رابط الزر', type: 'text' },
-    {
-      key: 'variant', label: 'شكل القسم', type: 'select',
-      options: [
-        { value: '', label: 'عادي' },
-        { value: 'banner', label: 'بانر ذهبي كامل' },
-        { value: 'promo-strip', label: 'شريط مضغوط' },
-      ],
-    },
-  ],
-  why_choose_us: [
-    { key: 'heading_ar', label: 'العنوان', type: 'text' },
-  ],
-}
-
-function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
+function SectionRow({ section, index, total, schema, onToggleEnabled, onMove, color }) {
   const [expanded, setExpanded] = useState(false)
-  const fieldsConfig = SECTION_FIELDS[section.type] ?? []
+  const fieldsConfig = Object.entries(schema?.fields ?? {})
+    .filter(([, f]) => f.kind !== 'repeatable')
+    .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options }))
   const [values, setValues] = useState(() => {
     const initial = {}
-    fieldsConfig.forEach(f => { initial[f.key] = section.data?.[f.key] ?? '' })
+    fieldsConfig.forEach(f => { initial[f.key] = section.data?.[f.key] ?? (f.type === 'boolean' ? false : '') })
     return initial
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
 
-  const setField = (key) => (e) => {
-    setValues(prev => ({ ...prev, [key]: e.target.value }))
+  const setField = (key, kind) => (e) => {
+    const raw = kind === 'boolean' ? e.target.checked : e.target.value
+    setValues(prev => ({ ...prev, [key]: raw }))
     setSaved(false)
   }
 
@@ -453,11 +397,13 @@ function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
     setSaving(true)
     setError(null)
     try {
-      // Numbers stored as real numbers, not strings; empty string clears the field
+      // Numbers/booleans stored as real numbers/booleans, not strings; empty string clears the field
       const fields = {}
       fieldsConfig.forEach(f => {
         const raw = values[f.key]
-        fields[f.key] = f.type === 'number' && raw !== '' ? Number(raw) : (raw === '' ? null : raw)
+        fields[f.key] = f.type === 'boolean' ? Boolean(raw)
+          : f.type === 'number' && raw !== '' ? Number(raw)
+          : (raw === '' ? null : raw)
       })
       await adminApi.patch(`/content/sections/${section.type}/fields`, { fields })
       setSaved(true)
@@ -478,7 +424,7 @@ function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
             <input type="checkbox" checked={enabled} onChange={(e) => onToggleEnabled(section.type, e.target.checked)} />
           </label>
           <span style={{ fontSize: 14, fontWeight: 700, color: T.textPrimary, opacity: enabled ? 1 : 0.45 }}>
-            {SECTION_LABELS[section.type] ?? section.type}
+            {schema?.label_ar ?? section.type}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -503,8 +449,12 @@ function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
                 <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={values[f.key]} onChange={setField(f.key)} />
               ) : f.type === 'select' ? (
                 <select style={inputStyle} value={values[f.key]} onChange={setField(f.key)}>
-                  {f.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  {f.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label_ar}</option>)}
                 </select>
+              ) : f.type === 'boolean' ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!values[f.key]} onChange={setField(f.key, 'boolean')} />
+                </label>
               ) : (
                 <input type={f.type === 'number' ? 'number' : 'text'} style={inputStyle} value={values[f.key]} onChange={setField(f.key)} />
               )}
@@ -523,13 +473,20 @@ function SectionRow({ section, index, total, onToggleEnabled, onMove, color }) {
 
 function SectionSettingsArea({ color }) {
   const [sections, setSections] = useState([])
+  const [schemas, setSchemas] = useState(null) // TOS-005 Phase B -- fetched once, not hardcoded
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(() => {
     setLoading(true)
-    adminApi.get('/content/sections')
-      .then(({ data }) => {
-        if (data.success) setSections([...data.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+    Promise.all([
+      adminApi.get('/content/sections'),
+      adminApi.get('/content/sections/schema'),
+    ])
+      .then(([sectionsRes, schemaRes]) => {
+        if (sectionsRes.data.success) {
+          setSections([...sectionsRes.data.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+        }
+        if (schemaRes.data.success) setSchemas(schemaRes.data.data)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -574,6 +531,7 @@ function SectionSettingsArea({ color }) {
             section={s}
             index={i}
             total={sections.length}
+            schema={schemas?.[s.type]}
             onToggleEnabled={handleToggleEnabled}
             onMove={handleMove}
             color={color}
