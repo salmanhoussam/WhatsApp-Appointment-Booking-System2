@@ -474,7 +474,46 @@ function MediaField({ pipeline, color }) {
   return null
 }
 
-function SectionEditorPanel({ section, schema, color }) {
+// Tenant OS Section Editor Phase 5 (2026-08-20) -- featured_items' and staff's real items
+// (CatalogService/Barber rows) are owned by the Catalog/Staff Capability, already fully
+// CRUD-editable via StaffTab.jsx (name/description/price/image/active/reorder for Services,
+// name/photo/hours for Staff) -- never rebuilt here. This is TOS-005 §1.3's "orchestrate, don't
+// duplicate a second CRUD" pattern applied a third time (after Content/Media). A small
+// declarative map, not a per-type if/else, names which section type deep-links to which
+// StaffTab.jsx subView (`?view=` query param, same pattern SmarListingsPage already uses for its
+// own `?type` filter -- rules/smar-tenant.md).
+const CAPABILITY_LINKS = {
+  featured_items: { view: 'services',  label: 'إدارة الخدمات ←' },
+  staff:          { view: 'employees', label: 'إدارة الموظفين ←' },
+}
+
+function CapabilityLink({ sectionType, color, changeTab }) {
+  const link = CAPABILITY_LINKS[sectionType]
+  if (!link || !changeTab) return null
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+      padding: '12px 14px', borderRadius: 8, marginBottom: 16,
+      background: `${color}0f`, border: `1px solid ${color}30`,
+    }}>
+      <span style={{ fontSize: 12.5, color: T.textSecond }}>
+        العناصر نفسها (الاسم، السعر، الصورة...) تُدار من صفحة الموظفين
+      </span>
+      <button
+        type="button"
+        onClick={() => changeTab('staff', `view=${link.view}`)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+          color, fontSize: 13, fontWeight: 700, fontFamily: FONT,
+        }}
+      >
+        {link.label}
+      </button>
+    </div>
+  )
+}
+
+function SectionEditorPanel({ section, schema, color, changeTab }) {
   const fieldsConfig = Object.entries(schema?.fields ?? {})
     .filter(([, f]) => f.kind !== 'repeatable' && f.kind !== 'media')
     .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options, fields: f.fields }))
@@ -527,6 +566,7 @@ function SectionEditorPanel({ section, schema, color }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 12 }}>
         {schema?.label_ar ?? section.type}
       </div>
+      <CapabilityLink sectionType={section.type} color={color} changeTab={changeTab} />
       {mediaFields.map(mf => (
         <MediaField key={mf.key} pipeline={mf.pipeline} color={color} />
       ))}
@@ -676,7 +716,7 @@ function RepeatableGroupEditor({ sectionType, field, fieldSchema, color }) {
   )
 }
 
-function SectionSettingsArea({ color }) {
+function SectionSettingsArea({ color, changeTab }) {
   const [sections, setSections] = useState([])
   const [schemas, setSchemas] = useState(null) // TOS-005 Phase B -- fetched once, not hardcoded
   const [loading, setLoading] = useState(true)
@@ -758,7 +798,7 @@ function SectionSettingsArea({ color }) {
           {/* Editor side -- the "opposite side" panel for whichever section is selected */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {selectedSection ? (
-              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} />
+              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} changeTab={changeTab} />
             ) : (
               <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد أقسام بعد.</div>
             )}
@@ -771,7 +811,7 @@ function SectionSettingsArea({ color }) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export default function SettingsTab({ settings, onUpdated, color, onFormChange }) {
+export default function SettingsTab({ settings, onUpdated, color, onFormChange, changeTab }) {
   const existingConfig = settings?.config ?? {}
   const existingHours   = existingConfig.working_hours ?? {}
 
@@ -961,7 +1001,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange }
           heading_ar, ...) live here now too, correcting the removed "Hero Text" card above,
           which wrote to config.hero -- a field HeroSection.jsx never read (confirmed real,
           pre-existing, dead since it shipped; nothing else in the codebase referenced it). */}
-      <SectionSettingsArea color={form.primary_color} />
+      <SectionSettingsArea color={form.primary_color} changeTab={changeTab} />
 
       {/* ── Feedback + Save ───────────────────────────────────────────── */}
       {error && (

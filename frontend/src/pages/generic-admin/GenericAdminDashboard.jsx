@@ -508,10 +508,13 @@ export default function GenericAdminDashboard() {
 
   // Single entry point for changing tabs -- updates both the in-memory activeTab state AND the
   // URL (replace, not push, so tab-switching doesn't spam browser history -- explicit requirement,
-  // Section B.11). Every setActiveTab call site below is replaced with this.
-  const changeTab = useCallback((id) => {
+  // Section B.11). Every setActiveTab call site below is replaced with this. `query` (optional,
+  // Tenant OS Section Editor Phase 5, 2026-08-20) lets a caller deep-link into a tab's own
+  // sub-view (e.g. StaffTab.jsx's `?view=services`) -- still one entry point, not a second
+  // navigation path bypassing this real activeTab/URL sync.
+  const changeTab = useCallback((id, query) => {
     setActiveTabRaw(id)
-    navigate(`${basePath}/${id}`, { replace: true })
+    navigate(`${basePath}/${id}${query ? `?${query}` : ''}`, { replace: true })
   }, [navigate, basePath])
 
   // Calendar becomes the default landing tab once we know this is a reservations tenant --
@@ -574,7 +577,7 @@ export default function GenericAdminDashboard() {
       case 'notifications':
         return <ComingSoonTab label="الإشعارات" color={color} />
       case 'settings':
-        return <SettingsTab settings={settings} onUpdated={setSettings} color={color} />
+        return <SettingsTab settings={settings} onUpdated={setSettings} color={color} changeTab={changeTab} />
       default:
         return null
     }
@@ -831,6 +834,7 @@ export default function GenericAdminDashboard() {
                   onUpdated={setSettings}
                   color={color}
                   onFormChange={setPreviewForm}
+                  changeTab={changeTab}
                 />
               </div>
             </motion.div>

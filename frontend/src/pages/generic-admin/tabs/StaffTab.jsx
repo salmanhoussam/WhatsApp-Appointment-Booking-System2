@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import adminApi       from '../../../utils/admin.config'
 import useImageUpload from '../../../hooks/useImageUpload'
 import { T, FONT } from '../theme'
@@ -100,7 +101,11 @@ const EMPTY_SERVICE = {
 export default function StaffTab({ color }) {
   // Staff/Store IA Separation (2026-08-09) -- الموظفون (existing content below, untouched) /
   // الخدمات (new CatalogService CRUD).
-  const [subView, setSubView] = useState('employees')
+  // Tenant OS Section Editor Phase 5 (2026-08-20) -- Section Editor deep-links here with
+  // `?view=services|employees` (SettingsTab.jsx's CapabilityLink) so opening "الخدمات"/"فريقنا"
+  // from the Section Editor lands directly on the matching sub-view, not always the default.
+  const [searchParams] = useSearchParams()
+  const [subView, setSubView] = useState(() => searchParams.get('view') === 'services' ? 'services' : 'employees')
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   useEffect(() => {
