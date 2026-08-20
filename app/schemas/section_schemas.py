@@ -105,6 +105,17 @@ SECTION_SCHEMAS = {
             "limit":      {"kind": "number", "label_ar": "عدد الخدمات المعروضة"},
         },
     },
+    # Products/Services Separation, Track B (2026-08-20) -- real CatalogItem (module_key='store')
+    # products, structurally separate from featured_items (real CatalogService, bookable). Same
+    # meta-only shape as featured_items -- items[] are live Store API data, not authored `data`,
+    # same reasoning as staff.members[] above.
+    "products": {
+        "label_ar": "المنتجات",
+        "fields": {
+            "heading_ar": {"kind": "text",   "label_ar": "العنوان"},
+            "limit":      {"kind": "number", "label_ar": "عدد المنتجات المعروضة"},
+        },
+    },
     "hours": {
         "label_ar": "ساعات العمل",
         "fields": {

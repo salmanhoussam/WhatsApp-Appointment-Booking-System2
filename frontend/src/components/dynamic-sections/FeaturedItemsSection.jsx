@@ -2,8 +2,13 @@
  * FeaturedItemsSection — Dynamic Section Renderer
  * data: { heading_ar, limit }
  *
- * Fetches catalog items for this tenant.
- * Shows items with is_featured=true first; falls back to first N items.
+ * Services only (Products/Services Separation, Track B, 2026-08-20) -- every item this component
+ * fetches is a real CatalogService (bookable), never a real Store product (CatalogItem,
+ * module_key='store') -- those now live in the separate ProductsSection.jsx. CTA is always
+ * "احجز الآن"; the old per-item `metadata.requires_booking` check is gone -- it predated the real
+ * CatalogService/CatalogItem model split (Phase 3.7C) and was fragile (real store products never
+ * even return `metadata` from the public API, so it only ever worked by accident for tenants
+ * seeded before the split). Shows items with is_featured=true first; falls back to first N items.
  */
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -25,7 +30,7 @@ function SkeletonCard() {
   )
 }
 
-export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, config, homepageTheme }) {
+export default function FeaturedItemsSection({ data, accent, slug, config, homepageTheme }) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
@@ -75,14 +80,21 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
       return
     }
 
-    // Fetch every real category (no tenant-wide moduleKey collapse -- TOS-004), then pool items
-    // across ALL of them, each routed by its own real module_key. A tenant with more than one
-    // catalog-bearing capability active (e.g. RK Barber's real Services + Store categories) must
-    // have every one of its real categories representable here, not just whichever one a
-    // hardcoded "first category" happened to pick.
+    // Fetch every real Services category (no tenant-wide moduleKey collapse -- TOS-004), then pool
+    // items across ALL of them, each routed by its own real module_key. A tenant with more than
+    // one catalog-bearing capability active (e.g. RK Barber's real Services + Store categories)
+    // must have every one of its real Services categories representable here, not just whichever
+    // one a hardcoded "first category" happened to pick.
+    //
+    // Store categories (module_key === 'store') are deliberately excluded here (Track B,
+    // 2026-08-20) -- real Store products now live in the separate ProductsSection.jsx, never
+    // pooled in with Services. This is what actually fixes the CTA ambiguity the old
+    // `requires_booking` flag was standing in for: an item reaching this component is now
+    // guaranteed bookable by construction (it only ever came from a non-store category), not by a
+    // fragile per-item flag.
     fetchAllCategories(slug)
       .then(res => {
-        const cats = res.data?.data ?? []
+        const cats = (res.data?.data ?? []).filter(cat => cat.module_key !== 'store')
         if (!cats.length) return []
         return Promise.all(
           cats.map(cat => fetchItems(cat.module_key, slug, cat.id).then(r => r.data?.data ?? []))
@@ -146,25 +158,15 @@ export default function FeaturedItemsSection({ data, accent, slug, onAddToCart, 
               gap: 16,
             }}
           >
-            {items.map(item => {
-              // Real, existing per-item signal (CatalogItem.metadata.requires_booking, already
-              // set on every real bookable service via the Reservation Pilot's catalog/service
-              // bridge -- confirmed present on BOTH fetch paths above, live). More correct than a
-              // tenant-level toggle: a tenant can have both real bookable services AND real
-              // cart-purchasable products in the same section (e.g. RK: "الخدمات" category is
-              // requires_booking, "منتجات العناية" is not) -- this decides per item, not per tenant.
-              const requiresBooking = item.metadata?.requires_booking === true
-              return (
-                <CatalogItemCard
-                  key={item.id}
-                  item={item}
-                  accent={accent}
-                  homepageTheme={homepageTheme}
-                  onAddToCart={requiresBooking ? undefined : onAddToCart}
-                  onBookNow={requiresBooking ? handleBookNow : undefined}
-                />
-              )
-            })}
+            {items.map(item => (
+              <CatalogItemCard
+                key={item.id}
+                item={item}
+                accent={accent}
+                homepageTheme={homepageTheme}
+                onBookNow={handleBookNow}
+              />
+            ))}
           </motion.div>
         )}
       </AnimatePresence>

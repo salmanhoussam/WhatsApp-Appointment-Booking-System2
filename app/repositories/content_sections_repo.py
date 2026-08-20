@@ -32,6 +32,45 @@ async def list_sections(client_id: str):
     return list(content.get("sections") or [])
 
 
+async def add_section(client_id: str, section_type: str, enabled: bool = True):
+    """
+    Appends a new, schema-known section type to this tenant's stored sections[] if not already
+    present -- idempotent, a no-op returning the unchanged list if it's already there. Closes the
+    same "materialize on first touch" gap Phase 5 Part B found and stopped on for Footer
+    (.claudedocs/implementation/TENANT_OS_SECTION_EDITOR/PHASE_5.md) -- every other function in
+    this file (set_section_enabled, update_section_field, the repeatable-field helpers) requires
+    the section to already exist in storage; nothing before this could ever add one. Validation
+    that `section_type` is real (`in SECTION_SCHEMAS`) is the caller's job (content_service.py),
+    not this Repository's -- same division of labor as every other function here.
+    """
+    client = await _client_repo.find_client_by_id(client_id)
+    if not client:
+        raise ValueError("Client not found")
+
+    config = dict(getattr(client, "config", None) or {})
+    content = dict(config.get("content") or {})
+    sections = list(content.get("sections") or [])
+
+    if any(s.get("type") == section_type for s in sections):
+        return sections
+
+    next_order = max((s.get("order", 0) for s in sections), default=-1) + 1
+    # Real, required field every other section entry already has (`s_hero`, `s_featured`, ...) --
+    # DynamicPage.jsx keys its rendered sections on `id`, not `type` (`key={section.id}`), and
+    # Footer.jsx's own QUICK_LINKS scroll-anchors target these same ids. Omitting it (a real bug,
+    # caught live via a React "duplicate key" console error during this Track's own verification)
+    # would silently break both.
+    sections.append({
+        "id": f"s_{section_type}", "type": section_type,
+        "order": next_order, "enabled": enabled, "data": {},
+    })
+
+    content["sections"] = sections
+    config["content"] = content
+    await _client_repo.update_client(client_id, {"config": Json(config)})
+    return sections
+
+
 async def get_section_field(client_id: str, section_type: str, field: str):
     """Find a section by `type`, return one of its `data` fields (or None)."""
     client = await _client_repo.find_client_by_id(client_id)

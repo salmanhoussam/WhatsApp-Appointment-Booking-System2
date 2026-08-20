@@ -56,6 +56,11 @@ class SectionFieldsUpdate(BaseModel):
     fields: dict[str, Any]
 
 
+class AddSectionBody(BaseModel):
+    section_type: str
+    enabled: bool = True
+
+
 class RepeatableItemBody(BaseModel):
     item: Any  # dict for object-shaped repeatables (why_choose_us.items), or a bare scalar
                # (e.g. str) for item_kind ones (location.tags)
@@ -115,6 +120,33 @@ async def list_sections(
     view renders as a list (type/order/enabled/data)."""
     sections = await content_service.list_sections(tenant["id"])
     return {"success": True, "data": sections}
+
+
+@router.post("/sections")
+async def add_section(
+    body: AddSectionBody,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """
+    Tenant OS Section Editor Phase 5's "materialize on first touch" gap, closed for real use
+    (2026-08-20, Track B) -- every other route in this router requires the section to already
+    exist in storage. Idempotent: adding an already-present type is a no-op, not an error. No
+    general "Add Section" UI exists in the Dashboard yet (deliberately deferred, same shape as
+    Footer in Phase 5) -- today's only real caller is scripts/add_products_section_rk.py.
+    """
+    if body.section_type not in SECTION_SCHEMAS:
+        raise HTTPException(status_code=404, detail=f"Unknown section type: {body.section_type}")
+    try:
+        sections = await content_service.add_section(tenant["id"], body.section_type, body.enabled)
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Content: section '%s' added for tenant '%s'", body.section_type, tenant["slug"])
+        return {"success": True, "data": sections}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error adding section for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
 
 
 @router.get("/sections/schema")

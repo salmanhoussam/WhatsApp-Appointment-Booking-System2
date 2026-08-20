@@ -1,6 +1,7 @@
 export { default as HeroSection }          from './HeroSection'
 export { default as StorySection }         from './StorySection'
 export { default as FeaturedItemsSection } from './FeaturedItemsSection'
+export { default as ProductsSection }      from './ProductsSection'
 export { default as CategoriesGridSection } from './CategoriesGridSection'
 export { default as GallerySection }       from './GallerySection'
 export { default as LocationSection }      from './LocationSection'

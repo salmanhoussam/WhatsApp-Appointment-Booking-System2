@@ -482,14 +482,23 @@ function MediaField({ pipeline, color }) {
 // declarative map, not a per-type if/else, names which section type deep-links to which
 // StaffTab.jsx subView (`?view=` query param, same pattern SmarListingsPage already uses for its
 // own `?type` filter -- rules/smar-tenant.md).
+// products entry added Track B (2026-08-20) -- real CatalogItem (module_key='store') rows are
+// owned by the Catalog/Store Capability, already fully CRUD-editable via StoreTab.jsx/
+// CatalogTab.jsx, same "orchestrate, don't duplicate" pattern as featured_items/staff above.
+// `navId: null` means "resolve dynamically" -- unlike featured_items/staff (always 'staff'),
+// products' target tab is a real hasReservations-driven branch (store.py's routes/StoreTab.jsx
+// for hasReservations tenants, catalog.py's/CatalogTab.jsx otherwise -- buildNav()'s own existing
+// split, GenericAdminDashboard.jsx), never a tenant-slug check.
 const CAPABILITY_LINKS = {
-  featured_items: { view: 'services',  label: 'إدارة الخدمات ←' },
-  staff:          { view: 'employees', label: 'إدارة الموظفين ←' },
+  featured_items: { navId: 'staff', view: 'services',  label: 'إدارة الخدمات ←' },
+  staff:          { navId: 'staff', view: 'employees', label: 'إدارة الموظفين ←' },
+  products:       { navId: null,    view: null,        label: 'إدارة المنتجات ←' },
 }
 
-function CapabilityLink({ sectionType, color, changeTab }) {
+function CapabilityLink({ sectionType, color, changeTab, hasReservations }) {
   const link = CAPABILITY_LINKS[sectionType]
   if (!link || !changeTab) return null
+  const navId = link.navId ?? (hasReservations ? 'store' : 'catalog')
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
@@ -497,11 +506,11 @@ function CapabilityLink({ sectionType, color, changeTab }) {
       background: `${color}0f`, border: `1px solid ${color}30`,
     }}>
       <span style={{ fontSize: 12.5, color: T.textSecond }}>
-        العناصر نفسها (الاسم، السعر، الصورة...) تُدار من صفحة الموظفين
+        العناصر نفسها (الاسم، السعر، الصورة...) تُدار من صفحة {navId === 'staff' ? 'الموظفين' : 'المتجر'}
       </span>
       <button
         type="button"
-        onClick={() => changeTab('staff', `view=${link.view}`)}
+        onClick={() => changeTab(navId, link.view ? `view=${link.view}` : undefined)}
         style={{
           background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
           color, fontSize: 13, fontWeight: 700, fontFamily: FONT,
@@ -513,7 +522,7 @@ function CapabilityLink({ sectionType, color, changeTab }) {
   )
 }
 
-function SectionEditorPanel({ section, schema, color, changeTab }) {
+function SectionEditorPanel({ section, schema, color, changeTab, hasReservations }) {
   const fieldsConfig = Object.entries(schema?.fields ?? {})
     .filter(([, f]) => f.kind !== 'repeatable' && f.kind !== 'media')
     .map(([key, f]) => ({ key, label: f.label_ar, type: f.kind, options: f.options, fields: f.fields }))
@@ -566,7 +575,7 @@ function SectionEditorPanel({ section, schema, color, changeTab }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 12 }}>
         {schema?.label_ar ?? section.type}
       </div>
-      <CapabilityLink sectionType={section.type} color={color} changeTab={changeTab} />
+      <CapabilityLink sectionType={section.type} color={color} changeTab={changeTab} hasReservations={hasReservations} />
       {mediaFields.map(mf => (
         <MediaField key={mf.key} pipeline={mf.pipeline} color={color} />
       ))}
@@ -716,7 +725,7 @@ function RepeatableGroupEditor({ sectionType, field, fieldSchema, color }) {
   )
 }
 
-function SectionSettingsArea({ color, changeTab }) {
+function SectionSettingsArea({ color, changeTab, hasReservations }) {
   const [sections, setSections] = useState([])
   const [schemas, setSchemas] = useState(null) // TOS-005 Phase B -- fetched once, not hardcoded
   const [loading, setLoading] = useState(true)
@@ -798,7 +807,7 @@ function SectionSettingsArea({ color, changeTab }) {
           {/* Editor side -- the "opposite side" panel for whichever section is selected */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {selectedSection ? (
-              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} changeTab={changeTab} />
+              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} changeTab={changeTab} hasReservations={hasReservations} />
             ) : (
               <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد أقسام بعد.</div>
             )}
@@ -811,7 +820,7 @@ function SectionSettingsArea({ color, changeTab }) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export default function SettingsTab({ settings, onUpdated, color, onFormChange, changeTab }) {
+export default function SettingsTab({ settings, onUpdated, color, onFormChange, changeTab, hasReservations }) {
   const existingConfig = settings?.config ?? {}
   const existingHours   = existingConfig.working_hours ?? {}
 
@@ -1001,7 +1010,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
           heading_ar, ...) live here now too, correcting the removed "Hero Text" card above,
           which wrote to config.hero -- a field HeroSection.jsx never read (confirmed real,
           pre-existing, dead since it shipped; nothing else in the codebase referenced it). */}
-      <SectionSettingsArea color={form.primary_color} changeTab={changeTab} />
+      <SectionSettingsArea color={form.primary_color} changeTab={changeTab} hasReservations={hasReservations} />
 
       {/* ── Feedback + Save ───────────────────────────────────────────── */}
       {error && (

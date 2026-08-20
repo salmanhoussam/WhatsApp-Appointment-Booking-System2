@@ -578,7 +578,7 @@ export default function GenericAdminDashboard() {
       case 'notifications':
         return <ComingSoonTab label="الإشعارات" color={color} />
       case 'settings':
-        return <SettingsTab settings={settings} onUpdated={setSettings} color={color} changeTab={changeTab} />
+        return <SettingsTab settings={settings} onUpdated={setSettings} color={color} changeTab={changeTab} hasReservations={hasReservations} />
       default:
         return null
     }
@@ -836,6 +836,7 @@ export default function GenericAdminDashboard() {
                   color={color}
                   onFormChange={setPreviewForm}
                   changeTab={changeTab}
+                  hasReservations={hasReservations}
                 />
               </div>
             </motion.div>

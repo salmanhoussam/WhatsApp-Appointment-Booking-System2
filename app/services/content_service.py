@@ -19,7 +19,7 @@ generic Dispatcher.
 """
 
 from app.repositories import content_sections_repo as _sections
-from app.schemas.section_schemas import validate_fields, validate_repeatable_item
+from app.schemas.section_schemas import SECTION_SCHEMAS, validate_fields, validate_repeatable_item
 
 
 # hero.title/story.heading's dedicated update_hero_title/get_hero_title/update_story_heading/
@@ -40,6 +40,19 @@ async def reorder_sections(client_id: str, ordered_types: list[str]):
 async def list_sections(client_id: str):
     """Read side for the Dashboard's Section Settings view (Homepage Phase 2.6, 2026-08-18)."""
     return await _sections.list_sections(client_id)
+
+
+async def add_section(client_id: str, section_type: str, enabled: bool = True):
+    """
+    Tenant OS Section Editor Phase 5's "materialize on first touch" gap, closed here for real use
+    (2026-08-20) -- `content_sections_repo.add_section` is generic, but every caller (an admin
+    route today, a one-off script tomorrow) must go through this validated boundary, same
+    discipline as update_section_fields above: `section_type` must be a real, declared type, never
+    an arbitrary string a caller invents.
+    """
+    if section_type not in SECTION_SCHEMAS:
+        raise ValueError(f"Unknown section type: {section_type}")
+    return await _sections.add_section(client_id, section_type, enabled)
 
 
 # ── Generic field update (Homepage Phase 2.6, 2026-08-18) ──────────────────────────────────────
