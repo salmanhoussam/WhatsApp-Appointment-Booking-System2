@@ -112,3 +112,58 @@ underlying "one system, shared capabilities" part reinforces an already-ratified
 (`backend/architecture.md §9`) rather than introducing a new one. The dashboard-driven page-builder
 idea stays here as a named future direction until it's actually attempted once, per this project's
 own Abstraction Rule (extract/promote only after real evidence, not a stated intention).
+
+## 2026-08-20
+
+### Context
+
+Pre-removal audit for Tenant OS Section Editor Phase 6 ("Remove Legacy Settings" —
+`page_type`/`catalog_layout`/`font`), triggered by Salman's explicit "verify before you remove"
+instruction rather than executing the phase as originally written.
+
+### Discovery
+
+A real, separate, still-live tenant rendering system exists that the entire Tenant OS Section
+Editor effort (TOS-005 + its own 6 phases) never touched or audited: the **auto-onboarded/Demo
+path** (`frontend/src/router/DynamicTenantResolver.jsx` → `DynamicPage.jsx`'s `DefaultFallback` for
+`page_type`, chaining into `DemoCatalogPage.jsx`/`DemoPublicPage.jsx` for `catalog_layout`) — this
+is the real mechanism a brand-new tenant (not yet in `tenantRegistry`, not yet with real Section
+content) uses to show *something* other than a blank "coming soon" page. `page_type`'s real value
+lives in a dedicated Prisma column (`Client.pageType`), not the JSON `config` blob most other
+per-tenant settings use — a real, separate storage decision from everything the Section Editor work
+touched. A real, currently-live tenant (`assi`) depends on this today, confirmed in a real browser.
+Full evidence: `.claudedocs/work/legacy-page-settings-audit/2026-08-20/summary.md`.
+
+### Current Understanding
+
+This project now has (at least) **three distinct real tenant-rendering systems**, not one:
+1. **Bespoke, hand-built pages** (`tenantRegistry` — `smar`, `caracas`, `arizona`, `footlab`,
+   `olivello`, `moments`, `beit-al-fakhar`, `sneakers-lb`, `sneakers-beirut`,
+   `store-pilot-20260731`) — each its own dedicated route tree, never touches `DynamicPage.jsx`.
+2. **Tenant OS Section Editor / Section System** (`DynamicPage.jsx` + `SECTION_MAP`, real
+   `content.sections[]` content) — `mr-h`/`rk`, the two tenants this whole session's work (TOS-005,
+   Phases 1-6, Customer Registry, Products/Services Separation) actually concerns.
+3. **Auto-onboarded/Demo** (`DynamicTenantResolver.jsx`'s `DefaultFallback` + `page_type` +
+   `DemoCatalogPage.jsx`/`DemoPublicPage.jsx` + `catalog_layout`) — for a tenant with `sections: []`
+   and not in the registry; this is effectively the real **Menu/Restaurant/Store application
+   foundation** for brand-new onboarding, named explicitly here for the first time as its own
+   system rather than assumed-dead legacy code.
+
+Nothing in today's work merges or plans to merge these three systems — Phase 6 was narrowed to
+`font` removal specifically *because* systems 1 and 3 are real and untouched by the Section Editor
+work, not because they're deprecated.
+
+### Open Questions
+
+- Does system 3 (auto-onboarded/Demo) get its own real audit/Capability treatment eventually — the
+  same rigor TOS-005/the Section Editor gave system 2 — or does it get folded into system 2 once a
+  tenant "graduates" past `sections: []`? Not decided, not even proposed yet.
+- Is the `page_type` UI's dead `"landing"` option (real bug, found during the same audit — selecting
+  it produces no different behavior than the default) worth a standalone fix, or does it wait for
+  whatever decision eventually touches system 3 as a whole?
+
+### Promoted?
+
+No — real, freshly-confirmed evidence about existing system boundaries, not yet a decision about
+what to do with system 3. Worth a real Capability Investigation of its own if/when Salman decides
+to open that track — named here so the boundary isn't rediscovered from scratch next time.
