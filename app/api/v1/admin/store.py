@@ -227,8 +227,13 @@ async def delete_product(
     _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
-    result = await _cat_repo.delete_item_by_filter(client_id, product_id, module_key="store")
-    if result.count == 0:
+    # delete_many() returns a plain int (row count) in this prisma-client-py version (0.15.0),
+    # not an object with a .count attribute -- same real bug class already found and fixed in
+    # reservation_repo.py's update_many() calls (2026-07-30). Found live here 2026-08-20 while
+    # cleaning up a real temporary test product created during Track B (Products/Services
+    # Separation) verification -- pre-existing, unrelated to that Track's own changes.
+    deleted_count = await _cat_repo.delete_item_by_filter(client_id, product_id, module_key="store")
+    if deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found.")
     return {"success": True}
 
