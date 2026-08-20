@@ -2,9 +2,10 @@
 
 Scope per Salman's explicit Phase 5 order (2026-08-20): Services/Staff deep-link orchestration
 into `StaffTab.jsx`, no new CRUD, no new source of truth; Footer becoming a real, toggleable
-Section. **Partial completion, by design** — Services/Staff done and verified; Footer stopped on,
-per instruction #6 ("إذا ظهر أي mismatch بين الخطة والكود الحقيقي، توقف عنده وبلّغ عنه"), not
-executed. Reported below, not silently resolved.
+Section. Services/Staff done and verified (Part A); Footer stopped on, per instruction #6 ("إذا
+ظهر أي mismatch بين الخطة والكود الحقيقي، توقف عنده وبلّغ عنه"), reported rather than executed
+(Part B) — then explicitly closed the same day: prior architectural decision stands, Footer stays
+fixed/always-on, no code changed. **Phase 5 is DONE as of this closure.**
 
 ---
 
@@ -153,19 +154,24 @@ not pure Dashboard-side orchestration/deep-linking, and specifically the kind of
 
 Zero risk taken on two real, financially-live production tenants' public-page footers.
 
-### Question back to Salman
+### Decision (Salman, 2026-08-20) — CLOSED
 
-Two real options, not proposed as a recommendation, just named:
+**Option 2 taken: the prior decision stands.** Footer stays fixed/always-on, exactly as
+`ALZABT_HOMEPAGE_SECTION_EXPANSION_PROPOSAL.md §3` and `Footer.jsx`'s own header comment already
+document — not overridden. Explicit, binding scope for this phase:
 
-1. **Override the prior decision** — confirm Footer should become a real `content.sections[]`
-   entry after all, explicitly superseding `ALZABT_HOMEPAGE_SECTION_EXPANSION_PROPOSAL.md §3`
-   (and accept the small, real, additive repository change needed to make first-touch
-   enable/reorder work without a manual backfill).
-2. **Keep the prior decision** — Footer stays a site-wide, always-on component; if some *other*
-   real need prompted "Footer as a section" today, name it, so the right narrower fix can be
-   scoped instead of the broad SECTION_MAP change.
+- `footer` is **not** added to `SECTION_MAP`.
+- No DB backfill for either tenant.
+- No new backend route/repository capability (the `set_section_enabled`/`reorder_sections`
+  "materialize on first touch" gap named above is *not* being built).
+- "Footer كـ selectable section" is **rejected for this phase** — recorded here as a real,
+  considered-and-declined request, not a silently dropped one.
+- **Left open on purpose**: a separate, narrower "Footer Settings" capability (e.g., a dedicated
+  Dashboard panel for `instagram_url`/other real `Client` fields Footer already reads) remains
+  possible later, if a real need for it shows up — this decision closes "Footer as a
+  `content.sections[]` entry," not "Footer can never get its own settings surface."
 
-Not executed either way without your explicit call.
+No code changed for Part B, before or after this decision — confirmed nothing to revert.
 
 ---
 
@@ -184,7 +190,10 @@ routes/schema/validation needed since `StaffTab.jsx`'s real endpoints already ex
 
 ## Result
 
-Part A (Services/Staff) complete and verified on both tenants. Part B (Footer) stopped per a real,
-evidenced architectural conflict — awaiting Salman's explicit decision before any further work.
-Phase 6 not started, per standing instruction. Products/Catalog, Clients, Notifications untouched,
-reserved for the separate Capability-to-Section Audit track named for after this phase.
+**Phase 5: DONE**, as of commit `8d27798` plus this closure. Part A (Services/Staff) complete and
+verified on both tenants. Part B (Footer) stopped on a real, evidenced architectural conflict,
+reported rather than resolved silently, then explicitly closed by Salman: prior decision stands,
+Footer stays fixed/always-on, no code touched. Phase 6 not started, per standing one-phase-at-a-time
+instruction — does not start automatically off the back of this closure either. Products/Catalog,
+Clients, Notifications untouched, reserved for the separate Capability-to-Section Audit track named
+for after this phase.
