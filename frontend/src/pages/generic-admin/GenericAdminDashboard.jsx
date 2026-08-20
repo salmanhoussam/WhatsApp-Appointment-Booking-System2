@@ -11,6 +11,7 @@ import ReservationsTab   from './tabs/ReservationsTab'
 import StaffTab          from './tabs/StaffTab'
 import StoreTab          from './tabs/StoreTab'
 import MyClientsTab      from './tabs/MyClientsTab'
+import CustomersTab      from './tabs/CustomersTab'
 import { useAdminRole, useAdminBarberId } from '../../hooks/useAdminRole'
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
@@ -573,7 +574,7 @@ export default function GenericAdminDashboard() {
       case 'staff':
         return <StaffTab color={color} />
       case 'customers':
-        return <ComingSoonTab label="العملاء" color={color} />
+        return <CustomersTab color={color} />
       case 'notifications':
         return <ComingSoonTab label="الإشعارات" color={color} />
       case 'settings':

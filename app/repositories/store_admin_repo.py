@@ -35,6 +35,18 @@ async def update_order_status(order_id: str, status: str):
     )
 
 
+async def list_all_orders_with_items(client_id: str) -> list:
+    """Every store order for this tenant, items + each item's real CatalogItem included (for
+    product name resolution) -- no take limit. Distinct from list_orders() above (paginated,
+    status-filterable, powers the Orders tab) -- used only by the Customer Registry aggregation
+    (customer_registry_service.py)."""
+    return await prisma_client.storeorder.find_many(
+        where={"clientId": client_id},
+        include={"items": {"include": {"catalogItem": True}}},
+        order={"createdAt": "desc"},
+    )
+
+
 async def list_today_orders(client_id: str, today_start) -> list:
     """All orders for a tenant created today (for stats)."""
     return await prisma_client.storeorder.find_many(

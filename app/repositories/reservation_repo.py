@@ -58,6 +58,18 @@ class ReservationRepository:
             take=limit,
         )
 
+    async def list_all_for_client_with_service(self, client_id: str) -> list:
+        """Every reservation for this tenant, real `service` relation included (for name
+        resolution) -- no take limit, tenant-wide (not barber-scoped like
+        list_customer_identities_for_barber below). Used only by the Customer Registry
+        aggregation (customer_registry_service.py) -- a real, separate, TENANT_ADMIN-gated read
+        path from list_my_clients' STAFF-scoped one, which stays untouched."""
+        return await self.db.reservation.find_many(
+            where={"clientId": client_id},
+            include={"service": True},
+            order={"reservedAt": "desc"},
+        )
+
     async def list_customer_identities_for_barber(self, client_id: str, barber_id: str) -> list:
         """Staff Scoped Access Phase C (2026-08-09) -- every reservation for one barber, no take
         limit, used only to derive distinct client identity (name/phone/email). Not a paginated
