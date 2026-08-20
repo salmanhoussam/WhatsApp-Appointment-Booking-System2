@@ -82,12 +82,6 @@ const LAYOUT_OPTS = [
   { key: 'showcase', label: 'بطاقات', icon: '▭' },
 ]
 
-const FONT_OPTS = [
-  { key: 'Cairo',    label: 'Cairo'   },
-  { key: 'Tajawal',  label: 'Tajawal' },
-  { key: 'Inter',    label: 'Inter'   },
-]
-
 // ── Store QR — deliberately minimal (Store Template Pilot, 2026-07-31) ────────
 // Generates on demand from the backend (GET /admin/settings/qr), no complex QR system --
 // one static image encoding the tenant's real public store URL, per Salman's explicit scope.
@@ -829,10 +823,13 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
     name_en:          settings?.name_en         ?? '',
     primary_color:    settings?.primary_color   ?? '#6366f1',
     whatsapp_number:  settings?.whatsapp_number ?? '',
-    // design
+    // design -- page_type/catalog_layout kept intentionally (Tenant OS Section Editor Phase 6
+    // scope decision, 2026-08-20): both are real, load-bearing for the auto-onboarded/Demo
+    // rendering path (DynamicTenantResolver.jsx, DemoCatalogPage.jsx) -- a separate, still-live
+    // Menu/Restaurant/Store application track this pass does not touch. See
+    // .claudedocs/work/legacy-page-settings-audit/2026-08-20/summary.md for the full evidence.
     page_type:        settings?.page_type       ?? 'normal',
     catalog_layout:   existingConfig.catalog_layout ?? 'grid',
-    font:             existingConfig.font           ?? 'Cairo',
     // working hours (Homepage Phase 2.6, 2026-08-18) -- the real field HoursSection.jsx actually
     // prioritizes; previously had zero Dashboard editing surface anywhere, confirmed via a real
     // grep of every admin tab (ALZABT_HOMEPAGE_SECTION_SETTINGS_CONTRACT.md SS3)
@@ -868,7 +865,6 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
         config: {
           ...existingConfig,
           catalog_layout: form.catalog_layout,
-          font:           form.font,
           // Real field HoursSection.jsx prioritizes (Homepage Phase 2.6) -- only written when
           // both times are actually set, so an empty form never wipes a real existing value.
           working_hours: (form.working_hours_open && form.working_hours_close) ? {
@@ -959,14 +955,10 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
           />
         </Field>
 
-        <Field label="الخط" hint="الخط المستخدم في الصفحة العامة">
-          <OptionGroup
-            options={FONT_OPTS}
-            value={form.font}
-            onChange={set('font')}
-            color={form.primary_color}
-          />
-        </Field>
+        {/* "الخط" (font) control removed -- Tenant OS Section Editor Phase 6, narrowed scope,
+            2026-08-20. Confirmed genuinely dead: zero real consumers anywhere in the codebase
+            (unlike page_type/catalog_layout above, kept intentionally -- see the comment on
+            this component's initial form state for the full reasoning). */}
 
         {/* Live color preview */}
         <div style={{
