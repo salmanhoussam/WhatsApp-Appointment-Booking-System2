@@ -145,7 +145,13 @@ export default function StoreTab({ color, currency = 'USD', activeServices }) {
       loadCategories()
       setShowCatModal(false)
     } catch (err) {
-      alert(err?.response?.data?.detail ?? 'حدث خطأ')
+      // Was err?.response?.data?.detail -- this app's real error envelope is
+      // {success:false, error:{code, message, details}} (app/core/handlers.py), never a bare
+      // `detail` key, so that always read undefined and silently fell to the generic fallback.
+      // Confirmed live, 2026-08-21: a real 403 ("Service 'store' is not activated for this
+      // tenant.") only ever showed "حدث خطأ" to the admin. Matches the working convention
+      // reservationInteractions.jsx already uses (err?.response?.data?.error?.message).
+      alert(err?.response?.data?.error?.message ?? 'حدث خطأ')
     } finally {
       setCatSaving(false)
     }
@@ -268,7 +274,13 @@ export default function StoreTab({ color, currency = 'USD', activeServices }) {
       loadItems(itemCatFilter || undefined)
       setShowItemModal(false)
     } catch (err) {
-      alert(err?.response?.data?.detail ?? 'حدث خطأ')
+      // Was err?.response?.data?.detail -- this app's real error envelope is
+      // {success:false, error:{code, message, details}} (app/core/handlers.py), never a bare
+      // `detail` key, so that always read undefined and silently fell to the generic fallback.
+      // Confirmed live, 2026-08-21: a real 403 ("Service 'store' is not activated for this
+      // tenant.") only ever showed "حدث خطأ" to the admin. Matches the working convention
+      // reservationInteractions.jsx already uses (err?.response?.data?.error?.message).
+      alert(err?.response?.data?.error?.message ?? 'حدث خطأ')
     } finally {
       setItemSaving(false)
     }

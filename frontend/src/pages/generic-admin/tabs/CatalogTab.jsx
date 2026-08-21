@@ -151,7 +151,9 @@ export default function CatalogTab({ color }) {
       loadCategories()
       setShowCatModal(false)
     } catch (err) {
-      alert(err?.response?.data?.detail ?? 'حدث خطأ')
+      // Was err?.response?.data?.detail -- see StoreTab.jsx's identical fix, same real cause
+      // (this app's error envelope is error.message, never a bare `detail` key), 2026-08-21.
+      alert(err?.response?.data?.error?.message ?? 'حدث خطأ')
     } finally {
       setCatSaving(false)
     }
@@ -260,7 +262,9 @@ export default function CatalogTab({ color }) {
       setItems(r.data.data ?? [])
       setShowItemModal(false)
     } catch (err) {
-      alert(err?.response?.data?.detail ?? 'حدث خطأ')
+      // Was err?.response?.data?.detail -- see StoreTab.jsx's identical fix, same real cause
+      // (this app's error envelope is error.message, never a bare `detail` key), 2026-08-21.
+      alert(err?.response?.data?.error?.message ?? 'حدث خطأ')
     } finally {
       setItemSaving(false)
     }

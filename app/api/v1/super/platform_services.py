@@ -6,6 +6,7 @@ from decimal import Decimal
 from app.db.client import prisma_client
 from app.core.tenant import require_super_admin
 from app.core.services import sync_selected_services
+from app.services import content_service
 
 router = APIRouter(tags=["Super Admin — Platform Services"])
 
@@ -135,6 +136,14 @@ async def toggle_client_service(
     )
 
     await sync_selected_services(client_id)
+
+    # Tenant OS Section Editor's "materialize on first touch" gap (B2, 2026-08-21 --
+    # .claudedocs/work/barber-production-readiness-study/2026-08-21/summary.md) -- activating
+    # `store` used to leave the homepage `products` section missing until someone ran a one-off
+    # script by hand (scripts/add_products_section_rk.py). add_section() is idempotent, so this is
+    # safe to call on every activation, not just the first.
+    if body.service_key == "store" and body.is_active:
+        await content_service.add_section(client_id, "products")
 
     return {"success": True, "client_id": client_id, "service_key": body.service_key, "is_active": body.is_active}
 

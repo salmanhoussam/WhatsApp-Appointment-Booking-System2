@@ -167,7 +167,7 @@ function IconLogout({ size = 18, color }) {
  * ComingSoonTab placeholder -- their own build is a separate future phase (per Salman's
  * instruction not to build calendar/staff features yet); this phase is the navigation shape only.
  */
-function buildNav(hasReservations) {
+function buildNav(hasReservations, activeServices) {
   if (!hasReservations) {
     return [
       { id: 'overview', labelAr: 'نظرة عامة', Icon: IconOverview },
@@ -184,15 +184,20 @@ function buildNav(hasReservations) {
   // Overview moved to the front (2026-08-10, Overview UX Improvements Contract) -- matches the
   // !hasReservations branch above, which already puts it first; this branch was the inconsistent
   // outlier with it last.
+  // 'store' gated on activeServices (Store B1 bug fix, 2026-08-21) -- was unconditional, so a
+  // reservations tenant without the `store` service still saw a real nav entry that 403'd on
+  // every request underneath it (confirmed live on mr-h,
+  // .claudedocs/work/store-b1-investigation/2026-08-21/summary.md).
+  const hasStore = (activeServices ?? []).includes('store')
   return [
     { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
     { id: 'calendar',      labelAr: 'التقويم',    Icon: IconCalendar      },
     { id: 'reservations',  labelAr: 'الحجوزات',   Icon: IconList          },
     { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
-    { id: 'store',         labelAr: 'المتجر',     Icon: IconOrders        },
+    ...(hasStore ? [{ id: 'store', labelAr: 'المتجر', Icon: IconOrders }] : []),
     { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
     { id: 'notifications', labelAr: 'الإشعارات',  Icon: IconNotifications },
-    { id: 'settings',      labelAr: 'الإعدادات',  Icon: IconSettings      },
+    { id: 'settings',      labelAr: 'الإعدادات', Icon: IconSettings      },
   ]
 }
 
@@ -492,11 +497,11 @@ export default function GenericAdminDashboard() {
   const color           = settings?.primary_color  ?? '#6366f1'
   const tenantName      = settings?.name_ar        ?? 'لوحة التحكم'
   const currency        = settings?.currency       ?? config?.currency ?? 'USD'
-  const activeServices  = config?.active_services  ?? []
+  const activeServices  = useMemo(() => config?.active_services ?? [], [config?.active_services])
   const hasReservations = activeServices.includes('reservations')
   const NAV               = useMemo(
-    () => (isStaff ? STAFF_NAV : buildNav(hasReservations)),
-    [hasReservations, isStaff],
+    () => (isStaff ? STAFF_NAV : buildNav(hasReservations, activeServices)),
+    [hasReservations, isStaff, activeServices],
   )
 
   // basePath = current URL with the trailing tab segment removed -- works for both real route
