@@ -5,7 +5,7 @@ import adminApi from '../../../utils/admin.config'
 import useTenantConfig from '../../../hooks/useTenantConfig'
 import ReservationsWeekCalendar, { startOfWeekSunday } from '../components/ReservationsWeekCalendar'
 import ReservationsTodayView from '../components/ReservationsTodayView'
-import { useBarbers, useServices, ReservationPopover, CreatePopover } from '../components/reservationInteractions'
+import { useBarbers, useServices, ReservationPopover, CreatePopover, fmtTimeUTC } from '../components/reservationInteractions'
 import Dropdown from '../components/Dropdown'
 import DatePicker from '../components/DatePicker'
 import StatCard from '../components/StatCard'
@@ -70,10 +70,14 @@ export function fmtDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
-export function fmtTime(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-}
+// Time display was toLocaleTimeString('ar-SA', ...) with no timezone -- let the browser's local
+// zone convert the UTC-suffixed ISO string, silently disagreeing with the Calendar/Today views and
+// every reschedule popover, which all read the same `reserved_at` via fmtTimeUTC (see that
+// function's own comment in reservationInteractions.jsx for the documented convention: reserved_at
+// is the tenant's wall-clock time written directly into a UTC-typed column, no real conversion).
+// Fixed 2026-08-21 by reusing that same canonical helper here instead of a second, disagreeing
+// implementation -- confirmed live: mr-h's real reservation showed 11:00 on Calendar and 02:00 PM
+// on this List, a real 3-hour discrepancy for the identical row.
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -273,7 +277,7 @@ function MobileReservationCard({ reservation, idx, color, onUpdate, onOpen }) {
         <div style={{ fontSize: 11, color: T.textMuted }}>
           {fmtDate(dateAt)}
           {dateAt ? <span style={{ margin: '0 4px', opacity: 0.5 }}>·</span> : ''}
-          {fmtTime(dateAt)}
+          {fmtTimeUTC(dateAt)}
         </div>
         {reservation.module_key && (
           <span style={{
@@ -895,7 +899,7 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
                       </td>
 
                       <td style={{ ...tdStyle, fontSize: 12, color: T.textSecond }}>
-                        {fmtTime(res.reserved_at ?? res.created_at)}
+                        {fmtTimeUTC(res.reserved_at ?? res.created_at)}
                       </td>
 
                       <td style={tdStyle}>
