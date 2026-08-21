@@ -339,6 +339,10 @@ change. **A2.1 (unify Calendar/List/Reschedule time display, Finding 5) DONE** �
 `.claudedocs/implementation/CALENDAR_TIMEZONE_FIX/A2.1.md`. **A2.2 (barber-aware working-hours
 grid, Finding 2) DONE** — see `.claudedocs/implementation/CALENDAR_TIMEZONE_FIX/A2.2.md`. Track A
 (Calendar) is now fully closed for the two confirmed findings from A1; the Week-view multi-barber
-scope gap (registered in A2.2) remains open, named, not solved. Track B (Store) untouched —
-awaiting Salman's decisions on Store's materialization mechanism (B2: (a) vs (b)) and whether
-mr-h gets a real Store at all (B3).
+scope gap (registered in A2.2) remains open, named, not solved.
+
+**Track B (Store) also DONE, 2026-08-21** — B1 investigation, both real bugs fixed (nav gating,
+error-message field), B2 decided (auto-materialize on Store activation) and B3 decided (rk's real
+hidden products made visible, full purchase chain verified end-to-end with real data; mr-h left
+without Store, zero product data to justify it) — see
+`.claudedocs/work/store-b1-investigation/2026-08-21/b2-b3-execution.md` for full evidence.
