@@ -264,6 +264,12 @@ export default function ReservationsWeekCalendar({
   const [direction, setDirection] = useState(0)
   const [popover, setPopover] = useState(null) // { item, anchor } -- Phase 3.4 Item 3
   const [createSlot, setCreateSlot] = useState(null) // { reservedAt, anchor } -- Phase 3.4 Item 2
+  // Deliberately left on the tenant-wide `hourRange` (A2.2, 2026-08-21) -- unlike
+  // ReservationsTodayView.jsx (single barber column, unambiguous), this view's columns are DAYS
+  // pooling every barber's reservations together (see `byDay` below), so there is no single
+  // barber whose own working hours the grid boundary could correctly narrow to. Making this
+  // barber-aware would need a real per-barber-lane redesign of this view, out of A2.2's scope
+  // (smallest safe change, no refactor) -- registered, not solved here.
   const [startHour, endHour] = hourRange
 
   // Local, optimistically-updated copy of `reservations` (Phase 3.4 Item 4) -- same pattern

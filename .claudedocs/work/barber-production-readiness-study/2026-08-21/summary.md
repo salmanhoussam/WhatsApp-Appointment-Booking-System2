@@ -335,8 +335,10 @@ currently-inactive-for-mr-h capability), not a hard technical dependency.
 ## Status
 
 **Study complete 2026-08-21.** A1 (real browser verification) executed same day, no code/DB
-change. **A2.1 (unify Calendar/List/Reschedule time display, Finding 5) executed and DONE** — see
-`.claudedocs/implementation/CALENDAR_TIMEZONE_FIX/A2.1.md` for full evidence. A2.2 (the
-working-hours hourRange-source fix, Finding 2) was explicitly NOT started, per instruction.
-Awaiting Salman's approval and decisions on: A2.2's direction, Store's materialization mechanism
-(B2: (a) vs (b)), and whether mr-h gets a real Store at all (B3).
+change. **A2.1 (unify Calendar/List/Reschedule time display, Finding 5) DONE** — see
+`.claudedocs/implementation/CALENDAR_TIMEZONE_FIX/A2.1.md`. **A2.2 (barber-aware working-hours
+grid, Finding 2) DONE** — see `.claudedocs/implementation/CALENDAR_TIMEZONE_FIX/A2.2.md`. Track A
+(Calendar) is now fully closed for the two confirmed findings from A1; the Week-view multi-barber
+scope gap (registered in A2.2) remains open, named, not solved. Track B (Store) untouched —
+awaiting Salman's decisions on Store's materialization mechanism (B2: (a) vs (b)) and whether
+mr-h gets a real Store at all (B3).

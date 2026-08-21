@@ -4,7 +4,7 @@ import {
   useDroppable, useDraggable, closestCorners,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { StatusBadge } from '../tabs/ReservationsTab'
+import { StatusBadge, parseHourLoose } from '../tabs/ReservationsTab'
 import {
   fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
@@ -287,11 +287,26 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
  *     and ReservationsWeekCalendar.jsx share one fetch each instead of two independent ones.
  */
 export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, services, hideBarberPicker = false }) {
-  const [startHour, endHour] = hourRange
   // Which barber's schedule is currently VISIBLE -- owned by ReservationsTab.jsx (props
   // `visibleBarberId`/`onVisibleBarberChange`), not local state here. This component fully
   // unmounts/remounts on every load() in the parent (day-nav, filters, etc.), so local state would
   // silently reset on every such change -- a real bug found via Browser Verification, 2026-08-05.
+  const visibleBarber = barbers.find((b) => b.id === visibleBarberId) ?? null
+
+  // A2.2 (2026-08-21) -- the grid's own hour boundaries must match what the backend will actually
+  // accept for THIS barber, not the tenant-wide default. reservation_service.py's
+  // _check_working_hours() resolves barber.workingHours first, falling back to the tenant-wide
+  // Client.config.working_hours only when the barber has none set -- mirrored here exactly (same
+  // priority, same loose parse) so the grid never renders a slot the backend would reject. `hourRange`
+  // (the tenant-wide default ReservationsTab.jsx already computes) is the fallback, not a second
+  // independent default -- single column, single barber at a time, so this is unambiguous here in a
+  // way it isn't for Week's multi-barber-per-day columns (ReservationsWeekCalendar.jsx, deliberately
+  // left on the tenant-wide range -- see that file's own note).
+  const barberOpen  = parseHourLoose(visibleBarber?.working_hours?.open_time)
+  const barberClose = parseHourLoose(visibleBarber?.working_hours?.close_time)
+  const [startHour, endHour] = (barberOpen != null && barberClose != null && barberClose > barberOpen)
+    ? [barberOpen, barberClose]
+    : hourRange
   const [items, setItems] = useState(reservations)
   const [activeId, setActiveId] = useState(null)
   const [popover, setPopover] = useState(null) // { item, anchor }
@@ -431,8 +446,6 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
       clearPending(active.id)
     }
   }, [items, date, startHour, endHour, onReschedule, markPending, clearPending])
-
-  const visibleBarber = barbers.find((b) => b.id === visibleBarberId) ?? null
 
   return (
     <div style={{ direction: 'rtl', fontFamily: FONT }}>

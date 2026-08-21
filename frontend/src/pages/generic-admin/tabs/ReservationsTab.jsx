@@ -92,7 +92,10 @@ function addDaysLocal(d, n) {
   copy.setDate(copy.getDate() + n)
   return copy
 }
-function parseHourLoose(v) {
+// Exported so ReservationsTodayView.jsx can resolve a barber-specific hour range with the exact
+// same loose ("09:00" or "9") parsing this file already uses for the tenant-wide fallback --
+// see that file's own hourRange comment (A2.2, 2026-08-21).
+export function parseHourLoose(v) {
   if (v == null) return null
   const [h] = String(v).split(':')
   const n = parseInt(h, 10)
