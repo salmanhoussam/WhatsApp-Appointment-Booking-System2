@@ -801,7 +801,7 @@ function SectionSettingsArea({ color, changeTab, hasReservations }) {
           {/* Editor side -- the "opposite side" panel for whichever section is selected */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {selectedSection ? (
-              <SectionEditorPanel section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} changeTab={changeTab} hasReservations={hasReservations} />
+              <SectionEditorPanel key={selectedSection.type} section={selectedSection} schema={schemas?.[selectedSection.type]} color={color} changeTab={changeTab} hasReservations={hasReservations} />
             ) : (
               <div style={{ fontSize: 12, color: T.textMuted }}>لا توجد أقسام بعد.</div>
             )}
