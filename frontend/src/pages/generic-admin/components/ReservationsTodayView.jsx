@@ -4,7 +4,7 @@ import {
   useDroppable, useDraggable, closestCorners,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { StatusBadge, parseHourLoose } from '../tabs/ReservationsTab'
+import { StatusBadge, STATUS_META, parseHourLoose } from '../tabs/ReservationsTab'
 import {
   fmtTimeUTC, quarterIndexFromIso, isoAtQuarter, todayISODate, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
@@ -272,6 +272,71 @@ function StaffColumn({ barber, items, quarters, startHour, barberOpenHour, barbe
             />
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ── Today Agenda Panel (A5, 2026-08-22) ─────────────────────────────────────────────────────────
+// The reviewed screenshot's own real, extractable idea (per the UX study's own Reuse/Reject note --
+// the month-grid main view was rejected as the wrong grain, this side strip was the one thing kept
+// worth building). A compact, time-sorted list of the day's real bookings across EVERY real barber,
+// not just the currently visible/toggled columns -- the whole point is one full-picture summary
+// regardless of which columns are shown, same reasoning the grid itself doesn't have. Reuses
+// StatusBadge/STATUS_META (ReservationsTab.jsx) and the exact same ReservationPopover every card
+// already opens -- no new mutation path, no new popover, no new data fetch (reads the same `items`
+// the grid itself already has).
+function TodayAgendaPanel({ items, barbers, serviceNameFor, onOpen }) {
+  const sorted = [...items]
+    .filter((i) => VISIBLE_STATUSES.includes(i.status))
+    .sort((a, b) => new Date(a.reserved_at) - new Date(b.reserved_at))
+
+  return (
+    <div style={{
+      width: 260, flexShrink: 0, background: T.cardBg, border: `1px solid ${T.border}`,
+      borderRadius: 12, boxShadow: T.shadow, overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', maxHeight: 640,
+    }}>
+      <div style={{
+        padding: '12px 14px', borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: T.textPrimary, fontFamily: FONT }}>جدول اليوم</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, fontFamily: FONT }}>{sorted.length} حجز</span>
+      </div>
+      <div style={{ overflowY: 'auto', padding: '6px 8px' }}>
+        {sorted.length === 0 ? (
+          <div style={{ padding: '32px 12px', textAlign: 'center', color: T.textMuted, fontSize: 12.5, fontFamily: FONT }}>
+            لا توجد حجوزات اليوم
+          </div>
+        ) : (
+          sorted.map((item) => {
+            const barberName = barbers.find((b) => b.id === item.barber_id)?.name ?? '—'
+            const stripe = STATUS_META[item.status]?.color ?? T.borderSoft
+            return (
+              <button
+                key={item.id}
+                onClick={(e) => onOpen(item, e)}
+                style={{
+                  width: '100%', display: 'block', textAlign: 'right', padding: '8px 10px',
+                  marginBottom: 4, borderRadius: 8, cursor: 'pointer', fontFamily: FONT,
+                  background: T.pageBg, border: 'none', borderInlineStart: `3px solid ${stripe}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, color: T.textPrimary }}>{fmtTimeUTC(item.reserved_at)}</span>
+                  <StatusBadge status={item.status} />
+                </div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: T.textPrimary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {item.customer_name}
+                </div>
+                <div style={{ fontSize: 10.5, color: T.textSecond, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {serviceNameFor(item) || '—'} · {barberName}
+                </div>
+              </button>
+            )
+          })
+        )}
       </div>
     </div>
   )
@@ -586,6 +651,12 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
           error, no API call, no move -- confirmed via Browser Verification after the pointer-
           events fix). closestCorners (KanbanBoard.jsx's own proven choice) picks the nearest
           droppable by center distance instead, tolerating exactly this kind of imprecision. */}
+      {/* A5 (2026-08-22) -- grid + the new agenda panel side by side. Grid stays first in DOM order
+          so it lands on the reading-start (right) side under this view's own `direction: 'rtl'`,
+          the agenda panel trailing (visually left) -- matches the reviewed reference's own
+          grid-primary/agenda-secondary relationship, mirrored for RTL. */}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', background: T.cardBg, boxShadow: T.shadow }}>
           {/* Time gutter */}
@@ -680,6 +751,15 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
+
+      <TodayAgendaPanel
+        items={items}
+        barbers={barbers}
+        serviceNameFor={serviceNameFor}
+        onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+      />
+      </div>
 
       {popover && (
         <ReservationPopover
