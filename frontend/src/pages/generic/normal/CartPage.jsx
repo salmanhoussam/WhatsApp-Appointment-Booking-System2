@@ -204,10 +204,44 @@ function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, 
   return lines.join('\n')
 }
 
+// ── Config error state ───────────────────────────────────────────────────────
+// Final Production Gate Audit, 2026-08-22 -- reuses the same retry/error-screen PATTERN
+// GenericAdminDashboard.jsx's own DashboardErrorState already established (a clear message + a
+// button that reloads the page), styled for this file's own dark public-facing theme rather than
+// importing that admin-side component directly (generic-admin/ and generic/ are separate
+// presentation trees in this codebase, never cross-imported). Not a new retry mechanism --
+// useTenantConfig()'s own `retry: 2` already handles the retry itself; this is only what renders
+// once that's exhausted.
+function CartErrorState({ accent, message }) {
+  return (
+    <div style={{
+      minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 16, padding: 24, fontFamily: "'Cairo', sans-serif", textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 40, opacity: 0.4 }}>⚠</div>
+      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)' }}>
+        {message || 'تعذّر تحميل السلة'}
+      </div>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        style={{
+          padding: '11px 26px', borderRadius: 999, border: 'none', cursor: 'pointer',
+          background: accent, color: '#fff', fontSize: 14, fontWeight: 700,
+          fontFamily: "'Cairo', sans-serif",
+        }}
+      >
+        إعادة المحاولة
+      </button>
+    </div>
+  )
+}
+
 // ── CartPage ──────────────────────────────────────────────────────────────────
 
 export default function CartPage() {
-  const { config } = useTenantConfig()
+  const { config, error: configError } = useTenantConfig()
   const slug       = useTenantSlug()
   const base       = useTenantBase()
   const navigate   = useNavigate()
@@ -330,6 +364,20 @@ export default function CartPage() {
       setSubmitting(false)
     }
   }, [cartItems, form, moduleKey, sessionId, slug, clearCart, config, totalPrice])
+
+  // ── Config load failure — real error state, never a silent blank page ───────────────────
+  // Final Production Gate Audit, 2026-08-22 (P0 fix): useTenantConfig() never returns `null` on
+  // error -- it falls back to `{...DEFAULT_CONFIG, slug: <the REAL slug>}` (see that hook's own
+  // comment), specifically so a page never hard-crashes. But that real slug is exactly what made
+  // the guard below indistinguishable from "genuinely no order capability": DEFAULT_CONFIG's
+  // `active_services` is `[]`, so `hasOrderCapability([])` is false either way, and this component
+  // silently `return null`ed on a real fetch failure -- confirmed live, reproducible (3 consecutive
+  // real 503s on `/rk/cart` left `#root` completely empty, no error, no way forward for a real
+  // customer). Checking `configError` first (the hook's own error signal, already exposed, just
+  // never read here before) resolves the ambiguity before the capability guard ever runs.
+  if (configError) {
+    return <CartErrorState accent={accent} message={configError} />
+  }
 
   // ── Guard — hide Cart entirely if this tenant has no order-bearing capability at all ──────
   // Plural check (TOS-004) against the tenant's real active_services, not the tenant-wide
