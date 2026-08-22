@@ -263,7 +263,7 @@ function NavBtn({ onClick, label, color }) {
  */
 export default function ReservationsWeekCalendar({
   reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, onEdit, onReschedule, hourRange,
-  barbers, services, weekVisibleBarberId, onWeekBarberChange,
+  barbers, services, weekVisibleBarberId, onWeekBarberChange, hideBarberPicker = false,
 }) {
   const [direction, setDirection] = useState(0)
   const [popover, setPopover] = useState(null) // { item, anchor } -- Phase 3.4 Item 3
@@ -493,8 +493,16 @@ export default function ReservationsWeekCalendar({
           select picker uses -- one shared design vocabulary, not two -- but the click behavior is
           single-select here, matching the approved study's own point: Week is a planning view, not
           a booking view, so it only ever narrows to one barber at a time. Renders only when there's
-          an actual choice to make, same gate as Day's picker. */}
-      {barbers.length > 1 && (
+          an actual choice to make, same gate as Day's picker.
+
+          Hidden entirely for STAFF (hideBarberPicker), same reasoning Day's own picker already
+          established (Staff Scoped Access Phase D): the backend already scopes every reservation
+          to their own barberId regardless of any selection made here, so showing chips for other
+          barbers would be actively misleading -- selecting one would silently narrow to an empty
+          week instead of any real data. `weekVisibleBarberId` is seeded to their own id in
+          ReservationsTab.jsx, so Week still opens correctly narrowed to their own real hours even
+          with the picker hidden. */}
+      {!hideBarberPicker && barbers.length > 1 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
           <span style={{ fontSize: 11.5, color: T.textMuted, marginInlineEnd: 2 }}>عرض جدول:</span>
           <button

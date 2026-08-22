@@ -361,7 +361,15 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
   // scope decision at the time). Single value, not a set like Day's `visibleBarberIds` -- Week is a
   // planning view, not a booking view (the UX study's own W1 direction, reviewed and approved), so
   // it only ever narrows to one barber at a time, never several side-by-side.
-  const [weekVisibleBarberId, setWeekVisibleBarberId] = useState(null)
+  //
+  // For a STAFF caller, seeded straight to their own barberId, same as Day's `visibleBarberIds` --
+  // GET /admin/reservations/ already server-scopes a STAFF caller to their own barberId regardless
+  // of any client-supplied selection (`_require_staff_barber_id`, app/api/v1/admin/reservations.py),
+  // so leaving this at pooled/null would silently narrow to nothing useful; seeding it to their own
+  // id instead makes Week open already narrowed to their own real hours, not the tenant-wide
+  // default. The chip row itself is hidden for STAFF regardless (ReservationsWeekCalendar.jsx's own
+  // `hideBarberPicker` gate) -- this seed just makes the un-pickable state the correct one.
+  const [weekVisibleBarberId, setWeekVisibleBarberId] = useState(() => myBarberId ?? null)
   const [todayViewDate, setTodayViewDate] = useState(todayISO()) // Today View's own day nav (Phase 3.1.1)
   // Which barber's schedule is visible in Today View (Phase 3.3) -- owned HERE, not inside
   // ReservationsTodayView, because that component fully unmounts/remounts on every load() (the
@@ -824,6 +832,7 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             services={services}
             weekVisibleBarberId={weekVisibleBarberId}
             onWeekBarberChange={setWeekVisibleBarberId}
+            hideBarberPicker={hideBarberPicker}
           />
         )
       ) : viewMode === 'today' ? (
