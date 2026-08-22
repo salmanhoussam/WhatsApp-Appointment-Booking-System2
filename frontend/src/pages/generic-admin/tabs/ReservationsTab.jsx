@@ -364,14 +364,26 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
   // to the first barber on every single ▶/◀ day-navigation click. ReservationsTab itself never
   // unmounts across those, so state lives here instead, same reasoning as todayViewDate above.
   // Staff Scoped Access Phase D (2026-08-09) -- for a STAFF caller, seeded directly from the JWT's
-  // display-only barber_id claim (useAdminBarberId(), passed in as myBarberId), never left to
-  // ReservationsTodayView's own "default to barbers[0]" effect. That effect can't be trusted here:
-  // `barbers` is the tenant's full, unscoped list (Phase B never touched GET /barbers/), so
-  // barbers[0] could just as easily resolve to a different staff member -- which would silently
-  // filter the calendar to nothing even though the backend already sent this STAFF user's own,
-  // real reservations. Non-STAFF callers are unaffected -- myBarberId is null for them, same as
-  // before this phase.
-  const [visibleBarberId, setVisibleBarberId] = useState(() => myBarberId ?? null)
+  // display-only barber_id claim (useAdminBarberId(), passed in as myBarberId), never left to the
+  // default-selection effect below. That effect can't be trusted here: `barbers` is the tenant's
+  // full, unscoped list (Phase B never touched GET /barbers/), so defaulting to "all" would show a
+  // STAFF user other barbers' columns -- which the backend already scopes them out of anyway, but
+  // showing empty columns for barbers who aren't them would be actively misleading. Non-STAFF
+  // callers are unaffected -- myBarberId is null for them, same as before this phase.
+  //
+  // A3.1 (2026-08-22, Day View Resource Columns) -- was a single `visibleBarberId`; Day now shows
+  // every selected barber as its own column (UX proposal reviewed and approved by Salman,
+  // `.claudedocs/work/calendar-uxui-study/2026-08-22/`), so this is a SET of visible barbers, not
+  // one. Owned here rather than inside ReservationsTodayView for the same reason the old single
+  // value was: that component fully unmounts/remounts on every load() (day-nav, filters, drag
+  // reschedule), so state living there would silently reset.
+  const [visibleBarberIds, setVisibleBarberIds] = useState(() => myBarberId ? [myBarberId] : [])
+  // One-time-only guard -- `visibleBarberIds.length === 0` is NOT a safe "not yet chosen" sentinel
+  // on its own, because a user deliberately deselecting every barber is a real, legitimate state
+  // (an intentionally empty grid) that must not be silently reset back to "all" on the next
+  // barbers-array re-render. A dedicated ref, same shape as this file's own `mountedRef`, makes the
+  // one-time default explicit instead of overloading array-emptiness to mean two different things.
+  const barberSelectionInitRef = useRef(false)
   // Barbers/services (Phase 3.4, 2026-08-06) -- fetched once here via the shared hooks and passed
   // down to both Today and Week, instead of each view independently re-fetching the same data on
   // every mount/toggle (a real, confirmed duplicate network call before this). Phase 3.7C
@@ -381,6 +393,27 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
   // one list serves both purposes now.
   const { barbers, barbersLoading } = useBarbers()
   const services = useServices()
+
+  // A3.1 -- default Day's visible-barber set to "all active barbers" exactly once, the moment
+  // barbers first load, for a non-STAFF caller who hasn't touched the selection yet. Mirrors the
+  // exact one-time-effect shape ReservationsTodayView.jsx's own former default-to-barbers[0] effect
+  // used (barbersLoading/barbers/[]-except-guard deps), just defaulting to every barber instead of
+  // the first one, and guarded by a ref instead of array-emptiness (see barberSelectionInitRef's
+  // own comment above for why).
+  useEffect(() => {
+    if (myBarberId) return // STAFF already seeded above, never auto-default
+    if (barberSelectionInitRef.current) return
+    if (barbersLoading || barbers.length === 0) return
+    barberSelectionInitRef.current = true
+    setVisibleBarberIds(barbers.map((b) => b.id))
+  }, [myBarberId, barbersLoading, barbers])
+
+  const toggleVisibleBarber = useCallback((id) => {
+    setVisibleBarberIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+  }, [])
+  const selectAllBarbers = useCallback(() => {
+    setVisibleBarberIds(barbers.map((b) => b.id))
+  }, [barbers])
 
   // List's own ReservationPopover/CreatePopover state (Phase 3.5, 2026-08-07) -- same shape
   // Today/Week already carry locally, not extracted (Abstraction Rule: local UI state stays local
@@ -800,8 +833,9 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             onReschedule={handleReschedule}
             onCreate={handleCreate}
             onEdit={handleEdit}
-            visibleBarberId={visibleBarberId}
-            onVisibleBarberChange={setVisibleBarberId}
+            visibleBarberIds={visibleBarberIds}
+            onToggleBarber={toggleVisibleBarber}
+            onSelectAllBarbers={selectAllBarbers}
             barbers={barbers}
             barbersLoading={barbersLoading}
             services={services}

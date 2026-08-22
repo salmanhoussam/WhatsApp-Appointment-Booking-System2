@@ -210,19 +210,27 @@ function GridLine() {
 // computed directly from the drag's pixel delta in handleDragEnd, not from which tiny cell was
 // hit -- same verified-correct isoAtQuarter()/quarterIndexFromIso() math as before, just fed a
 // coordinate computed a more robust way.
-function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor, onOpen, pendingIds, onEmptySlotClick, nowIndex }) {
+// A3.1 (Day View Resource Columns, 2026-08-22) -- `startHour` here is the SHARED grid's own
+// boundary (the union of every visible barber's real hours, computed once in
+// ReservationsTodayView), not this one barber's own hours -- that's what makes the shared hour
+// gutter and the single cross-column "now" line correct. `barberOpenHour`/`barberCloseHour` are
+// THIS barber's own real boundary, used only to hatch the portion of the shared grid outside their
+// own hours -- same per-barber real-hours source A2.2 already resolved (barber.working_hours,
+// falling back to the tenant-wide default), just applied per-column now that Day can show more than
+// one column. `onEmptySlotClick` itself (owned by the parent) is what actually refuses a click
+// inside the hatched region -- the hatch here is the visual half of that guarantee, not the
+// enforcement.
+function StaffColumn({ barber, items, quarters, startHour, barberOpenHour, barberCloseHour, color, serviceNameFor, onOpen, pendingIds, onEmptySlotClick }) {
   const { setNodeRef, isOver } = useDroppable({ id: barber.id })
-  const nowLineRef = useRef(null)
 
-  // Real-Time Calendar Awareness (Phase 3.3.1, 2026-08-05) -- bring "now" into the initial
-  // viewport once per mount. This component fully remounts whenever the parent reloads data
-  // (day-nav, drag reschedule, etc. -- see ReservationsTodayView's own doc comment), so this
-  // intentionally re-fires on those remounts too, matching "Today always opens near now" rather
-  // than treating it as a one-shot exception. `[]` on purpose -- must NOT re-fire on the once-a-
-  // minute nowIndex tick, or the view would yank back to "now" out from under a scrolled-away user.
-  useEffect(() => {
-    if (nowIndex != null) nowLineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const gridHeight = quarters.length * QUARTER_PX
+  const topHatchQuarters = barberOpenHour != null ? Math.max(0, Math.min(quarters.length, (barberOpenHour - startHour) * 4)) : 0
+  const bottomHatchFromQuarter = barberCloseHour != null ? Math.max(0, Math.min(quarters.length, (barberCloseHour - startHour) * 4)) : quarters.length
+  const hatchStyle = {
+    position: 'absolute', left: 0, right: 0,
+    background: 'repeating-linear-gradient(45deg, rgba(15,23,42,0.05) 0 6px, transparent 6px 13px)',
+    pointerEvents: 'none',
+  }
 
   return (
     <div style={{ flex: 1, minWidth: 150 }}>
@@ -238,23 +246,21 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
         style={{ position: 'relative', background: isOver ? `${color}0d` : 'transparent', cursor: 'copy' }}
       >
         {quarters.map((q) => <GridLine key={q} />)}
-        {nowIndex != null && (
-          <div
-            ref={nowLineRef}
-            style={{
-              position: 'absolute', top: nowIndex * QUARTER_PX, left: 0, right: 0,
-              borderTop: `2px solid ${T.danger}`, zIndex: 3, pointerEvents: 'none',
-            }}
-          >
-            <span style={{
-              position: 'absolute', right: 4, top: -9, fontSize: 9, fontWeight: 700,
-              color: '#fff', background: T.danger, padding: '1px 6px', borderRadius: 4,
-              fontFamily: FONT, whiteSpace: 'nowrap',
-            }}>
-              الآن
-            </span>
+
+        {/* Closed -- outside this barber's own real hours but inside the shared grid's union range
+            (e.g. a colleague who works later). Same real-hours source A2.2 resolved, just rendered
+            per column now. */}
+        {topHatchQuarters > 0 && (
+          <div style={{ ...hatchStyle, top: 0, height: topHatchQuarters * QUARTER_PX }}>
+            <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', fontSize: 9.5, color: T.textMuted, fontWeight: 700 }}>مغلق</div>
           </div>
         )}
+        {bottomHatchFromQuarter < quarters.length && (
+          <div style={{ ...hatchStyle, top: bottomHatchFromQuarter * QUARTER_PX, height: gridHeight - bottomHatchFromQuarter * QUARTER_PX }}>
+            <div style={{ position: 'absolute', top: 8, left: 0, right: 0, textAlign: 'center', fontSize: 9.5, color: T.textMuted, fontWeight: 700 }}>مغلق</div>
+          </div>
+        )}
+
         {items.map((item) => {
           const qIndex = quarterIndexFromIso(item.reserved_at, startHour)
           const top = qIndex * QUARTER_PX
@@ -285,27 +291,35 @@ function StaffColumn({ barber, items, quarters, startHour, color, serviceNameFor
  *   barbers/barbersLoading/services -- lifted to ReservationsTab.jsx (Phase 3.4, 2026-08-06)
  *     via useBarbers()/useServices() in reservationInteractions.jsx, passed down so this view
  *     and ReservationsWeekCalendar.jsx share one fetch each instead of two independent ones.
+ *   visibleBarberIds/onToggleBarber/onSelectAllBarbers -- A3.1 (2026-08-22): which barbers'
+ *     schedules are VISIBLE as columns, owned by ReservationsTab.jsx for the same reason the old
+ *     single visibleBarberId was -- this component fully unmounts/remounts on every load().
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberId, onVisibleBarberChange, barbers, barbersLoading, services, hideBarberPicker = false }) {
-  // Which barber's schedule is currently VISIBLE -- owned by ReservationsTab.jsx (props
-  // `visibleBarberId`/`onVisibleBarberChange`), not local state here. This component fully
-  // unmounts/remounts on every load() in the parent (day-nav, filters, etc.), so local state would
-  // silently reset on every such change -- a real bug found via Browser Verification, 2026-08-05.
-  const visibleBarber = barbers.find((b) => b.id === visibleBarberId) ?? null
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberIds, onToggleBarber, onSelectAllBarbers, barbers, barbersLoading, services, hideBarberPicker = false }) {
+  // A3.1 (Day View Resource Columns, 2026-08-22) -- Day now renders every VISIBLE barber as its own
+  // column (the UX proposal Salman reviewed and approved,
+  // `.claudedocs/work/calendar-uxui-study/2026-08-22/`), instead of one barber switched via pills.
+  // `visibleBarbers` preserves `barbers`' own order (filtering over `barbers`, not over
+  // `visibleBarberIds`), so column order stays stable regardless of selection order.
+  const visibleBarbers = barbers.filter((b) => visibleBarberIds.includes(b.id))
 
   // A2.2 (2026-08-21) -- the grid's own hour boundaries must match what the backend will actually
-  // accept for THIS barber, not the tenant-wide default. reservation_service.py's
-  // _check_working_hours() resolves barber.workingHours first, falling back to the tenant-wide
-  // Client.config.working_hours only when the barber has none set -- mirrored here exactly (same
-  // priority, same loose parse) so the grid never renders a slot the backend would reject. `hourRange`
-  // (the tenant-wide default ReservationsTab.jsx already computes) is the fallback, not a second
-  // independent default -- single column, single barber at a time, so this is unambiguous here in a
-  // way it isn't for Week's multi-barber-per-day columns (ReservationsWeekCalendar.jsx, deliberately
-  // left on the tenant-wide range -- see that file's own note).
-  const barberOpen  = parseHourLoose(visibleBarber?.working_hours?.open_time)
-  const barberClose = parseHourLoose(visibleBarber?.working_hours?.close_time)
-  const [startHour, endHour] = (barberOpen != null && barberClose != null && barberClose > barberOpen)
-    ? [barberOpen, barberClose]
+  // accept, resolved from reservation_service.py's own real priority (barber.workingHours, falling
+  // back to the tenant-wide Client.config.working_hours only when a barber has none set). A3.1
+  // extends this from "the one visible barber's hours" to a SHARED grid boundary spanning every
+  // visible barber (the widest open-to-close range across them, so no one's real hours are ever
+  // clipped by the shared gutter) -- each StaffColumn then hatches its own portion outside ITS own
+  // real hours (see that component's own comment), so the per-barber guarantee A2.2 established is
+  // preserved per column, not lost by sharing one axis. `hourRange` (the tenant-wide default
+  // ReservationsTab.jsx computes) is the fallback for any barber with no real hours set, same as
+  // before.
+  const perBarberHours = visibleBarbers.map((b) => {
+    const o = parseHourLoose(b?.working_hours?.open_time)
+    const c = parseHourLoose(b?.working_hours?.close_time)
+    return (o != null && c != null && c > o) ? [o, c] : hourRange
+  })
+  const [startHour, endHour] = perBarberHours.length
+    ? [Math.min(...perBarberHours.map((r) => r[0])), Math.max(...perBarberHours.map((r) => r[1]))]
     : hourRange
   const [items, setItems] = useState(reservations)
   const [activeId, setActiveId] = useState(null)
@@ -333,16 +347,8 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
   // 2026-08-06). The real 307-redirect/401 bug the old fetch's own comment documented lives in
   // useBarbers() now, fixed once, not per-view.
 
-  // Default the visible barber exactly once, the moment barbers first load and nothing is selected
-  // yet -- `visibleBarberId === null` (owned by the parent, see the prop comment above) is itself
-  // the guard, since that value persists across this component's own remounts; no local ref needed.
-  // Never derived via useMemo from barbers[0] -- that would re-fire every time the barbers array
-  // identity changes, not just once, silently overriding a real selection.
-  useEffect(() => {
-    if (!barbersLoading && barbers.length > 0 && visibleBarberId === null) {
-      onVisibleBarberChange(barbers[0].id)
-    }
-  }, [barbersLoading, barbers, visibleBarberId, onVisibleBarberChange])
+  // Default-selection (all active barbers, once) now lives in ReservationsTab.jsx, which owns
+  // visibleBarberIds -- see that file's own effect, same reasoning this effect used to state here.
 
   const serviceNameFor = useCallback((item) => {
     const id = item.service_id ?? item.metadata?.service_id
@@ -374,6 +380,17 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
     return (idx >= 0 && idx <= maxIndex) ? idx : null
   }, [isToday, startHour, endHour, nowTick])
 
+  // A3.1 -- the "now" line moved up from per-StaffColumn (Phase 3.3.1) to here, spanning every
+  // visible column at once, since they now all share one real time axis. Same bring-into-view-once
+  // behavior as before: this component remounts on every parent load() (day-nav, filters, drag
+  // reschedule), so `[]` re-fires on those remounts too, matching "Today always opens near now" --
+  // must NOT depend on the once-a-minute nowTick, or the view would yank back out from under a
+  // scrolled-away user.
+  const nowLineRef = useRef(null)
+  useEffect(() => {
+    if (nowIndex != null) nowLineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Empty-slot click -> Quick Create (Phase 3.2). Reuses the exact isoAtQuarter()/QUARTER_PX math
   // handleDragEnd already uses -- not reinvented. getBoundingClientRect() is measured fresh on
   // every click (never cached), so it's automatically correct under any scroll position -- no
@@ -385,6 +402,19 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
     const offsetY = e.clientY - rect.top
     const maxIndex = (endHour - startHour) * 4 - 1
     const quarterIndex = Math.max(0, Math.min(Math.round(offsetY / QUARTER_PX), maxIndex))
+
+    // A3.1 -- the shared grid can now render quarter-hours outside THIS barber's own real hours
+    // (hatched -- e.g. a colleague who works later). Refuse the click there instead of opening a
+    // Create popover the backend would just 409 on -- same "never offer what the backend would
+    // reject" guarantee A2.2 established for the single-column case, applied per column now.
+    const bOpen  = parseHourLoose(barber?.working_hours?.open_time)
+    const bClose = parseHourLoose(barber?.working_hours?.close_time)
+    if (bOpen != null && bClose != null && bClose > bOpen) {
+      const openQ  = (bOpen  - startHour) * 4
+      const closeQ = (bClose - startHour) * 4
+      if (quarterIndex < openQ || quarterIndex >= closeQ) return
+    }
+
     const reservedAt = isoAtQuarter(date, startHour, quarterIndex)
     setCreateSlot({ barberId: barber.id, reservedAt, anchor: { x: e.clientX, y: e.clientY } })
   }, [date, startHour, endHour])
@@ -420,24 +450,36 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
     const newIndex = Math.max(0, Math.min(Math.round(newTop / QUARTER_PX), maxIndex))
     const newReservedAt = isoAtQuarter(date, startHour, newIndex)
 
-    // Drag means "change the time," full stop (Phase 3.3, 2026-08-05) -- with a single barber's
-    // column visible at a time, there is no second droppable to drop onto, so this gesture can no
-    // longer imply a staff reassignment; that's now exclusively a deliberate action taken from the
-    // Edit popover's own barber selector. Compare as instants, not raw strings -- the API returns a
-    // "+00:00"-suffixed ISO string while isoAtQuarter()/toISOString() produce a "Z"-suffixed one;
-    // those never string-match for the same instant, which silently fired a no-op PATCH on every
-    // drop back onto the origin slot (found via Browser Verification, 2026-08-03).
+    // A3.1 (2026-08-22) -- supersedes Phase 3.3's "drag means change the time, full stop": that
+    // was correct only because a single barber's column was visible at a time, so there was no
+    // second droppable to drop onto. Day now has a real droppable per barber column
+    // (`useDroppable({ id: barber.id })`, StaffColumn), the exact same mechanism
+    // ReservationsWeekCalendar.jsx already proves correct for its own day-columns -- `over.id`
+    // identifies which barber's column the card was dropped into. Reassignment is a real,
+    // already-secured backend capability (reservation_service.edit_reservation()'s new_barber_id
+    // path -- checks the TARGET barber's own working hours/conflicts, and a STAFF caller is already
+    // blocked server-side from reassigning away from themselves), already exercised by Week's own
+    // drag -- this just wires the same existing capability into Day now that it has columns to
+    // drop between. Compare as instants, not raw strings, for the time half of the check (the API
+    // returns a "+00:00"-suffixed ISO string while isoAtQuarter()/toISOString() produce a
+    // "Z"-suffixed one; those never string-match for the same instant, which silently fired a
+    // no-op PATCH on every drop back onto the origin slot, found via Browser Verification,
+    // 2026-08-03) -- a drop that changes ONLY the column (same time, different barber) must still
+    // fire, so the no-op guard checks both, not time alone.
+    const targetBarberId = over.id
     const sameTime = new Date(current.reserved_at).getTime() === new Date(newReservedAt).getTime()
-    if (sameTime) return
+    if (sameTime && targetBarberId === current.barber_id) return
 
     const snapshot = items
     markPending(active.id)
     setItems((prev) => prev.map((i) => (
-      i.id === active.id ? { ...i, reserved_at: newReservedAt } : i
+      i.id === active.id ? { ...i, reserved_at: newReservedAt, barber_id: targetBarberId } : i
     )))
 
     try {
-      await onReschedule(active.id, { reserved_at: newReservedAt })
+      const payload = { reserved_at: newReservedAt }
+      if (targetBarberId !== current.barber_id) payload.barber_id = targetBarberId
+      await onReschedule(active.id, payload)
     } catch (err) {
       setItems(snapshot)
       setConflictMsg(err?.response?.data?.error?.message || 'تعذر نقل الحجز إلى هذا الموعد.')
@@ -454,37 +496,47 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
           <DayNav date={date} onDateChange={onDateChange} color={color} />
         </div>
 
-        {/* Staff switcher (Phase 3.3, 2026-08-05) -- which barber's schedule is VISIBLE, styled by
-            copying ReservationsTab.jsx's own Today/Week pill pattern (no shared toggle component
-            exists in this codebase to import). This pill row IS today's concrete control for the
-            "one schedule visible at a time" architecture decision -- not the architecture itself; if
-            the real barber count ever grows past what a pill row comfortably fits, the fix is
-            swapping the control (e.g. `overflowX:'auto'`, same proven fix ReservationsTab.jsx's own
-            status-pills row already uses -- or a dropdown), never re-introducing multiple visible
-            columns. Renders only when there's an actual choice to make.
+        {/* A3.1 (Day View Resource Columns, 2026-08-22) -- multi-select barber filter, replacing
+            Phase 3.3's single-select switcher now that Day renders every VISIBLE barber as its own
+            column instead of one at a time. "الكل" is a shortcut action (select every barber), not
+            a fourth independent state -- its own active styling is just whether the current
+            selection happens to already equal every barber, same as the UX proposal's chip row.
+            `overflowX:'auto'`/wrap is the named scaling answer if the real barber count grows past
+            what a row of chips comfortably fits (same proven fix ReservationsTab.jsx's own
+            status-pills row already uses) -- not re-introducing a single-visible-column mode.
+            Renders only when there's an actual choice to make.
 
             Staff Scoped Access Phase D (2026-08-09) -- hidden entirely for STAFF (hideBarberPicker):
-            the backend already scopes every reservation to their own barberId regardless of which
-            pill is "selected," so showing this picker to a STAFF user would be actively misleading,
-            not just unnecessary -- selecting another barber's name would silently keep showing their
-            own schedule underneath it. */}
+            the backend already scopes every reservation to their own barberId regardless of
+            selection, so showing this picker to a STAFF user would be actively misleading, not just
+            unnecessary. */}
         {!hideBarberPicker && barbers.length > 1 && (
-          <div style={{
-            display: 'flex', borderRadius: 20, padding: 2, marginBottom: 14,
-            background: T.pageBg, border: `1px solid ${T.border}`,
-          }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+            <button
+              onClick={onSelectAllBarbers}
+              style={{
+                padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+                background: visibleBarberIds.length === barbers.length ? `${color}18` : T.pageBg,
+                border: `1px solid ${visibleBarberIds.length === barbers.length ? `${color}55` : T.border}`,
+                color: visibleBarberIds.length === barbers.length ? color : T.textSecond,
+              }}
+            >
+              الكل
+            </button>
             {barbers.map((b) => {
-              const active = b.id === visibleBarberId
+              const active = visibleBarberIds.includes(b.id)
               return (
                 <button
                   key={b.id}
-                  onClick={() => onVisibleBarberChange(b.id)}
+                  onClick={() => onToggleBarber(b.id)}
                   style={{
                     padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
-                    cursor: 'pointer', fontFamily: FONT, border: 'none',
-                    background: active ? color : 'transparent',
+                    cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+                    background: active ? color : T.pageBg,
+                    border: `1px solid ${active ? color : T.border}`,
                     color: active ? '#0a0a0f' : T.textSecond,
-                    transition: 'background 0.15s ease, color 0.15s ease', whiteSpace: 'nowrap',
+                    transition: 'background 0.15s ease, color 0.15s ease',
                   }}
                 >
                   {b.name}
@@ -495,13 +547,15 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
         )}
 
         {/* Quick Create entry point (Phase 3.2), for when hunting the exact empty slot isn't the
-            fastest path; defaults to whichever barber's schedule is currently visible (Phase 3.3
-            fix -- previously silently fell back to barbers[0] regardless of what was on screen).
+            fastest path. A3.1 -- with N columns now visible instead of one, defaults to the FIRST
+            visible barber (preserves `barbers`' own order, same as `visibleBarbers` itself);
+            CreatePopover already handles an undefined default gracefully (the same path Week's own
+            header button already uses when no column context exists to default from).
             Upgraded from an icon-only square to a labeled button (Calendar Visual Redesign,
             2026-08-12) -- same header-level prominence as Week's own new "+ حجز جديد" button,
             same click behavior/handler, no new mutation path. */}
         <button
-          onClick={(e) => setCreateSlot({ barberId: visibleBarberId, anchor: { x: e.clientX, y: e.clientY } })}
+          onClick={(e) => setCreateSlot({ barberId: visibleBarbers[0]?.id, anchor: { x: e.clientX, y: e.clientY } })}
           style={{
             padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
             cursor: 'pointer', fontFamily: FONT, border: 'none',
@@ -543,12 +597,13 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
             ))}
           </div>
 
-          {/* Single visible barber's schedule (Phase 3.3, 2026-08-05) -- the calendar shows one
-              barber at a time, switched via the pill control above, never multiple columns
-              side-by-side. minWidth:0 kept for the same flex-shrink defect class already
-              root-caused dashboard-wide; whether overflowX:auto is still needed at all on a single
-              column (vs. the N-column case it was originally written for) is confirmed via the real
-              mobile-viewport pass, not assumed here. */}
+          {/* A3.1 (Day View Resource Columns, 2026-08-22) -- every VISIBLE barber renders as its
+              own column side-by-side (the UX proposal Salman reviewed and approved), replacing
+              Phase 3.3's single-column-at-a-time design. minWidth:0 kept for the same flex-shrink
+              defect class already root-caused dashboard-wide; overflowX:auto is now genuinely load-
+              bearing again once more than a handful of barbers are visible at once (the scaling
+              answer the picker's own comment names), not the "confirm via mobile pass" open
+              question it was for the single-column case. */}
           <div style={{ flex: 1, minWidth: 0, overflowX: 'auto', background: T.pageBg }}>
             {barbersLoading ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
@@ -558,24 +613,60 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
                 }} />
                 <style>{`@keyframes today-view-dot{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}`}</style>
               </div>
-            ) : !visibleBarber ? (
+            ) : barbers.length === 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: T.textMuted, fontSize: 13 }}>
                 لا يوجد موظفون نشطون
               </div>
+            ) : visibleBarbers.length === 0 ? (
+              // Real, legitimate state now that selection is a set the user can empty deliberately
+              // (see barberSelectionInitRef's own comment in ReservationsTab.jsx) -- distinct from
+              // "no staff exist at all" above, so it gets its own message rather than reusing that one.
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: T.textMuted, fontSize: 13 }}>
+                اختر حلاقاً واحداً على الأقل لعرض الجدول
+              </div>
             ) : (
-              <div style={{ background: T.cardBg }}>
-                <StaffColumn
-                  barber={visibleBarber}
-                  items={items.filter((i) => i.barber_id === visibleBarber.id && VISIBLE_STATUSES.includes(i.status))}
-                  quarters={quarters}
-                  startHour={startHour}
-                  color={color}
-                  serviceNameFor={serviceNameFor}
-                  onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
-                  pendingIds={pendingIds}
-                  onEmptySlotClick={handleEmptySlotClick}
-                  nowIndex={nowIndex}
-                />
+              <div style={{ background: T.cardBg, position: 'relative', display: 'flex' }}>
+                {visibleBarbers.map((barber) => {
+                  const bOpen  = parseHourLoose(barber?.working_hours?.open_time)
+                  const bClose = parseHourLoose(barber?.working_hours?.close_time)
+                  const hasOwnHours = bOpen != null && bClose != null && bClose > bOpen
+                  return (
+                    <StaffColumn
+                      key={barber.id}
+                      barber={barber}
+                      items={items.filter((i) => i.barber_id === barber.id && VISIBLE_STATUSES.includes(i.status))}
+                      quarters={quarters}
+                      startHour={startHour}
+                      barberOpenHour={hasOwnHours ? bOpen : null}
+                      barberCloseHour={hasOwnHours ? bClose : null}
+                      color={color}
+                      serviceNameFor={serviceNameFor}
+                      onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+                      pendingIds={pendingIds}
+                      onEmptySlotClick={handleEmptySlotClick}
+                    />
+                  )
+                })}
+
+                {/* One shared "now" line spanning every column -- see the ref/effect's own comment
+                    above for why this moved up from per-StaffColumn. */}
+                {nowIndex != null && (
+                  <div
+                    ref={nowLineRef}
+                    style={{
+                      position: 'absolute', top: nowIndex * QUARTER_PX, left: 0, right: 0,
+                      borderTop: `2px solid ${T.danger}`, zIndex: 3, pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', right: 4, top: -9, fontSize: 9, fontWeight: 700,
+                      color: '#fff', background: T.danger, padding: '1px 6px', borderRadius: 4,
+                      fontFamily: FONT, whiteSpace: 'nowrap',
+                    }}>
+                      الآن
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
