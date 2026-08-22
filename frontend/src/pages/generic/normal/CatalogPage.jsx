@@ -61,7 +61,23 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
   // Plural capability check (TOS-004) -- not the tenant-wide collapsed `moduleKey`. A tenant with
   // both Catalog and Store active (e.g. RK Barber) must still see the cart affordance; the old
   // `moduleKey === 'store'` check only worked for such a tenant by luck of derivation priority.
+  // Gates the floating CartBadge only -- a real cart from a different (order-bearing) category
+  // must stay reachable regardless of which category is currently being browsed.
   const canOrder  = hasOrderCapability(config?.active_services)
+  // Localhost Production Readiness fix, 2026-08-22 -- `canOrder` alone answers "can this TENANT
+  // order at all", not "does the category currently being browsed actually belong to an
+  // order-bearing capability". `useCatalog()`'s own fetchAllCategories() deliberately returns
+  // EVERY real category regardless of module_key (see that hook's own comment) -- filtering was
+  // always meant to happen here, per-category, not there. Confirmed live on rk (real DB read):
+  // "الخدمات" is a real `module_key: 'catalog'` category, sitting alongside "منتجات العناية"
+  // (`module_key: 'store'`) -- with only the tenant-level check, both offered the identical
+  // "+ أضف للسلة" affordance, letting a real service item enter the same cart as real Store
+  // products. The backend's own real order-creation path
+  // (`app/repositories/store_repo.py`'s `category.moduleKey == "store"` filter) then rejected it
+  // with a 404 at checkout time -- for the WHOLE cart, not just the offending item. Fixed at the
+  // source (never offer the action) instead of a checkout-side workaround, per instruction.
+  const canOrderActiveCategory = canOrder
+    && (activeCategory?.module_key === 'store' || activeCategory?.module_key === 'restaurant')
   const onAddCart = useCallback((item) => addItem(item, 1), [addItem])
 
   // Hooks must run unconditionally (Rules of Hooks) — always create the
@@ -133,7 +149,7 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
           <Template
             items={filteredItems}
             accent={accent}
-            onAddToCart={canOrder ? onAddCart : undefined}
+            onAddToCart={canOrderActiveCategory ? onAddCart : undefined}
             onItemClick={onItemClick}
           />
         )}
