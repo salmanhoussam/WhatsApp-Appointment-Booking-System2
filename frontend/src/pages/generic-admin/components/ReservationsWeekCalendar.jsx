@@ -9,6 +9,7 @@ import {
   fmtTimeUTC, isoAtQuarter, quarterIndexFromIso, fakeNowIso, VISIBLE_STATUSES,
   ReservationPopover, CreatePopover,
 } from './reservationInteractions'
+import { parseHourLoose } from '../tabs/ReservationsTab'
 import { T, FONT } from '../theme'
 
 // Sunday-first, matching this codebase's one existing calendar precedent (UnitCalendar.jsx's
@@ -256,21 +257,32 @@ function NavBtn({ onClick, label, color }) {
  *   hourRange      — [startHour, endHour]
  *   barbers/services — lifted to ReservationsTab.jsx (Phase 3.4, useBarbers()/useServices()
  *     in reservationInteractions.jsx) -- this view no longer self-fetches catalog items.
+ *   weekVisibleBarberId/onWeekBarberChange — A4.1 (Week View Planning Selector, 2026-08-22):
+ *     which ONE barber Week is narrowed to, or `null` for the pooled/"الكل" default. Owned by
+ *     ReservationsTab.jsx for the same reason Day's own visible-barber state is.
  */
 export default function ReservationsWeekCalendar({
   reservations, weekStart, onWeekChange, color, onStatusChange, onCreate, onEdit, onReschedule, hourRange,
-  barbers, services,
+  barbers, services, weekVisibleBarberId, onWeekBarberChange,
 }) {
   const [direction, setDirection] = useState(0)
   const [popover, setPopover] = useState(null) // { item, anchor } -- Phase 3.4 Item 3
-  const [createSlot, setCreateSlot] = useState(null) // { reservedAt, anchor } -- Phase 3.4 Item 2
-  // Deliberately left on the tenant-wide `hourRange` (A2.2, 2026-08-21) -- unlike
-  // ReservationsTodayView.jsx (single barber column, unambiguous), this view's columns are DAYS
-  // pooling every barber's reservations together (see `byDay` below), so there is no single
-  // barber whose own working hours the grid boundary could correctly narrow to. Making this
-  // barber-aware would need a real per-barber-lane redesign of this view, out of A2.2's scope
-  // (smallest safe change, no refactor) -- registered, not solved here.
-  const [startHour, endHour] = hourRange
+  const [createSlot, setCreateSlot] = useState(null) // { reservedAt, barberId?, anchor } -- Phase 3.4 Item 2
+  const weekVisibleBarber = weekVisibleBarberId ? barbers.find((b) => b.id === weekVisibleBarberId) ?? null : null
+
+  // A4.1 -- A2.2's own registered gap, resolved: when narrowed to ONE barber (weekVisibleBarberId
+  // set), the grid boundary is THAT barber's own real hours -- unambiguous now, the exact same
+  // real-hours source (barber.working_hours, A2.2) `ReservationsTodayView.jsx` already resolves,
+  // just applied here now that Week has a real single-barber selection to resolve it from. Pooled
+  // "الكل" mode (weekVisibleBarberId === null, the default -- unchanged from before A4.1) still has
+  // no single barber to narrow to (every barber's reservations pool into one day column, see
+  // `byDay` below) and correctly stays on the tenant-wide `hourRange` -- a real, accepted, named
+  // limitation of pooled mode specifically, not a gap in the barber-selected case anymore.
+  const weekBarberOpen  = parseHourLoose(weekVisibleBarber?.working_hours?.open_time)
+  const weekBarberClose = parseHourLoose(weekVisibleBarber?.working_hours?.close_time)
+  const [startHour, endHour] = (weekBarberOpen != null && weekBarberClose != null && weekBarberClose > weekBarberOpen)
+    ? [weekBarberOpen, weekBarberClose]
+    : hourRange
 
   // Local, optimistically-updated copy of `reservations` (Phase 3.4 Item 4) -- same pattern
   // ReservationsTodayView.jsx already uses for its own drag path: the parent's `reservations`
@@ -309,6 +321,9 @@ export default function ReservationsWeekCalendar({
     for (const r of items) {
       if (!r.reserved_at) continue
       if (!VISIBLE_STATUSES.includes(r.status)) continue
+      // A4.1 -- when narrowed to one barber, only THEIR reservations populate the planning grid;
+      // pooled "الكل" mode (weekVisibleBarberId === null) keeps every barber, unchanged.
+      if (weekVisibleBarberId && r.barber_id !== weekVisibleBarberId) continue
       const key = isoDateKey(new Date(r.reserved_at))
       if (map.has(key)) map.get(key).push(r)
     }
@@ -316,7 +331,7 @@ export default function ReservationsWeekCalendar({
       arr.sort((a, b) => new Date(a.reserved_at) - new Date(b.reserved_at))
     }
     return map
-  }, [days, items])
+  }, [days, items, weekVisibleBarberId])
 
   const hours = useMemo(
     () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
@@ -359,8 +374,11 @@ export default function ReservationsWeekCalendar({
     const maxIndex = hours.length * 4 - 1
     const quarterIndex = Math.max(0, Math.min(Math.round(offsetY / WEEK_QUARTER_PX), maxIndex))
     const reservedAt = isoAtQuarter(isoDateKey(day), startHour, quarterIndex)
-    setCreateSlot({ reservedAt, anchor: { x: e.clientX, y: e.clientY } })
-  }, [hours.length, startHour])
+    // A4.1 -- when Week is narrowed to one barber, an empty-slot click pre-fills THEM (there is
+    // exactly one real candidate to default to, same reasoning Day's own click handler already
+    // uses); pooled "الكل" mode leaves it unset, same as before A4.1.
+    setCreateSlot({ reservedAt, barberId: weekVisibleBarberId ?? undefined, anchor: { x: e.clientX, y: e.clientY } })
+  }, [hours.length, startHour, weekVisibleBarberId])
 
   // Drag-and-drop (Phase 3.4 Item 4) -- same technique Today's own handleDragEnd uses (origin
   // quarter-index + delta.y, not a fine-grained per-cell droppable), extended with one real new
@@ -456,7 +474,7 @@ export default function ReservationsWeekCalendar({
             already wired below, just triggered without a pre-filled slot (defaultReservedAt stays
             undefined, matching List's own "+ حجز جديد" button precedent) -- no new mutation path. */}
         <button
-          onClick={(e) => setCreateSlot({ reservedAt: undefined, anchor: { x: e.clientX, y: e.clientY } })}
+          onClick={(e) => setCreateSlot({ reservedAt: undefined, barberId: weekVisibleBarberId ?? undefined, anchor: { x: e.clientX, y: e.clientY } })}
           style={{
             padding: '7px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
             cursor: 'pointer', fontFamily: FONT, border: 'none',
@@ -469,6 +487,49 @@ export default function ReservationsWeekCalendar({
           حجز جديد
         </button>
       </div>
+
+      {/* A4.1 (Week View Planning Selector, 2026-08-22) -- single-select: "الكل" (pooled, the
+          default) or exactly one barber. Reuses the same chip visual language Day's own multi-
+          select picker uses -- one shared design vocabulary, not two -- but the click behavior is
+          single-select here, matching the approved study's own point: Week is a planning view, not
+          a booking view, so it only ever narrows to one barber at a time. Renders only when there's
+          an actual choice to make, same gate as Day's picker. */}
+      {barbers.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+          <span style={{ fontSize: 11.5, color: T.textMuted, marginInlineEnd: 2 }}>عرض جدول:</span>
+          <button
+            onClick={() => onWeekBarberChange(null)}
+            style={{
+              padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+              background: weekVisibleBarberId === null ? `${color}18` : T.pageBg,
+              border: `1px solid ${weekVisibleBarberId === null ? `${color}55` : T.border}`,
+              color: weekVisibleBarberId === null ? color : T.textSecond,
+            }}
+          >
+            الكل (مجمّع)
+          </button>
+          {barbers.map((b) => {
+            const active = weekVisibleBarberId === b.id
+            return (
+              <button
+                key={b.id}
+                onClick={() => onWeekBarberChange(b.id)}
+                style={{
+                  padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+                  background: active ? color : T.pageBg,
+                  border: `1px solid ${active ? color : T.border}`,
+                  color: active ? '#0a0a0f' : T.textSecond,
+                  transition: 'background 0.15s ease, color 0.15s ease',
+                }}
+              >
+                {b.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {conflictMsg && (
         <div style={{
@@ -590,6 +651,7 @@ export default function ReservationsWeekCalendar({
         <CreatePopover
           barbers={barbers}
           services={services}
+          defaultBarberId={createSlot.barberId}
           defaultReservedAt={createSlot.reservedAt}
           color={color}
           anchor={createSlot.anchor}

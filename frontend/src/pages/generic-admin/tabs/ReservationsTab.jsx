@@ -355,6 +355,13 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const [viewMode,     setViewMode]     = useState(defaultView) // 'list' | 'today' | 'week'
   const [weekStart,    setWeekStart]    = useState(() => startOfWeekSunday(new Date()))
+  // A4.1 (Week View Planning Selector, 2026-08-22) -- which ONE barber Week is narrowed to, or
+  // `null` for the pooled/"الكل" default (today's existing, unchanged behavior: every barber's
+  // reservations shown together, tenant-wide hours -- A2.2's own registered, deliberately-out-of-
+  // scope decision at the time). Single value, not a set like Day's `visibleBarberIds` -- Week is a
+  // planning view, not a booking view (the UX study's own W1 direction, reviewed and approved), so
+  // it only ever narrows to one barber at a time, never several side-by-side.
+  const [weekVisibleBarberId, setWeekVisibleBarberId] = useState(null)
   const [todayViewDate, setTodayViewDate] = useState(todayISO()) // Today View's own day nav (Phase 3.1.1)
   // Which barber's schedule is visible in Today View (Phase 3.3) -- owned HERE, not inside
   // ReservationsTodayView, because that component fully unmounts/remounts on every load() (the
@@ -815,6 +822,8 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             hourRange={hourRange}
             barbers={barbers}
             services={services}
+            weekVisibleBarberId={weekVisibleBarberId}
+            onWeekBarberChange={setWeekVisibleBarberId}
           />
         )
       ) : viewMode === 'today' ? (
