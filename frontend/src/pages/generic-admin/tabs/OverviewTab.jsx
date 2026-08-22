@@ -549,7 +549,20 @@ export default function OverviewTab({ color, activeServices, hasReservations, cu
   }, [hasReservations])
 
   // ── Fetch catalog data ─────────────────────────────────────────────────────
+  // Dashboard Production Readiness Audit, 2026-08-22 (P1 fix) -- was unconditional, the one fetch
+  // in this file that didn't already guard itself the way loadOrders/loadResStats do. The backend's
+  // GET /admin/catalog/items requires require_service("catalog") (app/api/v1/admin/catalog.py);
+  // a hasReservations tenant with no catalog/store capability (confirmed live: mr-h) got a real
+  // 403 on every single Overview load, silently caught -- which then rendered a literal "٠" on the
+  // Products/Categories stat cards, indistinguishable from "genuinely zero products" when the true
+  // state is "this capability isn't active at all." Same guard shape `orderEndpoint` above already
+  // uses.
+  const hasCatalogData = hasCapability(activeServices, 'catalog') || hasCapability(activeServices, 'store')
   useEffect(() => {
+    if (!hasCatalogData) {
+      if (mountedRef.current) { setCatalogCats([]); setCatalogItems([]); setCatalogLoading(false) }
+      return
+    }
     setCatalogLoading(true)
     Promise.all([
       adminApi.get('/catalog/categories').then(r => r.data.data ?? []),
@@ -563,7 +576,7 @@ export default function OverviewTab({ color, activeServices, hasReservations, cu
       })
       .catch(() => {})
       .finally(() => { if (mountedRef.current) setCatalogLoading(false) })
-  }, [])
+  }, [hasCatalogData])
 
   useEffect(() => {
     loadOrders()
