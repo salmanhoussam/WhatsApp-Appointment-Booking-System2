@@ -9,6 +9,17 @@ import TenantModuleNav   from '../../../design-system/organisms/TenantModuleNav'
 import useGenericStore   from '../store/useGenericStore'
 import { hasCapability, hasOrderCapability } from '../../../utils/capabilities'
 
+// Quick WhatsApp checkout (2026-08-22) -- same real, already-proven placeholder-identity pattern
+// useReservationBooking.js's own confirmViaWhatsApp() uses: a real order is still created
+// server-side first (never skipped -- this project's own load-bearing sequencing rule for any
+// WhatsApp-first confirm flow), just with these placeholders standing in for name/phone so a
+// customer in a hurry doesn't have to type anything before continuing in WhatsApp itself, where
+// their real name/number are already known from the chat. Exact same literal strings as the
+// reservation flow, not reinvented -- keeps the real data consistent for any admin looking at
+// either capability's orders/reservations list.
+const WHATSAPP_PLACEHOLDER_NAME  = 'زبون واتساب'
+const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
+
 // ── Cart item row ─────────────────────────────────────────────────────────────
 
 function CartRow({ item, accent, onUpdate, onRemove }) {
@@ -365,6 +376,74 @@ export default function CartPage() {
     }
   }, [cartItems, form, moduleKey, sessionId, slug, clearCart, config, totalPrice])
 
+  // ── Quick WhatsApp checkout (store only, matches this file's own existing WhatsApp block in
+  // handleSubmit above -- same two endpoints, same message builder, same real-order-first
+  // sequencing) ─────────────────────────────────────────────────────────────────────────────────
+  const confirmViaWhatsApp = useCallback(async () => {
+    if (!cartItems.length || moduleKey !== 'store' || !config?.whatsapp_number) return
+    setError(null)
+    setSubmitting(true)
+
+    // Opened synchronously, before any `await` -- same real fix
+    // useReservationBooking.js's own confirmViaWhatsApp() already proved necessary (Browser
+    // Verification, 2026-08-03): a tab opened only after an awaited network call falls outside the
+    // click's trusted-gesture window and gets popup-blocked. Navigated to the real wa.me URL once
+    // the order POST resolves.
+    const waTab = window.open('about:blank', '_blank')
+
+    try {
+      const params = { client_slug: slug }
+      const waName  = form.customer_name  || WHATSAPP_PLACEHOLDER_NAME
+      const waPhone = form.customer_phone || WHATSAPP_PLACEHOLDER_PHONE
+
+      for (const item of cartItems) {
+        await publicApi.post(
+          '/store/cart',
+          { session_id: sessionId, catalog_item_id: item.catalogItemId, quantity: item.quantity },
+          { params }
+        )
+      }
+      const { data } = await publicApi.post(
+        '/store/orders',
+        {
+          session_id:       sessionId,
+          customer_name:    waName,
+          customer_phone:   waPhone,
+          payment_method:   form.payment_method,
+          shipping_address: form.shipping_address
+            ? { address: form.shipping_address }
+            : null,
+          notes: form.notes || null,
+        },
+        { params }
+      )
+      const newOrderId = data?.data?.id ?? null
+      setOrderId(newOrderId)
+
+      const phone = (config?.whatsapp_number || '').replace(/[^0-9]/g, '')
+      const message = buildStoreWhatsAppMessage({
+        businessName: config?.name_ar,
+        form: { ...form, customer_name: waName, customer_phone: waPhone },
+        cartItems,
+        totalPrice: totalPrice(),
+        currency: config?.currency ?? 'USD',
+        orderId: newOrderId,
+      })
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      if (waTab) waTab.location.href = waUrl
+      else window.open(waUrl, '_blank')
+      setWhatsappSent(true)
+
+      clearCart()
+    } catch (err) {
+      if (waTab) waTab.close()
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'حدث خطأ، يرجى المحاولة مجدداً.')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [cartItems, moduleKey, config, sessionId, slug, form, clearCart, totalPrice])
+
   // ── Config load failure — real error state, never a silent blank page ───────────────────
   // Final Production Gate Audit, 2026-08-22 (P0 fix): useTenantConfig() never returns `null` on
   // error -- it falls back to `{...DEFAULT_CONFIG, slug: <the REAL slug>}` (see that hook's own
@@ -468,6 +547,29 @@ export default function CartPage() {
                 </span>
               </span>
             </div>
+
+            {/* ── Quick WhatsApp checkout (store only) — primary action, no typing required.
+                Same real "زبون واتساب" placeholder-identity pattern ReservePage.jsx's own
+                "متابعة الحجز عبر واتساب" button already uses -- a real order is still created
+                server-side first, just without requiring the customer to fill the form below. */}
+            {moduleKey === 'store' && config?.whatsapp_number && (
+              <button
+                type="button"
+                onClick={confirmViaWhatsApp}
+                disabled={submitting}
+                style={{
+                  width: '100%', padding: '14px 0', marginBottom: 16,
+                  background: submitting ? 'rgba(37,211,102,0.5)' : '#25D366',
+                  border: 'none', borderRadius: 12,
+                  color: '#fff', fontSize: 15, fontWeight: 700,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontFamily: "'Cairo', sans-serif",
+                }}
+              >
+                {submitting ? 'جارٍ الإرسال...' : 'متابعة الطلب عبر واتساب'}
+              </button>
+            )}
 
             {/* ── Checkout form ────────────────────────────────────────── */}
             <div style={{
