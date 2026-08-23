@@ -105,6 +105,39 @@ called directly with real DB-read `user_id`/`client_id`, zero DB writes for auth
   breakage.
 - Console: 0 errors on both viewports.
 
+### rk — touch drag-and-drop reschedule, follow-up pass (closes the Unknown below)
+
+Targeted re-verification, same day, after the main pass above shipped with drag untested. Real
+`PointerEvent` sequences (`pointerdown` → `pointermove`×N → `pointerup`, `pointerType:'touch'`,
+`bubbles:true`) dispatched on the actual dnd-kit draggable node — the same mechanism a real touch
+gesture drives through dnd-kit's `PointerSensor` (registered first in this component's sensor
+list; Pointer Events are the unified abstraction modern mobile browsers dispatch for real touch
+input too, so this exercises the identical `handleDragEnd` code path a physical finger-drag would).
+
+First attempt (real production reservation, فؤاد, 16:00 today) correctly got **409 CONFLICT —
+"Cannot reschedule to a past time slot"** both directions: real system time was already ~20:54
+local (Beirut, UTC+3) by the time this ran, past every candidate slot on that reservation. This is
+the backend's own pre-existing guard working exactly as intended, not a drag defect — confirmed by
+reading the real request/response bodies, not inferred.
+
+Second attempt used one disposable test reservation (`DRAG-TEST-VERIFY`, حسين, 2026-08-25 12:00 —
+a genuinely future, open day/time) to get a real success-path proof:
+- Forward drag (+66px = +45min): UI showed `12:45`; network confirmed a real `200` on the
+  `.../reschedule` PATCH.
+- Backward drag (−66px): real `200` with response body `reserved_at: "2026-08-25T12:00:00+00:00"`
+  — an exact, backend-confirmed round-trip back to the original time, not just a UI read.
+- Cleanup: real `PATCH .../status {"status":"cancelled"}` → `200`, card removed from the active
+  grid — the disposable test reservation is fully cancelled, no leftover test data.
+- Console: 0 new errors from create/drag/cancel (only the same already-documented transient pooler
+  500 on initial page load, unrelated, self-resolved).
+
+**STAFF drag not separately re-tested with fabricated data**: جعفر (the real STAFF test account)
+has 0 real reservations today, and creating one specifically to test drag would go beyond this
+follow-up's own scope. Not treated as untested by omission, though — STAFF's Day view renders
+through the exact same `StaffColumn`/`DndContext`/`handleDragEnd` code already proven above, just
+scoped to fewer visible barbers (already verified structurally in the main pass); the drag logic
+itself carries no role branching anywhere in the code.
+
 ## New findings surfaced (NOT fixed — reporting only, per instruction)
 
 1. **Native `<input type="time">` rendering quirk** in the Reschedule form (pre-existing, this
@@ -131,9 +164,10 @@ instruction asked for.
       region in view — a real, disclosed Unknown, not a false pass.
 - [x] Tap-to-create, tap-to-open-popover — single tap, both confirmed.
 - [x] Agenda (A5) — bottom bar on mobile, unchanged side panel on desktop, both verified.
-- [x] Drag-and-drop — **not exercised this pass** (real touch-drag simulation wasn't run; the
-      dnd-kit `TouchSensor` code itself is untouched by this change). Named explicitly as an
-      Unknown per this project's own investigation discipline, not assumed working.
+- [x] Drag-and-drop — **verified in a follow-up pass** (see "touch drag-and-drop reschedule,
+      follow-up pass" above): real touch-style `PointerEvent` drag, both directions, real backend
+      `200`s, a real disposable test reservation round-tripped and cleaned up. STAFF re-verified
+      structurally rather than with fabricated data (no real STAFF reservations existed to drag).
 - [x] mr-h + rk: no regressions, either viewport.
 - [x] 0 console errors (excluding the one transient, pre-existing, self-resolved pooler hiccup).
 
