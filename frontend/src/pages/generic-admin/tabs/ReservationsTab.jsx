@@ -423,6 +423,22 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
     setVisibleBarberIds(barbers.map((b) => b.id))
   }, [myBarberId, barbersLoading, barbers])
 
+  // Mobile Day (Mobile Calendar UX Approved, 2026-08-23, .claudedocs/design/mobile-calendar/) --
+  // which ONE barber the single mobile column shows. Single-select, unlike desktop's
+  // visibleBarberIds set -- the approved design's own single-column model. Lifted here rather than
+  // owned inside ReservationsTodayView for the exact same remount-survival reason as
+  // visibleBarberIds/weekVisibleBarberId above (that component fully unmounts/remounts on every
+  // load()). Seeded to myBarberId for STAFF (never auto-defaulted, same guard as visibleBarberIds);
+  // defaults to the first real barber for ADMIN once barbers load, matching the approved design's
+  // "الافتراضي: أول حلاق نشط".
+  const [mobileActiveBarberId, setMobileActiveBarberId] = useState(() => myBarberId ?? null)
+  useEffect(() => {
+    if (myBarberId) return
+    if (mobileActiveBarberId) return
+    if (barbersLoading || barbers.length === 0) return
+    setMobileActiveBarberId(barbers[0].id)
+  }, [myBarberId, barbersLoading, barbers, mobileActiveBarberId])
+
   const toggleVisibleBarber = useCallback((id) => {
     setVisibleBarberIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   }, [])
@@ -858,6 +874,9 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             barbersLoading={barbersLoading}
             services={services}
             hideBarberPicker={hideBarberPicker}
+            isMobile={isMobile}
+            mobileActiveBarberId={mobileActiveBarberId}
+            onMobileBarberChange={setMobileActiveBarberId}
           />
         )
       ) : isMobile ? (

@@ -286,16 +286,20 @@ function StaffColumn({ barber, items, quarters, startHour, barberOpenHour, barbe
 // StatusBadge/STATUS_META (ReservationsTab.jsx) and the exact same ReservationPopover every card
 // already opens -- no new mutation path, no new popover, no new data fetch (reads the same `items`
 // the grid itself already has).
-function TodayAgendaPanel({ items, barbers, serviceNameFor, onOpen }) {
+// `fullWidth` (Mobile Calendar UX Approved, 2026-08-23) -- lets Mobile Day reuse this exact
+// component inline inside its own collapsible bottom section instead of the desktop 260px side
+// column, with zero change to its data/sort/click logic -- only the two layout numbers that made
+// sense specifically for a fixed-width side panel.
+function TodayAgendaPanel({ items, barbers, serviceNameFor, onOpen, fullWidth = false }) {
   const sorted = [...items]
     .filter((i) => VISIBLE_STATUSES.includes(i.status))
     .sort((a, b) => new Date(a.reserved_at) - new Date(b.reserved_at))
 
   return (
     <div style={{
-      width: 260, flexShrink: 0, background: T.cardBg, border: `1px solid ${T.border}`,
+      width: fullWidth ? '100%' : 260, flexShrink: 0, background: T.cardBg, border: `1px solid ${T.border}`,
       borderRadius: 12, boxShadow: T.shadow, overflow: 'hidden',
-      display: 'flex', flexDirection: 'column', maxHeight: 640,
+      display: 'flex', flexDirection: 'column', maxHeight: fullWidth ? 360 : 640,
     }}>
       <div style={{
         padding: '12px 14px', borderBottom: `1px solid ${T.border}`,
@@ -360,13 +364,22 @@ function TodayAgendaPanel({ items, barbers, serviceNameFor, onOpen }) {
  *     schedules are VISIBLE as columns, owned by ReservationsTab.jsx for the same reason the old
  *     single visibleBarberId was -- this component fully unmounts/remounts on every load().
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberIds, onToggleBarber, onSelectAllBarbers, barbers, barbersLoading, services, hideBarberPicker = false }) {
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberIds, onToggleBarber, onSelectAllBarbers, barbers, barbersLoading, services, hideBarberPicker = false, isMobile = false, mobileActiveBarberId = null, onMobileBarberChange }) {
   // A3.1 (Day View Resource Columns, 2026-08-22) -- Day now renders every VISIBLE barber as its own
   // column (the UX proposal Salman reviewed and approved,
   // `.claudedocs/work/calendar-uxui-study/2026-08-22/`), instead of one barber switched via pills.
   // `visibleBarbers` preserves `barbers`' own order (filtering over `barbers`, not over
   // `visibleBarberIds`), so column order stays stable regardless of selection order.
-  const visibleBarbers = barbers.filter((b) => visibleBarberIds.includes(b.id))
+  //
+  // Mobile Day (Mobile Calendar UX Approved, 2026-08-23) -- on mobile, exactly one barber's column
+  // ever renders, driven by `mobileActiveBarberId` instead of the desktop multi-select set. Reusing
+  // the same `visibleBarbers` variable (and every StaffColumn/hour-range/DnD computation already
+  // built on it below) means the whole grid, hatch, now-line and drag logic need zero duplication --
+  // only the SELECTION source differs, not the rendering.
+  const effectiveVisibleBarberIds = isMobile
+    ? (mobileActiveBarberId ? [mobileActiveBarberId] : [])
+    : visibleBarberIds
+  const visibleBarbers = barbers.filter((b) => effectiveVisibleBarberIds.includes(b.id))
 
   // A2.2 (2026-08-21) -- the grid's own hour boundaries must match what the backend will actually
   // accept, resolved from reservation_service.py's own real priority (barber.workingHours, falling
@@ -392,6 +405,11 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
   const [createSlot, setCreateSlot] = useState(null) // { barberId?, reservedAt?, anchor }
   const [conflictMsg, setConflictMsg] = useState(null)
   const snapshotRef = useRef(items)
+  // Mobile Day Agenda (Mobile Calendar UX Approved, 2026-08-23) -- collapsed/expanded state of the
+  // bottom "جدول اليوم" bar. Deliberately local, not lifted like mobileActiveBarberId -- it's a
+  // transient view toggle, not a selection; resetting to collapsed on remount (day-nav, filters) is
+  // the correct, expected behavior, not a bug.
+  const [agendaOpen, setAgendaOpen] = useState(false)
 
   // In-flight-mutation guard (Phase 3.2, Reservation Capability Review Finding 4) -- a Set of
   // reservation ids currently mid-mutation (drag OR a popover action), shared across both surfaces
@@ -574,8 +592,12 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
             Staff Scoped Access Phase D (2026-08-09) -- hidden entirely for STAFF (hideBarberPicker):
             the backend already scopes every reservation to their own barberId regardless of
             selection, so showing this picker to a STAFF user would be actively misleading, not just
-            unnecessary. */}
-        {!hideBarberPicker && barbers.length > 1 && (
+            unnecessary.
+
+            Desktop-only from Mobile Calendar UX Approved (2026-08-23, .claudedocs/design/
+            mobile-calendar/) -- mobile gets its own single-select identity-strip/chip-row below,
+            never this multi-column picker (a mobile screen only ever shows one column). */}
+        {!isMobile && !hideBarberPicker && barbers.length > 1 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
             <button
               onClick={onSelectAllBarbers}
@@ -595,6 +617,62 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
                 <button
                   key={b.id}
                   onClick={() => onToggleBarber(b.id)}
+                  style={{
+                    padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
+                    background: active ? color : T.pageBg,
+                    border: `1px solid ${active ? color : T.border}`,
+                    color: active ? '#0a0a0f' : T.textSecond,
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                  }}
+                >
+                  {b.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Mobile Day -- STAFF identity strip (Mobile Calendar UX Approved, 2026-08-23). No
+            selector at all: the account itself is the identity ("STAFF isolation" per the approved
+            design), so this replaces the picker with a fixed avatar/name/hours readout instead of
+            leaving the header empty. */}
+        {isMobile && hideBarberPicker && visibleBarbers[0] && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexBasis: '100%' }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%', background: color, color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 800, fontFamily: FONT, flexShrink: 0,
+            }}>
+              {visibleBarbers[0].name?.[0] ?? '؟'}
+            </div>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: T.textPrimary, fontFamily: FONT }}>
+                {visibleBarbers[0].name}
+              </div>
+              {visibleBarbers[0].working_hours?.open_time && (
+                <div style={{ fontSize: 10.5, color: T.textMuted, fontFamily: FONT }}>
+                  {visibleBarbers[0].working_hours.open_time}–{visibleBarbers[0].working_hours.close_time}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Day -- ADMIN single-select chip row (Mobile Calendar UX Approved, 2026-08-23).
+            Same chip visual language as the desktop multi-select row above, but exactly one active
+            barber at a time -- driving `mobileActiveBarberId` (lifted to ReservationsTab.jsx),
+            never the desktop `visibleBarberIds` set. No "الكل" shortcut here: unlike desktop, mobile
+            never shows more than one column, so there is no "select every barber" state to shortcut
+            to -- "everyone" is what the Agenda bar below is for. */}
+        {isMobile && !hideBarberPicker && barbers.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, flexBasis: '100%' }}>
+            {barbers.map((b) => {
+              const active = mobileActiveBarberId === b.id
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => onMobileBarberChange?.(b.id)}
                   style={{
                     padding: '5px 14px', borderRadius: 18, fontSize: 12, fontWeight: 600,
                     cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap',
@@ -753,13 +831,65 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
       </DndContext>
       </div>
 
-      <TodayAgendaPanel
-        items={items}
-        barbers={barbers}
-        serviceNameFor={serviceNameFor}
-        onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
-      />
+      {/* Desktop only, unchanged (Mobile Calendar UX Approved, 2026-08-23) -- the side-column
+          Agenda stays exactly as A5 built it. Mobile gets its own collapsible bottom section below,
+          outside this flex row entirely, instead of squeezing a 260px column beside the grid. */}
+      {!isMobile && (
+        <TodayAgendaPanel
+          items={items}
+          barbers={barbers}
+          serviceNameFor={serviceNameFor}
+          onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+        />
+      )}
       </div>
+
+      {/* Mobile Day Agenda -- collapsible bottom section (Mobile Calendar UX Approved, 2026-08-23).
+          Reuses TodayAgendaPanel verbatim (fullWidth) for the expanded list -- no new data/sort/
+          click logic, only where it's mounted. `items` already holds every barber's reservations
+          for the date regardless of which single column is currently selected (the grid above
+          filters per-column, this doesn't), so this is always "everyone, today" for both STAFF
+          (whose own `items` the backend already scopes to just them) and ADMIN -- matching the
+          approved design's "Agenda دائماً الكل" rule with zero extra filtering. */}
+      {isMobile && (
+        <div style={{ marginTop: 14 }}>
+          {mobileActiveBarberId && items.filter((i) => i.barber_id === mobileActiveBarberId && VISIBLE_STATUSES.includes(i.status)).length === 0 && (
+            <div style={{ textAlign: 'center', fontSize: 11.5, color: T.textMuted, fontWeight: 700, marginBottom: 8, fontFamily: FONT }}>
+              لا حجوزات اليوم
+            </div>
+          )}
+          {agendaOpen && (
+            <div style={{ marginBottom: 10 }}>
+              <TodayAgendaPanel
+                items={items}
+                barbers={barbers}
+                serviceNameFor={serviceNameFor}
+                onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
+                fullWidth
+              />
+            </div>
+          )}
+          <button
+            onClick={() => setAgendaOpen((v) => !v)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '11px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: T.textPrimary, color: '#fff', fontFamily: FONT,
+              boxShadow: '0 8px 20px rgba(15,23,42,0.2)',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 800 }}>
+              📋 جدول اليوم{!hideBarberPicker ? ' — الكل' : ''}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+              <span style={{ fontWeight: 700, background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: 10 }}>
+                {items.filter((i) => VISIBLE_STATUSES.includes(i.status)).length} حجز
+              </span>
+              <span style={{ opacity: 0.7 }}>{agendaOpen ? '▲' : '▼'}</span>
+            </span>
+          </button>
+        </div>
+      )}
 
       {popover && (
         <ReservationPopover

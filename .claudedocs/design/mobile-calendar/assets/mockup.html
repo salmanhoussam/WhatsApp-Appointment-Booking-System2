@@ -1,0 +1,777 @@
+<title>One Barber, One Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ground: #F3F4F1;
+    --ground-soft: #EAEBE7;
+    --card: #FFFFFF;
+    --ink: #14201F;
+    --ink-soft: #55645F;
+    --ink-faint: #93A19B;
+    --line: rgba(20,32,31,0.10);
+    --line-soft: rgba(20,32,31,0.06);
+    --accent: #2F4F4F;
+    --accent-soft: rgba(47,79,79,0.09);
+    --accent-strong: #1E3636;
+    --confirmed: #047857;
+    --confirmed-bg: rgba(16,185,129,.12);
+    --pending: #b45309;
+    --pending-bg: rgba(245,158,11,.12);
+    --danger: #DC2626;
+    --shadow-sm: 0 1px 3px rgba(20,32,31,0.08), 0 1px 2px rgba(20,32,31,0.05);
+    --shadow-lg: 0 24px 60px rgba(20,32,31,0.16);
+    --bezel: #1B2624;
+    --bezel-soft: #26332F;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101513;
+      --ground-soft: #161C19;
+      --card: #1A211F;
+      --ink: #ECF1EF;
+      --ink-soft: #A6B3AE;
+      --ink-faint: #6C7A75;
+      --line: rgba(236,241,239,0.12);
+      --line-soft: rgba(236,241,239,0.07);
+      --accent: #6FA5A0;
+      --accent-soft: rgba(111,165,160,0.14);
+      --accent-strong: #8FBFB9;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --shadow-lg: 0 24px 60px rgba(0,0,0,0.55);
+      --bezel: #05070A;
+      --bezel-soft: #10151A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101513;
+    --ground-soft: #161C19;
+    --card: #1A211F;
+    --ink: #ECF1EF;
+    --ink-soft: #A6B3AE;
+    --ink-faint: #6C7A75;
+    --line: rgba(236,241,239,0.12);
+    --line-soft: rgba(236,241,239,0.07);
+    --accent: #6FA5A0;
+    --accent-soft: rgba(111,165,160,0.14);
+    --accent-strong: #8FBFB9;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-lg: 0 24px 60px rgba(0,0,0,0.55);
+    --bezel: #05070A;
+    --bezel-soft: #10151A;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'Cairo', 'Segoe UI', sans-serif;
+    direction: rtl;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; direction: ltr; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 28px 100px; }
+
+  /* ── Header ───────────────────────────────────────────── */
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace; direction: ltr; text-align: right;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(30px, 4.2vw, 46px); font-weight: 900; line-height: 1.18;
+    margin: 0 0 18px; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .lede {
+    font-size: 18px; line-height: 1.75; color: var(--ink-soft); max-width: 62ch;
+    font-weight: 500;
+  }
+  .criterion {
+    margin-top: 28px; padding: 20px 24px; border-radius: 14px;
+    background: var(--accent-soft); border: 1px solid var(--line);
+    font-size: 15.5px; line-height: 1.85; color: var(--ink);
+  }
+  .criterion b { color: var(--accent-strong); }
+
+  section { margin-top: 72px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+    color: var(--ink-faint); direction: ltr;
+  }
+  h2 { font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -0.005em; }
+  .section-sub { color: var(--ink-soft); font-size: 15px; margin-top: -10px; margin-bottom: 24px; max-width: 68ch; line-height: 1.7; }
+
+  /* ── Audit ────────────────────────────────────────────── */
+  .audit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .audit-grid { grid-template-columns: 1fr; } }
+  .audit-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; box-shadow: var(--shadow-sm);
+  }
+  .audit-card .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.03em; direction: ltr;
+  }
+  .tag.bad { background: rgba(220,38,38,0.1); color: var(--danger); }
+  .tag.warn { background: var(--pending-bg); color: var(--pending); }
+  .audit-card h3 { font-size: 16px; margin: 0 0 8px; font-weight: 800; }
+  .audit-card p { font-size: 13.5px; line-height: 1.7; color: var(--ink-soft); margin: 0; }
+  .audit-card code {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; direction: ltr;
+    display: inline-block; background: var(--ground-soft); padding: 1px 6px; border-radius: 5px;
+    color: var(--ink);
+  }
+
+  /* ── Directions ───────────────────────────────────────── */
+  .directions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 960px) { .directions { grid-template-columns: 1fr; } }
+  .dir-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 24px; box-shadow: var(--shadow-sm); position: relative; display: flex; flex-direction: column;
+  }
+  .dir-card.rec { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent), var(--shadow-sm); }
+  .rec-badge {
+    position: absolute; top: -12px; left: 24px; background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em;
+  }
+  .dir-card h3 { font-size: 16.5px; font-weight: 800; margin: 4px 0 10px; line-height: 1.4; }
+  .dir-card .desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.7; margin-bottom: 16px; flex: 1; }
+  .verdicts { display: flex; flex-direction: column; gap: 7px; }
+  .verdict-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .verdict-row .label { color: var(--ink-soft); width: 92px; flex-shrink: 0; }
+  .dots { display: flex; gap: 3px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+  .dot.on { background: var(--accent); }
+  .dir-card.rec .dot.on { background: var(--accent); }
+
+  /* ── Recommendation callout ──────────────────────────── */
+  .reco {
+    background: var(--accent); color: #fff; border-radius: 18px; padding: 30px 32px;
+    margin-top: 20px; display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;
+  }
+  .reco .icon { font-size: 28px; line-height: 1; }
+  .reco h3 { font-size: 19px; font-weight: 800; margin: 0 0 8px; }
+  .reco p { font-size: 14.5px; line-height: 1.75; margin: 0; opacity: 0.92; max-width: 74ch; }
+
+  /* ── Phone mockups ────────────────────────────────────── */
+  .stage {
+    display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start;
+    justify-content: center; padding: 20px 0 10px;
+  }
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .phone-label {
+    font-family: 'JetBrains Mono', monospace; direction: ltr; text-align: center;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-soft);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .role-chip {
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    background: var(--accent-soft); color: var(--accent-strong);
+  }
+
+  .phone {
+    width: 320px; background: var(--bezel); border-radius: 42px; padding: 14px;
+    box-shadow: var(--shadow-lg); position: relative;
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 90px; height: 22px; background: var(--bezel-soft); border-radius: 12px; z-index: 5;
+  }
+  .screen {
+    background: #FFFFFF; border-radius: 28px; overflow: hidden; position: relative;
+    height: 660px; display: flex; flex-direction: column;
+    font-family: 'Cairo', sans-serif; direction: rtl; color: #0F172A;
+  }
+  .statusbar {
+    height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 22px; font-size: 11px; font-weight: 700; color: #0F172A; font-family: 'JetBrains Mono', monospace;
+    direction: ltr;
+  }
+  .dash-top {
+    padding: 6px 16px 10px; border-bottom: 1px solid rgba(15,23,42,0.07);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .dash-top .shop { font-size: 12px; font-weight: 800; color: #0F172A; }
+  .dash-top .tab { font-size: 10px; color: #9CA3AF; font-weight: 600; }
+
+  .app-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: #FCFCFB; position: relative; }
+
+  .daynav {
+    display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; flex-shrink: 0;
+  }
+  .navbtn {
+    width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.1);
+    background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #2F4F4F;
+    flex-shrink: 0;
+  }
+  .daydate { font-size: 13px; font-weight: 800; color: #0F172A; flex: 1; text-align: center; }
+  .todaypill {
+    font-size: 10px; font-weight: 700; color: #2F4F4F; background: rgba(47,79,79,0.1);
+    border: 1px solid rgba(47,79,79,0.25); padding: 3px 9px; border-radius: 20px; flex-shrink: 0;
+  }
+
+  .identity-strip {
+    display: flex; align-items: center; gap: 8px; padding: 2px 14px 12px; flex-shrink: 0;
+  }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: #2F4F4F; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .identity-strip .who { font-size: 12.5px; font-weight: 800; color: #0F172A; }
+  .identity-strip .hours { font-size: 10.5px; color: #9CA3AF; font-weight: 600; }
+
+  .chip-row { display: flex; gap: 6px; padding: 2px 14px 12px; flex-shrink: 0; }
+  .chip {
+    padding: 5px 13px; border-radius: 16px; font-size: 11.5px; font-weight: 700;
+    border: 1px solid rgba(15,23,42,0.12); background: #fff; color: #55645F;
+  }
+  .chip.active { background: #2F4F4F; color: #fff; border-color: #2F4F4F; }
+
+  .grid-wrap { flex: 1; overflow: hidden; position: relative; padding: 0 14px; }
+  .grid-fade-top, .grid-fade-bottom {
+    position: absolute; left: 14px; right: 14px; height: 22px; z-index: 4; pointer-events: none;
+  }
+  .grid-fade-top { top: 0; background: linear-gradient(#FCFCFB, rgba(252,252,251,0)); }
+  .grid-fade-bottom { bottom: 0; background: linear-gradient(rgba(252,252,251,0), #FCFCFB); }
+
+  .grid {
+    display: flex; border: 1px solid rgba(15,23,42,0.09); border-radius: 12px; overflow: hidden;
+    background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+  }
+  .gutter { width: 40px; flex-shrink: 0; position: relative; padding-top: 4px; background: #FAFAF9; }
+  .gutter .hr {
+    height: 76px; font-size: 9.5px; color: #9CA3AF; font-weight: 700; padding-right: 5px;
+    box-sizing: border-box; border-top: 1px solid rgba(15,23,42,0.05); font-family: 'JetBrains Mono', monospace;
+    direction: ltr; padding-top: 2px;
+  }
+  .col { flex: 1; position: relative; background: #fff; }
+  .qline { height: 19px; border-top: 1px solid rgba(15,23,42,0.045); }
+  .hatch {
+    position: absolute; left: 0; right: 0;
+    background: repeating-linear-gradient(45deg, rgba(15,23,42,0.045) 0 6px, transparent 6px 13px);
+  }
+  .hatch span {
+    position: absolute; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 700; color: #9CA3AF;
+  }
+  .now-line {
+    position: absolute; left: 0; right: 0; border-top: 2px solid #DC2626; z-index: 3;
+  }
+  .now-line .tag {
+    position: absolute; right: 4px; top: -9px; font-size: 8.5px; font-weight: 700; color: #fff;
+    background: #DC2626; padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;
+  }
+  .card {
+    position: absolute; left: 5px; right: 5px; border-radius: 8px; padding: 5px 8px;
+    background: rgba(47,79,79,0.08); border: 1px solid rgba(15,23,42,0.06);
+    border-inline-start: 3px solid #2F4F4F; overflow: hidden;
+  }
+  .card .name { font-size: 10.5px; font-weight: 800; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .svc { font-size: 9px; color: #55645F; margin-top: 1px; }
+  .card .time { font-size: 8.5px; color: #9CA3AF; margin-top: 1px; font-family: 'JetBrains Mono', monospace; direction: ltr; }
+  .card .pill {
+    position: absolute; top: 5px; left: 6px; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 8px;
+  }
+  .card.confirmed .pill { background: rgba(16,185,129,.15); color: #047857; }
+
+  .empty-slot {
+    position: absolute; left: 5px; right: 5px; border-radius: 8px;
+    border: 1.5px dashed rgba(47,79,79,0.35); background: rgba(47,79,79,0.05);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-slot .plus { font-size: 15px; font-weight: 700; color: #2F4F4F; }
+
+  .empty-day { display:flex; flex-direction:column; align-items:center; justify-content:center; height: 140px; gap: 6px; }
+  .empty-day .big { font-size: 20px; }
+  .empty-day .msg { font-size: 11.5px; color: #9CA3AF; font-weight: 700; }
+
+  .bottom-bar {
+    flex-shrink: 0; margin: 10px 14px 14px; padding: 10px 14px; border-radius: 14px;
+    background: #0F172A; color: #fff; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 8px 20px rgba(15,23,42,0.25);
+  }
+  .bottom-bar .left { display: flex; align-items: center; gap: 8px; }
+  .bottom-bar .left .ic { font-size: 13px; }
+  .bottom-bar .title { font-size: 12px; font-weight: 800; }
+  .bottom-bar .count {
+    font-size: 10px; font-weight: 700; background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 10px;
+  }
+  .bottom-bar .chev { font-size: 11px; opacity: 0.6; }
+
+  .fab {
+    position: absolute; bottom: 92px; left: 16px; width: 44px; height: 44px; border-radius: 50%;
+    background: #2F4F4F; color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 8px 18px rgba(47,79,79,0.4); z-index: 6;
+  }
+
+  /* callouts */
+  .callout {
+    position: absolute; z-index: 8; display: flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; direction: ltr; font-size: 9.5px; font-weight: 600;
+  }
+  .callout .cdot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .callout .clabel {
+    background: var(--ink); color: var(--ground); padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  }
+
+  .phone-caption { font-size: 12.5px; color: var(--ink-soft); text-align: center; max-width: 300px; line-height: 1.6; }
+
+  /* Agenda sheet fragment */
+  .sheet-frame {
+    width: 320px; border-radius: 24px; overflow: hidden; box-shadow: var(--shadow-lg);
+    background: #fff; border: 1px solid var(--line);
+  }
+  .sheet-handle { display: flex; justify-content: center; padding: 10px 0 4px; }
+  .sheet-handle .bar { width: 36px; height: 4px; border-radius: 3px; background: rgba(15,23,42,0.15); }
+  .sheet-head {
+    padding: 4px 18px 12px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(15,23,42,0.07); font-family: 'Cairo', sans-serif; direction: rtl;
+  }
+  .sheet-head .t { font-size: 14px; font-weight: 800; color: #0F172A; }
+  .sheet-head .c { font-size: 11px; font-weight: 700; color: #9CA3AF; }
+  .sheet-list { padding: 10px 14px 18px; display: flex; flex-direction: column; gap: 8px; font-family: 'Cairo', sans-serif; direction: rtl; }
+  .sheet-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px;
+    background: #FAFAF9; border-inline-start: 3px solid;
+  }
+  .sheet-item .t2 { font-size: 11px; font-weight: 800; color: #0F172A; font-family: 'JetBrains Mono', monospace; direction: ltr; width: 42px; flex-shrink: 0; }
+  .sheet-item .mid { flex: 1; min-width: 0; }
+  .sheet-item .nm { font-size: 11.5px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet-item .sv { font-size: 10px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet-item .who-badge {
+    font-size: 9px; font-weight: 700; color: #2F4F4F; background: rgba(47,79,79,0.1); padding: 2px 7px; border-radius: 7px; flex-shrink: 0;
+  }
+
+  /* ── Role behavior table ─────────────────────────────── */
+  .role-table { display: grid; grid-template-columns: 160px 1fr 1fr; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); box-shadow: var(--shadow-sm); }
+  .role-table > div { padding: 14px 18px; font-size: 13.5px; line-height: 1.6; border-bottom: 1px solid var(--line-soft); }
+  .role-table > div:nth-child(3n+1) { font-weight: 700; color: var(--ink-soft); background: var(--ground-soft); font-size: 12.5px; }
+  .role-table > div:nth-child(3n+2) { border-inline-end: 1px solid var(--line-soft); }
+  .role-table .head { font-weight: 800 !important; color: var(--ink) !important; background: transparent !important; font-family: 'JetBrains Mono', monospace; font-size: 11.5px !important; letter-spacing: 0.04em; direction: ltr; text-align: center; }
+  .role-table > div:last-child, .role-table > div:nth-last-child(2), .role-table > div:nth-last-child(3) { border-bottom: none; }
+  code.src { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--ground-soft); padding: 1px 5px; border-radius: 4px; direction: ltr; display: inline-block; }
+  @media (max-width: 720px) { .role-table { grid-template-columns: 1fr; } .role-table > div:nth-child(3n+2) { border-inline-end: none; } }
+
+  /* ── Phases ──────────────────────────────────────────── */
+  .phases { display: flex; flex-direction: column; gap: 0; }
+  .phase {
+    display: grid; grid-template-columns: 90px 1fr; gap: 20px; padding: 22px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .phase:first-child { border-top: none; }
+  .phase-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: var(--accent);
+    direction: ltr;
+  }
+  .phase h4 { font-size: 15.5px; font-weight: 800; margin: 0 0 8px; }
+  .phase p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.7; margin: 0 0 10px; max-width: 74ch; }
+  .phase .meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; }
+  .phase .meta .m { display: flex; gap: 6px; align-items: baseline; }
+  .phase .meta .k { color: var(--ink-faint); font-weight: 600; }
+  .phase .meta .v { color: var(--ink); font-family: 'JetBrains Mono', monospace; direction: ltr; font-size: 11.5px; }
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .footer-note {
+    margin-top: 80px; padding: 24px 26px; border-radius: 14px; border: 1.5px dashed var(--line);
+    display: flex; align-items: center; gap: 14px; font-size: 14px; color: var(--ink-soft); line-height: 1.7;
+  }
+  .footer-note .ic { font-size: 20px; flex-shrink: 0; }
+  .footer-note b { color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">rk barber shop — mobile calendar ux study</div>
+  <h1>شاشة واحدة لكل حلاق، مش Desktop مصغّر</h1>
+  <p class="lede">
+    دراسة تصميم لإعادة بناء <b>Day View</b> على الموبايل فقط — الأعمدة الجانبية والـ agenda الجانبي
+    اللي بيشتغلوا منيح على شاشة كبيرة بيصيروا عبء على شاشة تلفون. لا كود، لا تنفيذ — هاي وريقة قرار.
+  </p>
+  <div class="criterion">
+    <b>معيار النجاح الوحيد:</b> يفتح الموظف التقويم من موبايله ويفهم خلال ثانيتين — اليوم، الساعة الحالية،
+    حجوزاته، وين في فراغ، ووين في حجز جاي — بدون zoom، بدون horizontal scroll، وبدون إحساس إنه عم يحاول يقرأ
+    شاشة كمبيوتر مصغّرة.
+  </div>
+
+  <!-- ── AUDIT ─────────────────────────────────────────── -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2>التشخيص — ليش الوضع الحالي متعب</h2>
+    </div>
+    <p class="section-sub">فحص مباشر للكود (<code class="mono">ReservationsTodayView.jsx</code>) قبل أي افتراض — المشكلة بنيوية، مش مسألة تصغير خط.</p>
+    <div class="audit-grid">
+      <div class="audit-card">
+        <span class="tag bad">root cause</span>
+        <h3>لا يوجد فرع Mobile إطلاقاً</h3>
+        <p>
+          <code>isMobile</code> محسوبة في <code>ReservationsTab.jsx</code> لكنها تُستخدم فقط لعرض القائمة (List).
+          مكوّنَي الـ Day/Week الفعليين لا يستقبلونها كـ prop إطلاقاً — الموبايل يشغّل نفس تخطيط الديسكتوب حرفياً.
+        </p>
+      </div>
+      <div class="audit-card">
+        <span class="tag bad">hard floors</span>
+        <h3>عرض ثابت لا يتقلّص</h3>
+        <p>
+          كل عمود حلاق <code>minWidth:150</code>، ولوحة "جدول اليوم" (A5) <code>width:260, flexShrink:0</code>
+          خارج منطقة الـ scroll الداخلية للشبكة — على حسين وجعفر معاً هذا يعني ٤٥٠px+ حجم أدنى إجباري.
+        </p>
+      </div>
+      <div class="audit-card">
+        <span class="tag warn">overflow</span>
+        <h3>Overflow عشوائي، مش مقصود</h3>
+        <p>
+          الـ container الخارجي (grid + agenda) بلا <code>overflowX</code> خاص فيه — النتيجة صفحة تفيض أفقياً
+          دون قصد، بالضبط عكس Week اللي عندها overflow مقصود ومُعلن بتعليق بالكود.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DIRECTIONS ────────────────────────────────────── -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2>ثلاثة اتجاهات ممكنة</h2>
+    </div>
+    <p class="section-sub">قورنت على القراءة، سرعة الحجز، لمسة الإصبع، ورؤية باقي الحلاقين — اتجاه واحد فقط موصى به.</p>
+
+    <div class="directions">
+      <div class="dir-card">
+        <h3>Horizontal scroll بين الحلاقين<br><span class="mono" style="font-size:11px;color:var(--ink-faint)">same pattern as Week</span></h3>
+        <p>نفس أعمدة الديسكتوب، لكن نسمح لها تفيض أفقياً بشكل معلَن بدل الصدفة. أبسط تغيير برمجياً، لكن نفس مشكلة العمود الضيق تبقى — فقط أصبحت مقصودة.</p>
+        <div class="verdicts">
+          <div class="verdict-row"><span class="label">القراءة</span><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+          <div class="verdict-row"><span class="label">سرعة الحجز</span><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+          <div class="verdict-row"><span class="label">لمسة الإصبع</span><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+          <div class="verdict-row"><span class="label">مخاطر الكود</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="dir-card rec">
+        <span class="rec-badge">التوصية</span>
+        <h3>عمود واحد لكل حلاق<br><span class="mono" style="font-size:11px;color:var(--ink-faint)">agenda كـ bottom sheet</span></h3>
+        <p>
+          STAFF يشوف عموده هو فقط — بلا اختيار. ADMIN يبدّل بين الحلاقين عبر chips صغيرة فوق نفس العمود.
+          الشبكة full-width دايماً. "جدول اليوم" (A5 الموجود فعلاً) ينزل كشريط سفلي قابل للتوسيع بدل عمود جانبي.
+        </p>
+        <div class="verdicts">
+          <div class="verdict-row"><span class="label">القراءة</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+          <div class="verdict-row"><span class="label">سرعة الحجز</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+          <div class="verdict-row"><span class="label">لمسة الإصبع</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+          <div class="verdict-row"><span class="label">مخاطر الكود</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="dir-card">
+        <h3>Agenda افتراضي، لا Grid إطلاقاً<br><span class="mono" style="font-size:11px;color:var(--ink-faint)">list-first mobile</span></h3>
+        <p>الموبايل يفتح مباشرة على قائمة زمنية (شبيهة بـ A5) بلا شبكة ساعات إطلاقاً. أخف بصرياً، لكن يفقد الإحساس المكاني بالفراغ بين الحجوزات — أضعف من ناحية "وين في فراغ".</p>
+        <div class="verdicts">
+          <div class="verdict-row"><span class="label">القراءة</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+          <div class="verdict-row"><span class="label">سرعة الحجز</span><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+          <div class="verdict-row"><span class="label">لمسة الإصبع</span><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+          <div class="verdict-row"><span class="label">مخاطر الكود</span><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reco">
+      <span class="icon">✂️</span>
+      <div>
+        <h3>ليش "عمود واحد" هو الأصح</h3>
+        <p>
+          هذا الاتجاه الوحيد يلبّي شرطين مع بعض دفعة وحدة: بطاقة حجز كبيرة ومقروءة بعرض الشاشة كامل،
+          + رؤية باقي الحلاقين عند الحاجة (Agenda) بدل ما نفرضها دايماً. وبما إن حساب الـ STAFF أصلاً
+          مربوط بهويته (<code class="mono" style="background:rgba(255,255,255,.15);padding:1px 6px;border-radius:4px">myBarberId</code>)،
+          الموبايل بيصير أبسط من الديسكتوب فعلياً — مش نسخة مصغّرة عنه.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── REAL MOCKUP ───────────────────────────────────── -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2>المعاينة — ببيانات rk الحقيقية</h2>
+    </div>
+    <p class="section-sub">
+      الأحد ٢٣ أغسطس ٢٠٢٦ — حسين (٠٩:٠٠–٢١:٠٠) وجعفر (٠٩:٠٠–١٨:٠٠، مغلق الإثنين) هم الحلاقان الفعليان
+      المسجّلان لـ rk حالياً. الحجوزات المعروضة حقيقية من قاعدة البيانات.
+    </p>
+
+    <div class="stage">
+      <!-- STAFF phone -->
+      <div class="phone-col">
+        <div class="phone-label"><span class="role-chip">STAFF</span> حساب حسين نفسه</div>
+        <div class="phone" style="position:relative">
+          <div class="screen">
+            <div class="statusbar"><span>13:38</span><span>●●● 5G 82%</span></div>
+            <div class="dash-top"><span class="tab">التقويم</span><span class="shop">RK Barber Shop</span></div>
+            <div class="app-body">
+              <div class="daynav">
+                <div class="navbtn">‹</div>
+                <div class="daydate">الأحد، ٢٣ أغسطس</div>
+                <div class="navbtn">›</div>
+              </div>
+              <!-- no barber selector at all for STAFF -->
+              <div class="identity-strip">
+                <div class="avatar">ح</div>
+                <div>
+                  <div class="who">حسين</div>
+                  <div class="hours mono">09:00–21:00</div>
+                </div>
+              </div>
+
+              <div class="grid-wrap">
+                <div class="grid-fade-top"></div>
+                <div class="grid-fade-bottom"></div>
+                <div class="grid">
+                  <div class="gutter">
+                    <div class="hr">12:00</div><div class="hr">13:00</div><div class="hr">14:00</div>
+                    <div class="hr">15:00</div><div class="hr">16:00</div><div class="hr">17:00</div>
+                  </div>
+                  <div class="col" style="height:456px">
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+
+                    <!-- empty affordance demo at 12:30 -->
+                    <div class="empty-slot" style="top:19px; height:38px;"><span class="plus">+</span></div>
+
+                    <!-- عواطف الحب 14:00-15:30 -->
+                    <div class="card confirmed" style="top:152px; height:114px;">
+                      <span class="pill">مؤكّد</span>
+                      <div class="name">عواطف الحب</div>
+                      <div class="svc">✂️ كرياتين</div>
+                      <div class="time">14:00 · 90 د</div>
+                    </div>
+
+                    <!-- فؤاد 16:00-16:30 -->
+                    <div class="card confirmed" style="top:304px; height:38px;">
+                      <span class="pill">مؤكّد</span>
+                      <div class="name">فؤاد</div>
+                      <div class="svc">✂️ شعر ودقن</div>
+                    </div>
+
+                    <div class="now-line" style="top:190px;"><span class="tag">الآن</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fab">+</div>
+
+              <div class="bottom-bar">
+                <div class="left"><span class="ic">📋</span><span class="title">جدول اليوم</span></div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="count">2 حجز</span><span class="chev">▲</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- callouts -->
+          <div class="callout" style="top:196px; right:-6px;"><span class="clabel">now-line</span><span class="cdot"></span></div>
+          <div class="callout" style="top:270px; right:-6px;"><span class="clabel">tap → create</span><span class="cdot"></span></div>
+        </div>
+        <p class="phone-caption">بلا اختيار حلاق — الحساب نفسه محدد الهوية. عمود واحد بعرض الشاشة كاملاً.</p>
+      </div>
+
+      <!-- ADMIN phone -->
+      <div class="phone-col">
+        <div class="phone-label"><span class="role-chip" style="background:rgba(180,83,9,.12);color:#b45309">ADMIN</span> يشاهد حسين، بإمكانه التبديل</div>
+        <div class="phone" style="position:relative">
+          <div class="screen">
+            <div class="statusbar"><span>13:38</span><span>●●● 5G 82%</span></div>
+            <div class="dash-top"><span class="tab">التقويم</span><span class="shop">RK Barber Shop</span></div>
+            <div class="app-body">
+              <div class="daynav">
+                <div class="navbtn">‹</div>
+                <div class="daydate">الأحد، ٢٣ أغسطس</div>
+                <div class="navbtn">›</div>
+              </div>
+              <div class="chip-row">
+                <div class="chip active">حسين</div>
+                <div class="chip">جعفر</div>
+              </div>
+
+              <div class="grid-wrap">
+                <div class="grid-fade-top"></div>
+                <div class="grid-fade-bottom"></div>
+                <div class="grid">
+                  <div class="gutter">
+                    <div class="hr">12:00</div><div class="hr">13:00</div><div class="hr">14:00</div>
+                    <div class="hr">15:00</div><div class="hr">16:00</div><div class="hr">17:00</div>
+                  </div>
+                  <div class="col" style="height:456px">
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+                    <div class="qline"></div><div class="qline"></div><div class="qline"></div><div class="qline"></div>
+
+                    <div class="card confirmed" style="top:152px; height:114px;">
+                      <span class="pill">مؤكّد</span>
+                      <div class="name">عواطف الحب</div>
+                      <div class="svc">✂️ كرياتين</div>
+                      <div class="time">14:00 · 90 د</div>
+                    </div>
+                    <div class="card confirmed" style="top:304px; height:38px;">
+                      <span class="pill">مؤكّد</span>
+                      <div class="name">فؤاد</div>
+                      <div class="svc">✂️ شعر ودقن</div>
+                    </div>
+                    <div class="now-line" style="top:190px;"><span class="tag">الآن</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fab">+</div>
+
+              <div class="bottom-bar">
+                <div class="left"><span class="ic">📋</span><span class="title">جدول اليوم — الكل</span></div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="count">2 حجز</span><span class="chev">▲</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="callout" style="top:110px; right:-6px;"><span class="clabel">1 chip = 1 col</span><span class="cdot"></span></div>
+        </div>
+        <p class="phone-caption">
+          نفس عمود STAFF بالضبط + صف chips فوقه فقط. جعفر (٩–١٨، بلا حجوزات حقيقية بتاريخ ٢٣ أغسطس) يعرض
+          حالة فارغة نظيفة عند اختياره — لا شبكة بيضاء ضخمة، رسالة واحدة صغيرة بدلها.
+        </p>
+      </div>
+    </div>
+
+    <!-- Agenda sheet fragment -->
+    <div class="stage" style="margin-top:8px">
+      <div class="phone-col">
+        <div class="phone-label"><span class="role-chip" style="background:var(--ground-soft);color:var(--ink-soft)">shared</span> الشريط السفلي عند التوسيع</div>
+        <div class="sheet-frame">
+          <div class="sheet-handle"><div class="bar"></div></div>
+          <div class="sheet-head"><span class="t">جدول اليوم</span><span class="c">2 حجز</span></div>
+          <div class="sheet-list">
+            <div class="sheet-item" style="border-color:#047857">
+              <span class="t2">14:00</span>
+              <div class="mid"><div class="nm">عواطف الحب</div><div class="sv">كرياتين</div></div>
+              <span class="who-badge">حسين</span>
+            </div>
+            <div class="sheet-item" style="border-color:#047857">
+              <span class="t2">16:00</span>
+              <div class="mid"><div class="nm">فؤاد</div><div class="sv">شعر ودقن</div></div>
+              <span class="who-badge">حسين</span>
+            </div>
+          </div>
+        </div>
+        <p class="phone-caption">
+          نفس مكوّن A5 الموجود فعلاً (<code class="mono">TodayAgendaPanel</code>) — بلا إعادة بناء، فقط يظهر كشريط
+          سفلي بدل عمود 260px جانبي. للـ ADMIN، هذا هو المكان اللي يشوف فيه كل الحلاقين مجمّعين مع بعض.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ROLE BEHAVIOR ─────────────────────────────────── -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2>سلوك الأدوار</h2>
+    </div>
+    <p class="section-sub">مبني على آلية موجودة فعلاً في الكود — لا حاجة لأي منطق صلاحيات جديد.</p>
+    <div class="role-table">
+      <div class="head" style="direction:rtl">—</div>
+      <div class="head">STAFF</div>
+      <div class="head">TENANT_ADMIN</div>
+
+      <div>عمود الحلاق</div>
+      <div>عموده هو فقط، دائماً</div>
+      <div>يبدّل عبر chips، افتراضي: أول حلاق نشط</div>
+
+      <div>الآلية</div>
+      <div><code class="src">myBarberId</code> يُمرَّر من الحساب، يحدد <code class="src">visibleBarberIds</code> تلقائياً</div>
+      <div><code class="src">myBarberId = null</code> → أول حلاق من <code class="src">barbers[]</code> يُختار افتراضياً</div>
+
+      <div>Barber picker</div>
+      <div>مخفي بالكامل (<code class="src">hideBarberPicker</code>)</div>
+      <div>ظاهر كـ chip row فوق الشبكة مباشرة</div>
+
+      <div>Agenda السفلي</div>
+      <div>حجوزات حسين فقط</div>
+      <div>حجوزات كل الحلاقين مجمّعة (نفس A5 الحالي)</div>
+
+      <div>Create / Reschedule / Popover</div>
+      <div colspan="2" style="grid-column: span 2">بلا أي تغيير — نفس المكوّنات والـ APIs الحالية تماماً لكلا الحسابين</div>
+    </div>
+  </section>
+
+  <!-- ── PHASES ────────────────────────────────────────── -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2>خطة تنفيذ مصغّرة — بعد الموافقة فقط</h2>
+    </div>
+    <p class="section-sub">كل مرحلة مستقلة وقابلة للتحقق بمفردها على localhost قبل الانتقال للتي بعدها.</p>
+    <div class="phases">
+      <div class="phase">
+        <span class="phase-tag">M1</span>
+        <div>
+          <h4>عمود واحد + هوية/chips — بلا Agenda بعد</h4>
+          <p>
+            فرع mobile داخل <code class="mono">ReservationsTodayView.jsx</code> فقط: عمود واحد full-width
+            (STAFF: هوية ثابتة، لا اختيار — ADMIN: chip row). الشبكة، الآن-لاين، الـ hatch، الـ drag،
+            الـ popover — كلهم يبقوا كما هم، فقط يُغلَّفوا بعرض مختلف.
+          </p>
+          <div class="meta">
+            <div class="m"><span class="k">الملف</span><span class="v">ReservationsTodayView.jsx</span></div>
+            <div class="m"><span class="k">التحقق</span><span class="v">mr-h + rk, STAFF + ADMIN, 0 console errors</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-tag">M2</span>
+        <div>
+          <h4>Agenda كشريط سفلي قابل للتوسيع</h4>
+          <p>
+            نقل <code class="mono">TodayAgendaPanel</code> (A5) الموجود فعلاً من عمود 260px جانبي إلى شريط سفلي
+            + توسيع بسيط (لا مكتبة bottom-sheet جديدة — CSS transition كافية لهذا الحجم). بيانات ومنطق A5 بلا تغيير.
+          </p>
+          <div class="meta">
+            <div class="m"><span class="k">الملف</span><span class="v">ReservationsTodayView.jsx</span></div>
+            <div class="m"><span class="k">مخاطر</span><span class="v">منخفضة — إعادة تخطيط بصري فقط</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-tag">M3</span>
+        <div>
+          <h4>لمسة اللمس + drag على الموبايل</h4>
+          <p>
+            التحقق الفعلي من drag-and-drop الموجود (dnd-kit TouchSensor مُفعّل أصلاً بالكود) على جهاز حقيقي —
+            لا نخترع تفاعلاً بديلاً قبل التأكد إنه فعلاً غير مناسب. إذا ظهرت مشكلة حقيقية، تُبحث حينها فقط.
+          </p>
+          <div class="meta">
+            <div class="m"><span class="k">التحقق</span><span class="v">real mobile viewport, touch drag, create, reschedule</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">
+    <span class="ic">⏸</span>
+    <div>هاي دراسة وقرار فقط — <b>ولا سطر كود اتكتب بعد</b>. بانتظار اعتمادك على الاتجاه (٠٢) قبل بدء M1.</div>
+  </div>
+
+</div>
