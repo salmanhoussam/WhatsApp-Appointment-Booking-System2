@@ -11,10 +11,12 @@
 // form + loading/error + success pattern, POSTing to the same /demo/create endpoint with a new
 // business_type="barbershop" value -- no new backend endpoint.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scissors, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import publicApi from '../../utils/publicApi'
+
+const WHATSAPP_GREEN = '#25D366'
 
 const VIOLET = '#7C3AED'
 const FONT = "'Cairo', 'Segoe UI', sans-serif"
@@ -33,6 +35,7 @@ const COPY = {
   passwordLabel: 'كلمة سر الأدمن المؤقتة',
   ctaReserve: 'جرّب صفحة الحجز الآن',
   ctaDashboard: 'أو افتح لوحة التحكم',
+  ctaWhatsapp: 'جرّب الحجز عبر واتساب',
 }
 
 function Spinner() {
@@ -53,6 +56,26 @@ export default function DemoBuilderPage() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [whatsappUrl, setWhatsappUrl] = useState(null)
+
+  // Non-blocking, best-effort — the success screen (slug/password/reserve/dashboard) must never
+  // wait on or break because of this. `available: false` (WHATSAPP_CENTRAL_NUMBER unset, or any
+  // network/API failure) silently renders nothing extra, per the approved plan.
+  useEffect(() => {
+    if (!result?.slug) return
+    let cancelled = false
+    publicApi
+      .get('/reservations/whatsapp-link', { params: { client_slug: result.slug } })
+      .then((res) => {
+        if (cancelled) return
+        const data = res.data?.data ?? res.data
+        if (data?.available && data?.url) setWhatsappUrl(data.url)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [result?.slug])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -217,6 +240,20 @@ export default function DemoBuilderPage() {
             >
               {COPY.ctaDashboard}
             </a>
+
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block', textAlign: 'center', fontSize: 13, marginTop: 12,
+                  color: WHATSAPP_GREEN, textDecoration: 'none', fontWeight: 700,
+                }}
+              >
+                {COPY.ctaWhatsapp}
+              </a>
+            )}
           </div>
         )}
       </main>

@@ -503,6 +503,21 @@ working hours + `reservations` client-service key + canonical `admin_url`) gets 
 as already documented in Section B5 — not reinvented. For now, this keeps effort on what's actually
 being shipped: a real, reusable Barber/Reservations product.
 
+> **Superseded note, 2026-08-24** (appended, original text above left as-is per this project's
+> evolution/plan-doc immutability convention): the "explicitly not built now" call above was
+> reversed the same day, later, by Salman's own explicit decision — commit `ff38f89` (2026-08-12,
+> 17:41) built a real, working self-service demo/tenant-creation path,
+> `frontend/src/pages/home/DemoBuilderPage.jsx`, POSTing to the existing `/demo/create` endpoint
+> with `business_type: "barbershop"`. It creates a real trial `Client` + personalized `Barber` + 6
+> real `CatalogService` rows, activates `booking`+`reservations`, and its success screen shows both
+> a `/{slug}/reserve` CTA and a real dashboard link. Verified end-to-end via real Playwright:
+> `.claudedocs/work/alzabt-demo-builder/2026-08-12/summary.md`. This coexists with, and does not
+> replace, the static `alzabt-demo` reference tenant this section describes — `/alzabt` and
+> `demo.salmansaas.com/alzabt` still point at that static tenant unchanged. See
+> `.claudedocs/work/alzabt-demo-builder-whatsapp-link/2026-08-24/summary.md` for the one real
+> follow-on gap this section's "not built now" language obscured until this note (a WhatsApp link
+> on the success screen, added 2026-08-24 once Central WABA — Phase B — existed to support it).
+
 ---
 
 ## K. Implementation Phases — RESOLVED order, 2026-08-12, ready to execute
@@ -603,6 +618,7 @@ separate commits per change — the same discipline already proven this session.
    Calendr.com pattern), not the left-text/right-floating-card family (Images 3/7).
 4. **Demo infrastructure** — ✅ **Static pre-seeded reference tenant** (Section J, fully resolved).
    `/demo/create`'s Barber-type gap stays documented (Section B5) but is explicitly not fixed now.
+   **Superseded same day, later (2026-08-12, `ff38f89`) — see the note appended to Section J.**
 5. **Onboarding audit** — ✅ **Deferred**, with an explicit resolved order (Section K steps 1-10).
 
 ---
