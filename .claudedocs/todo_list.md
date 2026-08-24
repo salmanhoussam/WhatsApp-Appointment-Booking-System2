@@ -53,19 +53,17 @@ now **fully complete, Phase A through F Contract, all 6 phases committed**
   the checklist's STEP 1 only once Salman says Railway is running.
 - Stage 2 (per-tenant WABA + `SECRET_ENCRYPTION_KEY`) — still deferred, no trigger fired.
 
-## ⚠️ NEW ACTIVE TASK 2026-08-24 (end of session) — Alzabt Demo Builder: WhatsApp link (plan ready, code NOT started)
+## ✅ DONE — 2026-08-25, commit `63888fd`: Alzabt Demo Builder — WhatsApp link
 
-Salman approved a small, scoped plan — current content of `.claude/plans/we-moved-on-new-hazy-
-barto.md` (the file above's own plan was superseded by this one once A-F closed). **Real finding**:
-Alzabt's self-service demo/tenant-creation flow (`frontend/src/pages/home/DemoBuilderPage.jsx`,
-commit `ff38f89`, 2026-08-12) **already exists, already works, already shows a dashboard link** —
-do not rebuild it. The one real gap: no WhatsApp link on its success screen (Phase B postdates
-that build). Fix: reuse the existing `GET /reservations/whatsapp-link?client_slug=` endpoint
-(built in Phase B above, zero new backend code), non-blocking fetch, silent-fail to hidden if
-unavailable. Also: append a superseded-note to `ALZABT_MASTER_PRODUCT_PLAN.md` Section J (it
-currently contradicts `ff38f89`'s own later, explicit reversal — never updated).
-- [ ] **Not started — first task next session.** See session file's own "START HERE NEXT SESSION."
-- Do not touch Railway/production as part of this — separate, deferred track (see above).
+Plan executed exactly as approved (`.claude/plans/we-moved-on-new-hazy-barto.md`). Two files only:
+`DemoBuilderPage.jsx` (non-blocking, silent-fail fetch to the existing `GET /reservations/
+whatsapp-link?client_slug=` endpoint, plain wa.me CTA rendered only when `available: true`) +
+`ALZABT_MASTER_PRODUCT_PLAN.md` (superseded-note appended to Section J + a one-line cross-ref in
+Section P, both append-only per this project's doc-immutability convention). Verified with a real
+created demo tenant (curl), a function-level proof of the `available: true` branch, and a real
+nested-Playwright browser pass (0 console errors, correct graceful-hide since
+`WHATSAPP_CENTRAL_NUMBER` is unset locally). Full evidence: `.claudedocs/work/
+alzabt-demo-builder-whatsapp-link/2026-08-24/summary.md`. No Railway/production work touched.
 
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
