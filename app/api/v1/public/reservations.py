@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 from app.core.db_resilience import with_db_resilience
-from app.services import reservation_service, catalog_service_service
+from app.services import reservation_service, catalog_service_service, whatsapp_service
 from app.repositories import resource_repo, barber_repo, barber_service_repo
 
 router = APIRouter()
@@ -214,6 +214,22 @@ async def get_availability(
         raise HTTPException(status_code=404, detail=str(exc))
 
     return {"success": True, "data": slots}
+
+
+@router.get("/whatsapp-link")
+async def get_whatsapp_booking_link(
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """Phase B, Stage 1 (Central Platform WABA) — this tenant's own deep link into the shared
+    booking bot. Registered before /{reservation_id} deliberately (Starlette matches routes in
+    registration order — this file's own /catalog-services comment already documents why a static
+    path segment must come before a same-method catch-all path param, same rule applied here).
+
+    `available: false` (url: null) means WHATSAPP_CENTRAL_NUMBER isn't configured in this
+    environment yet — frontend should hide the WhatsApp entry point rather than render a dead link."""
+    url = whatsapp_service.build_central_booking_link(tenant["slug"])
+    return {"success": True, "data": {"url": url, "available": url is not None}}
 
 
 @router.get("/{reservation_id}")

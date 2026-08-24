@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: Optional[str] = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
     WHATSAPP_BUSINESS_ACCOUNT_ID: Optional[str] = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")
     WHATSAPP_API_VERSION: str = "v18.0"  # إصدار API من فيسبوك
+    # Stage 1 (Central Platform WABA, Phase B): the shared bot's own dialable E.164 number, used
+    # only to build customer-facing wa.me deep links. NOT a secret (it's the number shown in the
+    # chat header to every customer) and NOT the same value as WHATSAPP_PHONE_NUMBER_ID (that's
+    # Meta's internal API id for outbound sends, never dialable itself).
+    WHATSAPP_CENTRAL_NUMBER: Optional[str] = os.getenv("WHATSAPP_CENTRAL_NUMBER")
     
     # 🧪 إعدادات البيئة المحلية للتطوير
     LOCAL_DOMAINS: List[str] = ["localhost", "127.0.0.1"]

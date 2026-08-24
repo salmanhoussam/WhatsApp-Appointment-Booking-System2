@@ -1,6 +1,7 @@
 import httpx
 import logging
 from typing import List, Dict, Optional
+from urllib.parse import quote
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -76,3 +77,25 @@ class WhatsAppService:
             }
         }
         return await self._send_request(data)
+
+
+def build_central_booking_link(client_slug: str) -> Optional[str]:
+    """
+    Stage 1 (Central Platform WABA, Phase B) — a wa.me deep link into the shared platform bot
+    number, pre-filled with a message the inbound webhook parses to identify which tenant this
+    conversation is for (see whatsapp_flow.py's _resolve_client_from_text()). The word "حجز" is
+    cosmetic (a natural-looking chat opener); the load-bearing part is the tenant's own slug token.
+
+    Distinct from a tenant's own `config.whatsapp_number` links used elsewhere in this codebase
+    (e.g. useReservationBooking.js's post-booking confirmation link) — those message the tenant's
+    OWN number directly with no bot/session involved; this one starts a conversation with the
+    shared booking bot. Checked at Phase B Contract time (2026-08-24) and confirmed these are two
+    genuinely different use cases, not a duplicate to consolidate.
+
+    Returns None when WHATSAPP_CENTRAL_NUMBER isn't configured yet (Stage 1 not live) or the slug
+    is empty — callers must treat a None return as "link not available," never build a partial URL.
+    """
+    if not settings.WHATSAPP_CENTRAL_NUMBER or not client_slug:
+        return None
+    message = f"حجز {client_slug}"
+    return f"https://wa.me/{settings.WHATSAPP_CENTRAL_NUMBER}?text={quote(message)}"

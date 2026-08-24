@@ -38,10 +38,20 @@ State machine (one session per customer phone number):
 
 ──────────────────────────────────────────────────────────────
 Session store: in-memory dict with 30-minute TTL per session.
-Tenant resolution: match metadata.display_phone_number → Client.phone.
+
+Tenant resolution (Phase B, Stage 1 — Central Platform WABA, 2026-08-24):
+  1. An already-bound session (mid-conversation) reuses its stored client_id — no re-resolution.
+  2. metadata.display_phone_number → Client.phone, when exactly one Client owns that number
+     (Stage 2 prep — a tenant with their own dedicated WABA number, unambiguous).
+  3. Otherwise (the shared central number, or no per-tenant number set up yet): parse a tenant
+     slug out of the first inbound message body (populated by that tenant's own wa.me deep link/
+     QR — see whatsapp_service.build_central_booking_link() — the customer never types it
+     manually) and match it against Client.slug.
+See _resolve_client() / _resolve_client_from_text() below.
 """
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -109,6 +119,20 @@ def _get_session(phone_number_id: str, customer_phone: str) -> ConversationSessi
         _sessions[key] = session
     else:
         session.touch()
+    return session
+
+
+def _peek_session(phone_number_id: str, customer_phone: str) -> Optional[ConversationSession]:
+    """
+    Non-vivifying lookup (Phase B, Stage 1): returns an existing, non-expired session or None --
+    never creates/stores one. Used before tenant resolution so an unresolvable message (no known
+    tenant slug in the text, no dedicated-number match) never leaves a phantom empty session
+    sitting in the store -- only a message that actually resolves to a real Client gets one.
+    """
+    session = _sessions.get((phone_number_id, customer_phone))
+    if session is None or session.is_expired:
+        return None
+    session.touch()
     return session
 
 
@@ -191,11 +215,27 @@ async def _dispatch(
     """Route a single message to the correct state handler."""
     wa = WhatsAppService()
 
-    # Resolve tenant from WABA display_phone → Client.phone
-    client = await _resolve_client(display_phone)
+    # Message parsed up front (Phase B, Stage 1) -- a mid-conversation reply must be routable by
+    # the state machine either way, but a NEW session's tenant resolution needs the raw text
+    # before we know which Client this even is. Peeked (not vivified) first: an unresolvable
+    # message must never leave a phantom empty session in the store -- see _peek_session().
+    msg_type, value, title = _extract_message(msg)
+    existing_session = _peek_session(phone_number_id, customer_phone)
+
+    client = await _resolve_client(
+        display_phone,
+        message_text=value if msg_type == "text" else "",
+        session=existing_session,
+    )
     if not client:
-        logger.warning("⚠️  No client found for display_phone=%s", display_phone)
+        logger.warning(
+            "⚠️  No client resolved for display_phone=%s (session bound=%s)",
+            display_phone, bool(existing_session and existing_session.client_id),
+        )
         return
+
+    # Only now -- once a tenant is actually known -- fetch-or-create the real session.
+    session = existing_session or _get_session(phone_number_id, customer_phone)
 
     # ADR-0001 §8.4/§8.4b: the message itself was already "accepted" (found,
     # logged) above — this gates the mutating half of the conversation flow
@@ -217,13 +257,12 @@ async def _dispatch(
         )
         return
 
-    session = _get_session(phone_number_id, customer_phone)
-    # Always attach client context to fresh sessions
+    # Always attach client context to fresh sessions (session was already fetched above, before
+    # tenant resolution, so it could be passed into _resolve_client() for the reuse check)
     if not session.client_id:
         session.client_id = client.id
         session.client_slug = client.slug
 
-    msg_type, value, title = _extract_message(msg)
     logger.info(
         "📩 [%s/%s] state=%s type=%s value=%s",
         customer_phone, client.slug, session.state, msg_type, value,
@@ -522,26 +561,66 @@ async def _step_confirming(wa, customer_phone, session, msg_type, value, phone_n
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _resolve_client(display_phone: str):
+async def _resolve_client(
+    display_phone: str,
+    message_text: str = "",
+    session: Optional["ConversationSession"] = None,
+):
     """
-    Match the WABA display phone number to a Client record.
-    Normalises both sides by stripping non-digit characters.
+    Resolve which Client owns this WhatsApp conversation.
 
     ADR-0001 §8.4/§8.4b: deliberately NOT filtered by isActive or status —
     this is the "always accept/find" half of the two-tier webhook policy.
     A suspended/expired tenant must still be found here so the incoming
     message is logged and handled (not silently dropped); the mutating
     half of the conversation (_dispatch, below) is what's actually gated.
+
+    Resolution order (Phase B, Stage 1 — Central Platform WABA, 2026-08-24):
+    1. Session already bound to a client (mid-conversation) → reuse it directly, no re-parsing.
+       Re-fetched by id (not cached on the session) so a status change mid-conversation is seen.
+    2. WABA display_phone_number → Client.phone, only when it identifies exactly ONE Client —
+       Stage 2 prep: a tenant with their own dedicated WABA number is unambiguous by definition.
+    3. Otherwise (zero or multiple matches — the shared central number, or no per-tenant number
+       configured yet): parse a tenant slug out of the inbound message body (populated by that
+       tenant's own wa.me deep link/QR — see whatsapp_service.build_central_booking_link() — never
+       typed manually by the customer) via _resolve_client_from_text().
+
+    The old blind "return clients[0] if clients else None" fallback this replaced was a real
+    single-tenant-dev-environment placeholder, not a deliberate multi-tenant design — keeping it
+    would have made step 3 unreachable in practice (it always "succeeded" first), silently
+    defeating Central WABA tenant routing. Removed as part of this same change, not left in
+    parallel with the new path.
     """
-    if not display_phone:
-        return None
-    normalised = "".join(filter(str.isdigit, display_phone))
+    if session and session.client_id:
+        return await prisma_client.client.find_unique(where={"id": session.client_id})
+
     clients = await prisma_client.client.find_many()
+
+    if display_phone:
+        normalised = "".join(filter(str.isdigit, display_phone))
+        matches = [
+            c for c in clients
+            if c.phone and "".join(filter(str.isdigit, c.phone)) == normalised
+        ]
+        if len(matches) == 1:
+            return matches[0]
+
+    return _resolve_client_from_text(message_text, clients)
+
+
+def _resolve_client_from_text(message_text: str, clients: list):
+    """
+    Stage 1 (Central Platform WABA): match a Client.slug token inside the inbound message body.
+    Only ever called for a NEW session's first message (an already-bound session short-circuits
+    in _resolve_client() before this runs) — cheap to call, no caching needed at this volume.
+    """
+    if not message_text:
+        return None
+    tokens = set(re.findall(r"[a-zA-Z0-9؀-ۿ_-]+", message_text.lower()))
     for c in clients:
-        if c.phone and "".join(filter(str.isdigit, c.phone)) == normalised:
+        if c.slug and c.slug.lower() in tokens:
             return c
-    # Fallback: return the first client (single-tenant deployments)
-    return clients[0] if clients else None
+    return None
 
 
 async def _estimate_price(session: ConversationSession) -> str:
