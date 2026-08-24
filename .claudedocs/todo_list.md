@@ -32,25 +32,40 @@
 # historical record per this file's own norm (correct via a new dated note, never silently edit
 # old lines) — do not read the line below as a live task.
 
-## ⚠️ UPDATE 2026-08-24 — new active track: Customer Identity + WhatsApp Barber Booking
+## ⚠️ UPDATE 2026-08-24 (end of session) — Customer Identity + WhatsApp Barber Booking: A-F CLOSED
 
-A separate, real track opened 2026-08-24 alongside (not instead of) the Alzabt/2026-08-31 track
-below. Full plan: `.claude/plans/we-moved-on-new-hazy-barto.md` (Phase A-F). Evidence:
-`.claudedocs/work/{services-capabilities-architecture-study,guest-booking-barber-lineage-audit,
-customer-identity-whatsapp-study}/2026-08-24/`, `.claudedocs/implementation/
-CUSTOMER_IDENTITY_PHASE_A/evidence.md`, session `.claudedocs/sessions/2026-08-24.md`.
+The track opened earlier today (alongside, not instead of, the Alzabt/2026-08-31 track below) is
+now **fully complete, Phase A through F Contract, all 6 phases committed**
+(`ce25aa5`→`77b9b9f`). Full plan (now superseded by a new, different plan — see below):
+`.claude/plans/we-moved-on-new-hazy-barto.md`'s git history / the evidence files below. Session:
+`.claudedocs/sessions/2026-08-24.md` (full narrative, all 12 numbered sections).
 
-- ✅ Phase A (Data Foundation) — DONE, real-verified, commits `18417bc`/`ce25aa5`:
-  `Reservation.customerId` (Hybrid — additive, snapshot fields kept), server-side status-
-  transition guard, 8 multi-tenant clientId-scoping fixes.
-- [ ] **Phase B (WhatsApp Infrastructure)** — NOT started, needs a fresh explicit go-ahead.
-  Starts with a `SECRET_ENCRYPTION_KEY` encryption utility (per-tenant WABA credentials will live
-  in `ClientService.config`, Salman's own decision 2026-08-24) before any real credential is
-  written anywhere.
-- [ ] Phase C flags a real, confirmed race condition in `create_reservation()` (no transaction/
-  lock/unique constraint on `(barberId, reservedAt)`) that must close before WhatsApp adds a
-  second concurrent booking channel — not optional, not a nice-to-have.
-- Do not conflate this track with the Alzabt Section System work below — fully separate scope.
+- ✅ Phase A (Customer Identity) — `Reservation.customerId`, transition guard, 8 clientId fixes.
+- ✅ Phase B Stage 1 (Central WABA) — tenant resolution from message body, `wa.me` link generator.
+- ✅ Phase C (Race condition + WhatsApp booking flow) — DB-level unique index (advisory lock tried
+  and proven NOT to work first), full "احجز موعد" conversation branch.
+- ✅ Phase D (Customer Experience) — returning-customer greeting, real notifications, admin
+  Customer↔Reservation join.
+- ✅ Phase E (Security & Regression) — cross-tenant/RBAC/webhook all held under real attack; one
+  real gap found+patched (`with_db_resilience` on `_resolve_client()`).
+- ✅ Phase F Contract — `.claudedocs/implementation/CUSTOMER_IDENTITY_PHASE_F/
+  {PRODUCTION_CONTRACT.md,RAILWAY_RESUME_CHECKLIST.md}`. **Railway itself NOT touched** — resume at
+  the checklist's STEP 1 only once Salman says Railway is running.
+- Stage 2 (per-tenant WABA + `SECRET_ENCRYPTION_KEY`) — still deferred, no trigger fired.
+
+## ⚠️ NEW ACTIVE TASK 2026-08-24 (end of session) — Alzabt Demo Builder: WhatsApp link (plan ready, code NOT started)
+
+Salman approved a small, scoped plan — current content of `.claude/plans/we-moved-on-new-hazy-
+barto.md` (the file above's own plan was superseded by this one once A-F closed). **Real finding**:
+Alzabt's self-service demo/tenant-creation flow (`frontend/src/pages/home/DemoBuilderPage.jsx`,
+commit `ff38f89`, 2026-08-12) **already exists, already works, already shows a dashboard link** —
+do not rebuild it. The one real gap: no WhatsApp link on its success screen (Phase B postdates
+that build). Fix: reuse the existing `GET /reservations/whatsapp-link?client_slug=` endpoint
+(built in Phase B above, zero new backend code), non-blocking fetch, silent-fail to hidden if
+unavailable. Also: append a superseded-note to `ALZABT_MASTER_PRODUCT_PLAN.md` Section J (it
+currently contradicts `ff38f89`'s own later, explicit reversal — never updated).
+- [ ] **Not started — first task next session.** See session file's own "START HERE NEXT SESSION."
+- Do not touch Railway/production as part of this — separate, deferred track (see above).
 
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
