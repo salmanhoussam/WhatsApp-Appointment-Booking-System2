@@ -39,6 +39,22 @@ tools: Read, Glob, Grep, Bash, Write, WebSearch, WebFetch, Agent
 .claudedocs/sessions/[latest].md        ← آخر جلسة
 ```
 
+**فحص إلزامي أول شيء، قبل أي شيء آخر في Step 0 (established 2026-08-24, Salman's explicit
+instruction — يجب ألا يُطلب مني تذكيره بهذا مرة ثانية):** تحقق (`ls .claudedocs/sessions/ | sort |
+tail -1` أو معادلها) هل يوجد ملف جلسة لتاريخ اليوم الحقيقي (`date +%F`)، وليس فقط "آخر ملف موجود".
+
+- **إذا لا يوجد ملف لتاريخ اليوم** → أنشئه فوراً بالقالب القياسي (نفس قالب `/session-open`:
+  `# Session — YYYY-MM-DD` + أقسام أهداف اليوم/منجز/قرارات تقنية/ما لم يكتمل) قبل المتابعة بأي
+  طلب فعلي.
+- **إذا آخر ملف جلسة موجود هو ليوم سابق (وليس اليوم)** → هذا يعني الجلسة "السابقة" لم تُغلق رسمياً
+  بملف خاص بها (يوم فات بلا ملف جلسة على الإطلاق يُحسب "جلسة مفتوحة لم تُغلق"، وليس مجرد يوم صامت).
+  اكتب لها ملخصاً موجزاً بأثر رجعي (Completed/Report قصير) بناءً على git log/session context
+  المتوفر إن أمكن، ثم أنشئ ملف اليوم الجديد ككيان منفصل يبدأ منه استكمال الخطة الحالية
+  (`.claude/plans/*.md` النشطة إن وُجدت) — لا تدمج يومين مختلفين بنفس الملف.
+- هذا الفحص يحصل **في كل مرة** يُستدعى فيها bo-hussein (أول رسالة في الجلسة أو استكمال جلسة قديمة)،
+  ليس فقط عند `/session-open` الصريح — لأن bo-hussein هو غالباً أول نقطة تفاعل، فلا يجوز أن تبدأ
+  استراتيجيته من سياق يوم قديم دون أن يُنشئ/يتحقق من ملف اليوم الحالي أولاً.
+
 **طلب "Project Status Audit"؟** استخدم القالب الثابت `.claudedocs/templates/PROJECT_STATUS_AUDIT_TEMPLATE.md` حرفياً — لا تُعِد اختراع شكل التقرير في كل مرة. يفصل Facts عن Opinions (Finding/Evidence/Impact/Recommendation)، يضع Snapshot date على كل رقم، ويفصل Technical Debt (مهام تنفيذية) عن Next Decision (قرارات تحتاج حكماً بشرياً/معمارياً).
 
 **قرار استراتيجي كبير (ADR جديد، Domain design جديد، تغيير معماري)؟** يمر إلزامياً عبر الـWorkflow الموثّق بـ`rules/documentation-policy.md` — لا تُوجّه أي agent لكتابة كود قبل ADR/Architecture Plan/Implementation Contract حسب الحالة.

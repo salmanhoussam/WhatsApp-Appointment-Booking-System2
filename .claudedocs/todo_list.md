@@ -32,6 +32,26 @@
 # historical record per this file's own norm (correct via a new dated note, never silently edit
 # old lines) — do not read the line below as a live task.
 
+## ⚠️ UPDATE 2026-08-24 — new active track: Customer Identity + WhatsApp Barber Booking
+
+A separate, real track opened 2026-08-24 alongside (not instead of) the Alzabt/2026-08-31 track
+below. Full plan: `.claude/plans/we-moved-on-new-hazy-barto.md` (Phase A-F). Evidence:
+`.claudedocs/work/{services-capabilities-architecture-study,guest-booking-barber-lineage-audit,
+customer-identity-whatsapp-study}/2026-08-24/`, `.claudedocs/implementation/
+CUSTOMER_IDENTITY_PHASE_A/evidence.md`, session `.claudedocs/sessions/2026-08-24.md`.
+
+- ✅ Phase A (Data Foundation) — DONE, real-verified, commits `18417bc`/`ce25aa5`:
+  `Reservation.customerId` (Hybrid — additive, snapshot fields kept), server-side status-
+  transition guard, 8 multi-tenant clientId-scoping fixes.
+- [ ] **Phase B (WhatsApp Infrastructure)** — NOT started, needs a fresh explicit go-ahead.
+  Starts with a `SECRET_ENCRYPTION_KEY` encryption utility (per-tenant WABA credentials will live
+  in `ClientService.config`, Salman's own decision 2026-08-24) before any real credential is
+  written anywhere.
+- [ ] Phase C flags a real, confirmed race condition in `create_reservation()` (no transaction/
+  lock/unique constraint on `(barberId, reservedAt)`) that must close before WhatsApp adds a
+  second concurrent booking channel — not optional, not a nice-to-have.
+- Do not conflate this track with the Alzabt Section System work below — fully separate scope.
+
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
 Alzabt IS the product (RK is the reference tenant, not a separate project). **Two separate tracks
