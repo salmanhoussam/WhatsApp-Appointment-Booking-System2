@@ -66,6 +66,7 @@ from app.repositories.customer_repo import CustomerRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
 from app.services import whatsapp_reservation_flow
+from app.core.db_resilience import with_db_resilience
 
 logger = logging.getLogger(__name__)
 
@@ -618,11 +619,28 @@ async def _resolve_client(
     would have made step 3 unreachable in practice (it always "succeeded" first), silently
     defeating Central WABA tenant routing. Removed as part of this same change, not left in
     parallel with the new path.
+
+    Phase E (Security & Regression, 2026-08-24) — real gap found and patched: both DB calls below
+    previously ran unwrapped. handle_incoming_message()'s own top-level try/except means ANY
+    exception here — including this project's own already-documented, recurring transient
+    Supabase-pooler failure (P1001, app/core/db_resilience.py's own docstring) — silently drops
+    the customer's entire message with zero retry and zero customer-facing reply, corrupting an
+    otherwise-healthy conversation's progression. Confirmed live during this phase's own
+    concurrency testing (real "Can't reach database server" crashes mid-conversation). Wrapped in
+    the same with_db_resilience() this codebase already uses everywhere else for exactly this
+    failure class (e.g. app/api/v1/public/reservations.py) — one retry, bounded wait, before
+    giving up — rather than inventing a second, parallel resilience mechanism.
     """
     if session and session.client_id:
-        return await prisma_client.client.find_unique(where={"id": session.client_id})
+        return await with_db_resilience(
+            lambda: prisma_client.client.find_unique(where={"id": session.client_id}),
+            label="whatsapp_resolve_client:bound",
+        )
 
-    clients = await prisma_client.client.find_many()
+    clients = await with_db_resilience(
+        lambda: prisma_client.client.find_many(),
+        label="whatsapp_resolve_client:unbound",
+    )
 
     if display_phone:
         normalised = "".join(filter(str.isdigit, display_phone))
