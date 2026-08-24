@@ -163,7 +163,7 @@ async def update_barber(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await barber_repo.update_barber(barber_id, patch)
+    updated = await barber_repo.update_barber(tenant["id"], barber_id, patch)
     return {"success": True, "data": _fmt(updated)}
 
 
@@ -178,7 +178,7 @@ async def deactivate_barber(
     if not existing:
         raise HTTPException(status_code=404, detail="Barber not found.")
 
-    updated = await barber_repo.update_barber(barber_id, {"isActive": False})
+    updated = await barber_repo.update_barber(tenant["id"], barber_id, {"isActive": False})
     return {"success": True, "data": _fmt(updated)}
 
 

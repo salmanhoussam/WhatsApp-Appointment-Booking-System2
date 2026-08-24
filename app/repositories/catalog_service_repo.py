@@ -34,9 +34,16 @@ async def create_catalog_service(data: dict):
     return await prisma_client.catalogservice.create(data=data)
 
 
-async def update_catalog_service(service_id: str, data: dict):
-    """Update a CatalogService by primary key."""
-    return await prisma_client.catalogservice.update(
-        where={"id": service_id},
+async def update_catalog_service(client_id: str, service_id: str, data: dict):
+    """Update a CatalogService by primary key, scoped to tenant.
+
+    Multi-tenant DB Integrity Audit (Study 7, Customer Identity + WhatsApp Booking Study,
+    2026-08-24) -- previously unscoped (`where={"id": service_id}` only); the caller already
+    pre-checks ownership via `find_catalog_service()`, but this query itself didn't enforce it.
+    Same `update_many()` + re-fetch fix as `barber_repo.update_barber()`.
+    """
+    await prisma_client.catalogservice.update_many(
+        where={"id": service_id, "clientId": client_id},
         data=data,
     )
+    return await find_catalog_service(client_id, service_id)

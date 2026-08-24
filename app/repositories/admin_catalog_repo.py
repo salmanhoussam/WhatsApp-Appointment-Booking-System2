@@ -52,12 +52,19 @@ async def create_category(data: dict):
     return await prisma_client.catalogcategory.create(data=data)
 
 
-async def update_category(category_id: str, data: dict):
-    """Update a CatalogCategory by primary key."""
-    return await prisma_client.catalogcategory.update(
-        where={"id": category_id},
+async def update_category(client_id: str, category_id: str, data: dict):
+    """Update a CatalogCategory by primary key, scoped to tenant.
+
+    Multi-tenant DB Integrity Audit (Study 7, Customer Identity + WhatsApp Booking Study,
+    2026-08-24) -- previously unscoped (`where={"id": category_id}` only); the caller already
+    pre-checks ownership via `find_category()`, but this query itself didn't enforce it. Same
+    `update_many()` + re-fetch fix as `barber_repo.update_barber()`.
+    """
+    await prisma_client.catalogcategory.update_many(
+        where={"id": category_id, "clientId": client_id},
         data=data,
     )
+    return await find_category(client_id, category_id)
 
 
 async def soft_delete_category(category_id: str, client_id: str):
@@ -66,10 +73,13 @@ async def soft_delete_category(category_id: str, client_id: str):
         where={"categoryId": category_id, "clientId": client_id},
         data={"isActive": False},
     )
-    return await prisma_client.catalogcategory.update(
-        where={"id": category_id},
+    # Multi-tenant DB Integrity Audit (Study 7, 2026-08-24) -- this second call was the one
+    # unscoped query in a function whose first call already scoped correctly; now consistent.
+    await prisma_client.catalogcategory.update_many(
+        where={"id": category_id, "clientId": client_id},
         data={"isActive": False},
     )
+    return await find_category(client_id, category_id)
 
 
 async def delete_categories_by_client(client_id: str):
@@ -127,20 +137,32 @@ async def create_item(data: dict):
     return await prisma_client.catalogitem.create(data=data)
 
 
-async def update_item(item_id: str, data: dict):
-    """Update a CatalogItem by primary key."""
-    return await prisma_client.catalogitem.update(
-        where={"id": item_id},
+async def update_item(client_id: str, item_id: str, data: dict):
+    """Update a CatalogItem by primary key, scoped to tenant.
+
+    Multi-tenant DB Integrity Audit (Study 7, Customer Identity + WhatsApp Booking Study,
+    2026-08-24) -- previously unscoped (`where={"id": item_id}` only); the caller already
+    pre-checks ownership via `find_item()`, but this query itself didn't enforce it. Same
+    `update_many()` + re-fetch fix as `barber_repo.update_barber()`.
+    """
+    await prisma_client.catalogitem.update_many(
+        where={"id": item_id, "clientId": client_id},
         data=data,
     )
+    return await find_item(client_id, item_id)
 
 
-async def soft_delete_item(item_id: str):
-    """Set isActive=False for a single item by primary key."""
-    return await prisma_client.catalogitem.update(
-        where={"id": item_id},
+async def soft_delete_item(client_id: str, item_id: str):
+    """Set isActive=False for a single item by primary key, scoped to tenant.
+
+    Multi-tenant DB Integrity Audit (Study 7, 2026-08-24) -- same unscoped-query fix as
+    `update_item()` above.
+    """
+    await prisma_client.catalogitem.update_many(
+        where={"id": item_id, "clientId": client_id},
         data={"isActive": False},
     )
+    return await find_item(client_id, item_id)
 
 
 async def delete_item_by_filter(client_id: str, item_id: str, module_key: Optional[str] = None):

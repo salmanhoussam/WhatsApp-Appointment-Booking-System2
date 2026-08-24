@@ -321,6 +321,11 @@ model Customer {
   bookings  Booking[]
   client    Client    @relation(fields: [clientId], references: [id])
 
+  // Reservation Engine canonical identity (Phase A, Customer Identity + WhatsApp Booking Study,
+  // 2026-08-24) -- Reservation.customerId's opposite side. Additive: Customer's own shape/usage by
+  // the Booking engine above is unchanged.
+  reservations Reservation[]
+
   @@unique([clientId, phone])
   @@index([clientId])
   @@index([phone])
@@ -816,6 +821,19 @@ model Reservation {
   serviceId String?         @map("service_id") @db.Uuid
   service   CatalogService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
+  // Canonical customer identity (Phase A, Customer Identity + WhatsApp Booking Study, 2026-08-24)
+  // -- Hybrid decision: this FK is additive alongside customerName/Phone/Email above, which stay
+  // as the permanent historical snapshot at booking time (never rewritten if the Customer's own
+  // info changes later). Nullable + onDelete: SetNull, same convention as barberId/serviceId/
+  // resourceId on this exact model -- deleting a Customer must never cascade-delete historical
+  // Reservation rows, and every existing row before this migration correctly gets customerId=null
+  // (this schema's own established honest-null convention, same as vertical/templateKey/
+  // provisioningStatus on Client). Reuses the Customer model + CustomerRepository already proven
+  // live in production for the Booking engine (app/services/booking_service.py) -- not new
+  // architecture, a second application of an already-trusted pattern.
+  customerId String?   @map("customer_id") @db.Uuid
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -824,6 +842,7 @@ model Reservation {
   @@index([clientId, status])
   @@index([clientId, resourceId, reservedAt])
   @@index([clientId, barberId, reservedAt])
+  @@index([clientId, customerId])
   @@map("reservations")
   @@schema("public")
 }

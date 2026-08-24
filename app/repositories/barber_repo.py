@@ -30,12 +30,25 @@ async def create_barber(data: dict):
     return await prisma_client.barber.create(data=data)
 
 
-async def update_barber(barber_id: str, data: dict):
-    """Update a Barber by primary key."""
-    return await prisma_client.barber.update(
-        where={"id": barber_id},
+async def update_barber(client_id: str, barber_id: str, data: dict):
+    """Update a Barber by primary key, scoped to tenant.
+
+    Multi-tenant DB Integrity Audit (Study 7, Customer Identity + WhatsApp Booking Study,
+    2026-08-24) -- previously took only `barber_id`, scoped by neither `update()`'s own `where`
+    nor the query itself (`prisma.barber.update(where={"id": barber_id})`); every real caller
+    happened to pre-check ownership via `find_barber()` first, so this was never exploited, but
+    the function itself didn't independently enforce this file's own "ALL queries MUST filter by
+    clientId" rule. `update()` requires its `where` to resolve via a real unique selector (`id`
+    alone already is one), so `update_many()` -- the same fix `reservation_repo.py`'s own mutating
+    calls already use -- is what lets `clientId` actually participate in the filter; it returns a
+    count, not the row, so the fresh row is re-fetched via the already-tenant-scoped
+    `find_barber()` for the caller to format.
+    """
+    await prisma_client.barber.update_many(
+        where={"id": barber_id, "clientId": client_id},
         data=data,
     )
+    return await find_barber(client_id, barber_id)
 
 
 async def delete_barbers_by_client(client_id: str):

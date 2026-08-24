@@ -199,7 +199,7 @@ async def admin_update_category(
     # as the `parent` relation, requiring connect/disconnect rather than a raw FK assignment.
     if parent_id is not None:
         patch["parent"] = {"connect": {"id": parent_id}} if parent_id else {"disconnect": True}
-    updated = await admin_catalog_repo.update_category(category_id, patch)
+    updated = await admin_catalog_repo.update_category(client_id, category_id, patch)
     return {"id": updated.id}
 
 
@@ -325,7 +325,7 @@ async def admin_update_item(
     # same fix already applied in reservation_service.py's create_reservation().
     if metadata is not None:
         patch["metadata"] = Json(metadata)
-    updated = await admin_catalog_repo.update_item(item_id, patch)
+    updated = await admin_catalog_repo.update_item(client_id, item_id, patch)
     return {"id": updated.id}
 
 
@@ -333,4 +333,4 @@ async def admin_delete_item(client_id: str, item_id: str) -> None:
     item = await admin_catalog_repo.find_item(client_id, item_id)
     if not item:
         raise HTTPException(404, "Item not found")
-    await admin_catalog_repo.soft_delete_item(item_id)
+    await admin_catalog_repo.soft_delete_item(client_id, item_id)

@@ -23,9 +23,26 @@ from prisma import Json
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
 from app.repositories import resource_repo, barber_repo, catalog_service_repo
+from app.repositories.customer_repo import CustomerRepository
 
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
+
+# Server-side status-transition graph (Phase A, Customer Identity + WhatsApp Booking Study,
+# 2026-08-24) -- mirrors frontend/src/pages/generic-admin/tabs/ReservationsTab.jsx's own
+# TRANSITIONS dict exactly. Before this, that frontend dict was the ONLY place a transition graph
+# existed anywhere in the system -- a raw API call could move e.g. a "cancelled" reservation back
+# to "confirmed", since update_status() only checked new_status membership in VALID_STATUSES, never
+# the reservation's current status. Closed here because WhatsApp is about to become a second,
+# unattended writer to this same endpoint. Terminal states (arrived/cancelled/no_show) have no
+# further transitions.
+TRANSITIONS: dict[str, list[str]] = {
+    "pending":   ["confirmed", "cancelled"],
+    "confirmed": ["arrived",   "cancelled", "no_show"],
+    "arrived":   [],
+    "cancelled": [],
+    "no_show":   [],
+}
 
 
 class ReservationAccessDenied(Exception):
@@ -257,6 +274,21 @@ async def create_reservation(
             if _has_conflict(overlapping, reserved_at, effective_duration):
                 raise ValueError("This slot is already reserved. Please choose a different time.")
 
+    # -- Resolve [Customer] -----------------------------------------------------------------------
+    # Phase A (Customer Identity + WhatsApp Booking Study, 2026-08-24) -- find-or-create by
+    # (phone, clientId), the exact same pattern already proven live in production for the Booking
+    # engine (BookingService.create_booking(), app/services/booking_service.py:19-25). Reservation
+    # keeps its own customerName/Phone/Email fields as a permanent historical snapshot regardless
+    # of this row (Hybrid decision) -- customerId is additive, not a replacement.
+    customer_repo = CustomerRepository(prisma_client)
+    customer = await customer_repo.get_by_phone(customer_phone, client_id)
+    if not customer:
+        customer = await customer_repo.create(client_id, {
+            "phone": customer_phone,
+            "name":  customer_name,
+            "email": customer_email,
+        })
+
     # -- Create ------------------------------------------------------------------------------------
     create_data = {
         "clientId":      client_id,
@@ -264,6 +296,7 @@ async def create_reservation(
         "customerName":  customer_name,
         "customerPhone": customer_phone,
         "customerEmail": customer_email,
+        "customerId":    customer.id,
         "reservedAt":    reserved_at,
         "durationMin":   effective_duration,
         "status":        "pending",
@@ -441,12 +474,16 @@ async def update_status(
     if new_status not in VALID_STATUSES:
         raise ValueError(f"Invalid status. Use: {VALID_STATUSES}")
     repo = ReservationRepository(prisma_client)
-    if staff_barber_id is not None:
-        existing = await repo.find_by_id(reservation_id, client_id)
-        if not existing:
-            return None
-        if getattr(existing, "barberId", None) != staff_barber_id:
-            raise ReservationAccessDenied()
+    # Always fetched now (previously only for STAFF) -- the transition-graph check below needs the
+    # reservation's current status regardless of caller role.
+    existing = await repo.find_by_id(reservation_id, client_id)
+    if not existing:
+        return None
+    if staff_barber_id is not None and getattr(existing, "barberId", None) != staff_barber_id:
+        raise ReservationAccessDenied()
+    current_status = existing.status
+    if new_status != current_status and new_status not in TRANSITIONS.get(current_status, []):
+        raise ValueError(f"Cannot change status from '{current_status}' to '{new_status}'.")
     r = await repo.update_status(reservation_id, client_id, new_status)
     return _fmt(r) if r else None
 

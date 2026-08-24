@@ -155,7 +155,7 @@ async def update_category(
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found.")
 
-    updated = await _cat_repo.update_category(category_id, {
+    updated = await _cat_repo.update_category(str(user.clientId), category_id, {
         "nameAr":    body.name_ar,
         "nameEn":    body.name_en,
         "imageUrl":  body.image_url,
@@ -267,7 +267,7 @@ async def update_item(
     if body.is_spicy:
         meta["spicy"] = True
 
-    updated = await _cat_repo.update_item(item_id, {
+    updated = await _cat_repo.update_item(client_id, item_id, {
         "categoryId":    body.category_id,
         "nameAr":        body.name_ar,
         "nameEn":        body.name_en,

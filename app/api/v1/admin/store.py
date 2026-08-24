@@ -215,7 +215,7 @@ async def update_product(
     if meta:
         update_data["metadata"] = Json(meta)
 
-    updated = await _cat_repo.update_item(product_id, update_data)
+    updated = await _cat_repo.update_item(client_id, product_id, update_data)
     return {"success": True, "data": _fmt_product(updated)}
 
 
@@ -296,7 +296,7 @@ async def update_category(
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found.")
 
-    updated = await _cat_repo.update_category(category_id, {
+    updated = await _cat_repo.update_category(client_id, category_id, {
         "nameAr":    body.name_ar,
         "nameEn":    body.name_en,
         "imageUrl":  body.image_url,

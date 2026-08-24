@@ -107,5 +107,5 @@ async def admin_update_service(
     }.items() if v is not None}
     if not patch:
         raise HTTPException(400, "No fields to update.")
-    updated = await catalog_service_repo.update_catalog_service(service_id, patch)
+    updated = await catalog_service_repo.update_catalog_service(client_id, service_id, patch)
     return {"id": updated.id}
