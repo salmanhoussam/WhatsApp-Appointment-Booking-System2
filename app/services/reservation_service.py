@@ -19,6 +19,7 @@ duplication is the point — it's the raw material for the honest post-hoc compa
 from datetime import date, datetime, timedelta, timezone
 
 from prisma import Json
+from prisma.errors import UniqueViolationError
 
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
@@ -315,7 +316,24 @@ async def create_reservation(
     if catalog_service:
         create_data["serviceId"] = catalog_service.id
 
-    reservation = await repo.create(create_data)
+    # Phase C (Study 6 race-condition close, 2026-08-24): the Conflict Check block above is a
+    # plain read-then-write and cannot, by itself, prevent two concurrent requests for the exact
+    # same barber+slot both passing it before either INSERT commits -- confirmed as a real,
+    # reproducible double-booking via a genuine concurrent-request test (see
+    # .claudedocs/implementation/CUSTOMER_IDENTITY_PHASE_C/evidence.md), not assumed. Closed by a
+    # real DB-level partial unique index (reservations_active_barber_slot_uidx --
+    # prisma/migrations/add_reservation_barber_slot_unique_index.sql), which Postgres enforces
+    # atomically at INSERT time regardless of the read-side race above. A losing concurrent INSERT
+    # raises UniqueViolationError here; translated into the exact same customer-facing message the
+    # pre-check above already gives, so callers (website, WhatsApp) see one consistent behavior
+    # whether the conflict was caught early (common case) or only at the DB (the race case this
+    # closes). Scoped to the "barber" path only, matching Study 6's own finding -- the
+    # resource-backed "clinic" path has the same theoretical race, deliberately left out of this
+    # phase's scope (see the migration file's own comment).
+    try:
+        reservation = await repo.create(create_data)
+    except UniqueViolationError:
+        raise ValueError("This barber is already booked for that time. Please choose a different time.")
 
     # -- Post Actions --------------------------------------------------------------------------
     # No-op today for every module_key — confirmed no pricing field on Reservation, no

@@ -65,6 +65,7 @@ from app.repositories.booking_repo import BookingRepository
 from app.repositories.customer_repo import CustomerRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
+from app.services import whatsapp_reservation_flow
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,18 @@ class ConversationSession:
     check_out: Optional[date] = None
     guests: Optional[int] = None
     customer_name: Optional[str] = None
+    # Phase C (Reservation Integration, 2026-08-24) -- accumulated data for the parallel
+    # "احجز موعد" conversation branch (whatsapp_reservation_flow.py). Kept on this same session
+    # dataclass rather than a second session store, since a conversation is only ever in ONE
+    # branch at a time (see whatsapp_flow._step_idle()'s routing) -- additive fields only, nothing
+    # above this comment was touched.
+    res_service_id: Optional[str] = None
+    res_service_name: Optional[str] = None
+    res_duration_min: Optional[int] = None
+    res_barber_id: Optional[str] = None
+    res_barber_name: Optional[str] = None
+    res_slot_datetime: Optional[datetime] = None
+    res_customer_name: Optional[str] = None
     # TTL
     expires_at: float = field(default_factory=lambda: time.monotonic() + SESSION_TTL)
 
@@ -296,11 +309,26 @@ async def _dispatch(
             phone_number_id,
         )
 
+    elif session.state in whatsapp_reservation_flow.STATES:
+        await whatsapp_reservation_flow.handle(
+            wa, customer_phone, session, msg_type, value, title,
+            client, phone_number_id, _clear_session,
+        )
+
 
 # ── State handlers ─────────────────────────────────────────────────────────────
 
 async def _step_idle(wa, customer_phone, session, client):
-    """Greet the user and show the property list."""
+    """Greet the user. Routes into the Reservation Engine's own "احجز موعد" branch (Phase C,
+    2026-08-24) when this tenant has the "reservations" service active -- otherwise unchanged,
+    falls through to the pre-existing Booking/Property flow below. No real tenant today has both
+    active simultaneously (confirmed via a real DB check during Phase C's own investigation), so
+    this is a hard either/or rather than a menu -- documented as a deliberate v1 scope limit in
+    the Phase C evidence, not a decision hidden here."""
+    if await whatsapp_reservation_flow.is_reservations_active(client.id):
+        await whatsapp_reservation_flow.start(wa, customer_phone, session, client)
+        return
+
     properties = await prisma_client.property.find_many(
         where={"clientId": client.id, "isActive": True},
         order={"name": "asc"},
