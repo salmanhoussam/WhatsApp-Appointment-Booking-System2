@@ -23,6 +23,17 @@ class CustomerRepository:
             }
         )
 
+    async def list_with_reservations(self, client_id: str) -> list:
+        """Phase D (Customer Experience, 2026-08-24) -- real Customer rows for this tenant, with
+        their Reservation history joined through the real customerId FK (Phase A), not a
+        customerPhone string match. Mirrors reservation_repo.py's own
+        list_all_for_client_with_service()'s `include={"service": True}` shape so both paths
+        expose the same reservation fields to callers."""
+        return await self.db.customer.find_many(
+            where={"clientId": client_id},
+            include={"reservations": {"include": {"service": True}}},
+        )
+
     async def upsert_system_customer(self, client_id: str, phone: str):
         """Upsert a deterministic system customer (used for admin block records).
 

@@ -40,7 +40,11 @@ State machine (parallel to whatsapp_flow.py's own IDLE->...->CONFIRMING chain):
         │ list_reply -> slot selected (its own conflict-check deferred to confirm time,
         │               same "React never decides whether a slot is free" principle this
         │               codebase already documents for the website's own edit_reservation())
-        ▼
+        │
+        │   Phase D (Customer Experience, 2026-08-24): if this phone already has a real
+        │   Customer row WITH a stored name, res_customer_name was already pre-filled back in
+        │   start() -- skips straight past RES_AWAITING_NAME entirely.
+        ▼ (new customer, or no name on file)
     RES_AWAITING_NAME
         │ text name
         ▼
@@ -62,6 +66,7 @@ from datetime import datetime, timezone
 
 from app.db.client import prisma_client
 from app.repositories import barber_repo, barber_service_repo
+from app.repositories.customer_repo import CustomerRepository
 from app.services import catalog_service_service, reservation_service
 
 logger = logging.getLogger(__name__)
@@ -107,7 +112,20 @@ def _parse_date_text(text: str):
 # ── Entry point (called from whatsapp_flow._step_idle) ─────────────────────────────────────────
 
 async def start(wa, customer_phone: str, session, client) -> None:
-    """Greet the user into the reservation flow and show the service list."""
+    """Greet the user into the reservation flow and show the service list.
+
+    Phase D (Customer Experience, 2026-08-24) -- returning-customer greeting: if this phone
+    already has a real Customer row (Phase A's find-or-create) WITH a stored name, greet them by
+    name and pre-fill session.res_customer_name now, so RES_AWAITING_SLOT's own check below can
+    skip the "what's your name" step entirely later in this same conversation. A first-time
+    customer, or one whose Customer row has no name yet (e.g. created via the old
+    upsert_system_customer path), gets the exact same generic greeting as before -- no regression."""
+    customer_repo = CustomerRepository(prisma_client)
+    existing_customer = await customer_repo.get_by_phone(customer_phone, client.id)
+    returning_name = existing_customer.name if (existing_customer and existing_customer.name) else None
+    if returning_name:
+        session.res_customer_name = returning_name
+
     services = await catalog_service_service.public_list_services(client.id)
     if not services:
         await wa.send_text(
@@ -129,9 +147,10 @@ async def start(wa, customer_phone: str, session, client) -> None:
         ],
     }]
 
+    header = f"أهلاً بعودتك {returning_name} 👋" if returning_name else f"احجز موعدك في {client.name} 💈"
     await wa.send_list_message(
         to=customer_phone,
-        header=f"احجز موعدك في {client.name} 💈",
+        header=header,
         body="للحجز، اختر الخدمة أولاً:",
         button_text="عرض الخدمات",
         sections=sections,
@@ -309,6 +328,12 @@ async def _step_awaiting_slot(wa, customer_phone, session, msg_type, value):
     # same check.
     session.res_slot_datetime = slot_dt
 
+    if session.res_customer_name:
+        # Phase D: a returning customer's name was already pre-filled in start() -- skip
+        # RES_AWAITING_NAME entirely and go straight to the confirmation summary.
+        await _send_confirmation_summary(wa, customer_phone, session)
+        return
+
     await wa.send_text(customer_phone, "ما اسمك الكريم؟")
     session.state = RES_AWAITING_NAME
 
@@ -319,7 +344,13 @@ async def _step_awaiting_name(wa, customer_phone, session, msg_type, value):
         return
 
     session.res_customer_name = value.strip()
+    await _send_confirmation_summary(wa, customer_phone, session)
 
+
+async def _send_confirmation_summary(wa, customer_phone, session) -> None:
+    """Shared by both the new-customer path (_step_awaiting_name, after they type their name)
+    and the returning-customer path (_step_awaiting_slot, Phase D skip) -- same summary, same
+    buttons, same state transition, regardless of how res_customer_name got set."""
     summary = (
         f"📋 *ملخص الحجز*\n"
         f"───────────────\n"

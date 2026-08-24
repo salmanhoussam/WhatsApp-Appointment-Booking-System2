@@ -14,6 +14,7 @@ app/repositories/store_admin_repo.py.
 
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
+from app.repositories.customer_repo import CustomerRepository
 import app.repositories.store_admin_repo as store_admin_repo
 
 _NO_PHONE_KEY = "__no_phone__"
@@ -39,6 +40,12 @@ def _bucket_for(registry: dict, phone: str | None, name: str) -> dict:
             # First-seen name wins if the same phone shows two different spellings across
             # reservations/orders -- a real, accepted limitation, not a silent smart-merge.
             "name": name,
+            # Phase D (Customer Experience, 2026-08-24) -- populated only when a real Customer
+            # row was found for this phone (customer_id set), i.e. at least one Reservation went
+            # through Phase A's find-or-create. None for store-only or pre-Phase-A-only buckets --
+            # never fabricated.
+            "customer_id": None,
+            "email": None,
             "has_reservations": False,
             "has_orders": False,
             "reservation_count": 0,
@@ -50,23 +57,45 @@ def _bucket_for(registry: dict, phone: str | None, name: str) -> dict:
     return registry[key]
 
 
+def _reservation_entry(r) -> dict:
+    return {
+        "id": r.id,
+        "service_name_ar": r.service.nameAr if r.service else None,
+        "reserved_at": r.reservedAt.isoformat() if r.reservedAt else None,
+        "status": r.status,
+    }
+
+
 async def list_customer_registry(client_id: str) -> list[dict]:
     reservation_repo = ReservationRepository(prisma_client)
-    reservations = await reservation_repo.list_all_for_client_with_service(client_id)
+    customer_repo = CustomerRepository(prisma_client)
+
+    # Phase D (Customer Experience, 2026-08-24): real Customer rows joined to their Reservation
+    # history through the real customerId FK (Phase A) -- not a customerPhone string match. This
+    # is the "necessary join/include" this phase asks for; the phone-based path below is now only
+    # the FALLBACK for whatever this join can't cover (rows with no linked Customer row), not the
+    # only path, so nothing that worked before regresses.
+    customers = await customer_repo.list_with_reservations(client_id)
+    orphan_reservations = await reservation_repo.list_orphan_for_client_with_service(client_id)
     orders = await store_admin_repo.list_all_orders_with_items(client_id)
 
     registry: dict[str, dict] = {}
 
-    for r in reservations:
+    for c in customers:
+        bucket = _bucket_for(registry, c.phone, c.name)
+        bucket["customer_id"] = c.id
+        bucket["email"] = c.email
+        for r in c.reservations:
+            bucket["has_reservations"] = True
+            bucket["reservation_count"] += 1
+            bucket["reservations"].append(_reservation_entry(r))
+            _bump_last(bucket, r.reservedAt)
+
+    for r in orphan_reservations:
         bucket = _bucket_for(registry, r.customerPhone, r.customerName)
         bucket["has_reservations"] = True
         bucket["reservation_count"] += 1
-        bucket["reservations"].append({
-            "id": r.id,
-            "service_name_ar": r.service.nameAr if r.service else None,
-            "reserved_at": r.reservedAt.isoformat() if r.reservedAt else None,
-            "status": r.status,
-        })
+        bucket["reservations"].append(_reservation_entry(r))
         _bump_last(bucket, r.reservedAt)
 
     for o in orders:
@@ -103,6 +132,8 @@ async def list_customer_registry(client_id: str) -> list[dict]:
         result.append({
             "phone": bucket["phone"],
             "name": bucket["name"],
+            "customer_id": bucket["customer_id"],
+            "email": bucket["email"],
             "badge": badge,
             "reservation_count": bucket["reservation_count"],
             "order_count": bucket["order_count"],

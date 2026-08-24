@@ -16,6 +16,8 @@ duplication is the point — it's the raw material for the honest post-hoc compa
 .claudedocs/evolution/reservation-capability.md, instead of an assumed one.
 """
 
+import asyncio
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from prisma import Json
@@ -25,6 +27,9 @@ from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
 from app.repositories import resource_repo, barber_repo, catalog_service_repo
 from app.repositories.customer_repo import CustomerRepository
+from app.services import whatsapp_notifications
+
+logger = logging.getLogger(__name__)
 
 VALID_STATUSES  = ["pending", "confirmed", "arrived", "cancelled", "no_show"]
 ACTIVE_STATUSES = ["pending", "confirmed", "arrived"]
@@ -71,6 +76,75 @@ MODULE_DEFAULTS: dict[str, dict] = {
 # own resourceId-equivalent (barberId) and its own resolve/conflict-check path below, built
 # independently rather than folded into this set.
 RESOURCE_BACKED_MODULE_KEYS = {"clinic"}
+
+
+# Phase D (Customer Experience, 2026-08-24) -- strong references for in-flight fire-and-forget
+# notification tasks. asyncio.create_task() alone doesn't keep its Task alive against GC; the
+# event loop only guarantees this once something else holds a reference. Standard asyncio
+# idiom (see the asyncio docs' own "Save a reference to the result" note) -- not premature, a
+# real correctness fix for the fire-and-forget mechanism itself.
+_background_notification_tasks: set[asyncio.Task] = set()
+
+
+def _fire_and_forget(coro) -> None:
+    task = asyncio.create_task(coro)
+    _background_notification_tasks.add(task)
+    task.add_done_callback(_background_notification_tasks.discard)
+
+
+async def _notify_reservation_event(reservation_row, kind: str) -> None:
+    """Phase D (Customer Experience, 2026-08-24) -- fire-and-forget WhatsApp notification for a
+    real reservation mutation. Called from update_status()/edit_reservation()/cancel_by_customer()
+    so every caller (admin dashboard routes, customer self-cancel, the WhatsApp bot flow itself)
+    gets the same behavior from this one Service -- per this project's "One Capability, One
+    Service" rule (rules/backend/architecture.md §9), never duplicated per-route/per-caller.
+
+    kind: "confirmation" | "cancellation" | "reschedule". Never raises -- resolution failures
+    (client/barber/service lookups) degrade to an empty label rather than blocking the real
+    mutation this is attached to; whatsapp_notifications.py's own send_* functions additionally
+    never raise on the actual send.
+
+    Scoped primarily to the "barber" module_key today (the only one with a real end-to-end
+    WhatsApp channel, Phase C) -- resolves barberId/serviceId when present, degrades gracefully
+    (empty field, not a crash) for other module_keys (restaurant/real_estate/clinic) that use
+    resourceId or legacy metadata labels instead. Not fully built out for every module_key's own
+    label shape in this phase -- named here rather than silently assumed complete.
+    """
+    try:
+        client = await prisma_client.client.find_unique(where={"id": reservation_row.clientId})
+        client_name = client.name if client else ""
+
+        service_name = ""
+        if reservation_row.serviceId:
+            service = await catalog_service_repo.find_catalog_service(reservation_row.clientId, reservation_row.serviceId)
+            service_name = service.nameAr if service else ""
+
+        barber_name = ""
+        if reservation_row.barberId:
+            barber = await barber_repo.find_barber(reservation_row.clientId, reservation_row.barberId)
+            barber_name = barber.name if barber else ""
+
+        ref = reservation_row.id[:8].upper()
+        reserved_at_str = reservation_row.reservedAt.strftime("%Y-%m-%d %H:%M")
+
+        if kind == "confirmation":
+            _fire_and_forget(whatsapp_notifications.send_reservation_confirmation(
+                customer_phone=reservation_row.customerPhone, reservation_ref=ref,
+                service_name=service_name, barber_name=barber_name,
+                reserved_at=reserved_at_str, client_name=client_name,
+            ))
+        elif kind == "cancellation":
+            _fire_and_forget(whatsapp_notifications.send_reservation_cancellation(
+                customer_phone=reservation_row.customerPhone, reservation_ref=ref, client_name=client_name,
+            ))
+        elif kind == "reschedule":
+            _fire_and_forget(whatsapp_notifications.send_reservation_reschedule(
+                customer_phone=reservation_row.customerPhone, reservation_ref=ref,
+                service_name=service_name, barber_name=barber_name,
+                reserved_at=reserved_at_str, client_name=client_name,
+            ))
+    except Exception as exc:
+        logger.error("🔥 _notify_reservation_event(%s) failed to prepare: %s", kind, exc, exc_info=True)
 
 
 def _fmt(r) -> dict:
@@ -503,12 +577,27 @@ async def update_status(
     if new_status != current_status and new_status not in TRANSITIONS.get(current_status, []):
         raise ValueError(f"Cannot change status from '{current_status}' to '{new_status}'.")
     r = await repo.update_status(reservation_id, client_id, new_status)
+    if r and new_status != current_status:
+        # Phase D: only a REAL transition notifies -- an idempotent same-status call (allowed
+        # above) must not re-send a confirmation/cancellation the customer already received.
+        if new_status == "confirmed":
+            await _notify_reservation_event(r, "confirmation")
+        elif new_status == "cancelled":
+            await _notify_reservation_event(r, "cancellation")
     return _fmt(r) if r else None
 
 
 async def cancel_by_customer(client_id: str, reservation_id: str, customer_phone: str) -> bool:
     repo = ReservationRepository(prisma_client)
-    return await repo.cancel(reservation_id, client_id, customer_phone)
+    cancelled = await repo.cancel(reservation_id, client_id, customer_phone)
+    if cancelled:
+        # Phase D: same cancellation notification update_status() sends for an admin-driven
+        # cancel -- a customer who just cancelled their own booking gets the same receipt-style
+        # confirmation that the cancellation actually went through.
+        r = await repo.find_by_id(reservation_id, client_id)
+        if r:
+            await _notify_reservation_event(r, "cancellation")
+    return cancelled
 
 
 async def edit_reservation(
@@ -621,4 +710,9 @@ async def edit_reservation(
         return _fmt(existing)
 
     updated = await repo.update_fields(reservation_id, client_id, patch)
+    if updated and schedule_changed:
+        # Phase D: only a REAL schedule change (time/duration/barber) notifies -- a
+        # name/phone/service-only edit is not a "your appointment moved" event for the customer,
+        # matching this function's own existing schedule_changed distinction (see its docstring).
+        await _notify_reservation_event(updated, "reschedule")
     return _fmt(updated) if updated else None

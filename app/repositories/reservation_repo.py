@@ -70,6 +70,19 @@ class ReservationRepository:
             order={"reservedAt": "desc"},
         )
 
+    async def list_orphan_for_client_with_service(self, client_id: str) -> list:
+        """Phase D (Customer Experience, 2026-08-24) -- Reservations with NO linked Customer row
+        (customerId IS NULL): rows created before Phase A's find-or-create existed, or any future
+        edge case. The Customer Registry (customer_registry_service.py) reads real Customer rows'
+        joined reservation history first (CustomerRepository.list_with_reservations) and uses this
+        as the fallback for whatever that join can't cover -- so pre-Phase-A history is never
+        silently dropped from the registry."""
+        return await self.db.reservation.find_many(
+            where={"clientId": client_id, "customerId": None},
+            include={"service": True},
+            order={"reservedAt": "desc"},
+        )
+
     async def list_customer_identities_for_barber(self, client_id: str, barber_id: str) -> list:
         """Staff Scoped Access Phase C (2026-08-09) -- every reservation for one barber, no take
         limit, used only to derive distinct client identity (name/phone/email). Not a paginated
