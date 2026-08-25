@@ -65,6 +65,38 @@ nested-Playwright browser pass (0 console errors, correct graceful-hide since
 `WHATSAPP_CENTRAL_NUMBER` is unset locally). Full evidence: `.claudedocs/work/
 alzabt-demo-builder-whatsapp-link/2026-08-24/summary.md`. No Railway/production work touched.
 
+## ✅ DONE — 2026-08-25, commit `7fffb10`: Alzabt landing page — offerings + real screenshots + roadmap
+
+Salman: "الألوان جيدة، بدي أكثر." Added to `AlzabtLandingPage.jsx`: a "شو بنقدملك بمنصة وحدة؟"
+offerings section (website/booking page, reservation system, customer registry, dashboard), two
+real RK screenshots (booking page + a cropped dashboard overview — the uncropped version exposed
+internal QA test-order names, caught before shipping), and a roadmap strip (Barber = building now,
+online shop = real live add-on, Clinic/Beauty = coming soon). Appended a dated note to
+`ALZABT_MASTER_PRODUCT_PLAN.md` Section A confirming no conflict with the standing Barber-only
+build priority. Verified: 0 console errors, 200 OK on both images, no mobile overflow. Evidence:
+`.claudedocs/work/alzabt-landing-content-expansion/2026-08-25/summary.md`. **Superseded structurally
+the same day** by the premium redesign below — the offerings/roadmap content survived, restyled;
+the plain side-by-side screenshot gallery this task added did not (folded into the new hero mockup).
+
+## ✅ DONE — 2026-08-25, commit `64c013d`: Alzabt landing page — premium dark-SaaS redesign
+
+Salman attached 2 reference images (a premium dark-SaaS Alzabt mockup + its own generation prompt/
+asset-recipe) and asked for a full visual redesign. Rebuilt `AlzabtLandingPage.jsx`: two-column RTL
+hero (copy right, a CSS-built laptop+phone device mockup left holding RK's real screenshots — no
+image assets needed), 4 feature cards (WhatsApp/calendar/staff/reports) each with a real CSS/SVG
+illustration (chat bubbles, calendar grid, avatar stack, bar chart) replacing the reference's 3D
+renders (no image-generation tool available in this environment — the exact missing-asset spec is
+documented for a later swap-in, per the brief's own "don't fake placeholders" rule), trust pillars
+with **no fabricated customer/review numbers** (the reference's own "+200 shops" claim was not
+copied — no real number to support it). Superseded the 2026-08-12 centered-hero call (Master Plan
+Section K step 7 — append-only note added, original kept). Verified: 0 console errors, 0 horizontal
+overflow at desktop/tablet(820px)/mobile(390px). Evidence: `.claudedocs/work/
+alzabt-landing-premium-redesign/2026-08-25/summary.md`.
+- ⚠️ **Open item, needs Salman's read**: the hero laptop mockup shows RK Barber Shop's real name —
+  flagged, not fixed; a small follow-up (fresh crop or generic name) if he'd rather it not show.
+- ⚠️ **Open item**: no visual sign-off yet from Salman on the new copy/wording — drafted from his
+  brief, may need adjustment.
+
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
 Alzabt IS the product (RK is the reference tenant, not a separate project). **Two separate tracks
