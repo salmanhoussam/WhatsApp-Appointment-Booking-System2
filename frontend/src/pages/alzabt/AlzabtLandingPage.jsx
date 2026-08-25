@@ -27,7 +27,7 @@
 // Local/dev traffic (demo.salmansaas.com doesn't resolve locally) still navigates in-app.
 
 import { useNavigate } from 'react-router-dom'
-import { Scissors, CalendarDays, MessageCircle, Users, Layers, Link2 } from 'lucide-react'
+import { Scissors, CalendarDays, MessageCircle, Users, Layers, Link2, Globe, ShoppingBag, UserCheck, LayoutDashboard, Sparkles, Stethoscope } from 'lucide-react'
 
 const DEMO_SLUG = 'alzabt-demo'
 const FONT = "'Cairo', 'Segoe UI', sans-serif"
@@ -98,6 +98,40 @@ const BENEFITS = [
   { icon: Users, text: 'إدارة الموظفين والخدمات من مكان واحد' },
   { icon: Layers, text: 'تقويم وحجوزات بمكان واحد، مش عشرين رسالة' },
   { icon: Link2, text: 'صفحة حجز خاصة فيك، تحمل اسمك وهويتك' },
+]
+
+// "شو بنقدملك بمنصة وحدة" -- the comprehensive offering list Salman asked for explicitly
+// (2026-08-25): website/page, reservation system, customer registry, dashboard -- named
+// distinctly from BENEFITS above (which stays as the tighter feature-bullet list).
+const OFFERINGS = [
+  { icon: Globe, title: 'موقع وصفحة حجز باسمك', text: 'صفحة حجز حقيقية، بهويتك وألوانك إنت، مش قالب عام' },
+  { icon: CalendarDays, title: 'نظام حجوزات متكامل', text: 'تقويم حقيقي، مواعيد متاحة فوراً، تأكيد تلقائي عبر واتساب' },
+  { icon: UserCheck, title: 'تسجيل وأرشيف الزباين', text: 'كل زبون بيرجع، بتعرفه — تاريخه وحجوزاته محفوظين عندك' },
+  { icon: LayoutDashboard, title: 'لوحة تحكم توريك كل شي', text: 'حجوزاتك، إيراداتك، موظفينك — بلمحة وحدة، من مكان وحد' },
+]
+
+const ROADMAP = [
+  {
+    icon: Scissors,
+    tag: 'هلأ عم نبني',
+    title: 'صالونات الحلاقة',
+    text: 'أول نمط حجوزات بنشتغل عليه اليوم — مبني، مُختبر، وشغال فعلياً',
+    active: true,
+  },
+  {
+    icon: ShoppingBag,
+    tag: 'متوفر كإضافة',
+    title: 'متجر إلكتروني بنفس الصفحة',
+    text: 'فينا نضيفلك متجر بيع منتجات جنب نظام الحجز، بنفس صفحتك وحسابك',
+    active: true,
+  },
+  {
+    icon: Sparkles,
+    tag: 'قريباً',
+    title: 'كلينكات وصالونات تجميل',
+    text: 'وأنماط تانية جايي بعد صالونات الحلاقة — بتختار النمط يلي يناسب شغلك',
+    active: false,
+  },
 ]
 
 export default function AlzabtLandingPage() {
@@ -175,6 +209,99 @@ export default function AlzabtLandingPage() {
         </div>
         <div style={{ textAlign: 'center', marginTop: 28 }}>
           <PrimaryCTA onClick={tryDemo}>جرّب التجربة كاملة ←</PrimaryCTA>
+        </div>
+      </section>
+
+      {/* ── Offerings — "شو بنقدملك بمنصة وحدة؟" ────────────────────────────────────────────── */}
+      <section style={{ padding: '20px 20px 72px', maxWidth: 1000, margin: '0 auto' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 'clamp(1.4rem, 3vw, 1.8rem)', fontWeight: 800, color: V.textPrimary, marginBottom: 8 }}>
+          شو بنقدملك بمنصة وحدة؟
+        </h2>
+        <p style={{ textAlign: 'center', fontSize: 14, color: V.textSecond, marginBottom: 32 }}>
+          مش بس صفحة حجز — منظومة كاملة تدير فيها شغلك من مكان وحد
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          {OFFERINGS.map((o, i) => (
+            <div key={i} style={{
+              padding: '22px 20px', background: V.cardBg, border: V.cardBorder, borderRadius: 18,
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 14, background: V.violetSoft, marginBottom: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <o.icon size={20} color={V.violet} strokeWidth={1.75} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: V.textPrimary, marginBottom: 6 }}>{o.title}</div>
+              <div style={{ fontSize: 13, color: V.textSecond, lineHeight: 1.6 }}>{o.text}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Real product screenshots — RK's own real booking page + real dashboard ──────────── */}
+      <section style={{ padding: '0 20px 72px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+          <figure style={{ margin: 0 }}>
+            <div style={{
+              height: 460, borderRadius: 20, overflow: 'hidden', border: V.cardBorder,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
+            }}>
+              <img
+                src="/assets/alzabt/booking-page.png"
+                alt="صفحة حجز حقيقية على عالزبط"
+                style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+                loading="lazy"
+              />
+            </div>
+            <figcaption style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: V.textSecond }}>
+              صفحة الحجز — تجربة حقيقية، مش موك أب
+            </figcaption>
+          </figure>
+          <figure style={{ margin: 0 }}>
+            <div style={{
+              height: 460, borderRadius: 20, overflow: 'hidden', border: V.cardBorder,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.45)', background: '#fff',
+            }}>
+              <img
+                src="/assets/alzabt/dashboard.png"
+                alt="لوحة تحكم حقيقية على عالزبط"
+                style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+                loading="lazy"
+              />
+            </div>
+            <figcaption style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: V.textSecond }}>
+              لوحة التحكم — أرقامك الحقيقية، بلمحة وحدة
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      {/* ── Roadmap strip — honest "building now" + online shop add-on + future verticals ──── */}
+      <section style={{ padding: '20px 20px 72px', maxWidth: 1000, margin: '0 auto' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16,
+        }}>
+          {ROADMAP.map((r, i) => (
+            <div key={i} style={{
+              padding: '20px 18px', borderRadius: 18,
+              background: r.active ? V.violetSoft : V.cardBg,
+              border: r.active ? `1px solid rgba(124,58,237,0.3)` : V.cardBorder,
+            }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '3px 10px', borderRadius: 999, marginBottom: 12,
+                background: r.active ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.06)',
+                fontSize: 11, fontWeight: 700, color: r.active ? V.violet : V.textMuted,
+              }}>
+                {r.tag}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <r.icon size={18} color={r.active ? V.violet : V.textMuted} strokeWidth={1.75} />
+                <span style={{ fontSize: 15, fontWeight: 700, color: V.textPrimary }}>{r.title}</span>
+              </div>
+              <div style={{ fontSize: 13, color: V.textSecond, lineHeight: 1.6 }}>{r.text}</div>
+            </div>
+          ))}
         </div>
       </section>
 

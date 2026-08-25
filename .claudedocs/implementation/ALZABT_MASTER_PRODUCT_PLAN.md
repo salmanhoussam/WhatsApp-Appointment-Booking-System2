@@ -77,6 +77,17 @@ different colors, on purpose:
                               this vertical.
 ```
 
+> **Note, 2026-08-25 (appended, does not change the rule above)**: `AlzabtLandingPage.jsx` was
+> extended with an honest "شو بنقدملك" (what we offer) section, real RK screenshots, and a small
+> roadmap strip naming three things: (1) Barber is what's actively being built today — matches this
+> Rollout Priority exactly; (2) an online shop/store add-on "على نفس الصفحة" — this is **not**
+> forward-pulled work, `store`/Catalog is an already-live capability RK itself already has active
+> (confirmed live in the real screenshot used on the page); (3) Clinic/Beauty named as "قريباً"
+> (coming soon) — marketing copy naming the roadmap, not a build-order change; no Clinic code was
+> touched, this rule's gate (`onboards via configuration alone, zero new product code`) still
+> applies unchanged before Clinic actually starts. Evidence:
+> `.claudedocs/work/alzabt-landing-content-expansion/2026-08-25/summary.md`.
+
 **Binding rule going forward**: every new decision in this plan gets asked against this order —
 "is this reusable for the Barber/Reservations product, or is it Clinic/Real-Estate-specific work
 being pulled forward before it's needed?" Per this project's own Abstraction Rule
