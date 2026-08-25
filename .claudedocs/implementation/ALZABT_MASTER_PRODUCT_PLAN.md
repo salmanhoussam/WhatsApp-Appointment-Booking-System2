@@ -546,6 +546,13 @@ All of Section P is now closed (see §P). Salman's explicit execution order:
 7. **Demo linking + Alzabt marketing entry point** — point "جرّب عالزبط" at the static pre-seeded
    reference tenant (§J); build the new landing page in the Violet Confidence product-brand
    (Section A), centered-hero structure (§P/Section C, Image 6 pattern).
+
+   > **Superseded, 2026-08-25** (appended, original call above left as-is): the centered-hero,
+   > screenshot-free pattern was replaced with a two-column hero (RTL-mirrored: copy right, a
+   > CSS-built laptop+phone device mockup left, both showing RK's real product screenshots) per
+   > Salman's own explicit reference-image brief the same day. Violet Confidence itself is
+   > unchanged — same palette, same "never on tenant pages" rule. Full detail:
+   > `.claudedocs/work/alzabt-landing-premium-redesign/2026-08-25/summary.md`.
 8. **RK verification** — the whole system proven end-to-end against the real reference tenant.
 9. **Onboarding Audit** — ✅ DONE 2026-08-12,
    `.claudedocs/work/onboarding-audit/2026-08-12/summary.md`. Found a real, confirmed functional
