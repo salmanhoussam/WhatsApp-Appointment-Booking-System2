@@ -428,34 +428,43 @@ export default function DemoLauncher() {
               }}
             />
 
-            {/* Modal panel */}
-            <motion.div
-              key="modal"
-              role="dialog"
-              aria-modal="true"
-              dir="rtl"
-              initial={{ opacity: 0, scale: 0.88, y: 40 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.88, y: 40 }}
-              transition={premiumSpring}
+            {/* Modal panel — centering lives on this plain, non-animated wrapper (flexbox, not a
+                transform) so it never fights with the motion.div's own animated transform below.
+                A static `transform: translate(-50%,-50%)` on the motion.div itself was silently
+                overwritten by Framer Motion's animated scale/y transform, leaving the panel
+                pinned to the viewport's vertical midpoint with no centering offset -- it hung off
+                the bottom of the screen, clipped, confirmed via a real computed-style check
+                (`getComputedStyle(modal).transform` was `"none"`, not the CSS-specified value). */}
+            <div
               style={{
-                position:      'fixed',
-                top:           '50%',
-                left:          '50%',
-                transform:     'translate(-50%, -50%)',
-                zIndex:        9999,
-                width:         'min(480px, calc(100vw - 32px))',
-                maxHeight:     'calc(100vh - 40px)',
-                overflowY:     'auto',
-                background:    GLASS_BG,
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                border:        GLASS_BORDER,
-                borderRadius:  '20px',
-                padding:       '28px',
-                boxShadow:     '0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+                position: 'fixed', inset: 0, zIndex: 9999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '20px', pointerEvents: 'none',
               }}
             >
+              <motion.div
+                key="modal"
+                role="dialog"
+                aria-modal="true"
+                dir="rtl"
+                initial={{ opacity: 0, scale: 0.88, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.88, y: 40 }}
+                transition={premiumSpring}
+                style={{
+                  pointerEvents: 'auto',
+                  width:         'min(480px, 100%)',
+                  maxHeight:     '100%',
+                  overflowY:     'auto',
+                  background:    GLASS_BG,
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  border:        GLASS_BORDER,
+                  borderRadius:  '20px',
+                  padding:       '28px',
+                  boxShadow:     '0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+                }}
+              >
               {/* ── Header ── */}
               <div style={{
                 display:       'flex',
@@ -630,7 +639,8 @@ export default function DemoLauncher() {
                   </motion.form>
                 )}
               </AnimatePresence>
-            </motion.div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
