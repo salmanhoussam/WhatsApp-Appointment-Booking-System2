@@ -96,6 +96,38 @@ alzabt-landing-premium-redesign/2026-08-25/summary.md`.
   flagged, not fixed; a small follow-up (fresh crop or generic name) if he'd rather it not show.
 - ⚠️ **Open item**: no visual sign-off yet from Salman on the new copy/wording — drafted from his
   brief, may need adjustment.
+- ✅ **RESOLVED 2026-08-26**: the RK-real-name concern above is now moot — this whole page
+  (`AlzabtLandingPage.jsx`) is superseded (see below), and its replacement uses zero real
+  screenshots at all, by hard rule.
+
+## ✅ DONE — 2026-08-26, commits `6f8d387` + `d330ad0`: Alzabt Homepage Implementation Contract
+
+**Supersedes the same-day `b68cac3` (3-tab homepage) and effectively retires
+`AlzabtLandingPage.jsx`** (`/alzabt` now redirects to `/`; file left on disk, not deleted). Real,
+firm correction from Salman: **Alzabt is the one product — Booking/Menu/Order are capabilities
+inside it, never 3 separate products, never a tab switcher (decision final).** Full Implementation
+Contract at `.claude/plans/we-moved-on-new-hazy-barto.md` — brand rules, art direction, required/
+forbidden assets (A-E split), visual/responsive rules, Definition of Done, all Salman's own,
+executed literally.
+
+`ProductShowcaseHome.jsx` (the real `/`) rebuilt: one-composition Hero (customer phone + business
+laptop, connected), Capabilities (3 non-sequential), Master Dashboard (same mockup component as
+the Hero), Order→Dashboard Ecosystem, Vertical Showcase (4 illustrated demo scenes, explicitly not
+real customers). **Zero `<img>` tags anywhere on the page** — the "no real tenant screenshots as
+marketing assets" rule is now structurally enforced, not just followed by convention.
+
+Salman then live-tested it and caught a real bug in `DemoLauncher.jsx` (pre-existing global "جرّب
+مجاناً" CTA, unrelated to this rebuild) — its modal was rendering off-screen (a Framer Motion
+`transform` conflict). Fixed and tested end-to-end (real tenant created). Side discovery: this
+component already has a real, working demo-creation flow for restaurant/store, not just booking —
+corrects an earlier same-day study that missed it.
+
+Evidence: `.claudedocs/work/alzabt-unified-homepage/2026-08-26/summary.md`,
+`.claudedocs/work/demo-launcher-centering-fix/2026-08-26/summary.md`.
+
+- [ ] **Open**: no final visual sign-off yet from Salman on the whole rebuilt page.
+- [ ] **Open, not urgent**: `_STORE_SEED` in `demo_service.py` still has placeholder product names
+      ("منتج تجريبي 1-6") — noted, not blocking.
 
 ## 🎯 STANDING TOP PRIORITY: عالزبط (Alzabt) — the product launching 2026-08-31
 
