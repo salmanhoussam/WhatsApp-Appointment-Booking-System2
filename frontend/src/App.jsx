@@ -47,12 +47,6 @@ const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'
 // Marketing landing page — formerly on Cloudflare, now integrated
 const MarketingApp = lazy(() => import('./pages/marketing/MarketingApp'));
 
-// عالزبط (Alzabt) — the Reservations-capability product's own marketing entry point (Alzabt
-// Master Product Plan, Section K step 7, 2026-08-12). Deliberately separate from MarketingApp
-// above (platform-wide, generic) -- scoped to Barber/Reservations only, per the Plan's rollout
-// priority (Section A).
-const AlzabtLandingPage = lazy(() => import('./pages/alzabt/AlzabtLandingPage'));
-
 // Dating module (Phase 75) — standalone, before /:slug/* catch-all
 const DatingPageResolver = lazy(() => import('./pages/dating/DatingPageResolver'));
 const DatingCreatePage   = lazy(() => import('./pages/dating/DatingCreatePage'));
@@ -225,12 +219,13 @@ function App() {
             <Suspense fallback={null}><MarketingApp /></Suspense>
           } />
 
-          {/* ── عالزبط (Alzabt) product marketing entry point (Alzabt Master Product Plan,
-              Section K step 7) — real route, part of the product, not a mockup. Must sit before
-              the /:slug/* tenant catch-all, same as /marketing above. */}
-          <Route path="/alzabt" element={
-            <Suspense fallback={null}><AlzabtLandingPage /></Suspense>
-          } />
+          {/* ── /alzabt → redirect to the canonical unified homepage, 2026-08-26 (Alzabt Homepage
+              Implementation Contract) — Alzabt is the one product, "/" is now its real homepage;
+              this route stays only as a backward-compat alias for old links. The old marketing
+              page it used to render, AlzabtLandingPage.jsx, is left on disk untouched -- not
+              deleted -- per the Contract's own instruction not to conflate this rebuild with a
+              cleanup pass. */}
+          <Route path="/alzabt" element={<Navigate to="/" replace />} />
 
           {/* ── Dating module routes (must be before /:slug/*) ── */}
           <Route path="/dating/create" element={
