@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy lockfiles first — npm ci layer is cached until package*.json changes
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci --prefer-offline
 
 # Copy source then build
