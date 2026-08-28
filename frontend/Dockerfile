@@ -18,6 +18,15 @@ COPY . .
 # ("Dockerfile Configuration", docs.railway.com/builds/dockerfiles).
 ARG VITE_API_URL
 ARG VITE_ADMIN_API_URL
+
+# Cache-bust marker (2026-08-28T16:35:07Z) -- forces Docker to invalidate its cached
+# `RUN npm run build` layer instead of silently reusing a build from before VITE_API_URL/
+# VITE_ADMIN_API_URL were set correctly on Railway. A literal ARG value baked into the Dockerfile
+# itself changes the instruction text at this point, which is what actually busts the cache --
+# unlike a bare comment, which Docker strips before computing layer cache keys and has no effect.
+# Bump this value (a fresh timestamp) any time a real rebuild needs to be forced regardless of
+# whether Railway's own inputs changed.
+ARG CACHEBUST=2026-08-28T16:35:07Z
 RUN npm run build
 
 # ── Serve with nginx ──────────────────────────────────────────────────────────
