@@ -14,11 +14,12 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    const USER_URL   = import.meta.env.VITE_API_URL
-      ? `${import.meta.env.VITE_API_URL}/api/v1/auth/users/login`
+    // Admin login — dashboard.salmansaas.com in production (2026-08-28 API domain split).
+    const USER_URL   = import.meta.env.VITE_ADMIN_API_URL
+      ? `${import.meta.env.VITE_ADMIN_API_URL}/api/v1/auth/users/login`
       : '/api/v1/auth/users/login';
-    const CLIENT_URL = import.meta.env.VITE_API_URL
-      ? `${import.meta.env.VITE_API_URL}/api/v1/auth/login`
+    const CLIENT_URL = import.meta.env.VITE_ADMIN_API_URL
+      ? `${import.meta.env.VITE_ADMIN_API_URL}/api/v1/auth/login`
       : '/api/v1/auth/login';
 
     try {

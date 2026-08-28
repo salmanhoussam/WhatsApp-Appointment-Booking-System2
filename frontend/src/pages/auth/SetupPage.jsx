@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+// Account setup (magic-link) — dashboard.salmansaas.com in production (2026-08-28 API domain split).
+const API_BASE = import.meta.env.VITE_ADMIN_API_URL || 'http://127.0.0.1:8000'
 
 export default function SetupPage() {
   const [params]   = useSearchParams()

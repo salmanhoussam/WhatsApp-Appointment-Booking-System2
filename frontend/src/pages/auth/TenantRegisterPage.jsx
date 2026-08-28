@@ -29,9 +29,11 @@ import axios                   from 'axios'
 import { getTemplate }         from '../../config/template-registry'
 import adminApi                from '../../utils/admin.config'
 
-// ── API base (auth is outside /public and /admin prefixes) ──────────────────
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
+// ── API base (auth is outside /public and /admin prefixes, but is admin-domain traffic --
+//    registration leads straight into dashboard access) — dashboard.salmansaas.com in production
+//    (2026-08-28 API domain split). ──────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_ADMIN_API_URL
+  ? `${import.meta.env.VITE_ADMIN_API_URL}/api/v1`
   : 'http://127.0.0.1:8000/api/v1'
 
 const authApi = axios.create({ baseURL: API_BASE })

@@ -1,9 +1,11 @@
 // src/api/index.js
 import axios from 'axios';
 
-// ✅ في الإنتاج: VITE_API_URL=https://my-backend.up.railway.app
-const BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
+// This client is admin-only (every export below hits /admin/...) — same domain split as
+// admin.config.js's adminApi: dashboard.salmansaas.com in production, not api.salmansaas.com.
+// See admin.config.js's own comment for the full rationale (2026-08-28).
+const BASE_URL = import.meta.env.VITE_ADMIN_API_URL
+  ? `${import.meta.env.VITE_ADMIN_API_URL}/api/v1`
   : '/api/v1';
 
 const API = axios.create({ baseURL: BASE_URL });

@@ -1,6 +1,7 @@
-// الرابط الأساسي للباك إند (قسم الإدارة)
-const BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1/admin`
+// الرابط الأساسي للباك إند (قسم الإدارة) — admin traffic, dashboard.salmansaas.com in production
+// (2026-08-28 API domain split — see admin.config.js's own comment for the full rationale).
+const BASE_URL = import.meta.env.VITE_ADMIN_API_URL
+  ? `${import.meta.env.VITE_ADMIN_API_URL}/api/v1/admin`
   : "http://127.0.0.1:8000/api/v1/admin";
 
 /**

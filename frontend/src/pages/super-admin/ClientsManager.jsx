@@ -14,7 +14,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAdminRole } from '../../hooks/useAdminRole';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// Super Admin traffic — dashboard.salmansaas.com in production (2026-08-28 API domain split).
+const API_BASE = import.meta.env.VITE_ADMIN_API_URL || 'http://127.0.0.1:8000';
 
 // ── Palette (matches SmarAdminDashboard) ──────────────────────────────────────
 const C = {

@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// SSO login — dashboard.salmansaas.com in production (2026-08-28 API domain split).
+const API_BASE = import.meta.env.VITE_ADMIN_API_URL || 'http://127.0.0.1:8000';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
