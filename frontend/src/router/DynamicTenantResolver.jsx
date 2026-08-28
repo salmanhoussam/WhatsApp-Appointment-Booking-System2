@@ -33,9 +33,9 @@
  * When sections are configured, page_type is ignored — sections drive the page.
  *
  * ── Production API ────────────────────────────────────────────────────────────
- * All API calls use publicApi (utils/publicApi.js) which reads VITE_API_URL.
+ * All API calls use publicApi (utils/publicApi.js) which reads VITE_PUBLIC_API_URL.
  * Set this in Railway env vars:
- *   VITE_API_URL=https://your-backend.up.railway.app
+ *   VITE_PUBLIC_API_URL=https://your-backend.up.railway.app
  * No changes to backend CORS needed — the domain is already in the allow-list.
  *
  * useParams() in child components inherits { slug } from the parent

@@ -15,8 +15,8 @@
  *   anything else             → "coming soon" message
  *
  * ── Production API ────────────────────────────────────────────────────────────
- *   Uses publicApi (VITE_API_URL env var). No raw axios. No hardcoded URL.
- *   Set VITE_API_URL=https://your-backend.up.railway.app in Railway env vars.
+ *   Uses publicApi (VITE_PUBLIC_API_URL env var). No raw axios. No hardcoded URL.
+ *   Set VITE_PUBLIC_API_URL=https://your-backend.up.railway.app in Railway env vars.
  */
 
 import { useState, useEffect, useMemo } from 'react'

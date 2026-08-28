@@ -9,7 +9,7 @@ export default defineConfig({
     // Local Pilot (RK Barber Shop, 2026-07-31): proxy API calls through this same
     // origin/port instead of a separate backend port, so the phone only deals with one
     // server. Plain HTTP — no cert-trust complexity. See frontend/.env's empty
-    // VITE_API_URL, which makes publicApi.js/api/index.js call relative paths that
+    // VITE_PUBLIC_API_URL, which makes publicApi.js/api/index.js call relative paths that
     // resolve through this proxy.
     proxy: {
       '/api': {

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.salmansaas.com';
+const API_BASE = import.meta.env.VITE_PUBLIC_API_URL || 'https://api.salmansaas.com';
 
 const IconChat = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

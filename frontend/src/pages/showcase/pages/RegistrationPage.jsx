@@ -3,8 +3,8 @@ import axios from 'axios';
 import { useTranslation } from '../hooks/useTranslation';
 import LanguageSwitcher from '../components/layout/LanguageSwitcher';
 
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
+const API_BASE = import.meta.env.VITE_PUBLIC_API_URL
+  ? `${import.meta.env.VITE_PUBLIC_API_URL}/api/v1`
   : 'http://127.0.0.1:8000/api/v1';
 
 function generateSlug(name) {
