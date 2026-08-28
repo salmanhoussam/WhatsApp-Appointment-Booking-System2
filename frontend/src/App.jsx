@@ -61,8 +61,26 @@ const _h = window.location.hostname;
 const _IS_LOCAL_HOST = _h === 'localhost' || _h.startsWith('127.') || _h.startsWith('192.168.');
 const IS_SUBDOMAIN_MODE = !_IS_LOCAL_HOST && _h.split('.').length >= 3;
 const IS_DEMO_SUBDOMAIN  = IS_SUBDOMAIN_MODE && _h.startsWith('demo.');
+// alzabt.salmansaas.com — canonical domain for SUBSCRIBED/paid tenants (Tenant Lifecycle + Dual
+// Subdomain audit, 2026-08-28), replacing the old per-tenant subdomain pattern (smar.salmansaas.com,
+// retired). Path-based exactly like demo.salmansaas.com — see IS_PATH_BASED_DOMAIN below.
+const IS_ALZABT_SUBDOMAIN = IS_SUBDOMAIN_MODE && _h.startsWith('alzabt.');
+// Both demo. and alzabt. resolve the tenant slug from the URL path, not the hostname — every
+// branch below that needs "acts like demo." for routing purposes should key off this, not
+// IS_DEMO_SUBDOMAIN alone. A branch that must stay demo-only (or gain alzabt-specific behavior)
+// still keys off the specific flag instead — see the 2026-08-28 audit's per-branch table.
+const IS_PATH_BASED_DOMAIN = IS_DEMO_SUBDOMAIN || IS_ALZABT_SUBDOMAIN;
 // salmansaas.com (no subdomain, not localhost) → serve showcase at root
 const IS_SHOWCASE_DOMAIN = !IS_SUBDOMAIN_MODE && !_IS_LOCAL_HOST;
+
+// alzabt.salmansaas.com's bare root (no slug) has no valid page of its own — every real
+// subscriber link always includes a slug. Redirect to the real marketing site. This is a
+// cross-origin navigation (different hostname), so React Router's <Navigate> can't do it —
+// it only handles same-origin SPA routes.
+function ExternalRedirect({ to }) {
+  if (typeof window !== 'undefined') window.location.replace(to);
+  return null;
+}
 
 function NotFound() {
   return (
@@ -100,21 +118,26 @@ function App() {
     <LanguageProvider>
       <BrowserRouter>
         <Routes>
-          {/* ── Root redirect — skipped on showcase domain (/* route handles it) ── */}
+          {/* ── Root redirect — skipped on showcase domain (/* route handles it) ──
+              alzabt.salmansaas.com has no bare-root page — every real subscriber link includes a
+              slug — so it redirects out to the real marketing site instead of into the SPA. */}
           {!IS_SHOWCASE_DOMAIN && (
             <Route path="/" element={
-              <Navigate to={
-                IS_SUBDOMAIN_MODE
-                  ? (_h.startsWith('demo.') ? '/home' : '/showcase')
-                  : '/showcase'
-              } replace />
+              IS_ALZABT_SUBDOMAIN
+                ? <ExternalRedirect to="https://salmansaas.com" />
+                : <Navigate to={
+                    IS_SUBDOMAIN_MODE
+                      ? (_h.startsWith('demo.') ? '/home' : '/showcase')
+                      : '/showcase'
+                  } replace />
             } />
           )}
 
           {/* ── Static admin routes ── */}
-          {/* demo.salmansaas.com/login → SSO portal | localhost/login → legacy dev form */}
+          {/* demo.salmansaas.com/login and alzabt.salmansaas.com/login → SSO portal (real
+              subscribed tenants log in here too) | localhost/login → legacy dev form */}
           <Route path="/login" element={
-            IS_DEMO_SUBDOMAIN
+            IS_PATH_BASED_DOMAIN
               ? <Suspense fallback={null}><SSOLoginPage /></Suspense>
               : <Login />
           } />
@@ -168,9 +191,9 @@ function App() {
             <Suspense fallback={null}><DynamicTenantResolver /></Suspense>
           } />
 
-          {/* ── Trial admin — auth subdomain + localhost (no tenant DNS needed) ── */}
-          {/* /:slug/dashboard  =  generic dashboard for all new tenants */}
-          {(IS_DEMO_SUBDOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
+          {/* ── Trial + subscribed admin — demo/alzabt subdomain + localhost (no tenant DNS needed) ── */}
+          {/* /:slug/dashboard  =  generic dashboard for all tenants, trial or subscribed */}
+          {(IS_PATH_BASED_DOMAIN || (!IS_SUBDOMAIN_MODE && !IS_SHOWCASE_DOMAIN)) && (
             <Route path="/:slug/dashboard/*" element={
               <ProtectedRoute>
                 <Suspense fallback={null}><GenericAdminDashboard /></Suspense>
@@ -236,11 +259,15 @@ function App() {
           } />
 
           {/* ── Dynamic tenant routes (must be last) ──
-               Subdomain mode: /* so smar.domain.com/showcase resolves cleanly
-               Demo subdomain: /:slug/* ALSO registered so /olivello/* gets correct pathnameBase
+               Subdomain mode: /* so a real per-tenant subdomain resolves cleanly (legacy pattern,
+                 no tenant currently uses it — smar.salmansaas.com was the last one, retired 2026-08-28)
+               Demo/alzabt subdomain: /:slug/* ALSO registered so /olivello/* or /smar/* gets the
+                 correct pathnameBase — React Router ranks this more specific pattern above the bare
+                 /* also registered below for the same host (IS_SUBDOMAIN_MODE is true for both),
+                 same mechanism this project already relies on for demo.salmansaas.com.
                Localhost mode:  /:slug/* so /smar/showcase resolves correctly
                Showcase domain: TenantResolver not registered (ShowcaseRoutes above handles /*) */}
-          {IS_DEMO_SUBDOMAIN && (
+          {IS_PATH_BASED_DOMAIN && (
             <Route path="/:slug/*" element={<TenantResolver />} />
           )}
           {IS_SUBDOMAIN_MODE

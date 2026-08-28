@@ -101,7 +101,13 @@ async def send_welcome_email(
     if not _client:
         return False
 
-    dashboard_url = f"https://demo.salmansaas.com/login"
+    # Was hardcoded to "https://demo.salmansaas.com/login" regardless of FRONTEND_URL or the
+    # tenant's real slug -- found 2026-08-28 (Tenant Lifecycle audit) as a real bug: every new
+    # tenant's welcome email misdirected to the demo domain. Fixed to match the same
+    # FRONTEND_URL-based, slug-scoped construction registration_service.py already uses correctly
+    # (dashboard_url = f"{base_url}/{client.slug}/dashboard").
+    base_url = os.getenv("FRONTEND_URL", "https://salmansaas.com")
+    dashboard_url = f"{base_url}/{slug}/dashboard"
     password_line = (
         f'<p style="color:rgba(255,255,255,0.55);font-size:13px;">كلمة المرور المؤقتة: <code style="background:rgba(212,168,83,0.1);color:#d4a853;padding:2px 8px;border-radius:4px;">{temp_password}</code></p>'
         if temp_password else ""

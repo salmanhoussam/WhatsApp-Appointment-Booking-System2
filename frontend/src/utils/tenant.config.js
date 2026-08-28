@@ -1,11 +1,12 @@
 // src/utils/tenant.config.js
 //
 // Resolution priority (highest → lowest):
-//   1. URL path /demo/:slug  → always wins on auth subdomain (prevents JWT bleed)
-//   2. JWT payload           → correct for subdomain + localhost admin routes
-//   3. ?tenant= param        → localhost dev override
-//   4. Subdomain             → smar.salmansaas.com → "smar"
-//   5. Fallback              → "smar" (local dev without any context)
+//   1. URL path /demo/:slug        → always wins on auth subdomain (prevents JWT bleed)
+//   2. JWT payload                 → correct for subdomain + localhost admin routes
+//   3. ?tenant= param              → localhost dev override
+//   4. Path-based domain slug      → demo./alzabt. read the first path segment
+//   5. Subdomain                   → a real per-tenant subdomain → its own name
+//   6. Fallback                    → "smar" (local dev without any context)
 //
 // NON-TENANT subdomains that must NOT be treated as slugs:
 const _RESERVED = new Set(['auth', 'admin', 'manager', 'api', 'www', 'mail']);
@@ -32,13 +33,25 @@ export const getTenantSlug = () => {
   const tenantParam = new URLSearchParams(window.location.search).get('tenant');
   if (tenantParam) return tenantParam;
 
-  // ── 4. Subdomain (e.g. smar.salmansaas.com) ───────────────────────────────
+  // ── 4. Path-based domain (demo./alzabt.salmansaas.com) — read slug from path ──
+  //    2026-08-28 (Tenant Lifecycle + Dual Subdomain audit): previously this file had no
+  //    path-reading fallback beyond tier 1's /demo/:slug special case, so a fresh (no-JWT,
+  //    no-?tenant=) visit to alzabt.salmansaas.com/{slug} would have fallen through to tier 5
+  //    below and misread "alzabt" itself as the slug. demo.salmansaas.com/{slug} had the same
+  //    latent gap, just never triggered because App.jsx/TenantResolver.jsx handle the actual
+  //    routing for real page loads — this hook is used independently in a few places, so it
+  //    needs its own correct fallback rather than relying on those other files being right.
   const hostname = window.location.hostname;
+  if ((hostname.startsWith('demo.') || hostname.startsWith('alzabt.')) && parts[0]) {
+    return parts[0];
+  }
+
+  // ── 5. Subdomain (a real per-tenant subdomain) ─────────────────────────────
   if (hostname !== 'localhost' && !hostname.startsWith('127.') && hostname.includes('.')) {
     const sub = hostname.split('.')[0];
     if (!_RESERVED.has(sub)) return sub;
   }
 
-  // ── 5. Fallback ────────────────────────────────────────────────────────────
+  // ── 6. Fallback ────────────────────────────────────────────────────────────
   return 'smar';
 };

@@ -74,11 +74,16 @@ export default function TenantResolver() {
   // Path-based slug (localhost / demo subdomain): /olivello/home → 'olivello'
   const pathSlug = window.location.pathname.split('/').filter(Boolean)[0] ?? null;
 
-  // demo.salmansaas.com uses path-based slug (like localhost) so that
-  // demo.salmansaas.com/olivello/* correctly routes to the olivello tenant.
-  // Other subdomains (smar.salmansaas.com) still use the subdomain as the slug.
+  // demo.salmansaas.com AND alzabt.salmansaas.com both use path-based slugs (like localhost) so
+  // that demo.salmansaas.com/olivello/* or alzabt.salmansaas.com/smar/* correctly route to the
+  // right tenant. alzabt.salmansaas.com is the canonical domain for subscribed/paid tenants
+  // (2026-08-28 — replaces the old per-tenant subdomain pattern, e.g. smar.salmansaas.com, retired).
+  // Any future genuine single-tenant subdomain would still fall through to the subdomain-as-slug
+  // branch below.
   const isDemoSubdomain = hostname.startsWith('demo.');
-  const activeSlug = (isLocalhost || isDemoSubdomain) ? pathSlug : (subdomain ?? pathSlug);
+  const isAlzabtSubdomain = hostname.startsWith('alzabt.');
+  const isPathBasedDomain = isDemoSubdomain || isAlzabtSubdomain;
+  const activeSlug = (isLocalhost || isPathBasedDomain) ? pathSlug : (subdomain ?? pathSlug);
 
   if (!activeSlug) {
     return <Navigate to="/smar" replace />;
