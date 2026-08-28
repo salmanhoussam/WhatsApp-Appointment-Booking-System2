@@ -61,30 +61,41 @@ stage:
 | Stage | Admin URL | Status |
 |---|---|---|
 | **Development** | `localhost/{slug}/dashboard` (or LAN IP, same pattern) | ✅ Live now |
-| **Current Production Strategy** | `https://demo.salmansaas.com/{slug}/dashboard` | ✅ Live now — the real canonical target for every tenant today, regardless of whether that tenant also has its own public subdomain |
-| **Future Strategy (deferred)** | `https://{slug}.salmansaas.com/dashboard` | Not built — intentionally deferred until the paid multi-subdomain deployment phase has a real economic justification, not built speculatively ahead of it |
+| **Free-trial tenants** | `https://demo.salmansaas.com/{slug}/dashboard` | ✅ Live — canonical for demo/trial tenants |
+| **Subscribed/paid tenants** | `https://alzabt.salmansaas.com/{slug}/dashboard` | ✅ Live, added 2026-08-28 (Tenant Lifecycle + Dual Subdomain rollout) — realizes this section's own "Future Strategy" below, but as a **shared path-based domain**, not per-tenant subdomains. `smar` was the first tenant moved off its legacy `smar.salmansaas.com` subdomain onto this pattern (DNS retired same day). |
+| **Future (still not built)** | `https://{slug}.salmansaas.com/dashboard` (real per-tenant subdomain) | Still deferred — 2026-08-28's rollout answered "how do we split paid from trial traffic" with a second shared domain, not with per-tenant subdomains. This row stays open until there's a real reason to revisit it. |
 
-**Binding rule going forward:** no new code couples itself directly to the tenant subdomain for
-admin access until multi-subdomain deployment is officially adopted. Every redirect/link uses the
-current canonical path (`demo.salmansaas.com/{slug}/...` in production, `/{slug}/...` in dev) —
-when subdomains are eventually turned on, the change happens **only in the routing layer**
-(`App.jsx`, adding a real subdomain-mode `GenericAdminDashboard` route), never by hunting down every
-call site that hardcoded `{slug}.salmansaas.com` in the meantime. This is the whole point of naming
-the strategy explicitly here — one migration point later, not dozens.
+**Binding rule, updated 2026-08-28:** admin-facing links now correctly target either
+`demo.salmansaas.com/{slug}/dashboard` (trial) or `alzabt.salmansaas.com/{slug}/dashboard`
+(subscribed) depending on tenant type — never a tenant subdomain, still. When true per-tenant
+subdomains are eventually built, the change still happens only in the routing layer, per this
+file's original reasoning — now proven twice (this rollout was exactly that kind of routing-layer-
+only change, no call sites hunted down individually).
 
-**Second open finding — hostname/environment detection is duplicated three ways, only two in
-sync:** `App.jsx`'s `_IS_LOCAL_HOST`/`IS_SUBDOMAIN_MODE` constants, `useTenantSlug.js`'s private
-`_isSubdomainMode()` (explicitly written to mirror `App.jsx`, per that file's own comment), and
-`RegistrationPage.jsx`'s own inline `isProd` check — the third one, independently written, does
-**not** treat `192.168.*` LAN IPs as local (the other two do), meaning a tenant registered from a
-LAN dev/test setup gets redirected to a real production domain that isn't running the dev build.
-Fixed as part of Item 1 (`RegistrationPage.jsx` now uses the same local-detection check the other
-two files already share).
+**Hostname/environment detection duplication — grew, not shrank, confirmed 2026-08-28.** The
+2026-08-XX finding below (three copies) is now **four**, per the Tenant Lifecycle audit
+(`.claudedocs/work/railway-production-readiness/2026-08-28/tenant-lifecycle-audit.md` §A):
+`App.jsx`'s `IS_SUBDOMAIN_MODE`/`IS_DEMO_SUBDOMAIN`/`IS_ALZABT_SUBDOMAIN`, `TenantResolver.jsx`'s
+`isDemoSubdomain`/`isAlzabtSubdomain`, `useTenantSlug.js`'s private `_isSubdomainMode()` (which had
+**zero** demo/alzabt awareness at all until 2026-08-28, despite being used by 24+ files — the
+highest-blast-radius instance found so far), and `tenant.config.js`'s own tier-based resolution. All
+four were updated together 2026-08-28 to add `alzabt.` consistently, but the underlying duplication
+itself was not resolved — a genuine candidate for the Abstraction Rule (`rules/team-roles.md`) once
+a third real domain is ever added, not before.
 
-Any future admin-facing link/redirect must point at `/{slug}/dashboard` (dev) or
-`demo.salmansaas.com/{slug}/dashboard` (current production) only — never a tenant subdomain — and
-any new hostname/environment check should reuse the same local-detection logic `useTenantSlug.js`
-already centralizes, rather than writing a fourth independent copy.
+*(Original three-way finding, kept for history):* `App.jsx`'s `_IS_LOCAL_HOST`/`IS_SUBDOMAIN_MODE`
+constants, `useTenantSlug.js`'s private `_isSubdomainMode()` (explicitly written to mirror `App.jsx`,
+per that file's own comment), and `RegistrationPage.jsx`'s own inline `isProd` check — the third one,
+independently written, did **not** treat `192.168.*` LAN IPs as local (the other two do), meaning a
+tenant registered from a LAN dev/test setup got redirected to a real production domain that wasn't
+running the dev build. Fixed as part of Item 1 (`RegistrationPage.jsx` now uses the same
+local-detection check the other two files already share).
+
+Any future admin-facing link/redirect must point at `/{slug}/dashboard` (dev),
+`demo.salmansaas.com/{slug}/dashboard` (trial), or `alzabt.salmansaas.com/{slug}/dashboard`
+(subscribed) — never a tenant subdomain — and any new hostname/environment check should reuse the
+same local-detection logic `useTenantSlug.js` already centralizes, rather than writing a fifth
+independent copy.
 
 ## 0c. Canonical Registration Flow (resolved 2026-08-07)
 
