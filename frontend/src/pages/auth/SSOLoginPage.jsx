@@ -52,8 +52,13 @@ function resolveRedirect(slug, token) {
   }
   // Canonical admin URL for every tenant, regardless of status (routing.md §0b) —
   // GenericAdminDashboard via /{slug}/dashboard. No per-status branching.
+  // Was hardcoded to demo.salmansaas.com regardless of which real domain the login page was
+  // loaded from -- found 2026-08-28 (Tenant Lifecycle audit): a real login from
+  // alzabt.salmansaas.com/login redirected the user away to demo.salmansaas.com/{slug}/dashboard
+  // instead of staying on the domain they were actually on. window.location.origin keeps the
+  // redirect on whichever real path-based domain (demo. or alzabt.) initiated the login.
   return import.meta.env.PROD
-    ? `https://demo.salmansaas.com/${slug}/dashboard?token=${token}`
+    ? `${window.location.origin}/${slug}/dashboard?token=${token}`
     : `http://localhost:5173/${slug}/dashboard?token=${token}`;
 }
 
