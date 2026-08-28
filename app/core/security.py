@@ -10,7 +10,14 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: Optional[str]) -> bool:
+    # No hash set at all (e.g. a Client root account that was never given a password) --
+    # fail closed instead of crashing. Found 2026-08-28: client_login() passes
+    # client.password_hash straight through, and a NULL value here previously raised an
+    # unhandled AttributeError ('NoneType' object has no attribute 'startswith'), a real
+    # 500 for any identifier that resolves to a real Client with no password set.
+    if not hashed_password:
+        return False
     # Only bcrypt comparison — no plain-text fallback.
     if not hashed_password.startswith("$2"):
         return False
