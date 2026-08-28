@@ -7,6 +7,7 @@ from app.services import UnitService
 from app.services.availability_service import AvailabilityService
 from app.schemas.unit import UnitResponse
 from app.core.exceptions import BusinessLogicError
+from app.core.tenant import assert_client_active, assert_client_lifecycle_allowed
 
 router = APIRouter()
 
@@ -36,6 +37,8 @@ async def get_property_units(
     client = await client_repo.get_by_slug(client_slug)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    await assert_client_active(client, endpoint="/api/v1/public/units/{property_id}/units")
+    await assert_client_lifecycle_allowed(client, endpoint="/api/v1/public/units/{property_id}/units")
     return await service.get_property_units(property_id, client.id)
 
 
@@ -68,6 +71,8 @@ async def get_unit_availability(
     client = await client_repo.get_by_slug(client_slug)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    await assert_client_active(client, endpoint="/api/v1/public/units/{unit_id}/availability")
+    await assert_client_lifecycle_allowed(client, endpoint="/api/v1/public/units/{unit_id}/availability")
 
     # Parse month
     try:

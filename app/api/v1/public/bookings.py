@@ -5,6 +5,7 @@ from app.db.client import prisma_client
 from app.repositories import ClientRepository, BookingRepository, CustomerRepository
 from app.services import BookingService
 from app.schemas.booking import BookingCreate, BookingResponse
+from app.core.tenant import assert_client_active, assert_client_lifecycle_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ async def create_booking(
     client = await client_repo.get_by_slug(client_slug)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    await assert_client_active(client, endpoint="/api/v1/public/bookings/")
+    await assert_client_lifecycle_allowed(client, endpoint="/api/v1/public/bookings/")
 
     try:
         # Separate customer data from booking meta

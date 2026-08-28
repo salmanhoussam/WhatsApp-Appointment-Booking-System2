@@ -467,6 +467,29 @@ async def assert_client_active(client, endpoint: Optional[str] = None) -> None:
     await _assert_client_active(client, endpoint=endpoint)
 
 
+async def assert_client_lifecycle_allowed(
+    client, endpoint: Optional[str] = None, soft_block_allowed: bool = False
+) -> None:
+    """
+    ADR-0002 §9.1 — public raising variant for synchronous request handlers
+    that already hold a freshly-fetched Client object, mirroring
+    assert_client_active()'s exact shape but for Soft Block
+    (lifecycle_state == "expired") instead of Hard Block. No second DB
+    lookup. Added 2026-08-28 (Tenant Lifecycle + Dual Subdomain audit) to
+    close a real, confirmed gap: the legacy "Enterprise" public routers
+    (properties.py, units.py, bookings.py) resolve their own Client object
+    via ClientRepository.get_by_slug() and never called either Hard- or
+    Soft-Block enforcement at all — unlike every route going through
+    get_current_tenant()/resolve_tenant_status(). Callers should call this
+    alongside assert_client_active(), same pattern as _verify_tenant()
+    itself does internally (tenant.py:200-204).
+    """
+    await _assert_lifecycle_allowed(
+        getattr(client, "lifecycle_state", None), client.id, client.slug,
+        endpoint=endpoint, soft_block_allowed=soft_block_allowed,
+    )
+
+
 def invalidate_tenant_cache(slug: str) -> None:
     """Remove a slug from the in-process cache (call after client updates)."""
     _tenant_cache.pop(slug, None)

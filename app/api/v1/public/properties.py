@@ -4,6 +4,7 @@ from app.db.client import prisma_client
 from app.repositories import ClientRepository, PropertyRepository
 from app.services import PropertyService
 from app.schemas.property import PropertyResponse
+from app.core.tenant import assert_client_active, assert_client_lifecycle_allowed
 
 router = APIRouter()
 
@@ -28,7 +29,9 @@ async def get_properties(
     client = await client_repo.get_by_slug(client_slug)
     if not client:
         raise HTTPException(status_code=404, detail="Client/Tenant not found")
-        
+    await assert_client_active(client, endpoint="/api/v1/public/properties/")
+    await assert_client_lifecycle_allowed(client, endpoint="/api/v1/public/properties/")
+
     return await service.get_client_properties(client.id)
 
 @router.get("/{property_id}", response_model=PropertyResponse)
@@ -42,6 +45,8 @@ async def get_property_details(
     client = await client_repo.get_by_slug(client_slug)
     if not client:
         raise HTTPException(status_code=404, detail="Client/Tenant not found")
+    await assert_client_active(client, endpoint="/api/v1/public/properties/{property_id}")
+    await assert_client_lifecycle_allowed(client, endpoint="/api/v1/public/properties/{property_id}")
 
     property_data = await service.get_property_details(property_id, client.id)
     if not property_data:
