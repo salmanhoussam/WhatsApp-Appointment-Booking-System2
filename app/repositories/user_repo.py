@@ -3,7 +3,25 @@ User Repository — Prisma queries only.
 All queries MUST filter by clientId where applicable. No business logic here.
 """
 
+import re
+
 from app.db.client import prisma_client
+
+_LEBANON_COUNTRY_CODE = "961"
+
+
+def normalize_local_phone(phone: str) -> str:
+    """Strip everything but digits, then strip a leading Lebanon country code
+    (961) if present -- Salman's explicit request 2026-08-29: phone LOGIN
+    should match on the local number alone, regardless of whether "+", "00",
+    or "961" was typed/stored. Used only for users.phone (the login-matching
+    field) -- NEVER apply this to clients.phone, which must keep its full
+    country code for real outbound WhatsApp sends (whatsapp_service.py) to
+    keep working."""
+    digits = re.sub(r"\D", "", phone or "")
+    if digits.startswith(_LEBANON_COUNTRY_CODE) and len(digits) > len(_LEBANON_COUNTRY_CODE):
+        digits = digits[len(_LEBANON_COUNTRY_CODE):]
+    return digits
 
 
 async def find_user_by_email(email: str):
@@ -15,10 +33,16 @@ async def find_user_by_email(email: str):
 
 
 async def find_user_by_phone(phone: str):
-    """Find a user by phone (global — used for login). phone has no unique
-    constraint (only STAFF-relevant fields do), so find_first, not find_unique."""
+    """Find a user by phone (global — used for login), matching on the
+    normalized local number (see normalize_local_phone) so "+96176985477",
+    "96176985477", and "76985477" all resolve to the same account. phone has
+    no unique constraint (only STAFF-relevant fields do), so find_first, not
+    find_unique."""
+    normalized = normalize_local_phone(phone)
+    if not normalized:
+        return None
     return await prisma_client.user.find_first(
-        where={"phone": phone},
+        where={"phone": normalized},
         include={"client": True},
     )
 

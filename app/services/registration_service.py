@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from prisma import Prisma
 
 from app.repositories.registration_repo import RegistrationRepository
+from app.repositories.user_repo import normalize_local_phone
 from app.core.security import get_password_hash
 from app.core.exceptions import ConflictError, BusinessLogicError
 from app.core.verticals import get_vertical
@@ -157,11 +158,13 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "password_hash":  get_password_hash(data["password"]),
         "fullName":       data.get("owner_name") or data.get("business_name_ar") or data.get("business_name", ""),
         "role":           "TENANT_ADMIN",
-        # Tenant Owner Phone Login (2026-08-29) -- same source value as Client.phone above
-        # (data["whatsapp_number"], already normalized by TenantRegistrationRequest's own
-        # validator), so the tenant's admin can log in with either email or this same phone
-        # number -- see app/api/v1/admin/auth.py's user_login() phone fallback.
-        "phone":          data["whatsapp_number"],
+        # Tenant Owner Phone Login (2026-08-29) -- same underlying number as Client.phone above,
+        # but normalized to the local number alone (no "+", no 961 country code) per Salman's
+        # explicit request -- login should match however the tenant types their own number. See
+        # app/api/v1/admin/auth.py's user_login() phone fallback + user_repo.normalize_local_phone.
+        # Client.phone itself stays untouched/unnormalized -- it must keep the full country code
+        # for real outbound WhatsApp sends to keep working.
+        "phone":          normalize_local_phone(data["whatsapp_number"]),
         "setupToken":     setup_token,
         "setupTokenExp":  setup_token_exp,
     })
