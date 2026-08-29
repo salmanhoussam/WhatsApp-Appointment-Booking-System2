@@ -149,6 +149,16 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
 
     try:
         user = await _user_repo.find_user_by_email(body.email)
+        # The request field is named `email` for the common case, but both real frontend login
+        # forms (SSOLoginPage.jsx, Login.jsx) already send whatever raw identifier the visitor
+        # typed here -- so a phone number is a legitimate value too, not a malformed request.
+        # Tenant Owner Phone Login (2026-08-29): every real tenant's admin phone lives on
+        # Client.phone already; User.phone mirrors it (registration_service.py persists it going
+        # forward, existing tenants backfilled once via SQL). No email-shape check needed before
+        # trying this -- a real email always contains "@", a real phone never does, so there's no
+        # realistic collision between the two lookups.
+        if not user:
+            user = await _user_repo.find_user_by_phone(body.email)
 
         if not user:
             logger.warning("❌ User not found: '%s'", body.email)

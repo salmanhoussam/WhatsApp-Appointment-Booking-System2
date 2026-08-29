@@ -157,6 +157,11 @@ async def register_new_tenant(db: Prisma, data: dict) -> dict:
         "password_hash":  get_password_hash(data["password"]),
         "fullName":       data.get("owner_name") or data.get("business_name_ar") or data.get("business_name", ""),
         "role":           "TENANT_ADMIN",
+        # Tenant Owner Phone Login (2026-08-29) -- same source value as Client.phone above
+        # (data["whatsapp_number"], already normalized by TenantRegistrationRequest's own
+        # validator), so the tenant's admin can log in with either email or this same phone
+        # number -- see app/api/v1/admin/auth.py's user_login() phone fallback.
+        "phone":          data["whatsapp_number"],
         "setupToken":     setup_token,
         "setupTokenExp":  setup_token_exp,
     })

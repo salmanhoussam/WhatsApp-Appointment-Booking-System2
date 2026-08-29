@@ -14,6 +14,15 @@ async def find_user_by_email(email: str):
     )
 
 
+async def find_user_by_phone(phone: str):
+    """Find a user by phone (global — used for login). phone has no unique
+    constraint (only STAFF-relevant fields do), so find_first, not find_unique."""
+    return await prisma_client.user.find_first(
+        where={"phone": phone},
+        include={"client": True},
+    )
+
+
 async def find_user_by_setup_token(token: str):
     """Find a user by setup token (one-time magic link)."""
     return await prisma_client.user.find_first(
