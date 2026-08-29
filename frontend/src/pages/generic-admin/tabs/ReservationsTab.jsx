@@ -408,6 +408,17 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
   // one list serves both purposes now.
   const { barbers, barbersLoading } = useBarbers()
   const services = useServices()
+  // Production Polish (2026-08-29) -- `barbers` (above) is the tenant's full, unfiltered roster,
+  // hidden/deactivated staff included; a real bug confirmed on RK's live dashboard: hiding a staff
+  // member (Staff tab's own "إخفاء") never removed them from Week/Day's calendar columns or barber
+  // pickers, because both consumed `barbers` directly with no isActive filter anywhere downstream.
+  // `activeBarbers` is what Week/Day should render as columns/picker chips; `barbers` itself stays
+  // untouched and still gets passed to Today as `allBarbers`, since Today's own barber-name lookup
+  // for an existing reservation (ReservationsTodayView.jsx, `allBarbers.find(...)`) must still
+  // resolve a hidden barber's name for their real historical reservations (confirmed: RK's hidden
+  // "جعفر" has one real past reservation) -- filtering that lookup list too would silently blank
+  // that row's staff name instead.
+  const activeBarbers = useMemo(() => barbers.filter((b) => b.is_active !== false), [barbers])
 
   // A3.1 -- default Day's visible-barber set to "all active barbers" exactly once, the moment
   // barbers first load, for a non-STAFF caller who hasn't touched the selection yet. Mirrors the
@@ -844,7 +855,7 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             onEdit={handleEdit}
             onReschedule={handleReschedule}
             hourRange={hourRange}
-            barbers={barbers}
+            barbers={activeBarbers}
             services={services}
             weekVisibleBarberId={weekVisibleBarberId}
             onWeekBarberChange={setWeekVisibleBarberId}
@@ -870,7 +881,8 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             visibleBarberIds={visibleBarberIds}
             onToggleBarber={toggleVisibleBarber}
             onSelectAllBarbers={selectAllBarbers}
-            barbers={barbers}
+            barbers={activeBarbers}
+            allBarbers={barbers}
             barbersLoading={barbersLoading}
             services={services}
             hideBarberPicker={hideBarberPicker}

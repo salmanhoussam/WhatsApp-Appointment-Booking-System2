@@ -364,7 +364,7 @@ function TodayAgendaPanel({ items, barbers, serviceNameFor, onOpen, fullWidth = 
  *     schedules are VISIBLE as columns, owned by ReservationsTab.jsx for the same reason the old
  *     single visibleBarberId was -- this component fully unmounts/remounts on every load().
  */
-export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberIds, onToggleBarber, onSelectAllBarbers, barbers, barbersLoading, services, hideBarberPicker = false, isMobile = false, mobileActiveBarberId = null, onMobileBarberChange }) {
+export default function ReservationsTodayView({ reservations, date, onDateChange, hourRange, color, onStatusChange, onReschedule, onCreate, onEdit, visibleBarberIds, onToggleBarber, onSelectAllBarbers, barbers, allBarbers = barbers, barbersLoading, services, hideBarberPicker = false, isMobile = false, mobileActiveBarberId = null, onMobileBarberChange }) {
   // A3.1 (Day View Resource Columns, 2026-08-22) -- Day now renders every VISIBLE barber as its own
   // column (the UX proposal Salman reviewed and approved,
   // `.claudedocs/work/calendar-uxui-study/2026-08-22/`), instead of one barber switched via pills.
@@ -837,7 +837,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
       {!isMobile && (
         <TodayAgendaPanel
           items={items}
-          barbers={barbers}
+          barbers={allBarbers}
           serviceNameFor={serviceNameFor}
           onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
         />
@@ -862,7 +862,7 @@ export default function ReservationsTodayView({ reservations, date, onDateChange
             <div style={{ marginBottom: 10 }}>
               <TodayAgendaPanel
                 items={items}
-                barbers={barbers}
+                barbers={allBarbers}
                 serviceNameFor={serviceNameFor}
                 onOpen={(item, e) => setPopover({ item, anchor: { x: e.clientX, y: e.clientY } })}
                 fullWidth
