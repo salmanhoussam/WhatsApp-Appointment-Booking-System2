@@ -28,6 +28,7 @@ import useGenericStore  from '../store/useGenericStore'
 import { hasOrderCapability } from '../../../utils/capabilities'
 import CartBadge      from '../../../design-system/molecules/CartBadge'
 import CartDrawer     from '../../../design-system/organisms/CartDrawer'
+import TenantHeader    from '../../../design-system/organisms/TenantHeader'
 import ConfigurableHero from '../../../components/ConfigurableHero'
 import Footer from '../../../components/Footer'
 
@@ -314,7 +315,13 @@ export default function DynamicPage() {
       background: '#0a0a0f',
       color: '#fff',
       fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+      // Offsets ALL in-flow content (trial ribbon, sections, footer) below the
+      // fixed TenantHeader (h-16 = 64px) added here 2026-08-31 — this page
+      // previously had no header/nav at all (Unified Tenant Header, §9).
+      paddingTop: 64,
     }}>
+      <TenantHeader />
+
       {isDemoRoute && (
         <TrialRibbon
           accent={accent}

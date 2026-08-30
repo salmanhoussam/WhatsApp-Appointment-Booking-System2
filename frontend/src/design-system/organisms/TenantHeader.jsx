@@ -2,13 +2,23 @@
  * TenantHeader.jsx — Organism
  *
  * Sticky glassmorphism navigation bar. Fully self-contained:
- * reads tenant name, logo, and whatsapp_number from useTenantConfig().
+ * reads tenant name, logo, whatsapp_number, and nav links from useTenantConfig().
  *
  * Features:
  *   - Elevated shadow + stronger backdrop when scrollY > 50
  *   - Language toggle (ar ↔ en) with RTL-aware layout flip
  *   - Gold "Book Now" CTA that opens WhatsApp
  *   - Zero prop drilling — works for any slug on any route
+ *
+ * Nav links — capability-aware (Unified Tenant Header, 2026-08-31):
+ *   Sourced from `navItems` (useTenantConfig() → getNavItems(), the same
+ *   data TenantModuleNav.jsx already uses for RK/Mr H/Footlab). Do NOT
+ *   hardcode a parallel link list here and do NOT call getNavItems()
+ *   directly — useTenantConfig() is the one canonical entry point.
+ *   The old hardcoded "Home"/"Contact" links are intentionally not part of
+ *   navItems (they aren't client_services-gated features): "Home" is now
+ *   the brand/logo click; "Contact" is superseded by the Book Now CTA,
+ *   which already opens WhatsApp.
  *
  * FM12 / React 19 safety:
  *   Native window scroll listener only — NO useScroll from Framer Motion.
@@ -20,41 +30,19 @@ import { User } from 'lucide-react';
 import { Button } from '../atoms';
 import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
-import useTenantSlug, { useTenantBase } from '../../hooks/useTenantSlug';
+import useTenantSlug from '../../hooks/useTenantSlug';
 
 export default function TenantHeader() {
-  const { config } = useTenantConfig();
+  const { config, navItems } = useTenantConfig();
   const navigate   = useNavigate();
   const slug       = useTenantSlug();
-  const base       = useTenantBase();
 
   const [scrolled,        setScrolled]        = useState(false);
   const [lang,            setLang]            = useState('ar');
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  // ── Nav link actions ──────────────────────────────────────────────────────
-  const NAV_LINKS = [
-    { ar: 'الرئيسية',   en: 'Home',    action: () => navigate(`${base}/showcase`) },
-    { ar: 'الوحدات',    en: 'Units',   action: () => navigate(`${base}/listings`) },
-    { ar: 'معرض الصور', en: 'Gallery', action: () => navigate(`${base}/gallery`) },
-    {
-      ar: 'تواصل معنا', en: 'Contact',
-      action: () => {
-        const number  = config?.whatsapp_number;
-        const message = lang === 'ar'
-          ? 'مرحباً، أودّ الاستفسار عن الوحدات المتاحة.'
-          : 'Hello, I would like to enquire about available units.';
-        if (number) {
-          window.open(
-            `https://wa.me/${number}?text=${encodeURIComponent(message)}`,
-            '_blank',
-            'noopener,noreferrer',
-          );
-        }
-      },
-    },
-  ];
+  const goHome = useCallback(() => navigate(`/${slug}`), [navigate, slug]);
 
   // ── Scroll elevation listener ─────────────────────────────────────────────
   useEffect(() => {
@@ -97,8 +85,12 @@ export default function TenantHeader() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
-        {/* ── Logo / Brand ─────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        {/* ── Logo / Brand — clickable, navigates home ───────────────────────── */}
+        <button
+          type="button"
+          onClick={goHome}
+          className="flex items-center gap-3 flex-shrink-0 bg-transparent border-0 cursor-pointer p-0 focus-visible:outline-none"
+        >
           {config?.logo_url && (
             <img
               src={config.logo_url}
@@ -114,15 +106,15 @@ export default function TenantHeader() {
           >
             {isRtl ? config?.name_ar : config?.name_en}
           </span>
-        </div>
+        </button>
 
         {/* ── Desktop Nav ──────────────────────────────────────────────────── */}
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
-          {NAV_LINKS.map((link) => (
+          {navItems.map((item) => (
             <button
-              key={link.en}
+              key={item.key}
               type="button"
-              onClick={link.action}
+              onClick={() => navigate(item.route)}
               className="
                 text-white/60 hover:text-[#d4a853]
                 text-sm tracking-wide
@@ -131,7 +123,7 @@ export default function TenantHeader() {
                 focus-visible:outline-none focus-visible:text-[#d4a853]
               "
             >
-              {isRtl ? link.ar : link.en}
+              {isRtl ? item.labelAr : item.labelEn}
             </button>
           ))}
         </nav>
@@ -230,11 +222,11 @@ export default function TenantHeader() {
             bg-[#0a0a0f]/95
           "
         >
-          {NAV_LINKS.map((link) => (
+          {navItems.map((item) => (
             <button
-              key={link.en}
+              key={item.key}
               type="button"
-              onClick={() => { link.action(); setMenuOpen(false); }}
+              onClick={() => { navigate(item.route); setMenuOpen(false); }}
               className="
                 text-start py-2.5 px-3 rounded-lg
                 text-sm text-white/70 hover:text-[#d4a853]
@@ -244,7 +236,7 @@ export default function TenantHeader() {
                 focus-visible:outline-none
               "
             >
-              {isRtl ? link.ar : link.en}
+              {isRtl ? item.labelAr : item.labelEn}
             </button>
           ))}
 
