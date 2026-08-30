@@ -35,7 +35,7 @@ is confirmed" rule.
 | 10 | Units/resources | ⏳ pending | |
 | 11 | Images/uploads | ⏳ pending | |
 | 12 | Email/Resend | ⏳ pending | |
-| 13 | Tenant status / Hard-Soft Block | ⏳ pending | |
+| 13 | Tenant status / Hard-Soft Block | ✅ DONE — see `.claudedocs/implementation/TENANT_STATUS_AUDIT/evidence.md` | Public/WhatsApp/Admin all correctly enforce `status`; real `isActive` gap found (doesn't block booking creation) — flagged, not fixed (architecture decision needed) |
 | 14 | Admin authorization / Tenant Isolation | ✅ DONE — see `.claudedocs/implementation/TENANT_ISOLATION_AUDIT/evidence.md` | full audit + real IDOR pen test + 2 fix commits (`3e05338`, `af90427`) |
 | 15 | Bilingual/public pages | ⏳ pending | |
 
