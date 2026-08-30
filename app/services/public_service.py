@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 from typing import Optional, Dict, Any, List
 from prisma import Prisma
 from fastapi import HTTPException
@@ -294,12 +295,36 @@ async def _inject_page_gallery_media(client_id: str, result: Dict[str, Any]) -> 
     data["images"] = [{"url": img["url"], "caption_ar": img["caption_ar"] or ""} for img in images]
 
 
+# ── In-process TTL cache for public tenant config ────────────────────────────
+# slug → (result_dict, monotonic_timestamp). Short-lived cache for the public
+# GET /{slug}/config response -- Salman's approved Step 2 for the initial-load
+# performance investigation (2026-08-30): this response is identical for every
+# visitor within a short window, so repeat visits shouldn't each pay the full
+# Supabase round-trip (measured ~5.6s avg after the Step-1 asyncio.gather fix,
+# still highly variable -- confirmed DB/pooler-level, not app-level).
+# No active invalidation wired to admin write paths yet -- deliberate, per
+# Salman's own explicit allowance ("أو نخلي TTL قصير بما يكفي"): a short TTL
+# bounds staleness instead of wiring invalidation into every hero/gallery/
+# content/settings write path right now. If that's ever needed, the same call
+# sites already invalidate app/core/tenant.py's own _tenant_cache (media.py,
+# content.py, settings.py all call invalidate_tenant_cache(slug)) -- mirror
+# that pattern rather than inventing a new one.
+_public_config_cache: dict[str, tuple[dict, float]] = {}
+_PUBLIC_CONFIG_CACHE_TTL: float = 30.0  # seconds
+
+
 async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
     """
     Fetch tenant public config from the clients table.
     If the client exists but has no styling (primary_color is null), auto-apply
     SMAR defaults so the 404 vanishes on first deploy — no manual DB seed needed.
     """
+    now = time.monotonic()
+    cached = _public_config_cache.get(slug)
+    if cached and (now - cached[1]) < _PUBLIC_CONFIG_CACHE_TTL:
+        logger.debug("⚡ Public config cache hit: %s", slug)
+        return cached[0]
+
     try:
         record = await db.client.find_first(
             where={"slug": slug, "isActive": True},
@@ -329,6 +354,8 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
             _inject_page_hero_media(record.id, result),
             _inject_page_gallery_media(record.id, result),
         )
+        _public_config_cache[slug] = (result, now)
+        logger.debug("💾 Public config cache miss, stored: %s", slug)
         return result
     except Exception as e:
         logger.error(f"🔥 DB error fetching tenant config for '{slug}': {e}", exc_info=True)
