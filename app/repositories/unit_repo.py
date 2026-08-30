@@ -64,23 +64,37 @@ class UnitRepository:
         )
 
     async def update(self, unit_id: str, client_id: str, data: dict):
-        """Update a unit (admin only). Client isolation enforced. Raises ValueError if not found."""
+        """Update a unit (admin only). Client isolation enforced. Raises ValueError if not found.
+
+        Tenant Isolation Audit (2026-08-30) -- the pre-check below already guarded this in
+        practice, but the mutating call itself was still only scoped by `id` (`where={"id":
+        unit_id}`), not independently enforcing this file's own isolation. `update_many()` +
+        re-fetch, same shape as this project's other Study 7 fixes.
+        """
         existing = await self.db.unit.find_first(
             where={"id": unit_id, "clientId": client_id}
         )
         if not existing:
             raise ValueError(f"Unit {unit_id} not found for this client.")
-        return await self.db.unit.update(
-            where={"id": unit_id},
+        await self.db.unit.update_many(
+            where={"id": unit_id, "clientId": client_id},
             data={k: v for k, v in data.items() if v is not None},
         )
+        return await self.db.unit.find_first(where={"id": unit_id, "clientId": client_id})
 
-    async def update_raw(self, unit_id: str, data: dict):
-        """Update a unit by primary key (caller must pre-verify ownership)."""
-        return await self.db.unit.update(
-            where={"id": unit_id},
+    async def update_raw(self, unit_id: str, client_id: str, data: dict):
+        """Update a unit by primary key, scoped to tenant.
+
+        Tenant Isolation Audit (2026-08-30) -- previously unscoped (`where={"id": unit_id}` only,
+        with a docstring trusting the caller to pre-verify ownership); every real caller
+        (`admin/units.py`) already does via `get_by_id()` first, so this was never exploitable in
+        practice, but the function itself didn't independently enforce scoping.
+        """
+        await self.db.unit.update_many(
+            where={"id": unit_id, "clientId": client_id},
             data=data,
         )
+        return await self.db.unit.find_first(where={"id": unit_id, "clientId": client_id})
 
     async def get_all_admin(self, client_id: str) -> list:
         """Return ALL units for a tenant (active + inactive) — admin view."""
@@ -100,9 +114,14 @@ class UnitRepository:
         """Insert a new Unit row (data must already include clientId + propertyId)."""
         return await self.db.unit.create(data=data)
 
-    async def delete_unit(self, unit_id: str):
-        """Hard-delete a unit by primary key (cascade at DB level)."""
-        return await self.db.unit.delete(where={"id": unit_id})
+    async def delete_unit(self, unit_id: str, client_id: str):
+        """Hard-delete a unit by primary key, scoped to tenant (cascade at DB level).
+
+        Tenant Isolation Audit (2026-08-30) -- previously unscoped; the caller (`admin/units.py`)
+        already pre-checks ownership via `get_by_id()` first, so this was never exploitable in
+        practice, but the function itself didn't independently enforce scoping.
+        """
+        return await self.db.unit.delete_many(where={"id": unit_id, "clientId": client_id})
 
     async def count_available(self, client_id: str) -> int:
         """Count active + available units for a tenant (for dashboard KPIs)."""

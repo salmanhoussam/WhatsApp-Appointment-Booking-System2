@@ -34,12 +34,23 @@ async def find_gallery_image(image_id: str, client_id: str):
     )
 
 
-async def update_gallery_image(image_id: str, data: dict):
-    """Update a gallery image by primary key."""
-    return await prisma_client.galleryimage.update(
-        where={"id": image_id},
+async def update_gallery_image(image_id: str, client_id: str, data: dict):
+    """Update a gallery image by primary key, scoped to tenant.
+
+    Tenant Isolation Audit (2026-08-30) -- previously unscoped (`where={"id": image_id}` only);
+    every real caller (`admin/gallery.py`) already pre-checks ownership via `find_gallery_image()`
+    first, so this was never exploitable in practice, but the function itself didn't independently
+    enforce this file's own "ALL queries MUST filter by clientId" rule. Same `update_many()` +
+    re-fetch shape already established for `barber_repo.update_barber()` / `catalog_service_repo.
+    update_catalog_service()` (Study 7, 2026-08-24) -- `update_many()` is what lets `clientId`
+    actually participate in the filter; it returns a count, not the row, so the fresh row is
+    re-fetched via the already-tenant-scoped `find_gallery_image()`.
+    """
+    await prisma_client.galleryimage.update_many(
+        where={"id": image_id, "clientId": client_id},
         data=data,
     )
+    return await find_gallery_image(image_id, client_id)
 
 
 async def reorder_gallery_image(image_id: str, client_id: str, sort_order: int):
@@ -50,9 +61,12 @@ async def reorder_gallery_image(image_id: str, client_id: str, sort_order: int):
     )
 
 
-async def delete_gallery_image(image_id: str):
-    """Hard-delete a gallery image by primary key."""
-    return await prisma_client.galleryimage.delete(where={"id": image_id})
+async def delete_gallery_image(image_id: str, client_id: str):
+    """Hard-delete a gallery image by primary key, scoped to tenant.
+
+    Tenant Isolation Audit (2026-08-30) -- same fix class as update_gallery_image() above.
+    """
+    return await prisma_client.galleryimage.delete_many(where={"id": image_id, "clientId": client_id})
 
 
 # ── Page-level tenant media (Media/Content Foundation, 2026-08-17) ─────────────────────────────

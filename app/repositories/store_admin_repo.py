@@ -26,11 +26,20 @@ async def find_order(client_id: str, order_id: str):
     )
 
 
-async def update_order_status(order_id: str, status: str):
-    """Update order status by primary key."""
-    return await prisma_client.storeorder.update(
-        where={"id": order_id},
+async def update_order_status(order_id: str, client_id: str, status: str):
+    """Update order status by primary key, scoped to tenant.
+
+    Tenant Isolation Audit (2026-08-30) -- previously unscoped (`where={"id": order_id}` only);
+    the caller (`admin/store.py`) already pre-checks ownership via `find_order()` first, so this
+    was never exploitable in practice, but the function itself didn't independently enforce
+    scoping. `update_many()` + re-fetch, same shape as this project's other Study 7 fixes.
+    """
+    await prisma_client.storeorder.update_many(
+        where={"id": order_id, "clientId": client_id},
         data={"status": status},
+    )
+    return await prisma_client.storeorder.find_first(
+        where={"id": order_id, "clientId": client_id},
         include={"items": True},
     )
 

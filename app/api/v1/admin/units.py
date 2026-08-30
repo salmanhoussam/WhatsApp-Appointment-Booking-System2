@@ -271,7 +271,7 @@ async def update_unit(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await _unit_repo.update_raw(unit_id, patch)
+    updated = await _unit_repo.update_raw(unit_id, tenant["id"], patch)
     return _fmt(updated)
 
 
@@ -411,7 +411,7 @@ async def upload_image(
     current_images = list(getattr(unit, "images", []) or [])
     new_images = current_images + [public_url]
 
-    updated = await _unit_repo.update_raw(unit_id, {"images": new_images, "image_url": new_images[0]})
+    updated = await _unit_repo.update_raw(unit_id, tenant["id"], {"images": new_images, "image_url": new_images[0]})
     return {"images": list(updated.images), "image_url": updated.image_url}
 
 
@@ -435,7 +435,7 @@ async def delete_image(
     current_images = list(getattr(unit, "images", []) or [])
     new_images = [u for u in current_images if u != body.url]
 
-    updated = await _unit_repo.update_raw(unit_id, {
+    updated = await _unit_repo.update_raw(unit_id, tenant["id"], {
         "images":    new_images,
         "image_url": new_images[0] if new_images else None,
     })
@@ -456,5 +456,5 @@ async def delete_unit(
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
-    await _unit_repo.delete_unit(unit_id)
+    await _unit_repo.delete_unit(unit_id, tenant["id"])
     return {"success": True, "deleted_id": unit_id}

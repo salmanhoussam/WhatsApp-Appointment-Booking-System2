@@ -132,7 +132,7 @@ async def update_gallery_image(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await _gallery.update_gallery_image(image_id, patch)
+    updated = await _gallery.update_gallery_image(image_id, tenant["id"], patch)
     return _fmt(updated)
 
 
@@ -164,4 +164,4 @@ async def delete_gallery_image(
         raise HTTPException(status_code=404, detail="Image not found.")
 
     await _svc_delete(existing.url)
-    await _gallery.delete_gallery_image(image_id)
+    await _gallery.delete_gallery_image(image_id, tenant["id"])

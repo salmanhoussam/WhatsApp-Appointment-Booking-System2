@@ -129,7 +129,7 @@ async def update_service(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await _repo.update_service(service_id, patch)
+    updated = await _repo.update_service(service_id, tenant["id"], patch)
     return _fmt(updated)
 
 
@@ -143,4 +143,4 @@ async def delete_service(
     if not existing:
         raise HTTPException(status_code=404, detail="Service not found.")
 
-    await _repo.delete_service(service_id)
+    await _repo.delete_service(service_id, tenant["id"])

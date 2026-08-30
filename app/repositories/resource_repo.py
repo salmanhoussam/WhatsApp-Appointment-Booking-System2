@@ -32,9 +32,16 @@ async def create_resource(data: dict):
     return await prisma_client.resource.create(data=data)
 
 
-async def update_resource(resource_id: str, data: dict):
-    """Update a Resource by primary key."""
-    return await prisma_client.resource.update(
-        where={"id": resource_id},
+async def update_resource(resource_id: str, client_id: str, data: dict):
+    """Update a Resource by primary key, scoped to tenant.
+
+    Tenant Isolation Audit (2026-08-30) -- previously unscoped (`where={"id": resource_id}` only);
+    the caller (`admin/resources.py`) already pre-checks ownership via `find_resource()` first, so
+    this was never exploitable in practice, but the function itself didn't independently enforce
+    scoping. `update_many()` + re-fetch, same shape as this project's other Study 7 fixes.
+    """
+    await prisma_client.resource.update_many(
+        where={"id": resource_id, "clientId": client_id},
         data=data,
     )
+    return await find_resource(client_id, resource_id)

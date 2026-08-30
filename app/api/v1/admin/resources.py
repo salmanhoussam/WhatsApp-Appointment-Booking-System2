@@ -134,7 +134,7 @@ async def update_resource(
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    updated = await resource_repo.update_resource(resource_id, patch)
+    updated = await resource_repo.update_resource(resource_id, tenant["id"], patch)
     return {"success": True, "data": _fmt(updated)}
 
 
@@ -149,5 +149,5 @@ async def deactivate_resource(
     if not existing:
         raise HTTPException(status_code=404, detail="Resource not found.")
 
-    updated = await resource_repo.update_resource(resource_id, {"isActive": False})
+    updated = await resource_repo.update_resource(resource_id, tenant["id"], {"isActive": False})
     return {"success": True, "data": _fmt(updated)}

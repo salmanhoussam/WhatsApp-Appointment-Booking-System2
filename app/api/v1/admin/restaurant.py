@@ -349,7 +349,7 @@ async def update_order_status(
             ),
         )
 
-    updated = await _rest_repo.update_order_status(order_id, body.status)
+    updated = await _rest_repo.update_order_status(order_id, restaurant.id, body.status)
     return {"success": True, "data": _fmt_order(updated)}
 
 
