@@ -33,7 +33,7 @@ is confirmed" rule.
 | 8 | Calendar | ✅ PASS | جعفر fix holds — only حسين (active) shows as a live column |
 | 9 | Services | ⚠️ PASS + finding | tab works; leftover hidden test service record still in prod DB |
 | 10 | Units/resources | ⏳ pending | |
-| 11 | Images/uploads | ⏳ pending | |
+| 11 | Images/uploads | ✅ DONE — see `.claudedocs/implementation/FILE_UPLOAD_AUDIT/evidence.md` | CRITICAL real path traversal found + fixed (confirmed live cross-tenant storage write), 4 more real gaps fixed, all re-verified live |
 | 12 | Email/Resend | ⏳ pending | |
 | 13 | Tenant status / Hard-Soft Block | ✅ DONE — see `.claudedocs/implementation/TENANT_STATUS_AUDIT/evidence.md` | Public/WhatsApp/Admin all correctly enforce `status`; real `isActive` gap found (doesn't block booking creation) — flagged, not fixed (architecture decision needed) |
 | 14 | Admin authorization / Tenant Isolation | ✅ DONE — see `.claudedocs/implementation/TENANT_ISOLATION_AUDIT/evidence.md` | full audit + real IDOR pen test + 2 fix commits (`3e05338`, `af90427`) |
