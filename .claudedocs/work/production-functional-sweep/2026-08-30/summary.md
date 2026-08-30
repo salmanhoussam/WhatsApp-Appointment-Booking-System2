@@ -36,7 +36,7 @@ is confirmed" rule.
 | 11 | Images/uploads | ⏳ pending | |
 | 12 | Email/Resend | ⏳ pending | |
 | 13 | Tenant status / Hard-Soft Block | ⏳ pending | |
-| 14 | Admin authorization | ⏳ pending | |
+| 14 | Admin authorization / Tenant Isolation | ✅ DONE — see `.claudedocs/implementation/TENANT_ISOLATION_AUDIT/evidence.md` | full audit + real IDOR pen test + 2 fix commits (`3e05338`, `af90427`) |
 | 15 | Bilingual/public pages | ⏳ pending | |
 
 ---
