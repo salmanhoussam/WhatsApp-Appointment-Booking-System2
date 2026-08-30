@@ -398,14 +398,12 @@ async def upload_image(
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
-    file_bytes = await file.read()
-
     public_url = await _svc_upload(
         client_slug=tenant["slug"],
         unit_id=unit_id,
-        file_bytes=file_bytes,
-        content_type=file.content_type or "image/jpeg",
-        original_filename=file.filename or "image.jpg",
+        file=file,
+        content_type=file.content_type,
+        original_filename=file.filename or "",
     )
 
     current_images = list(getattr(unit, "images", []) or [])

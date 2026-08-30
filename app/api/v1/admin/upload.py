@@ -43,6 +43,8 @@ from app.services.storage_service import upload_to_gallery_path
 from app.repositories import admin_catalog_repo as _cat_repo
 from app.repositories import gallery_repo as _gallery
 from app.repositories import UnitRepository
+from app.repositories import barber_repo as _barber_repo
+from app.repositories import catalog_service_repo as _catalog_service_repo
 
 _unit_repo = UnitRepository(prisma_client)
 
@@ -116,15 +118,33 @@ async def upload_image(
     if context == "catalog_service" and not service_id:
         raise HTTPException(status_code=400, detail="catalog_service context requires service_id")
 
-    folder     = _build_folder(context, category_id, item_id, unit_id, barber_id, service_id)
-    file_bytes = await file.read()
+    # Tenant Isolation (2026-08-30): catalog_item/unit_cover/unit_gallery below already verify
+    # ownership before using an id in the storage path -- barber/catalog_service were the two
+    # contexts missing that same check, letting a caller name another tenant's real barber_id/
+    # service_id as a path segment. Path traversal itself is already closed at the storage-service
+    # layer (segment sanitization), but the id should still belong to the calling tenant, same
+    # as every other context here.
+    if context == "barber":
+        barber = await _barber_repo.find_barber(tenant["id"], barber_id)
+        if not barber:
+            raise HTTPException(status_code=404, detail="Barber not found")
+    if context == "catalog_service":
+        service = await _catalog_service_repo.find_catalog_service(tenant["id"], service_id)
+        if not service:
+            raise HTTPException(status_code=404, detail="Catalog service not found")
 
+    folder = _build_folder(context, category_id, item_id, unit_id, barber_id, service_id)
+
+    # File Upload Security Audit (2026-08-30): a missing/empty Content-Type header must NOT
+    # silently default to an allowed value (that would let an attacker bypass the allowlist just
+    # by omitting the header) -- pass it through as-is; storage_service's own allowlist check
+    # rejects None/empty the same as any other disallowed value.
     public_url = await upload_to_gallery_path(
         client_slug=tenant["slug"],
         folder_context=folder,
-        file_bytes=file_bytes,
-        content_type=file.content_type or "image/jpeg",
-        original_filename=file.filename or "image.jpg",
+        file=file,
+        content_type=file.content_type,
+        original_filename=file.filename or "",
     )
 
     image_type = IMAGE_TYPE_MAP[context]

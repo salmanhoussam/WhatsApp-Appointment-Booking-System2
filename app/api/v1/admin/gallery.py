@@ -82,7 +82,6 @@ async def upload_gallery_image(
     unit_id:        str,
     file:           UploadFile = File(...),
     span_size:      str        = Form("small"),
-    folder_context: str        = Form(None),
     tenant:         dict       = Depends(get_current_tenant),
     _user:          dict       = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
@@ -90,14 +89,18 @@ async def upload_gallery_image(
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found.")
 
-    file_bytes = await file.read()
-    ctx = folder_context or f"units/{unit_id}/gallery"
+    # File Upload Security Audit (2026-08-30): `folder_context` used to be a free-form client
+    # Form field, concatenated directly into the Supabase Storage key -- confirmed live exploit
+    # (`../` sequences escaped the tenant's own folder entirely, landing at the bucket root).
+    # The only real frontend caller (UnitFormModal.jsx) already sent exactly this same computed
+    # value, so nothing is lost by no longer trusting a client-supplied override -- the already
+    # ownership-verified `unit_id` above is the only thing that determines the path now.
     public_url = await _svc_gallery_upload(
         client_slug=tenant["slug"],
-        folder_context=ctx,
-        file_bytes=file_bytes,
-        content_type=file.content_type or "image/jpeg",
-        original_filename=file.filename or "image.jpg",
+        folder_context=f"units/{unit_id}/gallery",
+        file=file,
+        content_type=file.content_type,
+        original_filename=file.filename or "",
     )
 
     count = await _gallery.count_gallery_images(unit_id, tenant["id"])

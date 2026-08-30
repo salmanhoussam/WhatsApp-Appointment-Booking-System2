@@ -133,7 +133,22 @@ async def import_trips(
     if not vehicle:
         raise HTTPException(404, "Vehicle not found")
 
-    contents = await file.read()
+    # File Upload Security Audit (2026-08-30): bounded read -- this endpoint had no size limit at
+    # all, so an oversized upload was fully buffered into memory before any check could reject it.
+    # 10 MB is generous for a CSV export (Uber Fleet Portal exports are a few hundred KB in real
+    # use) while still closing the unbounded-read DoS vector.
+    _MAX_CSV_BYTES = 10 * 1024 * 1024
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > _MAX_CSV_BYTES:
+            raise HTTPException(413, "File exceeds 10 MB limit")
+        chunks.append(chunk)
+    contents = b"".join(chunks)
     if not contents:
         raise HTTPException(400, "Empty file")
 
