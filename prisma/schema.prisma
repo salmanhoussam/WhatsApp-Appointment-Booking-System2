@@ -1274,3 +1274,25 @@ model Subscription {
   @@map("subscriptions")
   @@schema("public")
 }
+
+// WhatsApp Session Store (2026-08-30) -- DB-backed replacement for whatsapp_flow.py's former
+// in-memory `_sessions` dict. Root cause of a confirmed production bug: the backend runs
+// `gunicorn -w 2` (Dockerfile), so an in-process dict is invisible across workers -- a real
+// customer's conversation could land on a different worker per message and silently lose all
+// state. No Client relation (clientId stays a plain column, not an FK) -- this table is
+// deliberately isolated/high-churn (created and deleted within minutes for a normal
+// conversation), not worth coupling to the Client model's own relation graph.
+model WhatsAppSession {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phoneNumberId String   @map("phone_number_id")
+  customerPhone String   @map("customer_phone")
+  clientId      String?  @map("client_id") @db.Uuid
+  step          String   @default("IDLE") @map("step")
+  stateData     Json?    @map("state_data")
+  expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([phoneNumberId, customerPhone])
+  @@map("whatsapp_sessions")
+  @@schema("public")
+}

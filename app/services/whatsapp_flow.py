@@ -37,7 +37,15 @@ State machine (one session per customer phone number):
                         DONE → sends confirmation → IDLE
 
 ──────────────────────────────────────────────────────────────
-Session store: in-memory dict with 30-minute TTL per session.
+Session store: DB-backed (WhatsAppSession table), 30-minute TTL per session (2026-08-30 —
+previously an in-memory dict, which broke silently across gunicorn's multiple worker processes:
+each worker has its own Python memory space, so a real conversation could land on a different
+worker per message and lose all state with zero visible error. See
+.claudedocs/implementation/WHATSAPP_DB_SESSIONS_FIX/evidence.md for the full root-cause writeup.
+`ConversationSession` itself is unchanged as an in-memory working object for the duration of one
+`_dispatch()` call -- only how it's loaded (start of `_dispatch`) and persisted (end of
+`_dispatch`, via `app/repositories/whatsapp_session_repo.py`) changed. Every existing state handler
+below still just reads/mutates plain `session.xxx` attributes, unaware storage is now DB-backed.
 
 Tenant resolution (Phase B, Stage 1 — Central Platform WABA, 2026-08-24):
   1. An already-bound session (mid-conversation) reuses its stored client_id — no re-resolution.
@@ -52,7 +60,6 @@ See _resolve_client() / _resolve_client_from_text() below.
 
 import logging
 import re
-import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -63,15 +70,13 @@ from app.services.whatsapp_service import WhatsAppService
 from app.services.booking_service import BookingService
 from app.repositories.booking_repo import BookingRepository
 from app.repositories.customer_repo import CustomerRepository
+from app.repositories.whatsapp_session_repo import WhatsAppSessionRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
 from app.services import whatsapp_reservation_flow
 from app.core.db_resilience import with_db_resilience
 
 logger = logging.getLogger(__name__)
-
-# ── Session store ─────────────────────────────────────────────────────────────
-SESSION_TTL = 1800  # 30 minutes
 
 # States
 IDLE             = "IDLE"
@@ -110,48 +115,106 @@ class ConversationSession:
     res_barber_name: Optional[str] = None
     res_slot_datetime: Optional[datetime] = None
     res_customer_name: Optional[str] = None
-    # TTL
-    expires_at: float = field(default_factory=lambda: time.monotonic() + SESSION_TTL)
-
-    def touch(self):
-        self.expires_at = time.monotonic() + SESSION_TTL
-
-    @property
-    def is_expired(self) -> bool:
-        return time.monotonic() > self.expires_at
+    # Internal bookkeeping only -- never persisted (not part of _to_state_data below). Set by
+    # _clear_session() so _dispatch()'s own end-of-request save doesn't resurrect a row that was
+    # just deleted (e.g. after a booking/reservation completes or the customer cancels).
+    _cleared: bool = field(default=False, repr=False, compare=False)
 
 
-# session_key = (phone_number_id, customer_phone)
-_sessions: dict[tuple[str, str], ConversationSession] = {}
+def _session_to_state_data(session: ConversationSession) -> dict:
+    """Everything on ConversationSession except `state`/`client_id` (which have their own DB
+    columns, `step`/`clientId`) and the transient `_cleared` flag. date/datetime fields are
+    stored as ISO strings -- Json() can't serialize them directly."""
+    return {
+        "client_slug":        session.client_slug,
+        "property_id":        session.property_id,
+        "property_name":      session.property_name,
+        "unit_id":            session.unit_id,
+        "unit_name":          session.unit_name,
+        "check_in":           session.check_in.isoformat()  if session.check_in  else None,
+        "check_out":          session.check_out.isoformat() if session.check_out else None,
+        "guests":             session.guests,
+        "customer_name":      session.customer_name,
+        "res_service_id":     session.res_service_id,
+        "res_service_name":   session.res_service_name,
+        "res_duration_min":   session.res_duration_min,
+        "res_barber_id":      session.res_barber_id,
+        "res_barber_name":    session.res_barber_name,
+        "res_slot_datetime":  session.res_slot_datetime.isoformat() if session.res_slot_datetime else None,
+        "res_customer_name":  session.res_customer_name,
+    }
 
 
-def _get_session(phone_number_id: str, customer_phone: str) -> ConversationSession:
-    key = (phone_number_id, customer_phone)
-    session = _sessions.get(key)
-    if session is None or session.is_expired:
-        session = ConversationSession()
-        _sessions[key] = session
-    else:
-        session.touch()
-    return session
+def _session_from_row(row) -> ConversationSession:
+    data = row.stateData or {}
+    return ConversationSession(
+        state=row.step,
+        client_id=row.clientId or "",
+        client_slug=data.get("client_slug") or "",
+        property_id=data.get("property_id"),
+        property_name=data.get("property_name"),
+        unit_id=data.get("unit_id"),
+        unit_name=data.get("unit_name"),
+        check_in=date.fromisoformat(data["check_in"]) if data.get("check_in") else None,
+        check_out=date.fromisoformat(data["check_out"]) if data.get("check_out") else None,
+        guests=data.get("guests"),
+        customer_name=data.get("customer_name"),
+        res_service_id=data.get("res_service_id"),
+        res_service_name=data.get("res_service_name"),
+        res_duration_min=data.get("res_duration_min"),
+        res_barber_id=data.get("res_barber_id"),
+        res_barber_name=data.get("res_barber_name"),
+        res_slot_datetime=(
+            datetime.fromisoformat(data["res_slot_datetime"]) if data.get("res_slot_datetime") else None
+        ),
+        res_customer_name=data.get("res_customer_name"),
+    )
 
 
-def _peek_session(phone_number_id: str, customer_phone: str) -> Optional[ConversationSession]:
+async def _get_session(phone_number_id: str, customer_phone: str) -> ConversationSession:
+    """Fetch-or-create: returns the existing non-expired session, or a fresh (not-yet-persisted)
+    one. The fresh one is only actually written to the DB by _dispatch()'s end-of-request save --
+    matches the old in-memory version's behavior of a session existing "for real" only once a
+    handler has actually run against it."""
+    repo = WhatsAppSessionRepository(prisma_client)
+    row = await repo.find_active(phone_number_id, customer_phone)
+    if row is None:
+        return ConversationSession()
+    return _session_from_row(row)
+
+
+async def _peek_session(phone_number_id: str, customer_phone: str) -> Optional[ConversationSession]:
     """
     Non-vivifying lookup (Phase B, Stage 1): returns an existing, non-expired session or None --
     never creates/stores one. Used before tenant resolution so an unresolvable message (no known
     tenant slug in the text, no dedicated-number match) never leaves a phantom empty session
     sitting in the store -- only a message that actually resolves to a real Client gets one.
     """
-    session = _sessions.get((phone_number_id, customer_phone))
-    if session is None or session.is_expired:
+    repo = WhatsAppSessionRepository(prisma_client)
+    row = await repo.find_active(phone_number_id, customer_phone)
+    if row is None:
         return None
-    session.touch()
-    return session
+    return _session_from_row(row)
 
 
-def _clear_session(phone_number_id: str, customer_phone: str):
-    _sessions.pop((phone_number_id, customer_phone), None)
+async def _save_session(phone_number_id: str, customer_phone: str, session: ConversationSession) -> None:
+    repo = WhatsAppSessionRepository(prisma_client)
+    await repo.upsert(
+        phone_number_id=phone_number_id,
+        customer_phone=customer_phone,
+        client_id=session.client_id or None,
+        step=session.state,
+        state_data=_session_to_state_data(session),
+    )
+
+
+async def _clear_session(phone_number_id: str, customer_phone: str, session: ConversationSession) -> None:
+    """`session` is required (not optional) -- every real caller has one in scope, and setting its
+    `_cleared` flag here is what stops _dispatch()'s end-of-request save from resurrecting the row
+    this just deletes."""
+    session._cleared = True
+    repo = WhatsAppSessionRepository(prisma_client)
+    await repo.delete(phone_number_id, customer_phone)
 
 
 # ── Message parsing ───────────────────────────────────────────────────────────
@@ -234,7 +297,7 @@ async def _dispatch(
     # before we know which Client this even is. Peeked (not vivified) first: an unresolvable
     # message must never leave a phantom empty session in the store -- see _peek_session().
     msg_type, value, title = _extract_message(msg)
-    existing_session = _peek_session(phone_number_id, customer_phone)
+    existing_session = await _peek_session(phone_number_id, customer_phone)
 
     client = await _resolve_client(
         display_phone,
@@ -249,7 +312,7 @@ async def _dispatch(
         return
 
     # Only now -- once a tenant is actually known -- fetch-or-create the real session.
-    session = existing_session or _get_session(phone_number_id, customer_phone)
+    session = existing_session or await _get_session(phone_number_id, customer_phone)
 
     # ADR-0001 §8.4/§8.4b: the message itself was already "accepted" (found,
     # logged) above — this gates the mutating half of the conversation flow
@@ -315,6 +378,14 @@ async def _dispatch(
             wa, customer_phone, session, msg_type, value, title,
             client, phone_number_id, _clear_session,
         )
+
+    # Persist whatever the handler above did to `session` -- unless it already called
+    # _clear_session() itself (booking/reservation completed, or the customer cancelled), which
+    # both deletes the DB row and sets session._cleared so this doesn't resurrect it. This is the
+    # one place, per message, that state actually becomes visible to the NEXT message -- which may
+    # land on a different gunicorn worker (see this file's own module docstring).
+    if not session._cleared:
+        await _save_session(phone_number_id, customer_phone, session)
 
 
 # ── State handlers ─────────────────────────────────────────────────────────────
@@ -533,7 +604,7 @@ async def _step_confirming(wa, customer_phone, session, msg_type, value, phone_n
 
     if value == "cancel":
         await wa.send_text(customer_phone, "تم إلغاء الحجز. شكراً لتواصلك معنا 🙏")
-        _clear_session(phone_number_id, customer_phone)
+        await _clear_session(phone_number_id, customer_phone, session)
         return
 
     if value != "confirm":
@@ -585,7 +656,7 @@ async def _step_confirming(wa, customer_phone, session, msg_type, value, phone_n
         logger.error("🔥 WhatsApp booking creation failed: %s", exc, exc_info=True)
         await wa.send_text(customer_phone, "❌ حدث خطأ أثناء إتمام الحجز. الرجاء المحاولة لاحقاً.")
 
-    _clear_session(phone_number_id, customer_phone)
+    await _clear_session(phone_number_id, customer_phone, session)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

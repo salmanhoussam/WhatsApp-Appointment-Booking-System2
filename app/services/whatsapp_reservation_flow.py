@@ -379,7 +379,7 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
 
     if value == "cancel":
         await wa.send_text(customer_phone, "تم إلغاء الحجز. شكراً لتواصلك معنا 🙏")
-        clear_session_fn(phone_number_id, customer_phone)
+        await clear_session_fn(phone_number_id, customer_phone, session)
         return
 
     if value != "confirm":
@@ -416,7 +416,7 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
             "✅ Reservation created via WhatsApp: %s (client=%s, barber=%s)",
             reservation["id"], client.slug, session.res_barber_id,
         )
-        clear_session_fn(phone_number_id, customer_phone)
+        await clear_session_fn(phone_number_id, customer_phone, session)
 
     except ValueError as exc:
         # Explicit ask #3 (Phase C): includes the new race-condition rejection from
@@ -433,4 +433,4 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
     except Exception as exc:
         logger.error("🔥 WhatsApp reservation creation failed: %s", exc, exc_info=True)
         await wa.send_text(customer_phone, "❌ حدث خطأ أثناء إتمام الحجز. الرجاء المحاولة لاحقاً.")
-        clear_session_fn(phone_number_id, customer_phone)
+        await clear_session_fn(phone_number_id, customer_phone, session)
