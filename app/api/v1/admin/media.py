@@ -32,12 +32,17 @@ class HeroImageUpdate(BaseModel):
 @router.get("/hero-image")
 async def get_hero_image(
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Media/Content Foundation (2026-08-17): now backed by a real GalleryImage row
     (imageType="page_hero") instead of the JSON-blob field -- see media_service.get_page_media.
     Falls back to the legacy JSON-blob field for any tenant that hasn't been migrated yet, so no
     existing tenant's admin UI breaks.
+
+    Tenant Isolation Audit (2026-08-30) -- previously had no auth dependency (only
+    `get_current_tenant`'s public-route-shaped fallback); every sibling PATCH/POST/DELETE route in
+    this file already requires this same role check.
     """
     media = await media_service.get_page_media(tenant["id"], "page_hero")
     if media:
@@ -91,8 +96,12 @@ class GalleryReorder(BaseModel):
 @router.get("/gallery-images")
 async def list_gallery_images(
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
-    """Real rows for imageType=page_gallery -- what the admin Renderer shows as current state."""
+    """Real rows for imageType=page_gallery -- what the admin Renderer shows as current state.
+
+    Tenant Isolation Audit (2026-08-30) -- same missing-auth fix as get_hero_image() above.
+    """
     images = await media_service.list_page_media(tenant["id"], "page_gallery")
     return {"success": True, "data": images}
 

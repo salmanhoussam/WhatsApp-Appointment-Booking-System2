@@ -115,9 +115,18 @@ async def reorder_sections(
 @router.get("/sections")
 async def list_sections(
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """Phase 2.6 -- every real section for this tenant, what the Dashboard's Section Settings
-    view renders as a list (type/order/enabled/data)."""
+    view renders as a list (type/order/enabled/data).
+
+    Tenant Isolation Audit (2026-08-30) -- previously had no auth dependency at all (only
+    `get_current_tenant`, which falls back to the client-supplied `X-Tenant-Slug` header/
+    `?client_slug=` query param when no Bearer token is present -- by design, for PUBLIC routes).
+    Every sibling PATCH/POST/DELETE route in this exact file already requires
+    `require_roles("SUPER_ADMIN", "TENANT_ADMIN")` -- this GET route was the outlier, letting
+    anyone read a tenant's section list with zero authentication just by naming a slug.
+    """
     sections = await content_service.list_sections(tenant["id"])
     return {"success": True, "data": sections}
 
@@ -152,6 +161,7 @@ async def add_section(
 @router.get("/sections/schema")
 async def get_sections_schema(
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     TOS-005 Phase B -- the Dashboard's only path to learn which fields exist on which section and
@@ -209,6 +219,7 @@ async def list_repeatable_items(
     section_type: str,
     field: str,
     tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     if get_repeatable_field_schema(section_type, field) is None:
         raise HTTPException(

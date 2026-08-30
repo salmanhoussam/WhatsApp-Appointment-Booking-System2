@@ -15,9 +15,10 @@ import os
 from typing import Any, Dict, List, Optional
 
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from app.core.security import decode_token
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles, allow_during_soft_block
 from app.services import site_configuration_service
 
@@ -27,6 +28,28 @@ router = APIRouter(tags=["Admin Settings"])
 # Canonical public URL base — matches the documented pattern (demo.salmansaas.com/{slug}/{
 # defaultRedirect}, rules/frontend/routing.md). Overridable via env for other environments.
 STORE_QR_BASE_URL = os.getenv("STORE_QR_BASE_URL", "https://demo.salmansaas.com")
+
+
+async def _require_valid_tenant_jwt(request: Request) -> None:
+    """
+    Tenant Isolation Audit (2026-08-30) -- this router's own GET routes previously relied on
+    `get_current_tenant` alone, which is designed for public routes too: with no Bearer token
+    present (or an invalid one), it falls back to the client-supplied `X-Tenant-Slug` header or
+    `?client_slug=` query param -- letting anyone read a tenant's settings with zero
+    authentication, just by naming a slug. This router intentionally accepts BOTH client and admin
+    tokens (this file's own module docstring), so the fix is not `require_roles` (which would
+    reject a valid client token) -- it's requiring a real, valid, slug-bearing JWT to be present at
+    all, so `get_current_tenant`'s own JWT branch is guaranteed to be the one that resolves it.
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid Authorization header. Expected: Bearer <token>",
+        )
+    payload = decode_token(auth[7:])
+    if not payload or not payload.get("slug"):
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
 
 # ── Pydantic schema ───────────────────────────────────────────────────────────
@@ -52,6 +75,7 @@ class SettingsUpdateRequest(BaseModel):
 @router.get("/settings")
 async def get_settings(
     _soft_block = Depends(allow_during_soft_block),  # ADR-0002 §9.1: first live Soft Block allowlist consumer - must be declared first
+    _auth = Depends(_require_valid_tenant_jwt),
     tenant: dict = Depends(get_current_tenant),
 ):
     """Return all editable branding/config fields for this tenant's Client row."""
@@ -115,6 +139,7 @@ async def update_settings(
 @router.get("/settings/qr")
 async def get_store_qr(
     _soft_block = Depends(allow_during_soft_block),  # ADR-0002 §9.1 — must be declared first
+    _auth = Depends(_require_valid_tenant_jwt),
     tenant: dict = Depends(get_current_tenant),
 ):
     """
