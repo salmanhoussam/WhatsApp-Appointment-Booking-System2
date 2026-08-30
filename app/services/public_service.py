@@ -321,8 +321,14 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
             return None
 
         result = _record_to_dict(record)
-        await _inject_page_hero_media(record.id, result)
-        await _inject_page_gallery_media(record.id, result)
+        # Performance fix (2026-08-30, Salman's approved Step 1): hero and gallery media are
+        # independent lookups that both mutate `result` in place -- previously awaited
+        # sequentially, now run concurrently so the response only waits on the slower of the two,
+        # not their sum. No change to the API contract or response shape.
+        await asyncio.gather(
+            _inject_page_hero_media(record.id, result),
+            _inject_page_gallery_media(record.id, result),
+        )
         return result
     except Exception as e:
         logger.error(f"🔥 DB error fetching tenant config for '{slug}': {e}", exc_info=True)
