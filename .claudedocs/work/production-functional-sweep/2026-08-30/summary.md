@@ -37,7 +37,7 @@ is confirmed" rule.
 | 12 | Email/Resend | ⏳ pending | |
 | 13 | Tenant status / Hard-Soft Block | ✅ DONE — see `.claudedocs/implementation/TENANT_STATUS_AUDIT/evidence.md` | Public/WhatsApp/Admin all correctly enforce `status`; real `isActive` gap found (doesn't block booking creation) — flagged, not fixed (architecture decision needed) |
 | 14 | Admin authorization / Tenant Isolation | ✅ DONE — see `.claudedocs/implementation/TENANT_ISOLATION_AUDIT/evidence.md` | full audit + real IDOR pen test + 2 fix commits (`3e05338`, `af90427`) |
-| 15 | Bilingual/public pages | ⏳ pending | |
+| 15 | Bilingual/public pages | ✅ DONE — see `.claudedocs/implementation/BILINGUAL_AUDIT/evidence.md` | real finding: no working EN/AR toggle exists for the current product at all (hardcoded Arabic); live-confirmed the one legacy toggle (smar) is broken when used; no RTL layout bugs found in current single-language rendering; backend messages confirmed mixed EN/AR — all documented, none are quick-win fixable |
 
 ---
 
