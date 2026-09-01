@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
 import { colors } from '../tokens'
+import { useAppLanguage } from '../../context/AppLanguageContext'
+import { t } from '../../i18n/dictionary'
 
 /**
  * CartBadge — Molecule
@@ -13,6 +15,7 @@ import { colors } from '../tokens'
  *   onClick — () => void
  */
 export default function CartBadge({ count, accent = colors.gold, onClick }) {
+  const { lang } = useAppLanguage()
   if (!count) return null
 
   return (
@@ -55,7 +58,7 @@ export default function CartBadge({ count, accent = colors.gold, onClick }) {
       }}>
         {count}
       </span>
-      عرض السلة
+      {t('viewCart', lang)}
     </motion.button>
   )
 }

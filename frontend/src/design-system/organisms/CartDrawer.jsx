@@ -5,6 +5,9 @@ import useTenantConfig from '../../hooks/useTenantConfig'
 import { useTenantBase } from '../../hooks/useTenantSlug'
 import useGenericStore from '../../pages/generic/store/useGenericStore'
 import { colors, radius, spring } from '../tokens'
+import { useAppLanguage } from '../../context/AppLanguageContext'
+import { t } from '../../i18n/dictionary'
+import { resolveTenantText } from '../../i18n/resolveTenantText'
 
 /**
  * CartDrawer — Organism
@@ -20,6 +23,7 @@ export default function CartDrawer({ isOpen, onClose }) {
   const { config } = useTenantConfig()
   const base = useTenantBase()
   const navigate = useNavigate()
+  const { lang } = useAppLanguage()
   const accent = config?.primary_color ?? colors.gold
   const currency = config?.currency ?? 'USD'
 
@@ -61,6 +65,8 @@ export default function CartDrawer({ isOpen, onClose }) {
             style={{
               position: 'fixed',
               top: 0,
+              // right/borderLeft are physical values (not direction-aware) -- out of this pass's
+              // scope, same convention as CategoriesGridSection.jsx's textAlign (ADR-0006 Phase 3).
               right: 0,
               bottom: 0,
               width: '100%',
@@ -70,7 +76,6 @@ export default function CartDrawer({ isOpen, onClose }) {
               zIndex: 101,
               display: 'flex',
               flexDirection: 'column',
-              direction: 'rtl',
             }}
           >
             {/* Header */}
@@ -93,7 +98,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                 gap: 8,
               }}>
                 <span style={{ color: accent }}>🛒</span>
-                سلة الطلبات
+                {lang === 'ar' ? 'سلة الطلبات' : 'Order Cart'}
                 {cartItems.length > 0 && (
                   <span style={{
                     fontSize: 11,
@@ -146,7 +151,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                   fontFamily: "'Cairo', sans-serif",
                 }}>
                   <span style={{ fontSize: 48, opacity: 0.3 }}>🛒</span>
-                  <span style={{ fontSize: 15 }}>السلة فارغة</span>
+                  <span style={{ fontSize: 15 }}>{lang === 'ar' ? 'السلة فارغة' : 'Your cart is empty'}</span>
                 </div>
               ) : (
                 <AnimatePresence mode="popLayout">
@@ -157,6 +162,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                       accent={accent}
                       onUpdate={updateQuantity}
                       onRemove={removeItem}
+                      lang={lang}
                     />
                   ))}
                 </AnimatePresence>
@@ -179,10 +185,10 @@ export default function CartDrawer({ isOpen, onClose }) {
                   alignItems: 'baseline',
                 }}>
                   <span style={{ fontSize: 13, color: colors.textMuted, fontFamily: "'Cairo', sans-serif" }}>
-                    المجموع
+                    {t('total', lang)}
                   </span>
                   <span style={{ fontSize: 22, fontWeight: 800, color: accent }}>
-                    {totalPrice().toLocaleString('ar-SA')}
+                    {totalPrice().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
                     <span style={{ fontSize: 11, fontWeight: 400, marginRight: 4, color: colors.textDim }}>
                       {currency}
                     </span>
@@ -206,7 +212,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                     boxShadow: `0 6px 24px ${accent}44`,
                   }}
                 >
-                  إتمام الطلب ←
+                  {lang === 'ar' ? 'إتمام الطلب ←' : 'Complete Order →'}
                 </motion.button>
               </div>
             )}
@@ -219,7 +225,8 @@ export default function CartDrawer({ isOpen, onClose }) {
 
 // ── CartRow — inline sub-component ───────────────────────────────────────────
 
-function CartRow({ item, accent, onUpdate, onRemove }) {
+function CartRow({ item, accent, onUpdate, onRemove, lang }) {
+  const displayName = resolveTenantText(item, 'name', lang)
   return (
     <motion.div
       layout
@@ -250,7 +257,7 @@ function CartRow({ item, accent, onUpdate, onRemove }) {
         {item.image_url ? (
           <img
             src={item.image_url}
-            alt={item.name_ar || item.name_en}
+            alt={displayName}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
@@ -269,10 +276,10 @@ function CartRow({ item, accent, onUpdate, onRemove }) {
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}>
-          {item.name_ar || item.name_en}
+          {displayName}
         </div>
         <div style={{ fontSize: 13, color: accent, fontWeight: 700, marginTop: 3 }}>
-          {(item.price * item.quantity).toLocaleString('ar-SA')}
+          {(item.price * item.quantity).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
         </div>
       </div>
 

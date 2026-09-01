@@ -418,6 +418,46 @@ original point-in-time study.
   a code bug; belongs to the already-logged Dashboard Auto-Translation backlog item below, not a
   new item.
 
+- **Post-checkpoint execution (2026-09-01)** — the two reference candidates named in the
+  Phase-Numbering Checkpoint above, explicitly requested by Salman ("go ahead"):
+  1. **Dead-code removal** (Migration Plan items 3 & 8). Confirmed by real import-graph
+     investigation, not assumed from the audit's own category labels — one label turned out
+     stale: `design-system/organisms/BookingFlow.jsx` was listed in Category E ("#2, unfinished
+     TODO") but is actually live, imported by `ProductShowcaseHome.jsx`, `TenantHeader.jsx`,
+     `ListingsTemplate.jsx`, and `design-system/organisms/index.js` — **excluded from deletion**,
+     not touched. Deleted, all confirmed zero real importers by grepping both full paths and bare
+     component names, plus barrel-file re-exports: `context/LanguageContext.jsx`,
+     `utils/translations.js` (the root dead pair — their only 3 importers, `SmarHeader.jsx`/
+     `SmarTimelineGallery.jsx`/`ShowcaseHUD.jsx`, were themselves confirmed unrouted/unreferenced
+     first), `pages/smar/spatial/i18n.js`, `pages/catalog/CatalogPage.jsx` (unrouted duplicate of
+     the real `pages/generic/normal/CatalogPage.jsx`), `pages/smar/showcase/ShowcaseHUD.jsx`,
+     `pages/smar/spatial/SmarHeader.jsx`, `pages/smar/spatial/SmarTimelineGallery.jsx`,
+     `components/{AboutResort,CustomerHeader,DateSearchBar,ChaletCard,ChaletInterior}.jsx`.
+     `pages/smar/spatial/SpatialHomePage.jsx` (real, routed at `/smar/spatial`) kept — only its
+     one dead line (`export const LanguageContext = { t: {} }`) removed. `vite build` clean;
+     live-verified via nested Playwright that `/smar/spatial` still redirects to `/smar/listings`
+     and `/smar/showcase` still renders (non-empty DOM, zero console errors) after the deletions.
+  2. **`CartDrawer.jsx` gap, plus one more found while fixing it.** Removed the hardcoded
+     `direction: 'rtl'` (kept `right`/`borderLeft` as physical values, same out-of-scope
+     convention as `CategoriesGridSection.jsx`'s `textAlign`); wired `useAppLanguage()`,
+     `resolveTenantText()` for item names, `t('total', lang)`, and locale-aware
+     `toLocaleString()`; static strings (`سلة الطلبات`/`السلة فارغة`/`إتمام الطلب ←`) converted
+     to inline lang ternaries, matching `CartPage.jsx`'s own convention exactly (same English
+     wording, so the two read as one system). **Second real gap found along the way**: the
+     drawer's own trigger button, `design-system/molecules/CartBadge.jsx`, was itself
+     hardcoded-Arabic (`عرض السلة`, no language awareness at all) — not caught by the original
+     audit's 15-mechanism sweep. Fixed the same way (`useAppLanguage()` + a new `viewCart`
+     dictionary key). `CartBadge` is shared by `DynamicPage.jsx`/`CatalogPage.jsx` (both in
+     scope) and `beit-al-fakhar/product/ProductPage.jsx` (a different tenant's own bespoke page,
+     out of scope but harmless to also fix since the component is tenant-agnostic and
+     `AppLanguageProvider` is already mounted app-wide).
+     Live-verified via nested Playwright: seeded a real cart item into `rk_generic-cart`
+     `localStorage` (the tenant-scoped Zustand persist key), clicked the real "View Cart"/"عرض
+     السلة" trigger (found only after discovering the actual button text — an earlier
+     verification attempt wrongly assumed a 🛒 emoji trigger and reported a false negative),
+     confirmed the drawer opened, item name ("Test Product"), heading ("Order Cart"), and "Total"
+     label all rendered correctly in English; zero console errors. `vite build` clean.
+
 ### Backlog — explicitly logged, not implemented
 
 **Dashboard Auto-Translation** (Salman's own future-enhancement note, 2026-09-01): once the Admin

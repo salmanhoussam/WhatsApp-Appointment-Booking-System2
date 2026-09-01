@@ -24,6 +24,7 @@ export const DICTIONARY = {
   search:        { ar: 'ابحث...',          en: 'Search...' },
   noResults:     { ar: 'لا توجد نتائج',    en: 'No results' },
   cart:          { ar: 'السلة',            en: 'Cart' },
+  viewCart:      { ar: 'عرض السلة',        en: 'View Cart' },
   confirm:       { ar: 'تأكيد',            en: 'Confirm' },
   cancel:        { ar: 'إلغاء',            en: 'Cancel' },
   loading:       { ar: 'جارٍ التحميل...',  en: 'Loading...' },
