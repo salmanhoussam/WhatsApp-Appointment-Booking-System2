@@ -49,7 +49,7 @@ export default function CategoriesGridSection({ data, accent, slug }) {
   const goToCategory = (catId) => navigate(`${catalogPath}?cat=${catId}`)
 
   return (
-    <section style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section style={{ marginBottom: 56 }}>
       {/* Section header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{
@@ -130,7 +130,7 @@ export default function CategoriesGridSection({ data, accent, slug }) {
               <div style={{
                 position: 'absolute', bottom: 0, right: 0, left: 0,
                 padding: '10px 14px',
-                direction: 'rtl', textAlign: 'right',
+                textAlign: 'right', // physical value, not direction-aware -- out of this pass's scope (removing hardcoded `direction` only)
               }}>
                 <div style={{
                   fontSize: 14, fontWeight: 700,

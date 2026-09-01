@@ -12,6 +12,8 @@ import CatalogGrid                                      from '../../catalog/temp
 import CatalogList                                      from '../../catalog/templates/CatalogList'
 import CatalogShowcase                                  from '../../catalog/templates/CatalogShowcase'
 import AmbientGridBackground                            from '../../../components/AmbientGridBackground'
+import { useAppLanguage }                               from '../../../context/AppLanguageContext'
+import { t }                                            from '../../../i18n/dictionary'
 
 const TEMPLATE_MAP = { grid: CatalogGrid, list: CatalogList, showcase: CatalogShowcase }
 
@@ -49,6 +51,7 @@ function LoadingDot({ accent }) {
 export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
   const base     = useTenantBase()
   const navigate = useNavigate()
+  const { lang }  = useAppLanguage()
   const { addItem, totalItems } = useGenericStore()
 
   const {
@@ -99,7 +102,7 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
   const pageBackground = config?.config?.page_background || null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl', position: 'relative' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', position: 'relative' }}>
       {pageBackground === 'ambient_grid' && (
         <AmbientGridBackground accent={accent} />
       )}
@@ -115,13 +118,13 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث عن عنصر..."
+            placeholder={t('search', lang)}
             style={{
               width: '100%', padding: '12px 18px', boxSizing: 'border-box',
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 12, color: '#fff', fontSize: 14,
-              outline: 'none', direction: 'rtl',
+              outline: 'none',
               fontFamily: "'Cairo', sans-serif",
             }}
           />
@@ -142,6 +145,7 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
                 active={activeCategory?.id === cat.id}
                 accent={accent}
                 onClick={() => setActiveCategory(cat)}
+                lang={lang}
               />
             ))}
           </div>
@@ -156,7 +160,9 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
             color: 'rgba(255,255,255,0.25)', fontSize: 15,
             fontFamily: "'Cairo', sans-serif",
           }}>
-            {search ? `لا نتائج لـ "${search}"` : 'لا توجد عناصر في هذا القسم'}
+            {search
+              ? (lang === 'ar' ? `لا نتائج لـ "${search}"` : `No results for "${search}"`)
+              : (lang === 'ar' ? 'لا توجد عناصر في هذا القسم' : 'No items in this section')}
           </div>
         ) : (
           <Template
@@ -164,6 +170,7 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
             accent={accent}
             onAddToCart={canOrderActiveCategory ? onAddCart : undefined}
             onItemClick={onItemClick}
+            lang={lang}
           />
         )}
       </div>

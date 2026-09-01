@@ -36,7 +36,6 @@ export default function ListingsTemplate() {
       {/* ── Unit grid — pt-24 clears the fixed header ── */}
       <main className="pt-24 pb-12">
         <UnitGrid
-          lang="ar"
           onSelect={setSelectedUnit}
         />
       </main>

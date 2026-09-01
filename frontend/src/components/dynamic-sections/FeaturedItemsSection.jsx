@@ -114,7 +114,7 @@ export default function FeaturedItemsSection({ data, accent, slug, config, homep
   if (!loading && items.length === 0) return null
 
   return (
-    <section style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section style={{ marginBottom: 56 }}>
       <style>{`@keyframes fs-pulse{0%,100%{opacity:.4}50%{opacity:.8}}`}</style>
 
       {/* Section header */}

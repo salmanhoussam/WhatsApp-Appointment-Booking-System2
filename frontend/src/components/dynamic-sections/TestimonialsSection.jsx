@@ -28,7 +28,7 @@ export default function TestimonialsSection({ data, accent }) {
   if (items.length === 0) return null
 
   return (
-    <section style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section style={{ marginBottom: 56 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{

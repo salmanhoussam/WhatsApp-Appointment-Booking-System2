@@ -47,7 +47,7 @@ export default function VideoStorySection({ data, accent }) {
   if (videos.length === 0) return null
 
   return (
-    <section style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section style={{ marginBottom: 56 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{
           margin: 0,

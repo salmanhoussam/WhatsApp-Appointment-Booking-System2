@@ -10,20 +10,29 @@
  *   empty      — Soft empty-state message
  *   success    — Responsive 1→2→3 column grid of UnitCard molecules
  *
+ * Language (ADR-0006 Phase 3, 2026-09-01): reads the real, shared app language from
+ * AppLanguageContext instead of a hardcoded/caller-supplied literal -- its one real caller
+ * (ListingsTemplate.jsx) previously passed the literal `lang="ar"`, permanently pinning this to
+ * Arabic regardless of anything the header's toggle did. No `lang` prop anymore -- this Organism
+ * is the integration point with the app's real language state; UnitCard (a Molecule, "ZERO data
+ * fetching" by its own docblock) stays a pure, context-free component and keeps receiving `lang`
+ * as a plain prop from here.
+ *
  * Optional props:
- *   lang       — 'ar' | 'en'  (default 'ar')  forwarded to each UnitCard
  *   currency   — string       (default 'USD')  forwarded to each UnitCard
  *   onSelect   — fn(unit)     called when user clicks a card's CTA
  *   className  — merged onto the root <section>
  *
  * Usage:
- *   <UnitGrid lang="ar" onSelect={(u) => navigate(`/${slug}/spatial/property/${u.id}`)} />
+ *   <UnitGrid onSelect={(u) => navigate(`/${slug}/spatial/property/${u.id}`)} />
  */
 
 import { useState } from 'react';
 import { GoldDot, Skeleton, Button } from '../atoms';
 import { UnitCard } from '../molecules';
 import useUnits from '../../hooks/useUnits';
+import { useAppLanguage } from '../../context/AppLanguageContext';
+import { t } from '../../i18n/dictionary';
 
 const FILTERS = [
   { key: 'all',    ar: 'الكل',     en: 'All'     },
@@ -53,7 +62,7 @@ function CardSkeleton() {
 }
 
 // ── Error box ─────────────────────────────────────────────────────────────────
-function ErrorBox({ message, onRetry }) {
+function ErrorBox({ message, onRetry, lang }) {
   return (
     <div
       className="mx-auto max-w-md rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-8 text-center"
@@ -68,27 +77,27 @@ function ErrorBox({ message, onRetry }) {
         </div>
       </div>
       <p className="mb-1 text-sm font-semibold text-red-400 tracking-wide">
-        تعذّر تحميل الوحدات
+        {lang === 'ar' ? 'تعذّر تحميل الوحدات' : 'Could not load units'}
       </p>
       <p className="mb-6 text-xs text-white/40 leading-relaxed">
         {message}
       </p>
       <Button variant="ghost" onClick={onRetry}>
-        إعادة المحاولة
+        {t('retry', lang)}
       </Button>
     </div>
   );
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState() {
+function EmptyState({ lang }) {
   return (
     <div className="mx-auto max-w-sm py-24 text-center">
       <div className="mb-6 flex justify-center">
         <GoldDot size="lg" pulse={false} />
       </div>
       <p className="text-sm text-white/30 tracking-[0.12em]">
-        لا توجد وحدات متاحة حالياً
+        {lang === 'ar' ? 'لا توجد وحدات متاحة حالياً' : 'No units available right now'}
       </p>
     </div>
   );
@@ -96,11 +105,11 @@ function EmptyState() {
 
 // ── Main organism ─────────────────────────────────────────────────────────────
 export default function UnitGrid({
-  lang      = 'ar',
   currency  = 'USD',
   onSelect,
   className = '',
 }) {
+  const { lang } = useAppLanguage();
   const { units, isLoading, error, fetchUnits } = useUnits();
   const [activeFilter, setActiveFilter] = useState('all');
 
@@ -158,11 +167,11 @@ export default function UnitGrid({
 
       {/* ── Error ── */}
       {!isLoading && error && (
-        <ErrorBox message={error} onRetry={() => fetchUnits()} />
+        <ErrorBox message={error} onRetry={() => fetchUnits()} lang={lang} />
       )}
 
       {/* ── Empty ── */}
-      {!isLoading && !error && visibleUnits.length === 0 && <EmptyState />}
+      {!isLoading && !error && visibleUnits.length === 0 && <EmptyState lang={lang} />}
 
       {/* ── Success ── */}
       {!isLoading && !error && visibleUnits.length > 0 && (

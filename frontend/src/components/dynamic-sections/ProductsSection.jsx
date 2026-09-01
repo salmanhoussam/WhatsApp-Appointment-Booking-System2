@@ -77,7 +77,7 @@ export default function ProductsSection({ data, accent, slug, onAddToCart, confi
   if (!loading && items.length === 0) return null
 
   return (
-    <section style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section style={{ marginBottom: 56 }}>
       <style>{`@keyframes ps-pulse{0%,100%{opacity:.4}50%{opacity:.8}}`}</style>
 
       {/* Section header */}

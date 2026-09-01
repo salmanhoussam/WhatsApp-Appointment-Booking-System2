@@ -55,6 +55,7 @@ import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
 import useTenantSlug from '../../hooks/useTenantSlug';
 import { getServiceRoute } from '../../config/service-catalog';
+import { useAppLanguage } from '../../context/AppLanguageContext';
 
 const FALLBACK_ACCENT = '#d4a853'; // smar's own brand gold — used only when a tenant has no primary_color
 
@@ -78,9 +79,14 @@ export default function TenantHeader() {
   const { config, navItems } = useTenantConfig();
   const navigate   = useNavigate();
   const slug       = useTenantSlug();
+  // ADR-0006 Phase 2 (2026-09-01): reads the one real, shared, persisted language state instead
+  // of local-only useState -- was reset to 'ar' on every remount/navigation before this, and
+  // never reached anywhere outside this component. Behavior for a visitor is otherwise unchanged
+  // (same toggle button, same effect on this header's own labels); the language choice now also
+  // persists across navigation and writes document.documentElement.lang/dir for real.
+  const { lang, toggleLang } = useAppLanguage();
 
   const [scrolled,        setScrolled]        = useState(false);
-  const [lang,            setLang]            = useState('ar');
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -198,7 +204,7 @@ export default function TenantHeader() {
           {/* Language toggle */}
           <button
             type="button"
-            onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
+            onClick={toggleLang}
             aria-label="Toggle language"
             className="
               h-8 px-3 rounded-full

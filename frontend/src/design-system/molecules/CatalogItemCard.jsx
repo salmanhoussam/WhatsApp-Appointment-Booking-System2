@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { colors, radius } from '../tokens'
 import { serviceIconFor } from '../../utils/serviceIcons'
 import { homepageTokens } from '../../components/dynamic-sections/homepageTokens'
+import { resolveTenantText } from '../../i18n/resolveTenantText'
+import { t } from '../../i18n/dictionary'
 
 const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 }
 
@@ -33,12 +35,19 @@ const cardTransition = { type: 'spring', stiffness: 300, damping: 25, mass: 0.5 
  *                  used throughout is the fixed gold, not the tenant's own `accent` prop. Absent
  *                  for any other tenant, so this card's rendering elsewhere is byte-identical to
  *                  before this prop existed.
+ *   lang         — optional (ADR-0006 Phase 3, 2026-09-01), default 'ar' -- every existing caller
+ *                  that doesn't pass it (ProductsSection.jsx, FeaturedItemsSection.jsx) keeps its
+ *                  exact current behavior. Drives name/description via resolveTenantText.js
+ *                  (the same fallback-pair pattern UnitCard.jsx already proved correct) and the
+ *                  card's own static labels via dictionary.js's t().
  */
-export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick, homepageTheme }) {
+export default function CatalogItemCard({ item, accent = colors.gold, onAddToCart, onBookNow, onItemClick, homepageTheme, lang = 'ar' }) {
   const [imgHovered, setImgHovered] = useState(false)
   const available = item.is_available !== false && item.is_active !== false
   const useBlackGold = homepageTheme === 'black_gold'
   const themeAccent = useBlackGold ? homepageTokens.accent : accent
+  const displayName = resolveTenantText(item, 'name', lang)
+  const displayDesc = resolveTenantText(item, 'description', lang)
   // Richer generic fallback for real bookable services with no photo yet -- a gradient + the
   // service's own matched icon, editable the moment a real photo is uploaded (this is just the
   // fallback path; `item.image_url` still wins the instant it's set). Scoped to onBookNow only
@@ -94,7 +103,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
           {item.image_url ? (
             <img
               src={item.image_url}
-              alt={item.name_ar || item.name_en}
+              alt={displayName}
               style={{
                 width: '100%',
                 height: '100%',
@@ -139,7 +148,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                   boxShadow: `0 4px 20px ${themeAccent}66`,
                 }}
               >
-                {onBookNow ? 'احجز الآن' : '+ أضف للسلة'}
+                {onBookNow ? t('bookNow', lang) : `+ ${t('addToCart', lang)}`}
               </motion.button>
             </div>
           )}
@@ -166,7 +175,7 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                 textTransform: 'uppercase',
                 fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
               }}>
-                مميز
+                {t('featured', lang)}
               </span>
             )}
             {!available && (
@@ -180,20 +189,21 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
                 borderRadius: 999,
                 fontFamily: "'Cairo', sans-serif",
               }}>
-                غير متوفر
+                {t('notAvailable', lang)}
               </span>
             )}
           </div>
         </div>
 
-        {/* Info */}
+        {/* Info — no hardcoded `direction` (ADR-0006 Phase 3, 2026-09-01): inherits from
+            <html dir> (set by AppLanguageContext), rather than being permanently pinned to rtl
+            regardless of the active language. */}
         <div style={{
           padding: '14px 16px 18px',
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
-          direction: 'rtl',
         }}>
           <h3 style={{
             margin: 0,
@@ -203,10 +213,10 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
             lineHeight: 1.4,
             fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
           }}>
-            {item.name_ar || item.name_en}
+            {displayName}
           </h3>
 
-          {(item.description_ar || item.description_en) && (
+          {displayDesc && (
             <p style={{
               margin: 0,
               fontSize: 12,
@@ -218,14 +228,14 @@ export default function CatalogItemCard({ item, accent = colors.gold, onAddToCar
               overflow: 'hidden',
               fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
             }}>
-              {item.description_ar || item.description_en}
+              {displayDesc}
             </p>
           )}
 
           {item.price != null && (
             <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'baseline', gap: 4 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: themeAccent }}>
-                {Number(item.price).toLocaleString('ar-SA')}
+                {Number(item.price).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
               </span>
               {item.currency && (
                 <span style={{ fontSize: 10, color: useBlackGold ? homepageTokens.mutedText : colors.textDim }}>

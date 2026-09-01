@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { colors, radius } from '../tokens'
+import { resolveTenantText } from '../../i18n/resolveTenantText'
 
 /**
  * CategoryPill — Molecule
@@ -12,8 +13,10 @@ import { colors, radius } from '../tokens'
  *   active  — boolean
  *   accent  — tenant primary color
  *   onClick — () => void
+ *   lang    — optional (ADR-0006 Phase 3, 2026-09-01), default 'ar' -- existing callers that
+ *             don't pass it keep their exact current behavior.
  */
-export default function CategoryPill({ cat, active, accent = colors.gold, onClick }) {
+export default function CategoryPill({ cat, active, accent = colors.gold, onClick, lang = 'ar' }) {
   return (
     <motion.button
       onClick={onClick}
@@ -33,7 +36,7 @@ export default function CategoryPill({ cat, active, accent = colors.gold, onClic
         fontFamily: "'Cairo', sans-serif",
       }}
     >
-      {cat.name_ar || cat.name_en}
+      {resolveTenantText(cat, 'name', lang)}
     </motion.button>
   )
 }

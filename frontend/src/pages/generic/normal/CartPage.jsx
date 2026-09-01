@@ -8,6 +8,9 @@ import { useTenantBase } from '../../../hooks/useTenantSlug'
 import TenantModuleNav   from '../../../design-system/organisms/TenantModuleNav'
 import useGenericStore   from '../store/useGenericStore'
 import { hasCapability, hasOrderCapability } from '../../../utils/capabilities'
+import { useAppLanguage } from '../../../context/AppLanguageContext'
+import { resolveTenantText } from '../../../i18n/resolveTenantText'
+import { t } from '../../../i18n/dictionary'
 
 // Quick WhatsApp checkout (2026-08-22) -- same real, already-proven placeholder-identity pattern
 // useReservationBooking.js's own confirmViaWhatsApp() uses: a real order is still created
@@ -22,7 +25,8 @@ const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
 
 // ── Cart item row ─────────────────────────────────────────────────────────────
 
-function CartRow({ item, accent, onUpdate, onRemove }) {
+function CartRow({ item, accent, onUpdate, onRemove, lang }) {
+  const displayName = resolveTenantText(item, 'name', lang)
   return (
     <motion.div
       layout
@@ -34,14 +38,14 @@ function CartRow({ item, accent, onUpdate, onRemove }) {
         padding: '14px 18px',
         background: 'rgba(255,255,255,0.04)',
         border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 14, direction: 'rtl',
+        borderRadius: 14,
       }}
     >
       {/* Image */}
       {item.image_url ? (
         <img
           src={item.image_url}
-          alt={item.name_ar || item.name_en}
+          alt={displayName}
           style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
         />
       ) : (
@@ -57,10 +61,10 @@ function CartRow({ item, accent, onUpdate, onRemove }) {
       {/* Name */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
-          {item.name_ar || item.name_en}
+          {displayName}
         </div>
         <div style={{ fontSize: 13, color: accent, marginTop: 3, fontWeight: 700 }}>
-          {(item.price * item.quantity).toLocaleString('ar-SA')}
+          {(item.price * item.quantity).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
         </div>
       </div>
 
@@ -140,7 +144,7 @@ function Field({ label, type = 'text', value, onChange, required, placeholder })
 
 // ── Success screen ────────────────────────────────────────────────────────────
 
-function SuccessScreen({ accent, orderId, whatsappSent, onBack }) {
+function SuccessScreen({ accent, orderId, whatsappSent, onBack, lang }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -159,16 +163,17 @@ function SuccessScreen({ accent, orderId, whatsappSent, onBack }) {
         ✓
       </div>
       <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>
-        تم استلام طلبك!
+        {lang === 'ar' ? 'تم استلام طلبك!' : 'Your order was received!'}
       </h2>
       {whatsappSent && (
         <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-          جارٍ فتح واتساب لإرسال تفاصيل الطلب...
+          {lang === 'ar' ? 'جارٍ فتح واتساب لإرسال تفاصيل الطلب...' : 'Opening WhatsApp to send order details...'}
         </p>
       )}
       {orderId && (
         <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
-          رقم الطلب: <span style={{ color: accent, fontWeight: 600 }}>{orderId.slice(0, 8)}</span>
+          {lang === 'ar' ? 'رقم الطلب: ' : 'Order number: '}
+          <span style={{ color: accent, fontWeight: 600 }}>{orderId.slice(0, 8)}</span>
         </p>
       )}
       <button
@@ -180,7 +185,7 @@ function SuccessScreen({ accent, orderId, whatsappSent, onBack }) {
           cursor: 'pointer', fontFamily: "'Cairo', sans-serif",
         }}
       >
-        العودة للقائمة
+        {lang === 'ar' ? 'العودة للقائمة' : 'Back to list'}
       </button>
     </motion.div>
   )
@@ -192,6 +197,13 @@ function SuccessScreen({ accent, orderId, whatsappSent, onBack }) {
 // wa.me sends). This is the 2nd real case: the same message shape, reused for the generic
 // (shared) checkout path instead of a tenant-specific one, per this project's Abstraction
 // Rule (generalize once a 2nd real case proves the shape, not before).
+//
+// Deliberately NOT lang-aware (ADR-0006 Phase 3, 2026-09-01): this message is read by the
+// TENANT/merchant on their own WhatsApp, not by the customer -- it should reflect the
+// merchant's own operating language (Arabic, per every real tenant's admin dashboard today,
+// which itself has zero i18n -- Bilingual/i18n Architecture Audit, Category C3), never the
+// browsing customer's UI language choice. Translating this would be a real regression, not an
+// improvement.
 function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, currency, orderId }) {
   const lines = []
   lines.push(`طلب جديد${businessName ? ` من ${businessName}` : ''} 🛍️`)
@@ -223,16 +235,16 @@ function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, 
 // presentation trees in this codebase, never cross-imported). Not a new retry mechanism --
 // useTenantConfig()'s own `retry: 2` already handles the retry itself; this is only what renders
 // once that's exhausted.
-function CartErrorState({ accent, message }) {
+function CartErrorState({ accent, message, lang }) {
   return (
     <div style={{
-      minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl',
+      minHeight: '100vh', background: '#0a0a0f', color: '#fff',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       gap: 16, padding: 24, fontFamily: "'Cairo', sans-serif", textAlign: 'center',
     }}>
       <div style={{ fontSize: 40, opacity: 0.4 }}>⚠</div>
       <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)' }}>
-        {message || 'تعذّر تحميل السلة'}
+        {message || (lang === 'ar' ? 'تعذّر تحميل السلة' : 'Could not load the cart')}
       </div>
       <button
         type="button"
@@ -243,7 +255,7 @@ function CartErrorState({ accent, message }) {
           fontFamily: "'Cairo', sans-serif",
         }}
       >
-        إعادة المحاولة
+        {t('retry', lang)}
       </button>
     </div>
   )
@@ -256,6 +268,7 @@ export default function CartPage() {
   const slug       = useTenantSlug()
   const base       = useTenantBase()
   const navigate   = useNavigate()
+  const { lang }   = useAppLanguage()
   const accent     = config?.primary_color ?? '#d4a853'
 
   const { sessionId, cartItems, updateQuantity, removeItem, clearCart, totalPrice, setConfig: setStoreConfig } =
@@ -370,11 +383,11 @@ export default function CartPage() {
       clearCart()
     } catch (err) {
       const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'حدث خطأ، يرجى المحاولة مجدداً.')
+      setError(typeof detail === 'string' ? detail : (lang === 'ar' ? 'حدث خطأ، يرجى المحاولة مجدداً.' : 'Something went wrong, please try again.'))
     } finally {
       setSubmitting(false)
     }
-  }, [cartItems, form, moduleKey, sessionId, slug, clearCart, config, totalPrice])
+  }, [cartItems, form, moduleKey, sessionId, slug, clearCart, config, totalPrice, lang])
 
   // ── Quick WhatsApp checkout (store only, matches this file's own existing WhatsApp block in
   // handleSubmit above -- same two endpoints, same message builder, same real-order-first
@@ -438,11 +451,11 @@ export default function CartPage() {
     } catch (err) {
       if (waTab) waTab.close()
       const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'حدث خطأ، يرجى المحاولة مجدداً.')
+      setError(typeof detail === 'string' ? detail : (lang === 'ar' ? 'حدث خطأ، يرجى المحاولة مجدداً.' : 'Something went wrong, please try again.'))
     } finally {
       setSubmitting(false)
     }
-  }, [cartItems, moduleKey, config, sessionId, slug, form, clearCart, totalPrice])
+  }, [cartItems, moduleKey, config, sessionId, slug, form, clearCart, totalPrice, lang])
 
   // ── Config load failure — real error state, never a silent blank page ───────────────────
   // Final Production Gate Audit, 2026-08-22 (P0 fix): useTenantConfig() never returns `null` on
@@ -455,7 +468,7 @@ export default function CartPage() {
   // customer). Checking `configError` first (the hook's own error signal, already exposed, just
   // never read here before) resolves the ambiguity before the capability guard ever runs.
   if (configError) {
-    return <CartErrorState accent={accent} message={configError} />
+    return <CartErrorState accent={accent} message={configError} lang={lang} />
   }
 
   // ── Guard — hide Cart entirely if this tenant has no order-bearing capability at all ──────
@@ -470,10 +483,10 @@ export default function CartPage() {
   // ── Success screen ────────────────────────────────────────────────────────
   if (orderId !== null) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0f', direction: 'rtl' }}>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f' }}>
         <TenantModuleNav />
         <div style={{ maxWidth: 640, margin: '0 auto', padding: '88px 20px 80px' }}>
-          <SuccessScreen accent={accent} orderId={orderId} whatsappSent={whatsappSent} onBack={() => navigate(`${base}/${moduleKey === 'restaurant' ? 'menu' : 'store'}`)} />
+          <SuccessScreen accent={accent} orderId={orderId} whatsappSent={whatsappSent} onBack={() => navigate(`${base}/${moduleKey === 'restaurant' ? 'menu' : 'store'}`)} lang={lang} />
         </div>
       </div>
     )
@@ -481,7 +494,7 @@ export default function CartPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff' }}>
       <TenantModuleNav />
 
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '88px 20px 80px' }}>
@@ -497,10 +510,10 @@ export default function CartPage() {
               color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 20,
             }}
           >
-            ←
+            {lang === 'ar' ? '→' : '←'}
           </button>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#fff' }}>
-            سلة الطلبات
+            {lang === 'ar' ? 'سلة الطلبات' : 'Order Cart'}
           </h1>
         </div>
 
@@ -512,7 +525,7 @@ export default function CartPage() {
             fontFamily: "'Cairo', sans-serif",
           }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🛒</div>
-            السلة فارغة
+            {lang === 'ar' ? 'السلة فارغة' : 'Your cart is empty'}
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -527,6 +540,7 @@ export default function CartPage() {
                     accent={accent}
                     onUpdate={updateQuantity}
                     onRemove={removeItem}
+                    lang={lang}
                   />
                 ))}
               </AnimatePresence>
@@ -539,9 +553,9 @@ export default function CartPage() {
               borderTop: '1px solid rgba(255,255,255,0.08)',
               marginBottom: 32,
             }}>
-              <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)' }}>المجموع</span>
+              <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)' }}>{t('total', lang)}</span>
               <span style={{ fontSize: 22, fontWeight: 800, color: accent }}>
-                {totalPrice().toLocaleString('ar-SA')}
+                {totalPrice().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
                 <span style={{ fontSize: 12, fontWeight: 400, marginRight: 4, color: 'rgba(255,255,255,0.4)' }}>
                   {config?.currency ?? 'USD'}
                 </span>
@@ -551,7 +565,10 @@ export default function CartPage() {
             {/* ── Quick WhatsApp checkout (store only) — primary action, no typing required.
                 Same real "زبون واتساب" placeholder-identity pattern ReservePage.jsx's own
                 "متابعة الحجز عبر واتساب" button already uses -- a real order is still created
-                server-side first, just without requiring the customer to fill the form below. */}
+                server-side first, just without requiring the customer to fill the form below.
+                This BUTTON's own label is customer-facing UI (translated); the WhatsApp MESSAGE
+                it sends stays merchant-language Arabic (buildStoreWhatsAppMessage's own note
+                above) -- two different audiences, deliberately not the same choice. */}
             {moduleKey === 'store' && config?.whatsapp_number && (
               <button
                 type="button"
@@ -567,7 +584,7 @@ export default function CartPage() {
                   fontFamily: "'Cairo', sans-serif",
                 }}
               >
-                {submitting ? 'جارٍ الإرسال...' : 'متابعة الطلب عبر واتساب'}
+                {submitting ? t('sending', lang) : (lang === 'ar' ? 'متابعة الطلب عبر واتساب' : 'Continue via WhatsApp')}
               </button>
             )}
 
@@ -579,23 +596,23 @@ export default function CartPage() {
               display: 'flex', flexDirection: 'column', gap: 16,
             }}>
               <h2 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#fff' }}>
-                بيانات الطلب
+                {lang === 'ar' ? 'بيانات الطلب' : 'Order Details'}
               </h2>
 
-              <Field label="الاسم" required placeholder="اسمك الكريم" {...f('customer_name')} />
-              <Field label="رقم الهاتف" type="tel" required placeholder="+961..." {...f('customer_phone')} />
+              <Field label={lang === 'ar' ? 'الاسم' : 'Name'} required placeholder={lang === 'ar' ? 'اسمك الكريم' : 'Your name'} {...f('customer_name')} />
+              <Field label={lang === 'ar' ? 'رقم الهاتف' : 'Phone number'} type="tel" required placeholder="+961..." {...f('customer_phone')} />
 
               {moduleKey === 'restaurant' && (
-                <Field label="رقم الطاولة" placeholder="A4 — اختياري" {...f('table_number')} />
+                <Field label={lang === 'ar' ? 'رقم الطاولة' : 'Table number'} placeholder={lang === 'ar' ? 'A4 — اختياري' : 'A4 — optional'} {...f('table_number')} />
               )}
               {moduleKey === 'store' && (
-                <Field label="عنوان التوصيل" placeholder="اختياري" {...f('shipping_address')} />
+                <Field label={lang === 'ar' ? 'عنوان التوصيل' : 'Delivery address'} placeholder={lang === 'ar' ? 'اختياري' : 'Optional'} {...f('shipping_address')} />
               )}
 
               {moduleKey === 'store' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                    طريقة الدفع
+                    {lang === 'ar' ? 'طريقة الدفع' : 'Payment method'}
                   </label>
                   <select
                     value={form.payment_method}
@@ -615,7 +632,7 @@ export default function CartPage() {
                 </div>
               )}
 
-              <Field label="ملاحظات" placeholder="أي ملاحظات إضافية — اختياري" {...f('notes')} />
+              <Field label={lang === 'ar' ? 'ملاحظات' : 'Notes'} placeholder={lang === 'ar' ? 'أي ملاحظات إضافية — اختياري' : 'Any additional notes — optional'} {...f('notes')} />
 
               {error && (
                 <div style={{
@@ -643,7 +660,7 @@ export default function CartPage() {
                   fontFamily: "'Cairo', sans-serif",
                 }}
               >
-                {submitting ? 'جارٍ الإرسال...' : 'تأكيد الطلب'}
+                {submitting ? t('sending', lang) : t('confirm', lang)}
               </motion.button>
             </div>
 

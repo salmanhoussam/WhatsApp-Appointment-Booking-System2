@@ -21,7 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from './pages/admin/Login';
 import TenantResolver from './router/TenantResolver';
 import ProtectedRoute from './router/ProtectedRoute';
-import { LanguageProvider } from './context/LanguageContext';
+import { AppLanguageProvider } from './context/AppLanguageContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -115,7 +115,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
     <HelmetProvider>
-    <LanguageProvider>
+    <AppLanguageProvider>
       <BrowserRouter>
         <Routes>
           {/* ── Root redirect — skipped on showcase domain (/* route handles it) ──
@@ -276,7 +276,7 @@ function App() {
           }
         </Routes>
       </BrowserRouter>
-    </LanguageProvider>
+    </AppLanguageProvider>
     </HelmetProvider>
     </QueryClientProvider>
   );

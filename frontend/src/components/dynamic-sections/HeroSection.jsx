@@ -124,7 +124,6 @@ export default function HeroSection({ data, accent, homepageTheme, reserveHref }
       {/* Content */}
       <div style={{
         position: 'relative', zIndex: 1,
-        direction: 'rtl',
         width: hasFramedVideo ? '100%' : undefined,
         display: hasFramedVideo ? 'flex' : 'block',
         flexDirection: hasFramedVideo ? 'row' : undefined,

@@ -9,14 +9,21 @@ import Badge            from '../../../design-system/atoms/Badge';
 import { colors, spring, typography } from '../../../design-system/tokens';
 import useFootlabStore   from '../store/useFootlabStore';
 import TenantModuleNav  from '../../../design-system/organisms/TenantModuleNav';
+import { useAppLanguage } from '../../../context/AppLanguageContext';
+import { t } from '../../../i18n/dictionary';
 import '../footlab.css';
 
 const ACCENT     = '#6c63ff';
 const ACCENT_DIM = 'rgba(108,99,255,0.12)';
 
-function getName(field) {
+// footlab's own category/product name shape is a nested { ar, en } object, not the flat
+// name_ar/name_en fields resolveTenantText.js expects elsewhere -- kept as this file's own local
+// helper rather than force-fitting a different real data shape into that shared resolver
+// (ADR-0006 Phase 3, 2026-09-01: made lang-aware, was previously always Arabic-first regardless
+// of the active language).
+function getName(field, lang = 'ar') {
   if (!field) return '';
-  if (typeof field === 'object') return field.ar || field.en || '';
+  if (typeof field === 'object') return lang === 'ar' ? (field.ar || field.en || '') : (field.en || field.ar || '');
   return String(field);
 }
 
@@ -28,6 +35,7 @@ export default function StorePage() {
 
   const { activeCategoryId, setActiveCategoryId, addItem, cartItems } = useFootlabStore();
   const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
+  const { lang } = useAppLanguage();
 
   useEffect(() => {
     const slug = getTenantSlug();
@@ -59,11 +67,11 @@ export default function StorePage() {
 
       {/* ── Hero ── */}
       <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-        <p style={{ ...typography.eyebrow, color: ACCENT, marginBottom: 12 }}>متجر فوتلاب</p>
+        <p style={{ ...typography.eyebrow, color: ACCENT, marginBottom: 12 }}>{lang === 'ar' ? 'متجر فوتلاب' : 'Footlab Store'}</p>
         <h1 className="text-5xl font-black tracking-tight" style={{ color: colors.textPrimary }}>
           Footlab Store
         </h1>
-        <p className="mt-3" style={{ ...typography.body, color: colors.textMuted }}>أفضل معدات كرة القدم</p>
+        <p className="mt-3" style={{ ...typography.body, color: colors.textMuted }}>{lang === 'ar' ? 'أفضل معدات كرة القدم' : 'The best football gear'}</p>
         <div className="mt-4 h-px w-16" style={{ background: `linear-gradient(to right, transparent, ${ACCENT}, transparent)` }} />
       </div>
 
@@ -79,7 +87,7 @@ export default function StorePage() {
             color:       !activeCategoryId ? '#fff' : colors.textMuted,
           }}
         >
-          الكل
+          {lang === 'ar' ? 'الكل' : 'All'}
         </motion.button>
         {categories.map((cat) => {
           const active = activeCategoryId === cat.id;
@@ -95,7 +103,7 @@ export default function StorePage() {
                 color:       active ? '#fff' : colors.textMuted,
               }}
             >
-              {getName(cat.name)}
+              {getName(cat.name, lang)}
             </motion.button>
           );
         })}
@@ -113,7 +121,7 @@ export default function StorePage() {
           <motion.div key={product.id} whileHover={{ y: -3 }} transition={spring.snappy}>
             <GlassCard className="overflow-hidden p-0" goldAccent={false}>
               {product.image_url ? (
-                <img src={product.image_url} alt={getName(product.name)} className="w-full aspect-square object-cover" />
+                <img src={product.image_url} alt={getName(product.name, lang)} className="w-full aspect-square object-cover" />
               ) : (
                 <div className="flex aspect-square w-full items-center justify-center text-4xl" style={{ background: ACCENT_DIM }}>
                   ⚽
@@ -121,7 +129,7 @@ export default function StorePage() {
               )}
               <div className="p-3">
                 <h3 className="text-sm font-bold leading-snug" style={{ color: colors.textPrimary }}>
-                  {getName(product.name)}
+                  {getName(product.name, lang)}
                 </h3>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="font-black text-sm" style={{ color: ACCENT }}>${product.price}</span>
@@ -130,7 +138,7 @@ export default function StorePage() {
                       ${product.compare_at_price}
                     </span>
                   )}
-                  {product.is_featured && <Badge variant="featured" className="ml-auto">مميز</Badge>}
+                  {product.is_featured && <Badge variant="featured" className="ml-auto">{t('featured', lang)}</Badge>}
                 </div>
                 <Button
                   variant="ghost"
@@ -138,7 +146,7 @@ export default function StorePage() {
                   style={{ background: ACCENT_DIM, borderColor: ACCENT, color: ACCENT }}
                   onClick={() => addItem(product)}
                 >
-                  أضف للسلة
+                  {t('addToCart', lang)}
                 </Button>
               </div>
             </GlassCard>
@@ -157,7 +165,7 @@ export default function StorePage() {
             className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full px-7 py-3.5 font-bold text-sm text-white"
             style={{ background: ACCENT, boxShadow: `0 8px 32px ${ACCENT_DIM}` }}
           >
-            <span>السلة</span>
+            <span>{t('cart', lang)}</span>
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-black">
               {cartCount}
             </span>

@@ -146,7 +146,7 @@ function DefaultFallback({ config, accent, pageType, useTenantBase }) {
       minHeight: '60vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 16,
       textAlign: 'center', padding: '80px 32px',
-      direction: 'rtl', fontFamily: "'Cairo', sans-serif",
+      fontFamily: "'Cairo', sans-serif",
     }}>
       <div style={{
         width: 56, height: 56, borderRadius: 14,
@@ -181,7 +181,6 @@ function TrialRibbon({ accent, name }) {
       borderBottom: `1px solid ${accent}28`,
       padding: '8px 24px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      direction: 'rtl',
     }}>
       <span style={{
         fontSize: 12, color: `${accent}bb`, fontWeight: 600,

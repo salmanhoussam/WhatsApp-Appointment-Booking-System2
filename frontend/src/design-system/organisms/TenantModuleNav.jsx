@@ -13,19 +13,27 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useTenantConfig from '../../hooks/useTenantConfig';
 import useTenantSlug   from '../../hooks/useTenantSlug';
+import { useAppLanguage } from '../../context/AppLanguageContext';
 
 export default function TenantModuleNav() {
   const { config, navItems } = useTenantConfig();
   const navigate  = useNavigate();
   const location  = useLocation();
   const slug      = useTenantSlug();
+  // ADR-0006 Phase 2 (2026-09-01): this component previously had no language mechanism at all --
+  // labelEn on each nav item was real data (config/service-catalog.js) that nothing here ever
+  // read. Same shared context TenantHeader.jsx now reads, so a choice made on either component
+  // persists across both.
+  const { lang, toggleLang, isRtl } = useAppLanguage();
 
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
 
   const accent      = config?.primary_color ?? '#d4a853';
   const accentDim   = `${accent}22`;
-  const tenantLabel = config?.name_ar ?? config?.name_en ?? '';
+  const tenantLabel = isRtl
+    ? (config?.name_ar ?? config?.name_en ?? '')
+    : (config?.name_en ?? config?.name_ar ?? '');
 
   useEffect(() => {
     function onScroll() { setScrolled(window.scrollY > 40); }
@@ -42,6 +50,7 @@ export default function TenantModuleNav() {
 
   return (
     <header
+      dir={isRtl ? 'rtl' : 'ltr'}
       className={[
         'fixed top-0 w-full z-50 transition-all duration-400',
         scrolled
@@ -77,11 +86,22 @@ export default function TenantModuleNav() {
                   border:     active ? `1px solid ${accent}40` : '1px solid transparent',
                 }}
               >
-                {item.labelAr}
+                {isRtl ? item.labelAr : item.labelEn}
               </button>
             );
           })}
         </nav>
+
+        {/* ── Language toggle (ADR-0006 Phase 2 — new, this component had none before) ──────── */}
+        <button
+          type="button"
+          onClick={toggleLang}
+          aria-label="Toggle language"
+          className="h-8 px-3 rounded-full text-[11px] font-semibold tracking-widest uppercase bg-white/[0.02] border border-white/[0.08] transition-all duration-200 focus-visible:outline-none flex-shrink-0"
+          style={{ color: 'rgba(255,255,255,0.55)' }}
+        >
+          {lang === 'ar' ? 'EN' : 'AR'}
+        </button>
 
         {/* ── Mobile hamburger ──────────────────────────────────────────────── */}
         <button
@@ -119,7 +139,7 @@ export default function TenantModuleNav() {
                   background: active ? accentDim : 'transparent',
                 }}
               >
-                {item.labelAr}
+                {isRtl ? item.labelAr : item.labelEn}
               </button>
             );
           })}

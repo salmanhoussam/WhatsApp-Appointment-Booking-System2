@@ -65,7 +65,7 @@ export default function StorySection({ data, accent, homepageTheme }) {
   if (!hasBody && stats.length === 0) return null
 
   return (
-    <section ref={ref} style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section ref={ref} style={{ marginBottom: 56 }}>
       {/* Thin accent line */}
       <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2, marginBottom: 20 }} />
 

@@ -30,7 +30,7 @@ export default function LocationSection({ data, accent, homepageTheme }) {
   if (!hasRealPara && tags.length === 0 && !data.maps_url) return null
 
   return (
-    <section ref={ref} style={{ marginBottom: 56, direction: 'rtl' }}>
+    <section ref={ref} style={{ marginBottom: 56 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <motion.h2

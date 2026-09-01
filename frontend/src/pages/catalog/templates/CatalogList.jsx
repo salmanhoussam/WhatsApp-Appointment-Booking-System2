@@ -1,7 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { spring } from '../../../design-system/tokens';
+import { resolveTenantText } from '../../../i18n/resolveTenantText';
+import { t } from '../../../i18n/dictionary';
 
-function ListRow({ item, accent, onAddToCart }) {
+function ListRow({ item, accent, onAddToCart, lang = 'ar' }) {
+  const displayName = resolveTenantText(item, 'name', lang)
+  const displayDesc = resolveTenantText(item, 'description', lang)
   return (
     <motion.div
       layout
@@ -20,7 +24,6 @@ function ListRow({ item, accent, onAddToCart }) {
         border: '1px solid rgba(255,255,255,0.08)',
         cursor: 'default',
         transition: 'border-color 0.2s, background 0.2s',
-        direction: 'rtl',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = `${accent}44`;
@@ -35,7 +38,7 @@ function ListRow({ item, accent, onAddToCart }) {
       {item.image_url ? (
         <img
           src={item.image_url}
-          alt={item.name_ar || item.name_en}
+          alt={displayName}
           style={{
             width: 80, height: 80, borderRadius: 10,
             objectFit: 'cover', flexShrink: 0,
@@ -55,7 +58,7 @@ function ListRow({ item, accent, onAddToCart }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#fff' }}>
-            {item.name_ar || item.name_en}
+            {displayName}
           </h3>
           {item.is_featured && (
             <span style={{
@@ -63,18 +66,18 @@ function ListRow({ item, accent, onAddToCart }) {
               borderRadius: 999, background: `${accent}22`, color: accent,
               letterSpacing: '0.08em', textTransform: 'uppercase',
             }}>
-              مميز
+              {t('featured', lang)}
             </span>
           )}
         </div>
-        {(item.description_ar || item.description_en) && (
+        {displayDesc && (
           <p style={{
             margin: '0 0 6px', fontSize: 12,
             color: 'rgba(255,255,255,0.45)', lineHeight: 1.6,
             overflow: 'hidden', textOverflow: 'ellipsis',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           }}>
-            {item.description_ar || item.description_en}
+            {displayDesc}
           </p>
         )}
       </div>
@@ -84,7 +87,7 @@ function ListRow({ item, accent, onAddToCart }) {
         {item.price != null && (
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: accent, lineHeight: 1 }}>
-              {Number(item.price).toLocaleString('ar-SA')}
+              {Number(item.price).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
               {item.currency}
@@ -113,12 +116,12 @@ function ListRow({ item, accent, onAddToCart }) {
   );
 }
 
-export default function CatalogList({ items = [], accent = '#6d28d9', onAddToCart }) {
+export default function CatalogList({ items = [], accent = '#6d28d9', onAddToCart, lang = 'ar' }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <AnimatePresence mode="popLayout">
         {items.map(item => (
-          <ListRow key={item.id} item={item} accent={accent} onAddToCart={onAddToCart} />
+          <ListRow key={item.id} item={item} accent={accent} onAddToCart={onAddToCart} lang={lang} />
         ))}
       </AnimatePresence>
     </div>

@@ -1,8 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { spring } from '../../../design-system/tokens';
+import { resolveTenantText } from '../../../i18n/resolveTenantText';
+import { t } from '../../../i18n/dictionary';
 
-function ShowcaseCard({ item, accent, index, onAddToCart }) {
+function ShowcaseCard({ item, accent, index, onAddToCart, lang = 'ar' }) {
   const isWide = index % 3 === 0;   // كل 3 بطاقات، الأولى تأخذ عرض كامل
+  const displayName = resolveTenantText(item, 'name', lang)
+  const displayDesc = resolveTenantText(item, 'description', lang)
 
   return (
     <motion.div
@@ -20,7 +24,6 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
         display: 'flex',
         flexDirection: isWide ? 'row' : 'column',
         minHeight: isWide ? 220 : 300,
-        direction: 'rtl',
       }}
     >
       {/* الصورة */}
@@ -34,7 +37,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
         }}>
           <motion.img
             src={item.image_url}
-            alt={item.name_ar || item.name_en}
+            alt={displayName}
             whileHover={{ scale: 1.04 }}
             transition={{ duration: 0.5 }}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -48,7 +51,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
               textTransform: 'uppercase',
               boxShadow: `0 4px 16px ${accent}66`,
             }}>
-              مميز
+              {t('featured', lang)}
             </div>
           )}
         </div>
@@ -80,10 +83,10 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
           color: '#fff',
           lineHeight: 1.3,
         }}>
-          {item.name_ar || item.name_en}
+          {displayName}
         </h2>
 
-        {(item.description_ar || item.description_en) && (
+        {displayDesc && (
           <p style={{
             margin: 0,
             fontSize: 13,
@@ -91,7 +94,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
             lineHeight: 1.7,
             maxWidth: 480,
           }}>
-            {item.description_ar || item.description_en}
+            {displayDesc}
           </p>
         )}
 
@@ -99,7 +102,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
           {item.price != null && (
             <div>
               <span style={{ fontSize: 24, fontWeight: 800, color: accent }}>
-                {Number(item.price).toLocaleString('ar-SA')}
+                {Number(item.price).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
               </span>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginRight: 5 }}>
                 {item.currency}
@@ -125,7 +128,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
             onMouseEnter={e => { e.currentTarget.style.background = `${accent}2a`; }}
             onMouseLeave={e => { e.currentTarget.style.background = onAddToCart ? `${accent}22` : 'transparent'; }}
           >
-            {onAddToCart ? 'أضف للسلة' : 'تفاصيل أكثر'}
+            {onAddToCart ? t('addToCart', lang) : t('moreDetails', lang)}
           </motion.button>
         </div>
       </div>
@@ -133,7 +136,7 @@ function ShowcaseCard({ item, accent, index, onAddToCart }) {
   );
 }
 
-export default function CatalogShowcase({ items = [], accent = '#6d28d9', onAddToCart }) {
+export default function CatalogShowcase({ items = [], accent = '#6d28d9', onAddToCart, lang = 'ar' }) {
   return (
     <motion.div
       layout
@@ -145,7 +148,7 @@ export default function CatalogShowcase({ items = [], accent = '#6d28d9', onAddT
     >
       <AnimatePresence mode="popLayout">
         {items.map((item, idx) => (
-          <ShowcaseCard key={item.id} item={item} accent={accent} index={idx} onAddToCart={onAddToCart} />
+          <ShowcaseCard key={item.id} item={item} accent={accent} index={idx} onAddToCart={onAddToCart} lang={lang} />
         ))}
       </AnimatePresence>
     </motion.div>

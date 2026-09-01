@@ -44,7 +44,7 @@ export default function CtaSection({ data, accent, homepageTheme }) {
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
         transition={{ type: 'spring', stiffness: 100, damping: 22 }}
-        style={{ marginBottom: 56, direction: 'rtl' }}
+        style={{ marginBottom: 56 }}
       >
         <div style={{
           display: 'flex',
@@ -118,7 +118,6 @@ export default function CtaSection({ data, accent, homepageTheme }) {
         marginBottom: 56,
         marginLeft: -24,
         marginRight: -24,
-        direction: 'rtl',
       }}
     >
       <div style={{

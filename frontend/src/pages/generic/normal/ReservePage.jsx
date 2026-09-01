@@ -658,7 +658,7 @@ function BookingPage({ booking, config, accent }) {
 
       <TenantModuleNav />
 
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: '96px 20px 60px', direction: 'rtl' }}>
+      <div style={{ maxWidth: 880, margin: '0 auto', padding: '96px 20px 60px' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, color: DT.textPrimary, fontFamily: FONT }}>
             احجز موعدك
@@ -874,7 +874,7 @@ function LegacyReserveForm({ config, slug, accent, base, navigate }) {
 function LegacyPage({ config, slug, base, navigate }) {
   const accent = config?.primary_color ?? '#d4a853'
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff' }}>
       <TenantModuleNav />
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '88px 20px 80px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
@@ -928,7 +928,7 @@ export default function ReservePage() {
 
   if (!hasReservations) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0a0a0f', direction: 'rtl' }}>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f' }}>
         <TenantModuleNav />
         <div style={{
           maxWidth: 480, margin: '160px auto 0', padding: '0 20px',
@@ -949,7 +949,7 @@ export default function ReservePage() {
         <TenantModuleNav />
         <div style={{
           maxWidth: 420, margin: '160px auto 0', padding: '0 20px', textAlign: 'center',
-          direction: 'rtl', fontFamily: FONT,
+          fontFamily: FONT,
         }}>
           <p style={{ fontSize: 15, color: DT.textSecond, marginBottom: 18 }}>
             حدث خطأ أثناء تحميل صفحة الحجز. يرجى المحاولة مجدداً.
