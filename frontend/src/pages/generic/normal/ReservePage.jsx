@@ -10,6 +10,7 @@ import useTenantSlug          from '../../../hooks/useTenantSlug'
 import { useTenantBase }      from '../../../hooks/useTenantSlug'
 import useReservationBooking  from '../../../hooks/useReservationBooking'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
+import AmbientGridBackground  from '../../../components/AmbientGridBackground'
 import { hasCapability }      from '../../../utils/capabilities'
 import { serviceIconFor }     from '../../../utils/serviceIcons'
 import { T, FONT }            from '../../../theme'
@@ -636,6 +637,10 @@ function BookingPage({ booking, config, accent }) {
   const hoursText = workingHours?.open_time && workingHours?.close_time
     ? `يومياً ${workingHours.open_time} - ${workingHours.close_time}`
     : null
+  // Same opt-in as DynamicPage.jsx (Client.config.page_background) -- RK's reservation page gets
+  // the identical ambient background as its homepage (2026-09-01, explicit request: "بدنا الـ
+  // باك جراوند تبعها يكون بنفس الطريقة"), not a slug check.
+  const pageBackground = config?.config?.page_background || null
 
   return (
     <div style={{
@@ -643,7 +648,14 @@ function BookingPage({ booking, config, accent }) {
       // Same purple-into-black system background as HeroSection.jsx's default gradient (2026-08-16)
       // -- the booking flow now reads as a continuation of the homepage, not a separate light form.
       background: `radial-gradient(ellipse at 70% 0%, ${accent}1c 0%, transparent 55%), ${DT.pageBg}`,
+      position: 'relative',
     }}>
+      {pageBackground === 'ambient_grid' && (
+        <AmbientGridBackground accent={accent} />
+      )}
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+
       <TenantModuleNav />
 
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '96px 20px 60px', direction: 'rtl' }}>
@@ -752,6 +764,8 @@ function BookingPage({ booking, config, accent }) {
             )}
           </div>
         )}
+      </div>
+
       </div>
     </div>
   )

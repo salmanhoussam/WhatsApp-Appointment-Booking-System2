@@ -31,6 +31,7 @@ import CartDrawer     from '../../../design-system/organisms/CartDrawer'
 import TenantHeader    from '../../../design-system/organisms/TenantHeader'
 import ConfigurableHero from '../../../components/ConfigurableHero'
 import Footer from '../../../components/Footer'
+import AmbientGridBackground from '../../../components/AmbientGridBackground'
 
 import {
   HeroSection,
@@ -281,6 +282,11 @@ export default function DynamicPage() {
   // rendering with its own accent-driven look exactly as before this existed (Homepage Phase 2.3,
   // ALZABT_MISTER_H_HOMEPAGE_PHASE2_IMPLEMENTATION_CONTRACT.md §5.2).
   const homepageTheme = tenantConfig.config?.homepage_theme || null
+  // Real, per-tenant, data-driven opt-in (Client.config.page_background) -- same mechanism as
+  // homepage_theme above, NOT a slug check. Absent for every tenant except RK today (2026-09-01,
+  // replaced RK's old scroll-pinned story_experience video/frame hero -- real console warning +
+  // reported mobile sizing issues -- with this same ambient background the Alzabt homepage uses).
+  const pageBackground = tenantConfig.config?.page_background || null
 
   const activeServices = tenantConfig.active_services ?? []
 
@@ -319,7 +325,14 @@ export default function DynamicPage() {
       // fixed TenantHeader (h-16 = 64px) added here 2026-08-31 — this page
       // previously had no header/nav at all (Unified Tenant Header, §9).
       paddingTop: 64,
+      position: 'relative',
     }}>
+      {pageBackground === 'ambient_grid' && (
+        <AmbientGridBackground accent={accent} />
+      )}
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+
       <TenantHeader />
 
       {isDemoRoute && (
@@ -373,6 +386,7 @@ export default function DynamicPage() {
         <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
       )}
 
+      </div>
     </div>
   )
 }
