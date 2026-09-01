@@ -369,6 +369,38 @@ original point-in-time study.
   i18n, Category C3), not by the browsing customer; translating it would be a regression, not an
   improvement. Noted explicitly in that function's own comment, not silently left as a gap.
 
+- **Phase 4** — Reservation flow + checkout, closing the one real gap Phase 3 flagged and left
+  open (the calendar prev/next arrows staying RTL-oriented regardless of `dir`).
+  `useReservationBooking.js`: added `EN_WEEKDAYS`/`EN_WEEKDAYS_SHORT`/`EN_MONTHS`, made
+  `buildMonthGrid()`/`weekdaysShort` lang-aware via `useAppLanguage()`, added a public
+  `formatDate(iso)` (closes over the current `lang`) for UI display. Kept the original
+  `formatArabicDate()` **private and unchanged** — it's used only to build the WhatsApp message
+  sent to the merchant, same Arabic-only-for-merchant convention `CartPage.jsx` already
+  established in Phase 3. `ReservePage.jsx`: **real bug fixed** — `CalendarPanel`'s prev/next
+  chevrons were hardcoded (`ChevronRight` for "previous", `ChevronLeft` for "next", an RTL-only
+  reading) regardless of the page's actual `dir`; now swap based on `lang`. Wired `resolveTenantText()`
+  for service names (`ServiceCircle`, `SummaryCard` — confirmed `CatalogService` really returns
+  `name_en`, `app/services/catalog_service_service.py:21`) and `t()` for ~30 new dictionary keys
+  covering the whole `BookingPage`/`CalendarPanel`/`SummaryCard`/`ConfirmPanel`/
+  `InlineConfirmation` tree, plus `ReservePage`'s own loading/unavailable/error fallback text.
+  `LegacyReserveForm`/`LegacyPage` (a separate mode for non-Barber tenants) deliberately left
+  untouched — out of the stated scope ("BookingPage و CalendarPanel... التي تؤثر على /rk/reserve").
+  **Checkout flow: found already fully done in Phase 3, not new work** — `CartPage.jsx` (RK's
+  real checkout) already calls `useAppLanguage()` (line 271), already uses dynamic
+  `toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')` (lines 67, 558); the only remaining
+  `'ar-SA'` literals in that file (lines 220, 225) are inside `buildStoreWhatsAppMessage()`,
+  intentionally Arabic-only per Phase 3's own documented merchant-facing convention — verified by
+  direct code read, not re-touched.
+  Live-verified via nested Playwright on `/rk/reserve`: `dir`/`lang` flip `rtl/ar` → `ltr/en` on
+  toggle (direct DOM read, not inferred); calendar prev button now renders `chevron-left` on the
+  left and next renders `chevron-right` on the right (correct LTR convention); heading/breadcrumb
+  read as real English ("Book Your Appointment", "Choose Service · Choose Barber · Choose Date ·
+  Confirm"); zero console errors. **Side finding, not fixed**: 3 of RK's real `CatalogService`
+  rows have no `name_en` in the DB, so `resolveTenantText()` correctly falls back to Arabic for
+  those three service names in the English view — a content gap (missing translation data), not
+  a code bug; belongs to the already-logged Dashboard Auto-Translation backlog item below, not a
+  new item.
+
 ### Backlog — explicitly logged, not implemented
 
 **Dashboard Auto-Translation** (Salman's own future-enhancement note, 2026-09-01): once the Admin

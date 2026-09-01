@@ -2,12 +2,19 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import useTenantConfig from './useTenantConfig'
 import useTenantSlug from './useTenantSlug'
 import publicApi from '../utils/publicApi'
+import { useAppLanguage } from '../context/AppLanguageContext'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_WEEKDAYS_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
 const AR_MONTHS = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+]
+const EN_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const EN_WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const EN_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
 function todayUTC() {
@@ -21,7 +28,7 @@ function isoOf(d) {
 
 // Real month-grid (Calendly-style "full month view" rather than a short day-strip -- fewer clicks
 // to reach a day further out, and reads as an actual calendar, not a scrollable list of buttons).
-function buildMonthGrid(monthOffset) {
+function buildMonthGrid(monthOffset, lang) {
   const today = todayUTC()
   const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, 1))
   const startWeekday = first.getUTCDay()
@@ -39,15 +46,26 @@ function buildMonthGrid(monthOffset) {
     })
   }
 
+  const months = lang === 'ar' ? AR_MONTHS : EN_MONTHS
   return {
-    label: `${AR_MONTHS[first.getUTCMonth()]} ${first.getUTCFullYear()}`,
+    label: `${months[first.getUTCMonth()]} ${first.getUTCFullYear()}`,
     cells,
   }
 }
 
+// Always-Arabic -- used only for the merchant-facing WhatsApp confirmation message (Phase 3's
+// established convention, see CartPage.jsx's buildStoreWhatsAppMessage: the message goes to the
+// tenant's own operating language, not the customer's browsing language).
 function formatArabicDate(iso) {
   const d = new Date(`${iso}T00:00:00Z`)
   return `${AR_WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${AR_MONTHS[d.getUTCMonth()]}`
+}
+
+// Customer-facing display date -- follows the current UI language (ADR-0006, Phase 4).
+function formatDisplayDate(iso, lang) {
+  if (lang === 'ar') return formatArabicDate(iso)
+  const d = new Date(`${iso}T00:00:00Z`)
+  return `${EN_WEEKDAYS[d.getUTCDay()]} ${EN_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
 }
 
 // No real customer identity is collected on the primary (WhatsApp) path -- confirmation happens
@@ -72,6 +90,7 @@ const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
 export default function useReservationBooking() {
   const { config, isLoading: configLoading } = useTenantConfig()
   const slug = useTenantSlug()
+  const { lang } = useAppLanguage()
 
   const [barbers, setBarbers] = useState([])
   const [barbersLoading, setBarbersLoading] = useState(true)
@@ -89,7 +108,9 @@ export default function useReservationBooking() {
   )
 
   const [monthOffset, setMonthOffset] = useState(0)
-  const monthGrid = useMemo(() => buildMonthGrid(monthOffset), [monthOffset])
+  const monthGrid = useMemo(() => buildMonthGrid(monthOffset, lang), [monthOffset, lang])
+  const weekdaysShort = lang === 'ar' ? AR_WEEKDAYS_SHORT : EN_WEEKDAYS_SHORT
+  const formatDate = useCallback((iso) => formatDisplayDate(iso, lang), [lang])
   const [selectedDate, setSelectedDate] = useState(() => isoOf(todayUTC()))
 
   const [slots, setSlots] = useState([])
@@ -310,9 +331,9 @@ export default function useReservationBooking() {
   }, [canConfirm, customerName, customerPhone, createReservation])
 
   return {
-    config, configLoading, mode,
+    config, configLoading, mode, lang,
     monthGrid, goPrevMonth, goNextMonth, monthOffset,
-    weekdaysShort: AR_WEEKDAYS_SHORT,
+    weekdaysShort,
     selectedDate, chooseDate,
     services, servicesLoading, selectedServiceId, selectedService, chooseService,
     barbers, barbersLoading, barbersError, retryBarbers, selectedBarberId, selectedBarber, chooseBarber,
@@ -321,6 +342,6 @@ export default function useReservationBooking() {
     customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, reservationId, confirmMethod, whatsappUrl,
     canConfirm, confirmViaWhatsApp, confirmLocally,
-    formatArabicDate,
+    formatDate,
   }
 }

@@ -14,6 +14,8 @@ import AmbientGridBackground  from '../../../components/AmbientGridBackground'
 import { hasCapability }      from '../../../utils/capabilities'
 import { serviceIconFor }     from '../../../utils/serviceIcons'
 import { T, FONT }            from '../../../theme'
+import { t }                  from '../../../i18n/dictionary'
+import { resolveTenantText }  from '../../../i18n/resolveTenantText'
 
 // Light design tokens (T, FONT) imported from the shared source (frontend/src/theme.js) -- used
 // only by the legacy generic date/time form now (LegacyPage, below). The booking-mode UI (real
@@ -131,8 +133,9 @@ function NumberedSection({ index, title, children }) {
 // check badge for selected state, no size jump on select). Same selection semantics as the prior
 // ServiceCard (selected/onClick), only the visual presentation changed -- chooseService/
 // selectedServiceId, the API shape, and every other part of the booking flow are untouched.
-function ServiceCircle({ item, selected, onClick, accent }) {
+function ServiceCircle({ item, selected, onClick, accent, lang }) {
   const Icon = serviceIconFor(item.name_ar)
+  const displayName = resolveTenantText(item, 'name', lang)
   const size = 72
   return (
     <button
@@ -151,7 +154,7 @@ function ServiceCircle({ item, selected, onClick, accent }) {
           transition: 'box-shadow 0.15s ease',
         }}>
           {item.image_url
-            ? <img src={item.image_url} alt={item.name_ar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={item.image_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <Icon size={26} color={accent} strokeWidth={1.75} />}
         </div>
         {selected && (
@@ -165,7 +168,7 @@ function ServiceCircle({ item, selected, onClick, accent }) {
         )}
       </div>
       <span style={{ fontSize: 12.5, fontWeight: 700, color: DT.textPrimary, textAlign: 'center', lineHeight: 1.3 }}>
-        {item.name_ar}
+        {displayName}
       </span>
       {/* Price (Alzabt Master Product Plan, Section D/E's confirmed content gap -- the reference
           set's own booking-widget image showed price alongside duration on every service; this
@@ -175,7 +178,7 @@ function ServiceCircle({ item, selected, onClick, accent }) {
           Price rendered in the restrained secondary GOLD accent -- a deliberate, sparing highlight,
           not the dominant selected-state color (that's `accent`). */}
       <span style={{ fontSize: 10.5, color: DT.textSecond, textAlign: 'center', lineHeight: 1.3 }}>
-        {item.duration_min} دقيقة
+        {item.duration_min} {t('minutesUnit', lang)}
         {item.price != null && (
           <>
             {' · '}
@@ -294,8 +297,15 @@ function CalendarPanel({ booking, accent }) {
   const {
     monthGrid, goPrevMonth, goNextMonth, monthOffset, weekdaysShort,
     selectedDate, chooseDate, slots, slotsLoading, slotsError, retrySlots, selectedSlot, chooseSlot,
-    formatArabicDate,
+    formatDate, lang,
   } = booking
+  // Bug fix (ADR-0006, Phase 4): these chevrons were hardcoded for an RTL-only reading of "back"/
+  // "forward" (prev showed a right-pointing arrow, next a left-pointing one) regardless of the
+  // page's actual `dir` -- confirmed by live verification 2026-09-01 (arrows stayed RTL-oriented
+  // even with `document.dir === 'ltr'`). Now follows the real current language.
+  const isRtl = lang === 'ar'
+  const PrevIcon = isRtl ? ChevronRight : ChevronLeft
+  const NextIcon = isRtl ? ChevronLeft : ChevronRight
 
   // Bring the earliest (first) slot into view when viewing today -- no "find slot near now" search
   // of our own: the backend already returns slots past-filtered and chronologically ordered, so the
@@ -329,7 +339,7 @@ function CalendarPanel({ booking, accent }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <ChevronRight size={15} color={DT.textPrimary} />
+            <PrevIcon size={15} color={DT.textPrimary} />
           </button>
           <div style={{ fontSize: 15, fontWeight: 800, color: DT.textPrimary }}>{monthGrid.label}</div>
           <button
@@ -339,7 +349,7 @@ function CalendarPanel({ booking, accent }) {
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <ChevronLeft size={15} color={DT.textPrimary} />
+            <NextIcon size={15} color={DT.textPrimary} />
           </button>
         </div>
 
@@ -377,7 +387,7 @@ function CalendarPanel({ booking, accent }) {
         </div>
 
         <p style={{ marginTop: 12, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>
-          الأيام المتاحة قابلة للاختيار
+          {t('availableDaysNote', lang)}
         </p>
       </div>
 
@@ -385,7 +395,7 @@ function CalendarPanel({ booking, accent }) {
       <div style={{ borderInlineStart: `1px solid ${DT.borderSoft}`, paddingInlineStart: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <CalendarDays size={16} color={DT.textSecond} />
-          <span style={{ fontSize: 14, fontWeight: 700, color: DT.textPrimary }}>{formatArabicDate(selectedDate)}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: DT.textPrimary }}>{formatDate(selectedDate)}</span>
         </div>
 
         {slotsLoading && <LightLoadingDot accent={accent} />}
@@ -396,7 +406,7 @@ function CalendarPanel({ booking, accent }) {
         {!slotsLoading && slotsError && (
           <div style={{ textAlign: 'center', padding: '30px 0' }}>
             <p style={{ color: DT.textMuted, fontSize: 13, marginBottom: 12 }}>
-              حدث خطأ أثناء تحميل المواعيد. يرجى المحاولة مجدداً.
+              {t('slotsErrorText', lang)}
             </p>
             <button
               onClick={retrySlots}
@@ -406,13 +416,13 @@ function CalendarPanel({ booking, accent }) {
                 cursor: 'pointer', fontFamily: FONT,
               }}
             >
-              إعادة المحاولة
+              {t('retry', lang)}
             </button>
           </div>
         )}
         {!slotsLoading && !slotsError && slots.length === 0 && (
           <p style={{ color: DT.textMuted, fontSize: 13, textAlign: 'center', padding: '30px 0' }}>
-            لا توجد مواعيد متاحة في هذا اليوم — جرّب يوماً آخر.
+            {t('noSlotsText', lang)}
           </p>
         )}
         {/* Horizontal-scroll pill strip (2026-08-16, explicit spec: "horizontal time-slot pills on
@@ -459,7 +469,7 @@ function CalendarPanel({ booking, accent }) {
           </>
         )}
         <p style={{ marginTop: 14, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>
-          التوقيت المحلي (GMT+3)
+          {t('localTimeNote', lang)}
         </p>
       </div>
     </div>
@@ -467,24 +477,24 @@ function CalendarPanel({ booking, accent }) {
 }
 
 function SummaryCard({ booking }) {
-  const { selectedService, selectedBarber, selectedDate, selectedSlot, formatArabicDate } = booking
+  const { selectedService, selectedBarber, selectedDate, selectedSlot, formatDate, lang } = booking
   const rows = [
-    { icon: Scissors, label: 'الخدمة', value: selectedService?.name_ar },
-    { icon: UserRound, label: 'الحلاق', value: selectedBarber?.name },
-    { icon: CalendarDays, label: 'اليوم', value: selectedSlot ? formatArabicDate(selectedDate) : null },
-    { icon: Clock, label: 'الوقت', value: selectedSlot?.time },
-    { icon: Timer, label: 'المدة', value: selectedService?.duration_min ? `${selectedService.duration_min} دقيقة` : null },
+    { icon: Scissors, label: t('serviceLabel', lang), value: selectedService ? resolveTenantText(selectedService, 'name', lang) : null },
+    { icon: UserRound, label: t('barberLabel', lang), value: selectedBarber?.name },
+    { icon: CalendarDays, label: t('dayLabel', lang), value: selectedSlot ? formatDate(selectedDate) : null },
+    { icon: Clock, label: t('timeLabel', lang), value: selectedSlot?.time },
+    { icon: Timer, label: t('durationLabel', lang), value: selectedService?.duration_min ? `${selectedService.duration_min} ${t('minutesUnit', lang)}` : null },
     // Price row (Alzabt Master Product Plan, Section D/E) -- same confirmed content gap as
     // ServiceCircle above; shown here too so the price is visible through the whole flow, not
     // just at the initial service-picking step.
-    { icon: Tag, label: 'السعر', value: selectedService?.price != null ? `${selectedService.price} ${selectedService.currency}` : null, gold: true },
+    { icon: Tag, label: t('priceLabel', lang), value: selectedService?.price != null ? `${selectedService.price} ${selectedService.currency}` : null, gold: true },
   ]
   return (
     <div style={{
       background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 18, padding: '20px 22px',
       boxShadow: DT.shadow, display: 'flex', flexDirection: 'column', gap: 14,
     }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: DT.textPrimary }}>ملخص الحجز</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: DT.textPrimary }}>{t('bookingSummary', lang)}</div>
       {rows.map((r) => (
         <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
@@ -501,7 +511,7 @@ function SummaryCard({ booking }) {
 function ConfirmPanel({ booking, accent }) {
   const {
     showLocalForm, toggleLocalForm, customerName, setCustomerName, customerPhone, setCustomerPhone,
-    submitting, submitError, canConfirm, confirmViaWhatsApp, confirmLocally,
+    submitting, submitError, canConfirm, confirmViaWhatsApp, confirmLocally, lang,
   } = booking
 
   return (
@@ -509,7 +519,7 @@ function ConfirmPanel({ booking, accent }) {
       background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 18, padding: '22px 22px',
       boxShadow: DT.shadow, display: 'flex', flexDirection: 'column', gap: 12,
     }}>
-      <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>طريقة سريعة ومريحة</p>
+      <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>{t('quickMethod', lang)}</p>
 
       {submitError && (
         <div style={{
@@ -532,12 +542,12 @@ function ConfirmPanel({ booking, accent }) {
         }}
       >
         <MessageCircle size={18} />
-        {submitting ? 'جارٍ التأكيد...' : 'متابعة الحجز عبر واتساب'}
+        {submitting ? t('confirmingText', lang) : t('confirmViaWhatsAppBtn', lang)}
       </motion.button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
         <div style={{ flex: 1, height: 1, background: DT.borderSoft }} />
-        <span style={{ fontSize: 11, color: DT.textMuted }}>أو</span>
+        <span style={{ fontSize: 11, color: DT.textMuted }}>{t('orSeparator', lang)}</span>
         <div style={{ flex: 1, height: 1, background: DT.borderSoft }} />
       </div>
 
@@ -555,14 +565,14 @@ function ConfirmPanel({ booking, accent }) {
             }}
           >
             <UserRound size={16} />
-            أكمل الحجز من الموقع
+            {t('completeFromSite', lang)}
           </button>
-          <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>سيتم تأكيد الحجز فوراً</p>
+          <p style={{ margin: 0, fontSize: 11, color: DT.textMuted, textAlign: 'center' }}>{t('confirmedInstantly', lang)}</p>
         </>
       ) : (
         <form onSubmit={confirmLocally} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
-            required placeholder="الاسم" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+            required placeholder={t('namePlaceholder', lang)} value={customerName} onChange={(e) => setCustomerName(e.target.value)}
             style={{
               width: '100%', padding: '11px 14px', boxSizing: 'border-box', borderRadius: 10,
               border: `1px solid ${DT.cardBorder}`, background: DT.pageBg, color: DT.textPrimary,
@@ -570,7 +580,7 @@ function ConfirmPanel({ booking, accent }) {
             }}
           />
           <input
-            required type="tel" placeholder="رقم الهاتف" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+            required type="tel" placeholder={t('phonePlaceholder', lang)} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
             style={{
               width: '100%', padding: '11px 14px', boxSizing: 'border-box', borderRadius: 10,
               border: `1px solid ${DT.cardBorder}`, background: DT.pageBg, color: DT.textPrimary,
@@ -585,7 +595,7 @@ function ConfirmPanel({ booking, accent }) {
               cursor: submitting ? 'not-allowed' : 'pointer', opacity: (!customerName || !customerPhone) ? 0.5 : 1,
             }}
           >
-            تأكيد الحجز من الموقع
+            {t('confirmBookingBtn', lang)}
           </motion.button>
         </form>
       )}
@@ -594,7 +604,7 @@ function ConfirmPanel({ booking, accent }) {
 }
 
 function InlineConfirmation({ booking, accent }) {
-  const { reservationId, confirmMethod, whatsappUrl } = booking
+  const { reservationId, confirmMethod, whatsappUrl, lang } = booking
   return (
     <div style={{
       background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 20, padding: '48px 24px',
@@ -606,17 +616,17 @@ function InlineConfirmation({ booking, accent }) {
       }}>
         <Check size={26} color={GOLD} strokeWidth={3} />
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 19, fontWeight: 800, color: DT.textPrimary }}>تم إنشاء حجزك</h2>
+      <h2 style={{ margin: '0 0 8px', fontSize: 19, fontWeight: 800, color: DT.textPrimary }}>{t('bookingCreatedTitle', lang)}</h2>
       <p style={{ margin: 0, fontSize: 14, color: DT.textSecond, maxWidth: 380, marginInline: 'auto' }}>
         {confirmMethod === 'whatsapp'
-          ? 'فتحنا لك واتساب برسالة جاهزة — أرسلها لصاحب المحل لتأكيد الحجز نهائياً.'
-          : 'تم تسجيل حجزك — سيتواصل معك صاحب المحل لتأكيد الموعد.'}
-        {' '}رقم الحجز: <span style={{ color: accent, fontWeight: 700 }}>{reservationId.slice(0, 8)}</span>
+          ? t('whatsappConfirmMsg', lang)
+          : t('localConfirmMsg', lang)}
+        {' '}{t('reservationNumberLabel', lang)}: <span style={{ color: accent, fontWeight: 700 }}>{reservationId.slice(0, 8)}</span>
       </p>
       {confirmMethod === 'whatsapp' && whatsappUrl && (
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
           style={{ display: 'inline-block', marginTop: 16, fontSize: 13, color: DT.whatsapp, fontWeight: 700, fontFamily: FONT }}>
-          لم تفتح صفحة واتساب؟ اضغط هنا
+          {t('openWhatsAppLink', lang)}
         </a>
       )}
     </div>
@@ -629,13 +639,13 @@ function BookingPage({ booking, config, accent }) {
   const {
     services, servicesLoading, selectedServiceId, chooseService,
     barbers, barbersLoading, selectedBarberId, chooseBarber,
-    reservationId,
+    reservationId, lang,
   } = booking
 
   const whatsappNumber = config?.whatsapp_number
   const workingHours = config?.config?.working_hours
   const hoursText = workingHours?.open_time && workingHours?.close_time
-    ? `يومياً ${workingHours.open_time} - ${workingHours.close_time}`
+    ? `${t('dailyPrefix', lang)} ${workingHours.open_time} - ${workingHours.close_time}`
     : null
   // Same opt-in as DynamicPage.jsx (Client.config.page_background) -- RK's reservation page gets
   // the identical ambient background as its homepage (2026-09-01, explicit request: "بدنا الـ
@@ -661,7 +671,7 @@ function BookingPage({ booking, config, accent }) {
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '96px 20px 60px' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, color: DT.textPrimary, fontFamily: FONT }}>
-            احجز موعدك
+            {t('bookingHeading', lang)}
           </h1>
           {/* Compact breadcrumb subtitle (2026-08-17, real reference) -- states the whole 4-step
               flow in one glance instead of one paraphrased sentence, so the user always knows
@@ -670,13 +680,13 @@ function BookingPage({ booking, config, accent }) {
             margin: 0, fontSize: 12.5, color: DT.textMuted, fontFamily: FONT,
             letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}>
-            <span>اختر الخدمة</span>
+            <span>{t('stepChooseService', lang)}</span>
             <span style={{ opacity: 0.5 }}>·</span>
-            <span>اختر الحلاق</span>
+            <span>{t('stepChooseBarber', lang)}</span>
             <span style={{ opacity: 0.5 }}>·</span>
-            <span>اختر الموعد</span>
+            <span>{t('stepChooseDateShort', lang)}</span>
             <span style={{ opacity: 0.5 }}>·</span>
-            <span>تأكيد</span>
+            <span>{t('confirm', lang)}</span>
           </p>
         </div>
 
@@ -688,7 +698,7 @@ function BookingPage({ booking, config, accent }) {
               background: DT.cardBg, border: `1px solid ${DT.cardBorder}`, borderRadius: 22, boxShadow: DT.shadowLg,
               padding: '28px 26px', display: 'flex', flexDirection: 'column', gap: 26,
             }}>
-              <NumberedSection index={1} title="اختر الخدمة">
+              <NumberedSection index={1} title={t('stepChooseService', lang)}>
                 {servicesLoading ? <LightLoadingDot accent={accent} /> : (
                   <>
                     <ServicesScrollStyle />
@@ -703,7 +713,7 @@ function BookingPage({ booking, config, accent }) {
                       }}
                     >
                       {services.map((s) => (
-                        <ServiceCircle key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} accent={accent} />
+                        <ServiceCircle key={s.id} item={s} selected={selectedServiceId === s.id} onClick={() => chooseService(s.id)} accent={accent} lang={lang} />
                       ))}
                     </div>
                   </>
@@ -721,7 +731,7 @@ function BookingPage({ booking, config, accent }) {
                   Forcing a fresh mount per service is the idiomatic React fix for "reset local state
                   when an external input changes" (react.dev/learn/you-might-not-need-an-effect),
                   not a manual useEffect(() => setOffset(0), [barbers]). */}
-              <NumberedSection index={2} title="اختر الحلاق">
+              <NumberedSection index={2} title={t('stepChooseBarber', lang)}>
                 {barbersLoading ? <LightLoadingDot accent={accent} /> : (
                   <StaffCarousel key={selectedServiceId} barbers={barbers} selectedBarberId={selectedBarberId} onChoose={chooseBarber} accent={accent} />
                 )}
@@ -729,7 +739,7 @@ function BookingPage({ booking, config, accent }) {
 
               <div style={{ borderTop: `1px solid ${DT.borderSoft}` }} />
 
-              <NumberedSection index={3} title="اختر اليوم والوقت">
+              <NumberedSection index={3} title={t('sectionChooseDateTime', lang)}>
                 <CalendarPanel booking={booking} accent={accent} />
               </NumberedSection>
             </div>
@@ -749,17 +759,17 @@ function BookingPage({ booking, config, accent }) {
             {whatsappNumber && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
                 <Phone size={15} />
-                <span>دعم العملاء +{whatsappNumber}</span>
+                <span>{t('customerSupportLabel', lang)} +{whatsappNumber}</span>
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
               <MapPin size={15} />
-              <span>موقعنا لبنان</span>
+              <span>{t('ourLocationLabel', lang)}</span>
             </div>
             {hoursText && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DT.textSecond, fontSize: 13 }}>
                 <Clock size={15} />
-                <span>ساعات العمل {hoursText}</span>
+                <span>{t('workingHoursLabel', lang)} {hoursText}</span>
               </div>
             )}
           </div>
@@ -905,7 +915,7 @@ export default function ReservePage() {
   const base     = useTenantBase()
   const navigate = useNavigate()
   const booking  = useReservationBooking()
-  const { config, configLoading, mode } = booking
+  const { config, configLoading, mode, lang } = booking
   const accent   = config?.primary_color ?? GOLD
 
   // Loading must be checked BEFORE the "unavailable" branch below -- config is undefined while
@@ -934,7 +944,7 @@ export default function ReservePage() {
           maxWidth: 480, margin: '160px auto 0', padding: '0 20px',
           textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontFamily: FONT, fontSize: 16,
         }}>
-          خدمة الحجز غير متاحة حالياً.
+          {t('reservationUnavailable', lang)}
         </div>
       </div>
     )
@@ -952,7 +962,7 @@ export default function ReservePage() {
           fontFamily: FONT,
         }}>
           <p style={{ fontSize: 15, color: DT.textSecond, marginBottom: 18 }}>
-            حدث خطأ أثناء تحميل صفحة الحجز. يرجى المحاولة مجدداً.
+            {t('reservationLoadError', lang)}
           </p>
           <button
             onClick={booking.retryBarbers}
@@ -962,7 +972,7 @@ export default function ReservePage() {
               cursor: 'pointer', fontFamily: FONT,
             }}
           >
-            إعادة المحاولة
+            {t('retry', lang)}
           </button>
         </div>
       </div>
