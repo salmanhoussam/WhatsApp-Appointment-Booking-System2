@@ -108,7 +108,13 @@ export const SERVICE_CATALOG = {
     labelEn:  'Book',
     icon:     'calendar',
     route:    (slug) => `/${slug}/reserve`,
-    priority: 15,
+    // 8, not 15 (2026-09-01, RK Nav & Shop Correction) -- renders before `store` (priority 10) so
+    // a tenant with both active (today, only RK: reservations+store together) shows "Book" before
+    // "Shop", matching the requested nav order. No other tenant currently has both active
+    // simultaneously (confirmed via a real DB check across every client_services row), so this
+    // reorder has zero effect anywhere else -- `booking`'s own priority (10, real-estate module)
+    // is untouched.
+    priority: 8,
   },
 };
 

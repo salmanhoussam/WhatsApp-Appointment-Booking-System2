@@ -112,8 +112,13 @@ SECTION_SCHEMAS = {
     "products": {
         "label_ar": "المنتجات",
         "fields": {
-            "heading_ar": {"kind": "text",   "label_ar": "العنوان"},
-            "limit":      {"kind": "number", "label_ar": "عدد المنتجات المعروضة"},
+            "heading_ar":      {"kind": "text",   "label_ar": "العنوان"},
+            "limit":           {"kind": "number", "label_ar": "عدد المنتجات المعروضة"},
+            # Optional video banner above the grid (2026-09-01) -- lets a tenant show one video
+            # (e.g. a hair-care product clip) directly above its real product grid instead of a
+            # separate, disconnected `video_story` section duplicating the "منتجاتنا" heading.
+            "video_url":       {"kind": "url",  "label_ar": "رابط فيديو أعلى القسم (اختياري)"},
+            "video_caption_ar": {"kind": "text", "label_ar": "وصف الفيديو"},
         },
     },
     "hours": {

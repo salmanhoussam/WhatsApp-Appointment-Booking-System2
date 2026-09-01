@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import useTenantConfig from './useTenantConfig'
 import useTenantSlug from '../hooks/useTenantSlug'
 import useGenericStore from '../pages/generic/store/useGenericStore'
-import { fetchAllCategories, fetchItems } from '../services/catalogApi'
+import { fetchAllCategories, fetchCategories, fetchItems } from '../services/catalogApi'
 
 /**
  * useCatalog — domain hook for any catalog-driven page.
@@ -51,19 +51,45 @@ export default function useCatalog() {
   // Fetch every real category for this tenant once slug is ready -- no tenant-wide moduleKey
   // gate. Each category already carries its own real `module_key` (TOS-004, Capability
   // Resolution Layer); nothing here needs to know "the tenant's type" to fetch its categories.
+  //
+  // Real bug, fixed 2026-09-01 (RK Nav & Shop Correction, found live: RK's Shop showed "لا توجد
+  // عناصر" after `catalog` was correctly deactivated for RK -- `fetchAllCategories()` below is
+  // `/{slug}/catalog/categories`, gated by `require_service("catalog")` specifically, not "any
+  // catalog-bearing capability". Salman's own correction: this isn't RK-specific -- ANY tenant
+  // whose real capabilities are `reservations`+`store` (no generic `catalog`) hits the identical
+  // gap, since that's the standard shape for a barber/service-vertical tenant with a shop. Fixed
+  // generally here, not with a slug check: when `catalog` isn't active, fetch each *specific*
+  // module's own categories endpoint instead (same ones ProductsSection.jsx/FeaturedItemsSection.jsx
+  // already use) and tag each with its real module_key by hand (those endpoints don't return one --
+  // downstream fetchItems() needs it to route correctly). Every tenant that DOES have `catalog`
+  // active keeps the exact same single-call behavior as before, byte-identical.
   useEffect(() => {
-    if (!slug) return
+    if (!slug || configLoading) return
     setCatsLoading(true)
-    fetchAllCategories(slug)
-      .then(({ data }) => {
+
+    const activeServices = config?.active_services ?? []
+    const hasCatalog = activeServices.includes('catalog')
+
+    const catsPromise = hasCatalog
+      ? fetchAllCategories(slug).then(({ data }) => data?.data ?? [])
+      : Promise.all([
+          activeServices.includes('store')
+            ? fetchCategories('store', slug).then(({ data }) => (data?.data ?? []).map((c) => ({ ...c, module_key: 'store' })))
+            : Promise.resolve([]),
+          activeServices.includes('restaurant')
+            ? fetchCategories('restaurant', slug).then(({ data }) => (data?.data ?? []).map((c) => ({ ...c, module_key: 'restaurant' })))
+            : Promise.resolve([]),
+        ]).then((lists) => lists.flat())
+
+    catsPromise
+      .then((cats) => {
         if (!mountedRef.current) return
-        const cats = data?.data ?? []
         setCategories(cats)
         if (cats.length) setActiveCatRaw(cats[0])
       })
       .catch(() => { if (mountedRef.current) setCategories([]) })
       .finally(() => { if (mountedRef.current) setCatsLoading(false) })
-  }, [slug])
+  }, [slug, configLoading, config])
 
   // Fetch items when active category changes -- routed by THAT category's own module_key
   // (per-record ownership), never a tenant-wide derived value.

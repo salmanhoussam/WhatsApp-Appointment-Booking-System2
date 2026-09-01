@@ -14,9 +14,11 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { fetchCategories, fetchItems } from '../../services/catalogApi'
 import CatalogItemCard from '../../design-system/molecules/CatalogItemCard'
 import { homepageTokens } from './homepageTokens'
+import { getServiceRoute } from '../../config/service-catalog'
 
 function SkeletonCard() {
   return (
@@ -34,10 +36,12 @@ export default function ProductsSection({ data, accent, slug, onAddToCart, confi
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
+  const navigate = useNavigate()
   const useBlackGold = homepageTheme === 'black_gold'
   const themeAccent = useBlackGold ? homepageTokens.accent : accent
 
   const hasStore = (config?.active_services ?? []).includes('store')
+  const shopRoute = getServiceRoute('store', slug)
 
   // Same real StrictMode mountedRef-reset bug already fixed in FeaturedItemsSection.jsx/
   // useCatalog.js (2026-07-21) -- reset on every effect setup, not just the initializer.
@@ -91,6 +95,26 @@ export default function ProductsSection({ data, accent, slug, onAddToCart, confi
         <div style={{ width: 36, height: 3, background: themeAccent, borderRadius: 2 }} />
       </div>
 
+      {/* Optional video banner (2026-09-01) -- video on top, real product grid under it, one
+          section instead of a separate video_story section duplicating this same heading. */}
+      {data.video_url && (
+        <div style={{ marginBottom: 24 }}>
+          <video
+            src={data.video_url}
+            autoPlay muted loop playsInline
+            style={{ width: '100%', maxHeight: 420, objectFit: 'cover', display: 'block', borderRadius: 16 }}
+          />
+          {data.video_caption_ar && (
+            <p style={{
+              marginTop: 10, fontSize: 14, color: 'rgba(255,255,255,0.55)',
+              fontFamily: "'Cairo', sans-serif", textAlign: 'center',
+            }}>
+              {data.video_caption_ar}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Grid */}
       <AnimatePresence mode="wait">
         {loading ? (
@@ -129,6 +153,26 @@ export default function ProductsSection({ data, accent, slug, onAddToCart, confi
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* "View all products" -- RK Nav & Shop Correction (2026-09-01): this section is a curated
+          preview (data.limit), the full catalog lives on the real Shop page (/{slug}/store,
+          CatalogPage.jsx) -- reused here, not a second shop implementation. */}
+      {!loading && items.length > 0 && shopRoute && (
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <button
+            type="button"
+            onClick={() => navigate(shopRoute)}
+            style={{
+              padding: '10px 28px', borderRadius: 999, cursor: 'pointer',
+              background: 'transparent', border: `1px solid ${themeAccent}`,
+              color: themeAccent, fontSize: 13, fontWeight: 700,
+              fontFamily: useBlackGold ? homepageTokens.bodyFont : "'Cairo', sans-serif",
+            }}
+          >
+            شاهد كل المنتجات ←
+          </button>
+        </div>
+      )}
     </section>
   )
 }

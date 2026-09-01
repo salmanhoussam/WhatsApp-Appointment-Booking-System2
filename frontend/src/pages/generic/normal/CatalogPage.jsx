@@ -11,6 +11,7 @@ import { hasOrderCapability }                           from '../../../utils/cap
 import CatalogGrid                                      from '../../catalog/templates/CatalogGrid'
 import CatalogList                                      from '../../catalog/templates/CatalogList'
 import CatalogShowcase                                  from '../../catalog/templates/CatalogShowcase'
+import AmbientGridBackground                            from '../../../components/AmbientGridBackground'
 
 const TEMPLATE_MAP = { grid: CatalogGrid, list: CatalogList, showcase: CatalogShowcase }
 
@@ -90,9 +91,21 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
 
   const templateKey = layoutOverride ?? activeCategory?.display_template ?? 'grid'
   const Template    = TEMPLATE_MAP[templateKey] ?? CatalogGrid
+  // Same opt-in as DynamicPage.jsx/ReservePage.jsx (Client.config.page_background) -- RK's Shop
+  // page (this component, at /rk/store) gets the identical ambient background as Home/Reservation
+  // (RK Nav & Shop Correction, 2026-09-01, "Shop must visually belong to the same product
+  // experience"). Absent for every other tenant using this shared page (footlab, caracas,
+  // olivello, sneakers-*, beit-al-fakhar, ...) -- not a slug check.
+  const pageBackground = config?.config?.page_background || null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl' }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', direction: 'rtl', position: 'relative' }}>
+      {pageBackground === 'ambient_grid' && (
+        <AmbientGridBackground accent={accent} />
+      )}
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+
       <TenantModuleNav />
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '88px 20px 100px' }}>
@@ -165,6 +178,8 @@ export default function CatalogPage({ layoutOverride, productLinkBase } = {}) {
           />
         </AnimatePresence>
       )}
+
+      </div>
     </div>
   )
 }
