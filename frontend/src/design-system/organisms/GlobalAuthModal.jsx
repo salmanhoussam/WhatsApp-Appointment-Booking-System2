@@ -3,11 +3,19 @@
  *
  * Unified auth entry point for the tenant frontend.
  *
- * Two sections:
- *   1. Guest form — toggles between Sign In / Create Account
- *      Calls POST /public/{slug}/auth/login  or  /register
- *   2. Admin bridge — subtle footer link → hard redirect to
- *      https://demo.salmansaas.com (cross-subdomain, no React Router)
+ * Guest form — toggles between Sign In / Create Account.
+ * Calls POST /{slug}/auth/login or /register — real customer-scoped routes
+ * (app/api/v1/public/__init__.py, added 2026-09-01; this modal called them since it was built,
+ * but no route ever answered until then — real, confirmed 404, fixed).
+ *
+ * No admin/dashboard link anywhere in this modal (removed 2026-09-01, Salman's explicit
+ * instruction) -- dashboard access is exclusive via a direct link/QR code sent to the tenant, never
+ * discoverable from a public customer-facing surface.
+ *
+ * Brand color: reads config.primary_color via useTenantConfig(), same CSS-var approach as
+ * TenantHeader.jsx (accent* below) -- was hardcoded to smar's own gold `#d4a853` everywhere in this
+ * file before 2026-09-01, unrelated to and untouched by that same day's TenantHeader.jsx fix (this
+ * is a separate component).
  *
  * FM12 / React 19 safety:
  *   Only animate=, whileHover, whileTap, AnimatePresence — no MotionValues.
@@ -17,15 +25,30 @@
  *   onClose {function}
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Phone, Lock, User, Eye, EyeOff, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
+import { X, Phone, Lock, User, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
 import publicApi from '../../utils/publicApi';
 import useTenantSlug from '../../hooks/useTenantSlug';
+import useTenantConfig from '../../hooks/useTenantConfig';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+const FALLBACK_ACCENT = '#d4a853';
 
-const ADMIN_PORTAL_URL = 'https://demo.salmansaas.com';
+function hexToRgba(hex, alpha) {
+  const h = typeof hex === 'string' ? hex.replace('#', '') : '';
+  if (h.length !== 6) return `rgba(212, 168, 83, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function darkenHex(hex, amount) {
+  const h = typeof hex === 'string' ? hex.replace('#', '') : '';
+  if (h.length !== 6) return '#b8892e';
+  const chan = (i) => Math.max(0, Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - amount)));
+  return `rgb(${chan(0)}, ${chan(2)}, ${chan(4)})`;
+}
 
 // ── Animation variants ────────────────────────────────────────────────────────
 
@@ -49,7 +72,7 @@ const FORM_SLIDE = {
 
 // ── Input field component ─────────────────────────────────────────────────────
 
-function Field({ icon: Icon, type = 'text', placeholder, value, onChange, action }) {
+function Field({ icon: Icon, type = 'text', placeholder, value, onChange, action, accentSoft, accentBorder }) {
   return (
     <div style={{
       position: 'relative',
@@ -62,7 +85,7 @@ function Field({ icon: Icon, type = 'text', placeholder, value, onChange, action
         style={{
           position: 'absolute',
           right: 14,
-          color: 'rgba(212,168,83,0.5)',
+          color: accentSoft,
           pointerEvents: 'none',
           flexShrink: 0,
         }}
@@ -85,7 +108,7 @@ function Field({ icon: Icon, type = 'text', placeholder, value, onChange, action
           transition: 'border-color 0.2s',
           fontFamily: 'inherit',
         }}
-        onFocus={e => { e.target.style.borderColor = 'rgba(212,168,83,0.45)'; }}
+        onFocus={e => { e.target.style.borderColor = accentBorder; }}
         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.09)'; }}
       />
       {action && (
@@ -116,6 +139,14 @@ function Field({ icon: Icon, type = 'text', placeholder, value, onChange, action
 
 export default function GlobalAuthModal({ isOpen, onClose }) {
   const slug = useTenantSlug();
+  const { config } = useTenantConfig();
+
+  const accent = config?.primary_color || FALLBACK_ACCENT;
+  const accentDeep  = useMemo(() => darkenHex(accent, 0.15), [accent]);
+  const accentSoft  = useMemo(() => hexToRgba(accent, 0.5), [accent]);
+  const accentBorder = useMemo(() => hexToRgba(accent, 0.45), [accent]);
+  const accentBorderThin = useMemo(() => hexToRgba(accent, 0.14), [accent]);
+  const accentLine = useMemo(() => `linear-gradient(90deg, transparent, ${hexToRgba(accent, 0.7)} 50%, transparent)`, [accent]);
 
   const [mode,        setMode]        = useState('signin'); // 'signin' | 'register'
   const [phone,       setPhone]       = useState('');
@@ -156,6 +187,11 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
         const { data } = await publicApi.post(`/${slug}/auth/login`, { identifier: phone, password });
         if (data?.token) {
           localStorage.setItem('guest_token', data.token);
+          // Persisted so a real reservation confirm form (ReservePage.jsx's ConfirmPanel, via
+          // useReservationBooking.js) can auto-fill name/phone for a logged-in customer instead of
+          // asking again for data we already have (2026-09-01, Salman's explicit request).
+          if (data.name) localStorage.setItem('guest_name', data.name);
+          if (data.phone) localStorage.setItem('guest_phone', data.phone);
           setSuccessMsg('تم تسجيل الدخول بنجاح');
           setTimeout(handleClose, 1200);
         }
@@ -170,10 +206,6 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleAdminPortal() {
-    window.location.href = ADMIN_PORTAL_URL;
   }
 
   const isRegister = mode === 'register';
@@ -210,16 +242,16 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
               maxWidth: 400,
               background: 'hsl(240 8% 7% / 0.95)',
               backdropFilter: 'blur(40px) brightness(1.08)',
-              border: '1px solid rgba(212,168,83,0.14)',
+              border: `1px solid ${accentBorderThin}`,
               borderRadius: 24,
-              boxShadow: '0 32px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(212,168,83,0.08)',
+              boxShadow: `0 32px 80px rgba(0,0,0,0.75), inset 0 1px 0 ${hexToRgba(accent, 0.08)}`,
               overflow: 'hidden',
             }}
           >
-            {/* Top gold accent line */}
+            {/* Top accent line — tenant color */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-              background: 'linear-gradient(90deg, transparent, rgba(212,168,83,0.7) 50%, transparent)',
+              background: accentLine,
             }} />
 
             {/* ── Header ───────────────────────────────────────────────── */}
@@ -272,7 +304,7 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                     style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       padding: '8px 12px', borderRadius: 9,
-                      background: active ? 'linear-gradient(135deg, #d4a853, #b8892e)' : 'transparent',
+                      background: active ? `linear-gradient(135deg, ${accent}, ${accentDeep})` : 'transparent',
                       border: 'none',
                       color: active ? '#0a0a0f' : 'rgba(255,255,255,0.45)',
                       fontWeight: active ? 700 : 500,
@@ -305,6 +337,8 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                     placeholder="الاسم الكامل"
                     value={name}
                     onChange={e => setName(e.target.value)}
+                    accentSoft={accentSoft}
+                    accentBorder={accentBorder}
                   />
                 )}
 
@@ -314,6 +348,8 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                   placeholder="رقم الهاتف أو البريد الإلكتروني"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
+                  accentSoft={accentSoft}
+                  accentBorder={accentBorder}
                 />
 
                 <Field
@@ -322,6 +358,8 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                   placeholder="كلمة المرور"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  accentSoft={accentSoft}
+                  accentBorder={accentBorder}
                   action={{
                     onClick: () => setShowPass(s => !s),
                     icon: showPass
@@ -357,11 +395,11 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                   whileTap={loading  ? {} : { scale: 0.98 }}
                   style={{
                     width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
-                    background: loading ? 'rgba(212,168,83,0.4)' : 'linear-gradient(135deg, #d4a853 0%, #b8892e 100%)',
+                    background: loading ? hexToRgba(accent, 0.4) : `linear-gradient(135deg, ${accent} 0%, ${accentDeep} 100%)`,
                     color: '#0a0a0f', fontWeight: 700, fontSize: 14,
                     cursor: loading ? 'not-allowed' : 'pointer',
                     letterSpacing: '0.04em',
-                    boxShadow: loading ? 'none' : '0 4px 20px rgba(212,168,83,0.28)',
+                    boxShadow: loading ? 'none' : `0 4px 20px ${hexToRgba(accent, 0.28)}`,
                     transition: 'background 0.2s, box-shadow 0.2s',
                     marginTop: 2,
                   }}
@@ -371,48 +409,7 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
               </motion.form>
             </AnimatePresence>
 
-            {/* ── Admin bridge ──────────────────────────────────────────── */}
-            <div style={{ padding: '16px 22px 20px' }}>
-              {/* Divider */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
-              }}>
-                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                  أو
-                </span>
-                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-              </div>
-
-              {/* Admin portal link */}
-              <button
-                type="button"
-                onClick={handleAdminPortal}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(124,158,255,0.05)',
-                  border: '1px solid rgba(124,158,255,0.15)',
-                  color: 'rgba(124,158,255,0.7)',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  letterSpacing: '0.03em',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(124,158,255,0.10)';
-                  e.currentTarget.style.borderColor = 'rgba(124,158,255,0.35)';
-                  e.currentTarget.style.color = 'rgba(124,158,255,0.95)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(124,158,255,0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(124,158,255,0.15)';
-                  e.currentTarget.style.color = 'rgba(124,158,255,0.7)';
-                }}
-              >
-                <ShieldCheck size={13} strokeWidth={2} />
-                بوابة الموظفين والإدارة
-              </button>
-            </div>
+            <div style={{ height: 20 }} />
 
             {/* Bottom accent line */}
             <div style={{

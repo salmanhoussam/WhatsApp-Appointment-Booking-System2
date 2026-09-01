@@ -98,8 +98,12 @@ export default function useReservationBooking() {
   const [selectedSlot, setSelectedSlot] = useState(null)
 
   const [showLocalForm, setShowLocalForm] = useState(false)
-  const [customerName, setCustomerName] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
+  // Auto-fill for a logged-in customer (2026-09-01, Salman's explicit request: "ما في داعي يطلب
+  // منه... لأنه عنا ياهن already") -- GlobalAuthModal.jsx persists guest_name/guest_phone
+  // alongside guest_token on a real login. Lazy initializers so this only ever reads localStorage
+  // once, on mount; a guest with no account simply gets the same empty fields as before.
+  const [customerName, setCustomerName] = useState(() => localStorage.getItem('guest_name') || '')
+  const [customerPhone, setCustomerPhone] = useState(() => localStorage.getItem('guest_phone') || '')
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
