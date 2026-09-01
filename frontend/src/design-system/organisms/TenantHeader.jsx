@@ -7,7 +7,7 @@
  * Features:
  *   - Elevated shadow + stronger backdrop when scrollY > 50
  *   - Language toggle (ar ↔ en) with RTL-aware layout flip
- *   - Gold "Book Now" CTA that opens WhatsApp
+ *   - "Book Now" CTA, tenant-branded (see below)
  *   - Zero prop drilling — works for any slug on any route
  *
  * Nav links — capability-aware (Unified Tenant Header, 2026-08-31):
@@ -17,20 +17,62 @@
  *   directly — useTenantConfig() is the one canonical entry point.
  *   The old hardcoded "Home"/"Contact" links are intentionally not part of
  *   navItems (they aren't client_services-gated features): "Home" is now
- *   the brand/logo click; "Contact" is superseded by the Book Now CTA,
- *   which already opens WhatsApp.
+ *   the brand/logo click; "Contact" is superseded by the Book Now CTA.
+ *
+ * Book Now routing (fixed 2026-09-01 — real bug found testing RK on
+ * localhost: clicking "احجز الآن" fired a generic no-date WhatsApp message,
+ * completely bypassing RK's real staff-reservation flow):
+ *   - Tenant has `reservations` (staff/slot-based booking, e.g. RK) active
+ *     → navigate to its real booking page (`/${slug}/reserve`, same route
+ *       `getServiceRoute`/`navItems` already resolve). A WhatsApp message
+ *       with no date/time/service is meaningless for a slot-based tenant.
+ *   - Otherwise (e.g. smar — real-estate viewing requests, no online slot
+ *     system) → unchanged: open WhatsApp directly. This was this
+ *     component's original, documented, intentional behavior for smar and
+ *     is left as-is; only the confirmed-broken `reservations` case is fixed.
+ *
+ * Brand color (fixed 2026-09-01 — was hardcoded to smar's own gold
+ * `#d4a853` for every tenant sharing this header; RK etc. rendered gold
+ * regardless of their real brand color):
+ *   All accent usages below read `config.primary_color` via CSS custom
+ *   properties set once on the header root (`--tenant-accent*`), falling
+ *   back to `#d4a853` only when a tenant has no `primary_color` configured
+ *   — smar's own look is unchanged since smar's real primary_color IS
+ *   `#d4a853`. `Button.jsx`'s shared `gold` variant is intentionally left
+ *   untouched (also used by BookingFlow.jsx/KineticSection.jsx) — the Book
+ *   Now button overrides it locally via an inline `style`, which wins over
+ *   the variant's Tailwind classes without changing the shared atom.
  *
  * FM12 / React 19 safety:
  *   Native window scroll listener only — NO useScroll from Framer Motion.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from 'lucide-react';
 import { Button } from '../atoms';
 import GlobalAuthModal from './GlobalAuthModal';
 import useTenantConfig from '../../hooks/useTenantConfig';
 import useTenantSlug from '../../hooks/useTenantSlug';
+import { getServiceRoute } from '../../config/service-catalog';
+
+const FALLBACK_ACCENT = '#d4a853'; // smar's own brand gold — used only when a tenant has no primary_color
+
+function hexToRgba(hex, alpha) {
+  const h = typeof hex === 'string' ? hex.replace('#', '') : '';
+  if (h.length !== 6) return `rgba(212, 168, 83, ${alpha})`; // FALLBACK_ACCENT as rgba
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function darkenHex(hex, amount) {
+  const h = typeof hex === 'string' ? hex.replace('#', '') : '';
+  if (h.length !== 6) return '#b8892e'; // darkened FALLBACK_ACCENT
+  const chan = (i) => Math.max(0, Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - amount)));
+  return `rgb(${chan(0)}, ${chan(2)}, ${chan(4)})`;
+}
 
 export default function TenantHeader() {
   const { config, navItems } = useTenantConfig();
@@ -54,8 +96,26 @@ export default function TenantHeader() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // ── WhatsApp CTA ──────────────────────────────────────────────────────────
+  // ── Tenant brand color — CSS vars, see docblock ────────────────────────────
+  const accent = config?.primary_color || FALLBACK_ACCENT;
+  const accentVars = useMemo(() => ({
+    '--tenant-accent':    accent,
+    '--tenant-accent-06': hexToRgba(accent, 0.06),
+    '--tenant-accent-25': hexToRgba(accent, 0.25),
+    '--tenant-accent-40': hexToRgba(accent, 0.40),
+    '--tenant-accent-50': hexToRgba(accent, 0.50),
+    '--tenant-accent-deep': darkenHex(accent, 0.15),
+  }), [accent]);
+
+  // ── Book Now CTA — real reservation page when one exists, else WhatsApp ───
+  const hasStaffReservations = (config?.active_services ?? []).includes('reservations');
+  const bookingRoute = hasStaffReservations ? getServiceRoute('reservations', slug) : null;
+
   const handleBookNow = useCallback(() => {
+    if (bookingRoute) {
+      navigate(bookingRoute);
+      return;
+    }
     const number  = config?.whatsapp_number;
     const message = lang === 'ar'
       ? 'مرحباً، أودّ حجز موعد لمعاينة الوحدات.'
@@ -67,7 +127,7 @@ export default function TenantHeader() {
         'noopener,noreferrer',
       );
     }
-  }, [config?.whatsapp_number, lang]);
+  }, [bookingRoute, navigate, config?.whatsapp_number, lang]);
 
   const isRtl = lang === 'ar';
 
@@ -81,7 +141,11 @@ export default function TenantHeader() {
           ? 'bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/[0.10] shadow-[0_4px_32px_rgba(0,0,0,0.55)]'
           : 'bg-[#0a0a0f]/60 backdrop-blur-md border-b border-white/[0.04]',
       ].join(' ')}
-      style={{ background: scrolled ? 'rgba(10,10,15,0.90)' : 'rgba(10,10,15,0.60)', color: '#f0f0f5' }}
+      style={{
+        ...accentVars,
+        background: scrolled ? 'rgba(10,10,15,0.90)' : 'rgba(10,10,15,0.60)',
+        color: '#f0f0f5',
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
@@ -116,11 +180,11 @@ export default function TenantHeader() {
               type="button"
               onClick={() => navigate(item.route)}
               className="
-                text-white/60 hover:text-[#d4a853]
+                text-white/60 hover:text-[var(--tenant-accent)]
                 text-sm tracking-wide
                 transition-colors duration-200
                 bg-transparent border-0 cursor-pointer
-                focus-visible:outline-none focus-visible:text-[#d4a853]
+                focus-visible:outline-none focus-visible:text-[var(--tenant-accent)]
               "
             >
               {isRtl ? item.labelAr : item.labelEn}
@@ -139,11 +203,11 @@ export default function TenantHeader() {
             className="
               h-8 px-3 rounded-full
               text-[11px] font-semibold tracking-widest uppercase
-              text-white/50 hover:text-[#d4a853]
-              border border-white/[0.08] hover:border-[#d4a853]/40
-              bg-white/[0.02] hover:bg-[#d4a853]/[0.06]
+              text-white/50 hover:text-[var(--tenant-accent)]
+              border border-white/[0.08] hover:border-[var(--tenant-accent-40)]
+              bg-white/[0.02] hover:bg-[var(--tenant-accent-06)]
               transition-all duration-200
-              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4a853]/50
+              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--tenant-accent-50)]
             "
           >
             {lang === 'ar' ? 'EN' : 'AR'}
@@ -157,11 +221,11 @@ export default function TenantHeader() {
             className="
               flex items-center justify-center
               h-8 w-8 rounded-full
-              text-white/50 hover:text-[#d4a853]
-              border border-white/[0.08] hover:border-[#d4a853]/40
-              bg-white/[0.02] hover:bg-[#d4a853]/[0.06]
+              text-white/50 hover:text-[var(--tenant-accent)]
+              border border-white/[0.08] hover:border-[var(--tenant-accent-40)]
+              bg-white/[0.02] hover:bg-[var(--tenant-accent-06)]
               transition-all duration-200
-              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4a853]/50
+              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--tenant-accent-50)]
             "
           >
             <User size={15} strokeWidth={1.7} />
@@ -170,9 +234,12 @@ export default function TenantHeader() {
           {/* Book Now — desktop */}
           <div className="hidden sm:block">
             <Button
-              variant="gold"
               onClick={handleBookNow}
               className="h-9 px-5 text-xs"
+              style={{
+                background: `linear-gradient(135deg, ${accent}, var(--tenant-accent-deep))`,
+                boxShadow: `0 4px 24px var(--tenant-accent-25)`,
+              }}
             >
               {isRtl ? 'احجز الآن' : 'Book Now'}
             </Button>
@@ -229,7 +296,7 @@ export default function TenantHeader() {
               onClick={() => { navigate(item.route); setMenuOpen(false); }}
               className="
                 text-start py-2.5 px-3 rounded-lg
-                text-sm text-white/70 hover:text-[#d4a853]
+                text-sm text-white/70 hover:text-[var(--tenant-accent)]
                 hover:bg-white/[0.04]
                 transition-colors duration-200
                 bg-transparent border-0 cursor-pointer w-full
@@ -242,9 +309,12 @@ export default function TenantHeader() {
 
           <div className="mt-2">
             <Button
-              variant="gold"
               onClick={handleBookNow}
               className="w-full text-sm"
+              style={{
+                background: `linear-gradient(135deg, ${accent}, var(--tenant-accent-deep))`,
+                boxShadow: `0 4px 24px var(--tenant-accent-25)`,
+              }}
             >
               {isRtl ? 'احجز الآن' : 'Book Now'}
             </Button>
