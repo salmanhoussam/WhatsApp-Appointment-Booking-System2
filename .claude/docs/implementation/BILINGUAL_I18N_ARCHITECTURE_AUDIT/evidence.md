@@ -331,6 +331,23 @@ larger system chosen because a bigger number of mechanisms was found.**
 
 ---
 
+### 📌 Checkpoint: Phase Numbering Clarification (2026-09-01)
+
+**Numbering Systems Distinction:** The "Phases 1–6" mentioned earlier in this document refer to
+the internal structure of the initial architecture study (where "Phase 5" is the
+`## MIGRATION PLAN` section). The "Phases 1–4" used in the `## Implementation Log` below refer to
+the actual, committed execution work done on 2026-09-01. These are two distinct, non-continuous
+numbering systems. Never assume a "Phase 5" implementation task automatically follows Phase 4.
+
+**Migration Plan Status:** The study's "Phase 5" (`## MIGRATION PLAN`) is already complete as
+reference material. It is not a queued to-do list to execute automatically.
+
+**Execution Status:** No further Migration Plan execution is scheduled by this note. The real
+remaining items (e.g., deleting the now-fully-dead `context/LanguageContext.jsx` +
+`utils/translations.js` + Category E's dead files, or addressing the `CartDrawer.jsx` RTL/locale
+gap surfaced during Phase 3) stay logged strictly as reference candidates. They will only be
+picked up when explicitly requested by Salman.
+
 ## Implementation Log (post-study — ADR-0006 ratified the Recommendation above)
 
 Status changed from STUDY ONLY once Salman explicitly approved execution ("Go ahead. Start phase
