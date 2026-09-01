@@ -13,6 +13,8 @@ from app.core.services import require_service
 from app.services import public_service
 from app.services import catalog_service
 import app.repositories.public_repo as public_repo
+from app.core.security import verify_password, get_password_hash, create_access_token
+from app.repositories.customer_repo import CustomerRepository
 
 router = APIRouter()
 
@@ -89,6 +91,93 @@ async def create_booking_by_slug(request: Request, slug: str, data: BookingReque
         "booking_id": result.id,
         "customer_id": result.customerId,
     }
+
+class CustomerRegisterRequest(BaseModel):
+    full_name: str
+    phone: str
+    password: str
+
+class CustomerLoginRequest(BaseModel):
+    identifier: str  # phone -- field name matches GlobalAuthModal.jsx's existing request payload
+    password: str
+
+class CustomerAuthResponse(BaseModel):
+    token: str
+    customer_id: str
+    client_id: str
+    slug: str
+    name: str | None = None
+    phone: str
+    token_type: str = "bearer"
+
+
+# Real customer self-service login (2026-09-01) -- GlobalAuthModal.jsx (the header's login icon,
+# every tenant) has called these exact two URLs since it was built, but no route ever answered
+# them (confirmed via a real local request: 404). Reuses the SAME Customer row the
+# booking/reservation flow already creates (app/repositories/customer_repo.py's `create`/
+# `get_by_phone`, `clientId+phone` unique) instead of a second parallel identity model -- one
+# Capability, one Source of Truth (rules/backend/architecture.md #9). A Customer row created
+# earlier by a booking (no password yet) can register a password onto that same row rather than
+# colliding with the unique constraint. Same bcrypt/JWT primitives as Client/User login
+# (app/core/security.py) -- a third real token `type`, "customer", alongside "client"/"admin".
+@router.post("/{slug}/auth/register", response_model=CustomerAuthResponse, tags=["Public Tenant"])
+@limiter.limit("3/minute")
+async def customer_register(request: Request, slug: str, body: CustomerRegisterRequest):
+    if len(body.password) < 8:
+        raise HTTPException(status_code=422, detail="كلمة المرور يجب أن تكون 8 أحرف على الأقل")
+
+    tenant = await resolve_tenant_status(slug, endpoint=request.url.path)
+
+    customer_repo = CustomerRepository(prisma_client)
+    existing = await customer_repo.get_by_phone(body.phone, tenant["id"])
+    if existing and existing.passwordHash:
+        raise HTTPException(status_code=409, detail="يوجد حساب مسجّل مسبقاً بهذا الرقم")
+
+    password_hash = get_password_hash(body.password)
+    if existing:
+        customer = await customer_repo.set_password(existing.id, password_hash)
+    else:
+        customer = await customer_repo.create(tenant["id"], {
+            "phone":        body.phone,
+            "name":         body.full_name,
+            "passwordHash": password_hash,
+        })
+
+    token = create_access_token(data={
+        "type":        "customer",
+        "customer_id": customer.id,
+        "client_id":   tenant["id"],
+        "slug":        slug,
+        "phone":        customer.phone,
+    })
+    return CustomerAuthResponse(
+        token=token, customer_id=customer.id, client_id=tenant["id"],
+        slug=slug, name=customer.name, phone=customer.phone,
+    )
+
+
+@router.post("/{slug}/auth/login", response_model=CustomerAuthResponse, tags=["Public Tenant"])
+@limiter.limit("5/minute")
+async def customer_login(request: Request, slug: str, body: CustomerLoginRequest):
+    tenant = await resolve_tenant_status(slug, endpoint=request.url.path)
+
+    customer_repo = CustomerRepository(prisma_client)
+    customer = await customer_repo.get_by_phone(body.identifier, tenant["id"])
+    if not customer or not verify_password(body.password, customer.passwordHash):
+        raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
+
+    token = create_access_token(data={
+        "type":        "customer",
+        "customer_id": customer.id,
+        "client_id":   tenant["id"],
+        "slug":        slug,
+        "phone":        customer.phone,
+    })
+    return CustomerAuthResponse(
+        token=token, customer_id=customer.id, client_id=tenant["id"],
+        slug=slug, name=customer.name, phone=customer.phone,
+    )
+
 
 async def _resolve_tenant_or_404(slug: str, request: Request) -> dict:
     """

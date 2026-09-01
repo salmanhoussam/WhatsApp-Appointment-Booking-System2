@@ -316,6 +316,12 @@ model Customer {
   phone     String    @map("phone")
   name      String?   @map("name")
   email     String?   @map("email")
+  // Real customer self-service login (2026-09-01) -- nullable: every existing Customer row was
+  // created server-side by the booking/reservation flow (no password ever set), and stays that
+  // way unless/until that same phone number registers a real account through GlobalAuthModal.
+  // Same bcrypt convention as Client.password_hash/User.password_hash (app/core/security.py) --
+  // no separate hashing scheme.
+  passwordHash String? @map("password_hash")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookings  Booking[]

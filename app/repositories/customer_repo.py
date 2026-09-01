@@ -34,6 +34,13 @@ class CustomerRepository:
             include={"reservations": {"include": {"service": True}}},
         )
 
+    async def set_password(self, customer_id: str, password_hash: str):
+        """Attach/replace a customer's password hash (self-service account registration)."""
+        return await self.db.customer.update(
+            where={"id": customer_id},
+            data={"passwordHash": password_hash},
+        )
+
     async def upsert_system_customer(self, client_id: str, phone: str):
         """Upsert a deterministic system customer (used for admin block records).
 
