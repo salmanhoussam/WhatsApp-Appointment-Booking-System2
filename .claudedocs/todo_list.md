@@ -749,3 +749,56 @@ shows up.
 - SCHEMA-01: Add category field to GalleryImage + unify data source
 - FE-01: Persist language state to localStorage in LanguageContext.jsx
 - FE-02: Add ErrorBoundary wrapping App in App.jsx
+
+## 🐛 BUG (open, 2026-09-04) — `POST /admin/client-services/deactivate` returns 500 for every caller
+
+Found incidentally during Phase 2B-1's authorization verification; **deliberately not fixed there**
+(outside that phase's locked scope — it is a data-layer bug, not an authorization one).
+
+**Root cause:** `app/api/v1/admin/client_services.py`'s `deactivate_services` does
+`result = await _repo.deactivate_client_service(...)` then `if result.count > 0:`, but
+`prisma_client.clientservice.update_many()` returns an **`int`** in this Prisma Python version, not
+an object → `AttributeError: 'int' object has no attribute 'count'` → 500.
+
+**Impact:**
+- The route has evidently **never worked** for any caller. It went unnoticed because nothing calls
+  it — `grep -rn "client-services" frontend/src` returns zero callers.
+- Worse than a plain 500: `deactivate_client_service` **executes the DB write before the crash**,
+  while `sync_selected_services(client_id)` sits *after* the crashing line and never runs. So a
+  call can leave `ClientService.isActive` and `Client.selected_services` **out of sync**.
+
+**Fix sketch (not implemented):** use the returned int directly (`if result > 0`) — and check
+whether `activate`'s sibling code path has the same assumption. Needs its own verification that
+`selected_services` ends consistent.
+
+**Not related to** the permission-model track; do not fold it into that migration.
+
+## 🔐 Permission Model track — state at 2026-09-04 close
+
+Docs: `.claudedocs/implementation/PERMISSION_MODEL/` (2B design, 2B-2 design, **2B-3 phase record**)
+and `.claudedocs/work/permission-model-investigation/2026-09-04/summary.md`.
+
+| Phase | State |
+|---|---|
+| 2B-1 `client_services` gate | CLOSED ✅ |
+| 2B-2 presets/add-ons/Team design | APPROVED ✅ |
+| 2B-3 permission core + Slice 2 | **CLOSED ✅** (uncommitted, HEAD `85bd886`) |
+
+**Open, each its own item:**
+- [ ] **Slice 3** — migrate `store` / `catalog` / `customers` to `require_permission`. Unlocks the
+      مدير المتجر and مدير الحجوزات presets **and the inventory add-on**. This is what actually
+      unblocks RK's originating case ("يحط حجوزات ينزل بضاعة") — the Team UI alone does not.
+- [ ] **Phase 2B-4** — Team tab in `GenericAdminDashboard` + STAFF account creation
+      (`team.py` gains `preset`/`addons`/`barber_id`, resolved **server-side**). Design per
+      `PHASE_2B_2_DESIGN.md` §7–§8. Note the binding rule: *a preset may only be offered once every
+      area it grants is migrated* — so 2B-4 shipped before Slice 3 offers only موظف + المالك, with
+      the inventory add-on disabled.
+- [ ] **Permission Bundle Correction** (separate, behavior-changing) — legacy
+      `MANAGER_RESERVATIONS` loses `store.*` and `services.write`. **Re-measure** the active
+      `MANAGER_RESERVATIONS` count immediately before shipping (was exactly 1 on 2026-09-04).
+- [ ] Shop Manager preset — blocked on Slice 3. No `SHOP_MANAGER` enum value; `role=STAFF` inert.
+- [ ] `MANAGER_UNITS` — stays legacy, untouched, absent from the new UI.
+
+**Known limitations, recorded not open:** SUPER_ADMIN migrated-route HTTP path not directly verified
+(controlled SA tenant lacks the capability); a `422` on a permission write test means
+"gate passed; downstream validation rejected request", not a permission failure.
