@@ -349,6 +349,16 @@ export default function StaffTab({ color }) {
     loadStaff()
   }
 
+  // The counterpart deactivate() above already promises in its own confirm text ("يمكن إعادة
+  // تفعيله لاحقاً") -- until now nothing in the UI delivered it, so hiding a member was a one-way
+  // door (2026-09-03 investigation). Uses the existing generic PATCH route, which has always
+  // accepted is_active; no new endpoint.
+  const activate = async (member) => {
+    if (!confirm(`إظهار "${member.name}" مجدداً؟`)) return
+    await adminApi.patch(`/barbers/${member.id}`, { is_active: true })
+    loadStaff()
+  }
+
   // ── Services CRUD (الخدمات sub-view) ──────────────────────────────────────────
 
   const resetSvcImageState = () => {
@@ -652,8 +662,10 @@ export default function StaffTab({ color }) {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button variant="secondary" size="sm" onClick={() => openEdit(member)}>تعديل</Button>
-                {member.is_active && (
+                {member.is_active ? (
                   <Button variant="danger" size="sm" onClick={() => deactivate(member)}>إخفاء</Button>
+                ) : (
+                  <Button variant="primary" color={color} size="sm" onClick={() => activate(member)}>إظهار</Button>
                 )}
               </div>
             </Card>
