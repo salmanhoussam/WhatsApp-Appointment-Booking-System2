@@ -113,10 +113,42 @@ Site Configuration    Dashboard ✅   Inline ❌ (unless a real public surface e
 No — same reasoning as the entry above. This sharpens that entry's own open question about
 Interfaces rather than closing it.
 
+## 2026-08-19
+
+### Context
+
+TOS-005 (CMS Generic Engine) — grounding the Homepage Section Editor's design in real code, not
+assumption, before writing the ADR.
+
+### Discovery
+
+A real, second independent proof of this entry's own open question ("do Operations need multiple
+Interfaces sharing one Contract?"): `hero.title`/`story.heading` had two real Interfaces — Inline
+click-to-edit (`TOS-002`'s `EditableRegion`) and the Dashboard's own Section Settings form (Phase
+2.6) — that did **not** share one Contract. Each called its own dedicated backend route
+(`/content/hero-title` vs. `/content/sections/hero/fields`), both writing the identical JSON
+location. Confirmed by reading the real code (`sectionFieldHelpers.js`), not assumed.
+
+### Current Understanding
+
+Unifying these onto the one generic route (`TOS-005` §4.3, Phase A) is the concrete resolution:
+Inline and Dashboard now demonstrably share one backend Contract, in real, verified code — not a
+hypothetical anymore.
+
+### Promoted?
+
+**Yes → `TOS-005-cms-generic-engine.md`.** The three-layer model this evolution log first named
+(`Capability → Operations → Interfaces`) is now a real, ratified ADR decision, proven on a real
+conflict rather than only reasoned about. This entry's own earlier open question is answered
+concretely; further Operations→Interfaces questions for *other* Capabilities remain open on their
+own terms, not closed by this promotion.
+
 ## Related
 
 - `.claudedocs/adr/TOS-002-editing-engine.md` — where `UpdateField`/`ReplaceMedia` were first
   named as real Operation types; this entry's `UpdateConfiguration` is the natural fourth.
+- `.claudedocs/adr/TOS-005-cms-generic-engine.md` — the real ADR this evolution log's own model
+  was promoted into, 2026-08-19.
 - `.claudedocs/architecture/capabilities/site-configuration.md` — the Capability this insight came
   from applying in practice.
 - `.claudedocs/reviews/site-configuration-phase3-verification.md` — the real investigation

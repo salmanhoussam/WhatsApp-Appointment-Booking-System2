@@ -656,3 +656,45 @@ isolation, final smoke test) are the real closing verification and must happen p
 **Blocking on**: `git push origin main` — this session has no GitHub credentials (confirmed again,
 same as the earlier Frontend Build Blocker track). Salman needs to push commits `3e4b09b` and
 `9153d77` from a terminal with real credentials before Railway can build/deploy either change.
+
+---
+
+## §N — Final Answer Record (2026-08-29 update)
+
+Salman's own restated answers, re-checked against live reality before being recorded (per this
+project's Repository-over-memory discipline) rather than accepted verbatim:
+
+1. **Bare `alzabt.salmansaas.com/`** — never relied on as a tenant URL. Real tenant URLs are always
+   `alzabt.salmansaas.com/{slug}`. A root landing page, if built later, is a separate topic from
+   tenant resolution. Matches what's live (external redirect to `salmansaas.com`) — no change.
+2. **`alzabt.salmansaas.com/login`** — the SSO portal, same as `demo.`. Confirmed via real live
+   smoke test 2026-08-29: login stays on `alzabt.salmansaas.com/{slug}/dashboard`.
+3. **`/home`** — not part of the tenant routing contract. Tenant operational links are always
+   slug-scoped; any future Alzabt marketing/landing homepage is separate from tenant resolution.
+4. **Scope** — all subscribed tenants at once, not `smar` alone. `alzabt.salmansaas.com/{slug}` is
+   the shared new tenant domain pattern.
+5. **`smar.salmansaas.com` retirement** — **checked live before recording, real conflict found and
+   resolved with Salman 2026-08-29**: Salman's restated preference was "don't retire immediately,
+   keep it working during a transition window." Live check at the time:
+   ```
+   $ curl -sD- https://smar.salmansaas.com/
+   HTTP/2 404
+   server: cloudflare
+   x-railway-fallback: true
+   {"status":"error","code":404,"message":"Application not found"}
+   ```
+   DNS still resolves (Cloudflare proxy IPs), but the Railway-side custom domain binding is gone —
+   the old URL is already broken, not "still working." Presented to Salman as a real choice: restore
+   the Railway custom domain binding (real infra work) vs. accept it as already effectively retired.
+   **Salman's decision: accept as already retired** — `alzabt.salmansaas.com/smar` is the one
+   canonical pattern going forward, no restoration work scheduled.
+6. **Legacy Hard/Soft-Block bypass** — confirmed real, needed fixing, and already shipped as part of
+   this migration (`9153d77`). Salman's restated framing — that it *should* have been ticketed as a
+   separate security track rather than bundled into the domain migration — is a retrospective
+   categorization note for next time, not a request to revert working code. No action taken.
+7. **Cloudflare DNS** — confirmed Salman's own responsibility, unchanged. Engineering-side live
+   verification (this document + `.claudedocs/sessions/2026-08-29.md`) is complete; DNS
+   ownership/configuration itself stays outside this session's access/scope.
+
+Full 2026-08-29 verification evidence (SSO live check, real reservation flow, cross-tenant
+isolation re-check): `.claudedocs/sessions/2026-08-29.md`.
