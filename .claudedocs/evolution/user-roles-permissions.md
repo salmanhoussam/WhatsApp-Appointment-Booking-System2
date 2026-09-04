@@ -143,3 +143,64 @@ None — this closes the item both prior entries left open.
 ### Promoted?
 
 N/A — this is a correction to a prior entry's Discovery, not a new capability finding.
+
+## 2026-09-04
+
+### Context
+
+Dashboard Architecture (Maturity) Review 1 (`.claudedocs/maturity/dashboard.md`), run as a gate
+before Phase 2B-4 (Team UI + STAFF account creation). Review-only, no code. The review read the
+dashboard's real source rather than reasoning from the permission track's own documents.
+
+### Discovery
+
+**The authorization model and the Interface that renders it now read from two different sources of
+truth, and both are individually correct.**
+
+- Phase 2B-3 deliberately placed `permissions`/`scope`/`preset` in the **database**, with zero token
+  changes — `get_current_admin_user` reloads the `User` row every request, so revocation applies on
+  the next call. This was a considered decision, recorded in
+  `.claudedocs/implementation/PERMISSION_MODEL/PHASE_2B_3_EVIDENCE.md`.
+- `GenericAdminDashboard`'s entire nav-visibility input is `useAdminRole()`
+  (`frontend/src/hooks/useAdminRole.js:7-20`), which decodes the **JWT** client-side and returns
+  `payload.role` — a token that structurally cannot carry permissions.
+- **No `/me` endpoint exists anywhere** (`grep` across `app/api/v1/` returns nothing), so the
+  frontend has no other way to learn a user's resolved identity.
+
+Consequence, traced concretely: a `shop_manager` account stores `role=STAFF` as an *inert
+placeholder* (2B-2 §5). At login it would therefore render `STAFF_NAV`
+(`GenericAdminDashboard.jsx:213-217`) — Calendar / Reservations / My Clients — which are exactly the
+three surfaces it has no permission for, while every store surface it does have stays hidden.
+
+Also found: the dashboard already carries **three** parallel nav-gating mechanisms — capability-driven
+`buildNav()`, role-driven `STAFF_NAV`, and `ROLE_TABS`/`canAccessTab` which is dead for this
+dashboard (documented as such in-code at `GenericAdminDashboard.jsx:204-212`).
+
+### Current Understanding
+
+Server-side authorization moved to a permission model; the Interface's *visibility* logic did not,
+and cannot follow it while its only input is the token. The gap is invisible for the `staff` preset
+purely by coincidence — that preset's permissions happen to match the hardcoded `STAFF_NAV` — so
+Staff-only v1 would appear to work while resting on the wrong foundation, and would break at Slice 3
+when the first preset without a matching legacy role ships.
+
+The working model: **a permission-based Interface needs a server-resolved identity endpoint, not a
+richer token.** Enriching the JWT would reintroduce exactly what 2B-3 avoided — stale permissions
+surviving until token expiry.
+
+### Open Questions
+
+- Should nav visibility derive from `/admin/me` immediately (before a fourth `isStaff ? …` branch
+  exists), or stay role-based for Staff-only v1 with a named follow-up? The review recommends the
+  former; the decision is Salman's.
+- Do the three existing nav mechanisms converge into one permission-driven resolver, or does the
+  capability-driven `buildNav` stay a separate, legitimate axis? (Capability and permission are
+  genuinely different questions — *does this tenant have the feature* vs. *may this user use it* —
+  so collapsing them may be wrong.)
+
+### Promoted?
+
+No — one review, one topic. The `/admin/me` prerequisite is an implementation item for Phase 2B-4,
+not yet a ratified decision about how Interfaces read identity platform-wide. Revisit once a second
+Interface (Mobile, or an AI action path) needs the same resolved identity — that would be the second
+independent case this project's Abstraction Rule requires.
