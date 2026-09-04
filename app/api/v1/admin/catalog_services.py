@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.core.tenant import require_roles
+from app.core.permissions import require_permission
 from app.core.services import require_service
 from app.db.dependencies import get_current_tenant
 from app.services import catalog_service_service
@@ -66,7 +67,7 @@ async def list_catalog_services(
     # STAFF added 2026-08-09 (Staff Scoped Access Phase D fix) -- read-only grant, not an ownership
     # grant. The Calendar needs this list to resolve service names on the caller's own reservation
     # cards; write routes below (create/update) deliberately do NOT include STAFF.
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
+    _user: dict  = Depends(require_permission("services.read", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
 ):
     data = await catalog_service_service.admin_list_services(tenant["id"], include_inactive, category_id)
     return {"success": True, "data": data}
@@ -77,7 +78,7 @@ async def create_catalog_service(
     body: CatalogServiceCreate,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("services.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     data = await catalog_service_service.admin_create_service(
         client_id=tenant["id"], category_id=body.category_id, name_ar=body.name_ar,
@@ -94,7 +95,7 @@ async def update_catalog_service(
     body: CatalogServiceUpdate,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("services.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     data = await catalog_service_service.admin_update_service(
         client_id=tenant["id"], service_id=service_id, name_ar=body.name_ar, name_en=body.name_en,

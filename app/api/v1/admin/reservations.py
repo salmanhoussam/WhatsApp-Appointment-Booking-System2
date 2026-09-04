@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.tenant import require_roles
+from app.core.permissions import require_permission, scope_barber_id
 from app.core.services import require_service
 from app.services import reservation_service
 from app.services.reservation_service import ReservationAccessDenied
@@ -44,14 +45,16 @@ def _is_staff(user) -> bool:
 
 
 def _require_staff_barber_id(user) -> Optional[str]:
-    """Server-derived from the authenticated User, never from client input. Returns None for every
-    non-STAFF role (no scoping applies). A STAFF user with no barberId link is a misconfiguration --
-    fails closed (403), never silently falls back to seeing everything."""
-    if not _is_staff(user):
-        return None
-    if not user.barberId:
-        raise HTTPException(status_code=403, detail="Staff account is not linked to a barber profile.")
-    return str(user.barberId)
+    """Server-derived from the authenticated User, never from client input. Returns None when no
+    scoping applies. A self-scoped user with no barberId link is a misconfiguration -- fails closed
+    (403), never silently falls back to seeing everything.
+
+    Phase 2B-3 (2026-09-04): delegates to the central resolver so scoping has ONE implementation
+    shared by legacy and permission-based accounts. Behaviour for legacy accounts is unchanged --
+    scope_barber_id() derives 'self' from the STAFF role exactly as this function always did (I1);
+    it additionally honours scope='self' on permission-based accounts (I2). Kept as a thin wrapper
+    because admin/barbers.py imports this name."""
+    return scope_barber_id(user, "reservations")
 
 
 class StatusUpdateIn(BaseModel):
@@ -100,7 +103,7 @@ async def list_reservations(
     date_to:    Optional[date] = Query(None, description="YYYY-MM-DD — range end, inclusive"),
     limit:      int = Query(50, le=500),
     barber_id:  Optional[str] = Query(None, description="Ignored/overridden for STAFF -- their own barberId always applies"),
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.read", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     range_from = range_to = None
@@ -139,7 +142,7 @@ async def list_reservations(
 @router.get("/stats")
 async def reservations_stats(
     module_key: Optional[str] = Query(None),
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.read", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     """Today's counts per status."""
@@ -170,7 +173,7 @@ async def reservations_stats(
 @router.get("/my-clients")
 async def my_clients(
     barber_id: Optional[str] = Query(None, description="Non-STAFF only -- inspect a specific barber's clients; ignored/overridden for STAFF"),
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.read", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     """Staff Scoped Access Phase C (2026-08-09) -- "my clients" = customers who appear in the
@@ -191,7 +194,7 @@ async def my_clients(
 @router.get("/{reservation_id}")
 async def get_reservation(
     reservation_id: str,
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.read", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     try:
@@ -212,7 +215,7 @@ async def get_reservation(
 async def update_status(
     reservation_id: str,
     body: StatusUpdateIn,
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.write", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     try:
@@ -236,7 +239,7 @@ async def update_status(
 async def reschedule(
     reservation_id: str,
     body: RescheduleIn,
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.write", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     """Calendar drag-and-drop -- time and/or staff reassignment. All conflict/working-hours
@@ -265,7 +268,7 @@ async def reschedule(
 async def edit_reservation(
     reservation_id: str,
     body: EditReservationIn,
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.write", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     """Full Edit (Phase 3.2, 2026-08-05) -- name/phone/service/time/staff/duration, any subset.
@@ -297,7 +300,7 @@ async def edit_reservation(
 @router.post("/")
 async def create_reservation(
     body: ReservationCreateIn,
-    user=Depends(require_roles(*RESERVATION_ROLES)),
+    user=Depends(require_permission("reservations.write", *RESERVATION_ROLES)),
     _svc=Depends(require_service("reservations")),
 ):
     """Admin-side Create (Quick Create, Phase 3.2, 2026-08-05) -- calls the exact same

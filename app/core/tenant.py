@@ -509,6 +509,27 @@ def require_roles(*allowed_roles: str):
     async def _dependency(request: Request):
         user = await get_current_admin_user(request)
         role = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+        # Deny-by-default for permission-based accounts (Phase 2B-3, invariant I4).
+        # An account carrying an explicit `permissions` array is governed by that array, not by
+        # `role` -- and this route has not been migrated to require_permission() yet, so it has no
+        # way to evaluate it. Denying is the only safe answer: falling through to the role check
+        # would let such an account inherit whatever its (non-authoritative, placeholder) legacy
+        # role happens to grant. That is exactly the silent over-grant this rule exists to prevent,
+        # and it is what makes migrating one area at a time safe.
+        #
+        # Legacy accounts (permissions IS NULL -- every account that existed before 2026-09-04)
+        # skip this branch entirely and keep the original behaviour below, unchanged (I1).
+        # SUPER_ADMIN is exempt, per I3.
+        if role != "SUPER_ADMIN" and getattr(user, "permissions", None) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "This account uses granular permissions; "
+                    "this endpoint has not been migrated to permission checks yet."
+                ),
+            )
+
         if role not in allowed_roles:
             raise HTTPException(
                 status_code=403,

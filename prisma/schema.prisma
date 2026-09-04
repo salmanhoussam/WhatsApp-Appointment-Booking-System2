@@ -172,6 +172,31 @@ model User {
   // Unique: a login account maps to at most one Barber, and vice versa. No JWT change needed --
   // get_current_admin_user() already loads the full User row from DB on every request.
   barberId          String?    @unique @map("barber_id") @db.Uuid
+  // -- Granular Permissions, Phase 2B-3 (2026-09-04) --------------------------
+  // All three nullable and additive. NULL on all three == a legacy account: it resolves through
+  // the route's own existing role list, byte-identical to before this feature existed (invariant
+  // I1, .claudedocs/implementation/PERMISSION_MODEL/PHASE_2B_DESIGN.md). Every account that
+  // existed before 2026-09-04 is exactly that, and none were rewritten.
+  //
+  // Same "no JWT change needed" reasoning as barberId above: get_current_admin_user() reloads the
+  // User row every request, so a permission change takes effect on the account's next request --
+  // no re-issue, no stale window, no denylist.
+  //
+  // permissions: the FULLY RESOLVED array (preset baseline + add-ons), e.g.
+  //   ["reservations.write","staff.read","services.read"]. Deliberately resolved-and-frozen rather
+  //   than a reference to a preset, so editing a preset definition later can never silently
+  //   re-privilege existing accounts (PHASE_2B_2_DESIGN.md §5).
+  // scope: 'self' | 'all'. Account-level. Only areas that genuinely have per-employee row
+  //   ownership may interpret 'self' (invariant I2) -- today reservations and staff. Every other
+  //   area ignores it entirely.
+  // preset: which preset was chosen ('staff' | 'reservations_manager' | 'shop_manager'), for
+  //   display and debugging. NOT authoritative for authorization -- permissions is.
+  //
+  // NOTE: for a permission-based account, `role` above is NOT authoritative either. It is retained
+  // only because the column is NOT NULL, and set to the nearest legacy value for readability.
+  permissions       Json?      @map("permissions")
+  scope             String?    @map("scope")
+  preset            String?    @map("preset")
   // ---------------------------------------------------------------------------
   createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)

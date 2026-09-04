@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.tenant import require_roles
+from app.core.permissions import require_permission
 from app.core.services import require_service
 from app.db.dependencies import get_current_tenant
 from app.repositories import barber_repo, barber_service_repo
@@ -91,7 +92,7 @@ async def list_barbers(
     # STAFF added 2026-08-09 (Staff Scoped Access Phase D fix) -- read-only grant, not an ownership
     # grant. The Calendar needs this list to resolve/render the caller's own barber row; write
     # routes below (create/update/deactivate/set_barber_services) deliberately do NOT include STAFF.
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
+    _user: dict  = Depends(require_permission("staff.read", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")),
 ):
     # Roster scoping (2026-08-10, .claudedocs/work/staff-barbers-roster-scoping/2026-08-10/
     # investigation.md): this route used to return the FULL, unfiltered roster -- names, phone
@@ -111,7 +112,7 @@ async def create_barber(
     body: BarberCreate,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("staff.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     from prisma import Json
 
@@ -136,7 +137,7 @@ async def update_barber(
     body: BarberUpdate,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("staff.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     from prisma import Json
 
@@ -172,7 +173,7 @@ async def deactivate_barber(
     barber_id: str,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("staff.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     existing = await barber_repo.find_barber(tenant["id"], barber_id)
     if not existing:
@@ -189,7 +190,7 @@ async def get_barber_services(
     barber_id: str,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
+    _user: dict  = Depends(require_permission("staff.read", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     existing = await barber_repo.find_barber(tenant["id"], barber_id)
     if not existing:
@@ -204,7 +205,7 @@ async def set_barber_services(
     body: BarberServicesSet,
     tenant: dict = Depends(get_current_tenant),
     _svc: dict   = Depends(require_service("reservations")),
-    _user: dict  = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    _user: dict  = Depends(require_permission("staff.write", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     existing = await barber_repo.find_barber(tenant["id"], barber_id)
     if not existing:
