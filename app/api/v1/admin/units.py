@@ -178,7 +178,7 @@ async def create_unit(
             detail="No active property found for this tenant. Create a property first."
         )
 
-    unit = await _unit_repo.create_unit(data={
+    data: dict = {
         "clientId":       tenant["id"],
         "propertyId":     prop.id,
         "name_ar":        body.name_ar,
@@ -198,10 +198,19 @@ async def create_unit(
         "category":       body.category,
         "description_ar": body.description_ar,
         "description_en": body.description_en,
-        "content_blocks": Json(body.content_blocks) if body.content_blocks is not None else None,
-        "amenities":      Json(body.amenities)      if body.amenities      is not None else None,
-        "rules_policies": Json(body.rules_policies) if body.rules_policies is not None else None,
-    })
+    }
+    # Json? fields — Prisma's create() needs these OMITTED when absent, not sent as a bare
+    # None (that's what caused the real 500 this fix closes; a bare None here doesn't map to
+    # any of create()'s allowed input types for a Json? column). Mirrors update_unit()'s
+    # already-working conditional-patch pattern below, applied here for the same reason.
+    if body.content_blocks is not None:
+        data["content_blocks"] = Json(body.content_blocks)
+    if body.amenities is not None:
+        data["amenities"] = Json(body.amenities)
+    if body.rules_policies is not None:
+        data["rules_policies"] = Json(body.rules_policies)
+
+    unit = await _unit_repo.create_unit(data=data)
     return _fmt(unit)
 
 
