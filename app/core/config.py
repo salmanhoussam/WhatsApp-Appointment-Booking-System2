@@ -79,7 +79,14 @@ class Settings(BaseSettings):
     # chat header to every customer) and NOT the same value as WHATSAPP_PHONE_NUMBER_ID (that's
     # Meta's internal API id for outbound sends, never dialable itself).
     WHATSAPP_CENTRAL_NUMBER: Optional[str] = os.getenv("WHATSAPP_CENTRAL_NUMBER")
-    
+    # Meta App Secret — used ONLY to verify the X-Hub-Signature-256 header on inbound webhook
+    # POSTs (HMAC-SHA256 over the raw body). Distinct from WHATSAPP_VERIFY_TOKEN (the one-time GET
+    # challenge token) and WHATSAPP_ACCESS_TOKEN (outbound API calls). Found on the Meta App
+    # Dashboard under Settings → Basic → App Secret. Optional/None here on purpose — see
+    # webhook.py's own fail-closed handling when unset, rather than crashing the whole app at
+    # startup like SECRET_KEY/WHATSAPP_VERIFY_TOKEN do below.
+    WHATSAPP_APP_SECRET: Optional[str] = os.getenv("WHATSAPP_APP_SECRET")
+
     # 🧪 إعدادات البيئة المحلية للتطوير
     LOCAL_DOMAINS: List[str] = ["localhost", "127.0.0.1"]
     
