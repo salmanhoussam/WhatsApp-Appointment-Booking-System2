@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from prisma import Json
+from prisma.errors import UniqueViolationError
 
 from app.db.client import prisma_client
 
@@ -91,6 +92,33 @@ async def create_cart(client_id: str, session_id: str, expires_at: datetime):
             "expiresAt": expires_at,
         }
     )
+
+
+async def get_or_create_cart(client_id: str, session_id: str, expires_at: datetime):
+    """Create-or-fetch by sessionId (@unique) -- defends against two concurrent callers racing to
+    create the SAME brand-new session's cart (e.g. two rapid double-clicks; the checkout flow
+    itself now avoids the race structurally via a single /cart/bulk request instead of N
+    concurrent ones, see app/api/v1/public/store.py's add_to_cart_bulk).
+
+    NOT `prisma_client.storecart.upsert()` -- confirmed live, 2026-09-03, that this Prisma Python
+    client's upsert() does NOT behave as a true atomic DB-level `INSERT ... ON CONFLICT`: two
+    concurrent upsert() calls for the same new sessionId both raised
+    prisma.errors.UniqueViolationError instead of one of them cleanly resolving to the existing
+    row. Catching that error and re-fetching is the actual race-safe pattern here."""
+    cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+    if cart is not None:
+        return cart
+    try:
+        return await prisma_client.storecart.create(
+            data={"clientId": client_id, "sessionId": session_id, "expiresAt": expires_at},
+        )
+    except UniqueViolationError:
+        # Lost the race to a concurrent caller between the find above and this create -- the
+        # cart now exists, fetch it instead of failing the request.
+        cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+        if cart is None:
+            raise
+        return cart
 
 
 async def upsert_cart_item(cart_id: str, catalog_item_id: str, quantity: int):

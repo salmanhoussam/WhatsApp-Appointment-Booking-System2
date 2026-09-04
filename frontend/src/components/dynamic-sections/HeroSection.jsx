@@ -58,14 +58,19 @@ export default function HeroSection({ data, accent, homepageTheme, reserveHref }
   return (
     <section style={{
       position: 'relative',
-      minHeight: '82vh',
+      minHeight: '74vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
+      marginTop: 24,
       marginBottom: 56,
-      marginLeft: -24,
-      marginRight: -24,
+      // No longer full-bleed (was marginLeft/marginRight: -24) -- 2026-09-03, real feedback:
+      // edge-to-edge hero media completely hid the ambient background (AmbientGridBackground)
+      // that sits behind the whole page on tenants with page_background === 'ambient_grid'.
+      // Staying inside the page's own 24px container padding, plus a rounded frame, lets that
+      // background show around the hero instead of being fully covered by it.
+      borderRadius: 24,
     }}>
 
       {/* Background */}

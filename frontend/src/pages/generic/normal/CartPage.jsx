@@ -204,15 +204,14 @@ function SuccessScreen({ accent, orderId, whatsappSent, onBack, lang }) {
 // which itself has zero i18n -- Bilingual/i18n Architecture Audit, Category C3), never the
 // browsing customer's UI language choice. Translating this would be a real regression, not an
 // improvement.
+// Simplified per Salman's explicit spec (2026-09-03): no customer name/phone as message
+// "details" (the merchant already has both in the real order record via the dashboard -- this
+// message is the customer-facing confirmation text, not an internal order sheet). Kept generic
+// (businessName, not a hardcoded "RK Barber Shop") since this same function serves every Store
+// tenant's checkout, not just RK.
 function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, currency, orderId }) {
   const lines = []
-  lines.push(`طلب جديد${businessName ? ` من ${businessName}` : ''} 🛍️`)
-  lines.push('')
-  lines.push(`الاسم: ${form.customer_name}`)
-  lines.push(`الهاتف: ${form.customer_phone}`)
-  if (form.shipping_address) lines.push(`عنوان التوصيل: ${form.shipping_address}`)
-  lines.push(`طريقة الدفع: ${form.payment_method}`)
-  if (form.notes) lines.push(`ملاحظات: ${form.notes}`)
+  lines.push(`سيتم تأكيد طلبك من ${businessName} في أسرع وقت.`)
   lines.push('')
   lines.push('المنتجات المطلوبة:')
   cartItems.forEach((item) => {
@@ -223,7 +222,8 @@ function buildStoreWhatsAppMessage({ businessName, form, cartItems, totalPrice, 
   })
   lines.push('')
   lines.push(totalPrice > 0 ? `الإجمالي: ${totalPrice.toLocaleString('ar-SA')} ${currency}` : 'الإجمالي: السعر يُحدد حسب الطلب')
-  if (orderId) lines.push('', `رقم الطلب: ${orderId.slice(0, 8)}`)
+  lines.push(`طريقة الدفع: ${form.payment_method}`)
+  if (orderId) lines.push(`رقم الطلب: ${orderId.slice(0, 8)}`)
   return lines.join('\n')
 }
 
@@ -337,14 +337,17 @@ export default function CartPage() {
         setOrderId(data?.data?.id ?? null)
 
       } else if (moduleKey === 'store') {
-        // Sync local cart to server, then checkout
-        for (const item of cartItems) {
-          await publicApi.post(
-            '/store/cart',
-            { session_id: sessionId, catalog_item_id: item.catalogItemId, quantity: item.quantity },
-            { params }
-          )
-        }
+        // Sync local cart to server in ONE request, not one request per item -- real bug,
+        // 2026-09-03: N sequential requests were the reported "took too long" slowdown; a first
+        // attempt at N *parallel* requests instead made it worse (confirmed live: concurrent
+        // requests for a brand-new session raced to create the same cart row and threw a real
+        // 500). /store/cart/bulk creates the cart once and loops items server-side -- one
+        // round-trip regardless of cart size, no race possible.
+        await publicApi.post(
+          '/store/cart/bulk',
+          { session_id: sessionId, items: cartItems.map((item) => ({ catalog_item_id: item.catalogItemId, quantity: item.quantity })) },
+          { params }
+        )
         const { data } = await publicApi.post(
           '/store/orders',
           {
@@ -409,13 +412,13 @@ export default function CartPage() {
       const waName  = form.customer_name  || WHATSAPP_PLACEHOLDER_NAME
       const waPhone = form.customer_phone || WHATSAPP_PLACEHOLDER_PHONE
 
-      for (const item of cartItems) {
-        await publicApi.post(
-          '/store/cart',
-          { session_id: sessionId, catalog_item_id: item.catalogItemId, quantity: item.quantity },
-          { params }
-        )
-      }
+      // Same single-request bulk sync as handleSubmit above -- this was the actual path the
+      // "took too long" report came from (the WhatsApp quick-checkout button).
+      await publicApi.post(
+        '/store/cart/bulk',
+        { session_id: sessionId, items: cartItems.map((item) => ({ catalog_item_id: item.catalogItemId, quantity: item.quantity })) },
+        { params }
+      )
       const { data } = await publicApi.post(
         '/store/orders',
         {

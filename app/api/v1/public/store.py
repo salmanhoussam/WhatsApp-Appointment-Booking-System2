@@ -169,13 +169,55 @@ async def add_to_cart(
 
     expires = datetime.now(timezone.utc) + timedelta(days=_CART_TTL_DAYS)
 
-    cart = await store_repo.find_cart_by_session(body.session_id)
-    if not cart:
-        cart = await store_repo.create_cart(tenant["id"], body.session_id, expires)
-    elif cart.clientId != tenant["id"]:
+    cart = await store_repo.get_or_create_cart(tenant["id"], body.session_id, expires)
+    if cart.clientId != tenant["id"]:
         raise HTTPException(status_code=403, detail="Cart mismatch.")
 
     await store_repo.upsert_cart_item(cart.id, body.catalog_item_id, body.quantity)
+
+    return {"success": True, "data": {"session_id": cart.sessionId}}
+
+
+class BulkCartItemIn(BaseModel):
+    catalog_item_id: str
+    quantity:        int = 1
+
+
+class AddToCartBulkIn(BaseModel):
+    session_id: str
+    items:      list[BulkCartItemIn]
+
+
+@router.post("/cart/bulk")
+async def add_to_cart_bulk(
+    body: AddToCartBulkIn,
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("store")),
+):
+    """Sync every cart line in ONE request instead of one request per item (real bug, 2026-09-03:
+    the checkout flow used to fire N sequential `/cart` requests, then N *parallel* ones after a
+    naive fix -- parallel calls for a brand-new session all raced to create the SAME cart row and
+    threw prisma.errors.UniqueViolationError, because Prisma Python's `upsert()` is not a true
+    atomic DB-level upsert here (confirmed live: the race reproduced even through
+    store_repo.get_or_create_cart's upsert). A single request creates/finds the cart exactly once,
+    then loops item upserts in-process -- no cross-request race is possible, and it's one network
+    round-trip regardless of cart size instead of N."""
+    if not body.items:
+        raise HTTPException(status_code=400, detail="No items to add.")
+    for item in body.items:
+        if item.quantity < 1:
+            raise HTTPException(status_code=400, detail="Quantity must be at least 1.")
+
+    expires = datetime.now(timezone.utc) + timedelta(days=_CART_TTL_DAYS)
+    cart = await store_repo.get_or_create_cart(tenant["id"], body.session_id, expires)
+    if cart.clientId != tenant["id"]:
+        raise HTTPException(status_code=403, detail="Cart mismatch.")
+
+    for item in body.items:
+        product = await store_repo.find_product_for_cart(tenant["id"], item.catalog_item_id)
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product not found: {item.catalog_item_id}")
+        await store_repo.upsert_cart_item(cart.id, item.catalog_item_id, item.quantity)
 
     return {"success": True, "data": {"session_id": cart.sessionId}}
 
