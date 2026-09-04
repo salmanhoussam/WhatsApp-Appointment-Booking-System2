@@ -15,6 +15,27 @@ Why a separate file:
   "breakfast" or "pool access"). This file manages ClientService rows
   (platform feature flags: "restaurant", "store", "reservations", …).
   Different concerns, different models.
+
+Authorization (Phase 2B-1, 2026-09-04):
+  GET /, POST /activate, POST /deactivate -> SUPER_ADMIN or TENANT_ADMIN only.
+
+  These three routes previously depended on get_current_admin_user alone, with NO
+  require_roles() gate -- meaning ANY authenticated account of ANY role could read,
+  and by the same dependency activate/deactivate, the tenant's own capabilities.
+  Confirmed live 2026-09-04 with a real STAFF token (a barber account):
+  GET /admin/client-services/ returned 200 with the full capability config, while
+  correctly-gated routes (/admin/team, /admin/store/products) returned 403 for the
+  same token. See .claudedocs/work/permission-model-investigation/2026-09-04/summary.md (F5).
+
+  Ownership reasoning matches admin/team.py's already-approved matrix: turning a
+  tenant's modules on and off is a tenant-owner decision, not an operational one.
+  Managers are denied because no business case exists today for an operational role
+  to change which modules the business has -- not an absolute prohibition; a real
+  case later gets its own reviewed matrix.
+
+  In the granular-permission model (PHASE_2B_DESIGN.md §6, migration step 1) this
+  gate becomes require_permission("capabilities.write"); the role list here is the
+  behavior it must reproduce.
 """
 
 import logging
@@ -23,7 +44,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.db.dependencies import get_current_admin_user
+from app.core.tenant import require_roles
 from app.core.services import sync_selected_services
 from app.repositories import client_services_repo as _repo
 
@@ -72,7 +93,7 @@ def _fmt(row) -> dict:
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/")
-async def list_client_services(user=Depends(get_current_admin_user)):
+async def list_client_services(user=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN"))):
     """Return all ClientService rows (active + inactive) for the current tenant."""
     rows = await _repo.list_client_services(str(user.clientId))
     return {"success": True, "data": [_fmt(r) for r in rows]}
@@ -81,7 +102,7 @@ async def list_client_services(user=Depends(get_current_admin_user)):
 @router.post("/activate", status_code=201)
 async def activate_services(
     body: ActivateServicesIn,
-    user=Depends(get_current_admin_user),
+    user=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Activate platform services for the current tenant.
@@ -131,7 +152,7 @@ async def activate_services(
 @router.post("/deactivate", status_code=200)
 async def deactivate_services(
     body: DeactivateServicesIn,
-    user=Depends(get_current_admin_user),
+    user=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     """
     Deactivate platform services for the current tenant.
