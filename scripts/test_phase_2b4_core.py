@@ -32,6 +32,7 @@ from app.core.permissions import (  # noqa: E402
     has_permission,
     resolve_preset,
     scope_of,
+    unmigrated_areas_for,
 )
 
 PASS, FAIL = [], []
@@ -105,19 +106,24 @@ check("tenant_admin -> role TENANT_ADMIN", t["role"] == "TENANT_ADMIN")
 check("tenant_admin -> no barber link required", t["requires_barber"] is False)
 
 print("\nD. Migration gate — enforced server-side, not only in the UI (2B-2 §1)")
-check("'inventory' add-on is defined...", "inventory" in ADDONS)
-check("...but NOT assignable while store is unmigrated", "inventory" not in ASSIGNABLE_ADDONS)
-msg = raises(resolve_preset, "staff", ["inventory"])
-check("staff + inventory -> rejected with a reason", msg is not None and "not assignable" in msg)
-check("  ...and the reason names the permission it would have granted",
-      msg is not None and "store.write" in msg)
+# REVISED BY SLICE 3 (2026-09-04). Six checks here originally pinned Slice 2's point-in-time gate
+# state: 'inventory'/'shop_manager' unassignable, reservations_manager/shop_manager unregistered,
+# and ASSIGNABLE_PRESETS == {staff, tenant_admin}. Slice 3 deliberately moved that boundary
+# (store + customers migrated), so those assertions became false BY DESIGN, not by regression.
+#
+# They are replaced with the INVARIANT they were really protecting — "a preset whose areas are not
+# all migrated is rejected server-side, with a reason" — asserted through reservations_manager,
+# which is still blocked (by catalog). The current gate state is asserted in test_slice3_core.py,
+# group C, so the two files do not both hard-code a snapshot that must be edited every slice.
+check("'inventory' add-on is defined", "inventory" in ADDONS)
+msg = raises(resolve_preset, "reservations_manager")
+check("a preset with an unmigrated area -> rejected with a reason",
+      msg is not None and "not assignable" in msg)
+check("  ...and the reason names the unmigrated area", msg is not None and "catalog" in msg)
 check("unknown add-on -> rejected", raises(resolve_preset, "staff", ["nope"]) is not None)
 check("unknown preset -> rejected", raises(resolve_preset, "does_not_exist") is not None)
-check("shop_manager is not registered at all this phase", "shop_manager" not in PRESETS)
-check("reservations_manager is not registered at all this phase",
-      "reservations_manager" not in PRESETS)
-check("assignable set is exactly {staff, tenant_admin} today",
-      ASSIGNABLE_PRESETS == frozenset({"staff", "tenant_admin"}))
+check("ASSIGNABLE_PRESETS is derived from the gate, never hand-maintained",
+      ASSIGNABLE_PRESETS == frozenset(p for p in PRESETS if not unmigrated_areas_for(p)))
 check("a legacy-shaped preset takes no add-ons",
       raises(resolve_preset, "tenant_admin", ["inventory"]) is not None)
 

@@ -673,7 +673,10 @@ export default function GenericAdminDashboard() {
       case 'staff':
         return <StaffTab color={color} />
       case 'team':
-        return <TeamTab color={color} />
+        // activeServices drives the capability axis of preset availability (Slice 3): a preset
+        // needing a module this tenant lacks renders disabled with that reason, rather than being
+        // offered and then 403-ing underneath — pattern P1, applied preventively.
+        return <TeamTab color={color} activeServices={activeServices} />
       case 'customers':
         return <CustomersTab color={color} />
       case 'notifications':

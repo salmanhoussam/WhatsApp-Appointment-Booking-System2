@@ -46,6 +46,15 @@ const labelStyle = {
 // This list is a LABEL catalogue, not an authority: the server resolves preset -> permissions and
 // rejects anything unassignable with a 422 (enforced in resolve_preset, not only here). If the two
 // ever disagree, the server wins and the user sees its message.
+// Two INDEPENDENT axes decide whether a preset can be offered, and they are different questions:
+//
+//   migration axis  -- have all the areas this preset grants been migrated to permission checks?
+//                      (Slice 3: store + customers migrated; catalog is not, so مدير الحجوزات
+//                      stays blocked.) Mirrored here as a static `assignable` flag.
+//   capability axis -- does THIS tenant actually have the module? Driven from real server data
+//                      (`activeServices`, straight from GET /admin/me), never hardcoded.
+//
+// `requiresService` is the capability axis; `assignable` is the migration axis.
 const PRESETS = [
   {
     id: 'staff', label: 'موظف',
@@ -55,12 +64,16 @@ const PRESETS = [
   {
     id: 'reservations_manager', label: 'مدير الحجوزات',
     hint: 'يدير كل الحجوزات',
-    assignable: false, reason: 'غير متاح بعد — بانتظار ترحيل صلاحيات العملاء والكتالوج',
+    // Deliberately shown, not hidden (design §6.2): a visible disabled option with its reason makes
+    // the migration state legible instead of mysterious.
+    assignable: false, reason: 'غير متاح بعد — صلاحيات الكتالوج لم تُرحّل بعد',
   },
   {
     id: 'shop_manager', label: 'مدير المتجر',
-    hint: 'يدير المتجر والمنتجات',
-    assignable: false, reason: 'غير متاح بعد — بانتظار ترحيل صلاحيات المتجر',
+    hint: 'يدير المتجر والمنتجات والطلبات، ويرى سجل العملاء',
+    assignable: true, requiresBarber: false,
+    requiresService: 'store',
+    serviceReason: 'غير متاح — هذا الحساب لا يملك خدمة المتجر',
   },
   {
     id: 'tenant_admin', label: 'المالك',
@@ -69,7 +82,20 @@ const PRESETS = [
   },
 ]
 
+// Add-ons layered on top of a preset. Named "المخزون" for the merchant, but its authority is the
+// WHOLE Store area (store.write) — the approved v1 Store permission, deliberately not split
+// (PHASE_2B_5_SLICE3_DESIGN.md §3.1). The hint says so plainly rather than implying it is narrower.
+const ADDONS = [
+  {
+    id: 'inventory', label: 'يقدر يدير المتجر',
+    hint: 'إضافة وتعديل المنتجات والفئات، وتغيير حالة الطلبات',
+    appliesTo: ['staff', 'reservations_manager'],
+    requiresService: 'store',
+  },
+]
+
 const PRESET_LABEL = Object.fromEntries(PRESETS.map(p => [p.id, p.label]))
+const ADDON_LABEL  = Object.fromEntries(ADDONS.map(a => [a.id, a.label]))
 
 const ROLE_LABEL = {
   SUPER_ADMIN:          'مدير المنصة',
@@ -121,11 +147,11 @@ function Field({ label, children }) {
   )
 }
 
-const EMPTY_MEMBER = { full_name: '', email: '', password: '', preset: 'staff', barber_id: '' }
+const EMPTY_MEMBER = { full_name: '', email: '', password: '', preset: 'staff', barber_id: '', addons: [] }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export default function TeamTab({ color }) {
+export default function TeamTab({ color, activeServices }) {
   const [members,   setMembers]   = useState([])
   const [staff,     setStaff]     = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -166,7 +192,23 @@ export default function TeamTab({ color }) {
 
   useEffect(() => { load() }, [load])
 
+  const services = activeServices ?? []
+  // One helper answers both axes, so no call site re-derives availability.
+  // The server is still the authority: resolve_preset() rejects a blocked preset with a 422 naming
+  // the unmigrated area, even for a request that never went through this UI (design §5.1).
+  const availability = (p) => {
+    if (!p.assignable) return { ok: false, reason: p.reason }
+    if (p.requiresService && !services.includes(p.requiresService)) {
+      return { ok: false, reason: p.serviceReason }
+    }
+    return { ok: true }
+  }
+
   const selectedPreset = PRESETS.find(p => p.id === form.preset)
+  const availableAddons = ADDONS.filter(a =>
+    a.appliesTo.includes(form.preset) &&
+    (!a.requiresService || services.includes(a.requiresService))
+  )
   // Barbers with no login account yet. User.barberId is @unique, so an already-linked barber would
   // be rejected with a 409 — filtering here turns that into an affordance the owner never hits.
   const linkedBarberIds = new Set(members.map(m => m.barber_id).filter(Boolean))
@@ -199,6 +241,7 @@ export default function TeamTab({ color }) {
         preset:    form.preset,
       }
       if (selectedPreset?.requiresBarber) payload.barber_id = form.barber_id
+      if (form.addons.length) payload.addons = form.addons
       await adminApi.post('/team', payload)
       setShowModal(false)
       await load()
@@ -276,6 +319,16 @@ export default function TeamTab({ color }) {
                       created before this phase (and for the inert placeholder role). */}
                   {PRESET_LABEL[member.preset] ?? ROLE_LABEL[member.role] ?? member.role}
                 </span>
+                {/* Derived from the account's REAL stored permissions (the server resolves the
+                    final array), not from what was requested at creation. Shown only when the
+                    permission came from the add-on — shop_manager holds store.write natively. */}
+                {Array.isArray(member.permissions) &&
+                 member.permissions.includes('store.write') &&
+                 member.preset !== 'shop_manager' && (
+                  <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: `${color}14`, color, fontWeight: 600 }}>
+                    + {ADDON_LABEL.inventory}
+                  </span>
+                )}
                 {member.scope === 'self' && (
                   <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: `${T.textMuted}18`, color: T.textSecond, fontWeight: 600 }}>
                     بياناته فقط
@@ -317,30 +370,60 @@ export default function TeamTab({ color }) {
 
           <Field label="الصلاحية">
             <div style={{ display: 'grid', gap: 8 }}>
-              {PRESETS.map(p => (
-                <label key={p.id}
-                  title={p.assignable ? undefined : p.reason}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
-                    borderRadius: 8, border: `1px solid ${form.preset === p.id ? color : T.border}`,
-                    background: form.preset === p.id ? `${color}0d` : T.cardBg,
-                    cursor: p.assignable ? 'pointer' : 'not-allowed',
-                    opacity: p.assignable ? 1 : 0.5,
-                  }}>
-                  <input type="radio" name="preset" value={p.id} disabled={!p.assignable}
-                    checked={form.preset === p.id}
-                    onChange={() => setForm({ ...form, preset: p.id, barber_id: '' })}
-                    style={{ marginTop: 2 }} />
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{p.label}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: T.textMuted }}>
-                      {p.assignable ? p.hint : p.reason}
+              {PRESETS.map(p => {
+                const { ok, reason } = availability(p)
+                return (
+                  <label key={p.id}
+                    title={ok ? undefined : reason}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                      borderRadius: 8, border: `1px solid ${form.preset === p.id ? color : T.border}`,
+                      background: form.preset === p.id ? `${color}0d` : T.cardBg,
+                      cursor: ok ? 'pointer' : 'not-allowed',
+                      opacity: ok ? 1 : 0.5,
+                    }}>
+                    <input type="radio" name="preset" value={p.id} disabled={!ok}
+                      checked={form.preset === p.id}
+                      onChange={() => setForm({ ...form, preset: p.id, barber_id: '', addons: [] })}
+                      style={{ marginTop: 2 }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{p.label}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: T.textMuted }}>
+                        {ok ? p.hint : reason}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))}
+                  </label>
+                )
+              })}
             </div>
           </Field>
+
+          {availableAddons.length > 0 && (
+            <Field label="إضافات">
+              <div style={{ display: 'grid', gap: 8 }}>
+                {availableAddons.map(a => (
+                  <label key={a.id} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                    borderRadius: 8, border: `1px solid ${form.addons.includes(a.id) ? color : T.border}`,
+                    background: form.addons.includes(a.id) ? `${color}0d` : T.cardBg, cursor: 'pointer',
+                  }}>
+                    <input type="checkbox" checked={form.addons.includes(a.id)}
+                      onChange={e => setForm({
+                        ...form,
+                        addons: e.target.checked
+                          ? [...form.addons, a.id]
+                          : form.addons.filter(x => x !== a.id),
+                      })}
+                      style={{ marginTop: 2 }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.textPrimary }}>{a.label}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: T.textMuted }}>{a.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
 
           {selectedPreset?.requiresBarber && (
             <Field label="مرتبط بالموظف">

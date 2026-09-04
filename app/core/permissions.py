@@ -69,6 +69,40 @@ PRESETS: dict[str, dict] = {
         "legacy_role":     "STAFF",
         "requires_barber": True,
     },
+    # 'reservations_manager' -- REGISTERED but NOT assignable until catalog is migrated (Slice 4).
+    #   Registered deliberately rather than omitted: the gate must be able to say WHICH dependency
+    #   is missing ("catalog"), which it can only do if the preset's real permission array exists
+    #   here. An unregistered preset would fail with "Unknown preset", telling nobody anything.
+    #
+    #   ⚠ customers.read is an INTENTIONAL PRESET EXPANSION (design §4.1), NOT legacy equivalence:
+    #   customers.py's real tuple is ("SUPER_ADMIN","TENANT_ADMIN"), so a legacy
+    #   MANAGER_RESERVATIONS account CANNOT read the customer registry today. This preset grants
+    #   more than that legacy role holds. Acceptable because it is a NEW preset no existing account
+    #   uses -- nothing regresses -- but it is recorded, never implied to be preservation.
+    #   It is NOT Permission Bundle Correction: that ticket narrows the LEGACY bundle; this widens
+    #   a NEW preset. Opposite directions, separate decisions.
+    #   services.write is deliberately absent (PHASE_2B_2_DESIGN.md, Salman's decision 3).
+    "reservations_manager": {
+        "permissions":     ["reservations.write", "staff.read", "services.read",
+                            "catalog.read", "customers.read"],
+        "scope":           "all",
+        "legacy_role":     "MANAGER_RESERVATIONS",
+        "requires_barber": False,
+    },
+    # 'shop_manager' (Slice 3) -- PHASE_2B_5_SLICE3_DESIGN.md §4.2.
+    #   catalog.write was DROPPED from the originally-approved row: catalog.py can reach the store
+    #   AND restaurant partitions of CatalogItem/CatalogCategory (module_key is client-supplied and
+    #   catalog_service's update/delete apply no module filter), so granting it here would hand a
+    #   "shop" manager wider access than the name implies. store products, store categories and
+    #   store orders all sit behind store.write, so nothing is lost for its real job.
+    #   legacy_role STAFF is an INERT PLACEHOLDER (design §4.2): this account is governed by its
+    #   permission array, never by role. No SHOP_MANAGER enum value exists or is added.
+    "shop_manager": {
+        "permissions":     ["store.write", "customers.read"],
+        "scope":           "all",
+        "legacy_role":     "STAFF",
+        "requires_barber": False,
+    },
     # 'tenant_admin' is deliberately NOT permission-based (PHASE_2B_2_DESIGN.md §2): an owner is
     # stored exactly as owners are stored today (role=TENANT_ADMIN, permissions=NULL) so it resolves
     # through the legacy path and keeps working across migrated and unmigrated areas alike.
@@ -81,6 +115,13 @@ PRESETS: dict[str, dict] = {
 }
 
 # Add-on -> the permissions it grants (PHASE_2B_2_DESIGN.md §3).
+#
+# NAMING vs AUTHORITY -- Salman's explicit framing correction, PHASE_2B_5_SLICE3_DESIGN.md §3.1:
+# this add-on is called "inventory" for product/UI purposes, but its authority is the ENTIRE Store
+# area, because store.write is the approved v1 Store permission and is deliberately NOT split
+# (splitting it would require an orders.write string that the approved vocabulary does not contain).
+# So it also grants store category mutation and PATCH /orders/{id}/status. Do not describe, label,
+# or implement it as a narrower inventory-only grant.
 ADDONS: dict[str, list[str]] = {"inventory": ["store.write"]}
 
 # ── The migration gate, as data ───────────────────────────────────────────────
@@ -89,14 +130,57 @@ ADDONS: dict[str, list[str]] = {"inventory": ["store.write"]}
 # UI-only enforcement would leave a crafted request able to create an account that is 403'd
 # everywhere by deny-by-default (I4).
 #
-# Slice 2 migrated: reservations, staff, services. Therefore:
-#   - 'staff' is assignable (its three permissions are all in migrated areas).
-#   - 'reservations_manager'/'shop_manager' are NOT registered at all yet -- they need catalog/
-#     customers/store, which Slice 3 migrates.
-#   - the 'inventory' add-on is NOT assignable: it grants store.write, and store is unmigrated.
-# Widening either set is a deliberate act that belongs to the slice that migrates those areas.
-ASSIGNABLE_PRESETS: frozenset[str] = frozenset({"staff", "tenant_admin"})
-ASSIGNABLE_ADDONS: frozenset[str] = frozenset()
+# MIGRATED_AREAS is the single source of truth for the Dependency/Gate Matrix
+# (PHASE_2B_5_SLICE3_DESIGN.md §5). Salman's requirement: "preset enabled" must not be scattered
+# across frontend/backend assumptions -- the API gate and the Team UI both read from THIS, and
+# neither computes assignability independently.
+#
+#   Slice 1 -> capabilities   Slice 2 -> reservations, staff, services
+#   Slice 3 -> store, customers                      Slice 4 -> catalog (not yet)
+MIGRATED_AREAS: frozenset[str] = frozenset({
+    "capabilities",                          # Slice 1 (2B-1)
+    "reservations", "staff", "services",     # Slice 2 (2B-3)
+    "store", "customers",                    # Slice 3
+})
+
+
+def _areas_of(permissions: Optional[list]) -> set[str]:
+    """The distinct areas a permission list touches ('store.write' -> 'store')."""
+    return {p.split(".", 1)[0] for p in (permissions or [])}
+
+
+def unmigrated_areas_for(preset: str, addons: Optional[list] = None) -> list[str]:
+    """Which areas a preset (+ add-ons) grants that have NOT been migrated yet.
+
+    Empty list == offerable. This function IS the gate: assignability is derived from the real
+    permission arrays and MIGRATED_AREAS, never from a hand-maintained list of preset names that
+    could silently drift away from what the presets actually grant.
+    """
+    spec = PRESETS.get(preset)
+    if spec is None:
+        return []
+    granted = list(spec["permissions"] or [])
+    for addon in (addons or []):
+        granted += ADDONS.get(addon, [])
+    return sorted(_areas_of(granted) - MIGRATED_AREAS)
+
+
+def is_assignable(preset: str, addons: Optional[list] = None) -> bool:
+    """A preset may only be offered once EVERY area it grants has been migrated
+    (PHASE_2B_2_DESIGN.md §1). Offering one earlier produces an account that deny-by-default (I4)
+    403s on the very thing its name promises."""
+    return preset in PRESETS and not unmigrated_areas_for(preset, addons)
+
+
+# Derived, not hand-maintained -- the two frozensets below stay for the existing call sites and for
+# error messages, but they are now COMPUTED from the matrix above, so the table and the code cannot
+# disagree.
+#   After Slice 3: staff ✅ · tenant_admin ✅ · shop_manager ✅ · inventory ✅
+#                  reservations_manager ❌ (needs catalog -- Slice 4)
+ASSIGNABLE_PRESETS: frozenset[str] = frozenset(p for p in PRESETS if is_assignable(p))
+ASSIGNABLE_ADDONS: frozenset[str] = frozenset(
+    a for a, perms in ADDONS.items() if not (_areas_of(perms) - MIGRATED_AREAS)
+)
 
 
 def _role_of(user) -> str:
@@ -225,10 +309,15 @@ def resolve_preset(preset: str, addons: Optional[list] = None) -> dict:
     """
     if preset not in PRESETS:
         raise ValueError(f"Unknown preset '{preset}'.")
-    if preset not in ASSIGNABLE_PRESETS:
+    blocked_by = unmigrated_areas_for(preset, addons)
+    if blocked_by:
+        # Name the exact missing dependency (design §5.1): a caller must be able to tell WHY, not
+        # just that it failed. This is the server-side gate -- it rejects a direct request that
+        # bypasses the UI entirely, because the UI explains assignability, it never enforces it.
         raise ValueError(
-            f"Preset '{preset}' is not assignable yet: some areas it grants have not been migrated "
-            f"to permission checks. Assignable today: {sorted(ASSIGNABLE_PRESETS)}."
+            f"Preset '{preset}' is not assignable yet: it grants permissions in "
+            f"{blocked_by}, which {'has' if len(blocked_by) == 1 else 'have'} not been migrated to "
+            f"permission checks. Assignable today: {sorted(ASSIGNABLE_PRESETS)}."
         )
 
     spec = PRESETS[preset]

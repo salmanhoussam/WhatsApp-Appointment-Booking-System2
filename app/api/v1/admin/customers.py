@@ -14,7 +14,7 @@ capability would wrongly 403 a tenant that only has the other one active.
 
 from fastapi import APIRouter, Depends
 
-from app.core.tenant import require_roles
+from app.core.permissions import require_permission
 from app.services import customer_registry_service
 
 router = APIRouter()
@@ -22,7 +22,15 @@ router = APIRouter()
 
 @router.get("/")
 async def list_customers(
-    user=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+    # Slice 3 (PHASE_2B_5_SLICE3_DESIGN.md §3). Legacy accounts are still checked against this
+    # route's OWN existing tuple -- ("SUPER_ADMIN","TENANT_ADMIN"), unchanged, so
+    # MANAGER_RESERVATIONS stays denied here exactly as before (I1). Permission-based accounts are
+    # checked against customers.read.
+    #
+    # There is deliberately no customers.write: this file has no POST/PATCH/DELETE at all. The
+    # registry is query-time aggregation over Reservation + StoreOrder merged by phone (no Customer
+    # table, Salman's 2026-08-20 decision), so there is nothing to write and no permission to name.
+    user=Depends(require_permission("customers.read", "SUPER_ADMIN", "TENANT_ADMIN")),
 ):
     data = await customer_registry_service.list_customer_registry(str(user.clientId))
     return {"success": True, "data": data}
