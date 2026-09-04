@@ -54,6 +54,50 @@ SCOPABLE_AREAS: frozenset[str] = frozenset({"reservations", "staff"})
 PRESET_STAFF: list[str] = ["reservations.write", "staff.read", "services.read"]
 
 
+# ── Preset registry (Phase 2B-4) ──────────────────────────────────────────────
+# PHASE_2B_4_DESIGN.md §0's binding condition: authorization rules live in THIS module and nowhere
+# else. The route layer resolves a preset by calling resolve_preset() below -- it never maps a
+# preset to permissions itself, and it never trusts a client-supplied permission array (I7).
+
+PRESETS: dict[str, dict] = {
+    # 'staff' -- the only preset whose areas are fully migrated as of Slice 2.
+    #   legacy_role is the INERT placeholder written to User.role (PHASE_2B_2_DESIGN.md §5): the
+    #   account is governed by its permission array, never by this value.
+    "staff": {
+        "permissions":     PRESET_STAFF,
+        "scope":           "self",
+        "legacy_role":     "STAFF",
+        "requires_barber": True,
+    },
+    # 'tenant_admin' is deliberately NOT permission-based (PHASE_2B_2_DESIGN.md §2): an owner is
+    # stored exactly as owners are stored today (role=TENANT_ADMIN, permissions=NULL) so it resolves
+    # through the legacy path and keeps working across migrated and unmigrated areas alike.
+    "tenant_admin": {
+        "permissions":     None,          # None => legacy account, not "no permissions"
+        "scope":           "all",
+        "legacy_role":     "TENANT_ADMIN",
+        "requires_barber": False,
+    },
+}
+
+# Add-on -> the permissions it grants (PHASE_2B_2_DESIGN.md §3).
+ADDONS: dict[str, list[str]] = {"inventory": ["store.write"]}
+
+# ── The migration gate, as data ───────────────────────────────────────────────
+# PHASE_2B_2_DESIGN.md §1's binding rule: "a preset may only be offered once every area it grants
+# has been migrated to permission checks." Enforced HERE (server-side) as well as in the UI --
+# UI-only enforcement would leave a crafted request able to create an account that is 403'd
+# everywhere by deny-by-default (I4).
+#
+# Slice 2 migrated: reservations, staff, services. Therefore:
+#   - 'staff' is assignable (its three permissions are all in migrated areas).
+#   - 'reservations_manager'/'shop_manager' are NOT registered at all yet -- they need catalog/
+#     customers/store, which Slice 3 migrates.
+#   - the 'inventory' add-on is NOT assignable: it grants store.write, and store is unmigrated.
+# Widening either set is a deliberate act that belongs to the slice that migrates those areas.
+ASSIGNABLE_PRESETS: frozenset[str] = frozenset({"staff", "tenant_admin"})
+ASSIGNABLE_ADDONS: frozenset[str] = frozenset()
+
 
 def _role_of(user) -> str:
     """Prisma may hand back an enum or a plain string depending on call path."""
@@ -124,6 +168,102 @@ def scope_barber_id(user, area: str) -> Optional[str]:
     if not getattr(user, "barberId", None):
         raise HTTPException(status_code=403, detail="Staff account is not linked to a barber profile.")
     return str(user.barberId)
+
+
+# ── Projection (Phase 2B-4) ───────────────────────────────────────────────────
+
+def describe_authority(user) -> dict:
+    """The `authority` block GET /admin/me returns — a pure projection of this module's own
+    functions. PHASE_2B_4_DESIGN.md §3.3.
+
+    Every field is produced by calling something already defined above; this function introduces no
+    rule of its own, so the endpoint and the enforcement path can never disagree.
+
+    Note `permissions` is returned VERBATIM — null for a legacy account (constraint C1: a legacy
+    account genuinely has no resolved array; I1 preserves behaviour via each route's own role
+    tuple, not via a derived bundle). It is deliberately NOT expanded by write-implies-read: that
+    is a resolver rule (I5), and copying it into the transport layer would let the two drift. A
+    caller needing that question answered asks has_permission(), it does not re-implement it.
+    """
+    return {
+        "role":           _role_of(user),
+        "is_legacy":      not is_permission_based(user),
+        "permissions":    _permissions_of(user),
+        "scope":          scope_of(user),
+        "preset":         getattr(user, "preset", None),
+        "scopable_areas": sorted(SCOPABLE_AREAS),
+    }
+
+
+def describe_legacy_owner_authority(role: str = "TENANT_ADMIN") -> dict:
+    """The same block for a Client-type token holder, who has no User row at all (constraint C2).
+
+    This is NOT a new authority model: useAdminRole.js:12-13 already maps a client-type token to
+    TENANT_ADMIN client-side today. This moves that existing mapping to the server unchanged so the
+    dashboard has ONE source of truth, rather than inventing anything.
+    """
+    return {
+        "role":           role,
+        "is_legacy":      True,
+        "permissions":    None,
+        "scope":          "all",
+        "preset":         None,
+        "scopable_areas": sorted(SCOPABLE_AREAS),
+    }
+
+
+# ── Server-side preset resolution (Phase 2B-4, I7) ────────────────────────────
+
+def resolve_preset(preset: str, addons: Optional[list] = None) -> dict:
+    """preset + add-ons -> the exact row values to store on a new User.
+
+    Returns {"permissions": list|None, "scope": str, "role": str, "requires_barber": bool}.
+
+    Raises ValueError for an unknown or not-yet-assignable preset/add-on; the route turns that into
+    a 422 with the reason. Resolution is server-side only: no caller may supply a permission array
+    (I7), so a crafted request cannot grant itself anything.
+    """
+    if preset not in PRESETS:
+        raise ValueError(f"Unknown preset '{preset}'.")
+    if preset not in ASSIGNABLE_PRESETS:
+        raise ValueError(
+            f"Preset '{preset}' is not assignable yet: some areas it grants have not been migrated "
+            f"to permission checks. Assignable today: {sorted(ASSIGNABLE_PRESETS)}."
+        )
+
+    spec = PRESETS[preset]
+    requested = list(addons or [])
+
+    for addon in requested:
+        if addon not in ADDONS:
+            raise ValueError(f"Unknown add-on '{addon}'.")
+        if addon not in ASSIGNABLE_ADDONS:
+            raise ValueError(
+                f"Add-on '{addon}' is not assignable yet: it grants "
+                f"{ADDONS[addon]}, whose area has not been migrated to permission checks."
+            )
+
+    base = spec["permissions"]
+    if base is None:
+        # A legacy-shaped preset (tenant_admin). An add-on cannot be layered onto it -- there is no
+        # array to layer onto, and inventing one would make the owner permission-based, which
+        # PHASE_2B_2_DESIGN.md §2 explicitly rejects.
+        if requested:
+            raise ValueError(f"Preset '{preset}' is legacy-shaped and takes no add-ons.")
+        permissions = None
+    else:
+        permissions = list(base)
+        for addon in requested:
+            for perm in ADDONS[addon]:
+                if perm not in permissions:
+                    permissions.append(perm)
+
+    return {
+        "permissions":     permissions,
+        "scope":           spec["scope"],
+        "role":            spec["legacy_role"],
+        "requires_barber": spec["requires_barber"],
+    }
 
 
 # ── Dependency ────────────────────────────────────────────────────────────────

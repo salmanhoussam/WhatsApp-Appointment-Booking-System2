@@ -78,6 +78,18 @@ async def find_user_by_id(user_id: str, client_id: str):
     )
 
 
+async def find_user_by_barber_id(barber_id: str):
+    """The login account linked to a Barber, if any.
+
+    User.barberId is @unique, so this answers "is this barber already linked?" before a create
+    attempt turns a constraint violation into a 500 (Phase 2B-4). Intentionally NOT client-scoped:
+    the uniqueness it guards is global, and the caller has already verified the barber belongs to
+    its own tenant — scoping here would report "free" for a barber linked elsewhere and then fail
+    at the DB anyway.
+    """
+    return await prisma_client.user.find_first(where={"barberId": barber_id})
+
+
 async def find_admin_user_for_client(client_id: str, role: str = "TENANT_ADMIN"):
     """First user with the given role for a client."""
     return await prisma_client.user.find_first(
@@ -98,9 +110,35 @@ async def update_user(user_id: str, data: dict):
     )
 
 
-async def deactivate_user(user_id: str, client_id: str):
-    """Soft-deactivate a team member, scoped to tenant."""
-    return await prisma_client.user.update(
-        where={"id": user_id},
+async def deactivate_user(user_id: str, client_id: str) -> int:
+    """Soft-deactivate a team member, scoped to tenant. Returns rows affected.
+
+    Phase 2B-4: the tenant filter is now applied AT THE DB LEVEL. It previously ran
+    `where={"id": user_id}` only — the docstring said "scoped to tenant" but the query was not,
+    and the scope rested entirely on the caller's preceding find_user_by_id(user_id, client_id)
+    ownership check in admin/team.py. Never exploitable through any real caller, but it is the
+    exact shape flagged 2026-08-30 in resource_repo/unit_repo and again by Dashboard Architecture
+    Review 1 (Discovery 3). Tightened here, deliberately narrowly, because this phase adds its
+    mirror (reactivate_user) right beside it — shipping a new mutation next to an unscoped one
+    would knowingly propagate the pattern.
+
+    update_many (not update) because a composite where needs it: Prisma's `update` accepts only a
+    unique selector, so `id` alone would be the only filter available.
+    """
+    return await prisma_client.user.update_many(
+        where={"id": user_id, "clientId": client_id},
         data={"isActive": False},
+    )
+
+
+async def reactivate_user(user_id: str, client_id: str) -> int:
+    """Re-activate a soft-deactivated team member, scoped to tenant. Returns rows affected.
+
+    The exact inverse of deactivate_user, with the same tenant scoping — Dashboard Architecture
+    Review 1 pattern P2 ("soft-delete without a restore path", two independent real cases: this
+    one and StaffTab's hide-without-unhide). There is no hard delete anywhere in this lifecycle.
+    """
+    return await prisma_client.user.update_many(
+        where={"id": user_id, "clientId": client_id},
+        data={"isActive": True},
     )

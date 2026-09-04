@@ -13,6 +13,8 @@ import StoreTab          from './tabs/StoreTab'
 import MyClientsTab      from './tabs/MyClientsTab'
 import CustomersTab      from './tabs/CustomersTab'
 import { useAdminRole, useAdminBarberId } from '../../hooks/useAdminRole'
+import useAdminIdentity, { hasPermission } from '../../hooks/useAdminIdentity'
+import TeamTab from './tabs/TeamTab'
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
 import useImageUpload     from '../../hooks/useImageUpload'
@@ -167,12 +169,21 @@ function IconLogout({ size = 18, color }) {
  * ComingSoonTab placeholder -- their own build is a separate future phase (per Salman's
  * instruction not to build calendar/staff features yet); this phase is the navigation shape only.
  */
-function buildNav(hasReservations, activeServices) {
+function buildNav(hasReservations, activeServices, isOwner = false) {
+  // Phase 2B-4: the Team entry is owner-only (SUPER_ADMIN/TENANT_ADMIN), matching admin/team.py's
+  // own already-approved authorization matrix -- a MANAGER_* account would 403 on every request
+  // underneath it, which is exactly the "nav entry the tenant can't actually use" defect the
+  // Dashboard Review recorded twice (P1). Defaults to false so nothing changes for a caller that
+  // doesn't pass it.
+  const team = isOwner
+    ? [{ id: 'team', labelAr: 'الفريق', Icon: IconStaff }]
+    : []
   if (!hasReservations) {
     return [
       { id: 'overview', labelAr: 'نظرة عامة', Icon: IconOverview },
       { id: 'orders',   labelAr: 'الطلبات',   Icon: IconOrders   },
       { id: 'catalog',  labelAr: 'الكتالوج',  Icon: IconCatalog  },
+      ...team,
       { id: 'settings', labelAr: 'الإعدادات', Icon: IconSettings },
     ]
   }
@@ -196,6 +207,7 @@ function buildNav(hasReservations, activeServices) {
     { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
     ...(hasStore ? [{ id: 'store', labelAr: 'المتجر', Icon: IconOrders }] : []),
     { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
+    ...team,
     { id: 'notifications', labelAr: 'الإشعارات',  Icon: IconNotifications },
     { id: 'settings',      labelAr: 'الإعدادات', Icon: IconSettings      },
   ]
@@ -215,6 +227,50 @@ const STAFF_NAV = [
   { id: 'reservations', labelAr: 'الحجوزات',  Icon: IconList      },
   { id: 'myclients',    labelAr: 'عملائي',    Icon: IconCustomers },
 ]
+
+// Phase 2B-4 (PHASE_2B_4_DESIGN.md §5.2) -- nav for a PERMISSION-BASED account, derived from the
+// server's own resolved authority (GET /admin/me) rather than from the JWT's role claim.
+//
+// Why this exists at all: Phase 2B-3 put permissions in the DATABASE with zero token changes, so
+// the JWT cannot carry them. A `shop_manager` stores role=STAFF as an inert placeholder -- reading
+// nav from that role would show it precisely the three surfaces it has no permission for. The
+// `staff` preset happens to match STAFF_NAV, which is exactly why this had to be built before
+// Slice 3 rather than after: it would look fine right up until the first preset that doesn't.
+//
+// LEGACY ACCOUNTS DO NOT COME THROUGH HERE. `permissions IS NULL` keeps the existing role/
+// capability path untouched (invariant I1 applied to the Interface, same as the backend applies it
+// per route) -- STAFF_NAV above still serves legacy STAFF accounts, unchanged.
+//
+// Each entry declares the permission it needs; `service` additionally requires the TENANT to have
+// that capability active. Both axes, together, in one place -- the Dashboard Review found two real
+// bugs (Store B1 2026-08-21, OverviewTab 2026-08-22) caused by a surface acting on only one.
+const PERMISSION_NAV = [
+  { id: 'calendar',     labelAr: 'التقويم',    Icon: IconCalendar,  permission: 'reservations.read' },
+  { id: 'reservations', labelAr: 'الحجوزات',   Icon: IconList,      permission: 'reservations.read' },
+  { id: 'myclients',    labelAr: 'عملائي',     Icon: IconCustomers, permission: 'reservations.read', selfOnly: true },
+  { id: 'store',        labelAr: 'المتجر',     Icon: IconOrders,    permission: 'store.read',     service: 'store'   },
+  { id: 'catalog',      labelAr: 'الكتالوج',   Icon: IconCatalog,   permission: 'catalog.read',   service: 'catalog' },
+  { id: 'customers',    labelAr: 'العملاء',    Icon: IconCustomers, permission: 'customers.read' },
+]
+
+/**
+ * Build the nav for a permission-based account.
+ *
+ * The Staff (management) tab is deliberately absent for every scope='self' account: the `staff`
+ * preset grants `staff.read` for the barber PICKERS and for server-side ownership, not because a
+ * staff member administers the staff roster. Salman's own decision, 2026-09-04 -- hidden in v1
+ * rather than a read-only variant, which would be real new UX with no owner behind it.
+ */
+function buildPermissionNav(authority, activeServices, hasPermissionFn) {
+  const services = activeServices ?? []
+  const isSelf   = authority?.scope === 'self'
+  return PERMISSION_NAV.filter((entry) => {
+    if (!hasPermissionFn(authority, entry.permission)) return false
+    if (entry.service && !services.includes(entry.service)) return false
+    if (entry.selfOnly && !isSelf) return false
+    return true
+  })
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
@@ -355,9 +411,23 @@ export default function GenericAdminDashboard() {
   // observed silently swallowed in (STAFF_STORE... err, dashboard-ux-corrections evidence,
   // item-11). Since isStaff needs no async wait, STAFF's default tab is now resolved at the very
   // first render instead, skipping the flash (and the effect below) entirely for this role.
+  // Phase 2B-4: the SERVER's resolved authority is now the source of truth for what this account
+  // may see. useAdminRole() (JWT-decoded) is kept only for the legacy path below and for the
+  // synchronous first-render default-tab optimisation described above -- it is no longer what
+  // decides a permission-based account's nav.
+  const {
+    authority,
+    activeServices: identityServices,
+    isLegacy,
+    isLoading: identityLoading,
+    error: identityError,
+  } = useAdminIdentity()
+
   const role       = useAdminRole()
   const isStaff    = role === 'STAFF'
   const myBarberId = useAdminBarberId()
+  // True only once identity has actually resolved -- never assumed while it is still in flight.
+  const isPermissionBased = isLegacy === false
 
   const [activeTab,    setActiveTabRaw] = useState(
     () => initialUrlTab || (isStaff ? 'calendar' : 'overview')
@@ -497,12 +567,25 @@ export default function GenericAdminDashboard() {
   const color           = settings?.primary_color  ?? '#6366f1'
   const tenantName      = settings?.name_ar        ?? 'لوحة التحكم'
   const currency        = settings?.currency       ?? config?.currency ?? 'USD'
-  const activeServices  = useMemo(() => config?.active_services ?? [], [config?.active_services])
-  const hasReservations = activeServices.includes('reservations')
-  const NAV               = useMemo(
-    () => (isStaff ? STAFF_NAV : buildNav(hasReservations, activeServices)),
-    [hasReservations, isStaff, activeServices],
+  // Prefer /admin/me's capability list once identity has resolved: it and useTenantConfig() derive
+  // active_services identically (active ClientService rows), but /me returns it alongside the
+  // authority the nav is filtered by, so both axes come from one server answer rather than two
+  // calls that can disagree mid-load. useTenantConfig stays the fallback and still serves every
+  // other consumer of `config` in this file.
+  const activeServices  = useMemo(
+    () => identityServices ?? config?.active_services ?? [],
+    [identityServices, config?.active_services],
   )
+  const hasReservations = activeServices.includes('reservations')
+  const NAV               = useMemo(() => {
+    // Permission-based account -> derived from server authority (Phase 2B-4).
+    if (isPermissionBased) return buildPermissionNav(authority, activeServices, hasPermission)
+    // Legacy account -> untouched pre-2B-4 behaviour (I1), plus the owner-only Team entry.
+    const isOwner = authority
+      ? ['SUPER_ADMIN', 'TENANT_ADMIN'].includes(authority.role)
+      : false
+    return isStaff ? STAFF_NAV : buildNav(hasReservations, activeServices, isOwner)
+  }, [hasReservations, isStaff, activeServices, isPermissionBased, authority])
 
   // basePath = current URL with the trailing tab segment removed -- works for both real route
   // patterns since both wildcard-capture the tab segment into routeParams['*'].
@@ -541,6 +624,17 @@ export default function GenericAdminDashboard() {
     }
   }, [hasReservations, changeTab, isStaff])
 
+  // Phase 2B-4 safety net, permission-based accounts only: land on a tab this account can actually
+  // see. `activeTab`'s initializer runs before identity resolves and can only guess from the JWT's
+  // (non-authoritative, possibly placeholder) role -- so a deep link or a role/permission change
+  // could otherwise leave a permission-based account mounted on a tab absent from its own nav,
+  // firing 403s underneath it. Deliberately scoped to isPermissionBased so no legacy account's
+  // landing behaviour changes (I1).
+  useEffect(() => {
+    if (!isPermissionBased || NAV.length === 0) return
+    if (!NAV.some((n) => n.id === activeTab)) changeTab(NAV[0].id)
+  }, [isPermissionBased, NAV, activeTab, changeTab])
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem('admin_access_token')
     window.location.href = '/login'
@@ -578,6 +672,8 @@ export default function GenericAdminDashboard() {
         return <StoreTab color={color} currency={currency} activeServices={activeServices} />
       case 'staff':
         return <StaffTab color={color} />
+      case 'team':
+        return <TeamTab color={color} />
       case 'customers':
         return <CustomersTab color={color} />
       case 'notifications':
@@ -596,8 +692,15 @@ export default function GenericAdminDashboard() {
   // reservations tenant purely because this fetch hadn't caught up yet, not because the tenant
   // genuinely lacks that capability. A real, permanent failure on either source now shows a real
   // error state instead of either spinning forever or silently rendering the wrong shell.
-  if (loading || configLoading) return <FullScreenSpinner color={color} />
-  if (settingsError || configError) return <DashboardErrorState color={color} message={settingsError || configError} />
+  // Phase 2B-4 adds identity as a THIRD gated async source, for the same reason the second one was
+  // added above: NAV now depends on it. Rendering before it resolves would paint a legacy-shaped
+  // nav and then swap it -- the exact flash-then-redirect window that already produced two real
+  // bugs here (spurious 403s from a briefly-mounted wrong tab, and swallowed nav clicks). The rule
+  // this phase's design states plainly: no nav before identity.
+  if (loading || configLoading || identityLoading) return <FullScreenSpinner color={color} />
+  if (settingsError || configError || identityError) {
+    return <DashboardErrorState color={color} message={settingsError || configError || identityError} />
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
