@@ -802,3 +802,30 @@ and `.claudedocs/work/permission-model-investigation/2026-09-04/summary.md`.
 **Known limitations, recorded not open:** SUPER_ADMIN migrated-route HTTP path not directly verified
 (controlled SA tenant lacks the capability); a `422` on a permission write test means
 "gate passed; downstream validation rejected request", not a permission failure.
+
+## 📱 WhatsApp — CLOSED 2026-09-05, وما تبعها
+
+**مغلق:** الربط الكامل مع Meta Cloud API، والتحقق end-to-end بحجز حقيقي (`BF948302`, tenant `mr-h`).
+يغلق blocker 2026-08-31. توقيع `X-Hub-Signature-256` فعّال بالإنتاج (`0bbc5f0`).
+
+**التالي، بترتيب سلمان (2026-09-05):**
+
+- [ ] **(أ) إشعارات التاجر على واتساب** — عند حجز/طلب جديد يصل إشعار لصاحب المحل. مرتبط بالبند
+      أدناه: الحجز يُسجَّل `status=pending` بينما الزبون يرى "تم التأكيد".
+- [ ] **(ب) دورة حياة حساب الموظف** — TENANT_ADMIN ينشئ manager → **رابط setup عبر واتساب** →
+      الموظف يضع كلمة مروره → يدخل الداشبورد بصلاحيته. الحالة الاختبارية: **جعفر عند `rk`**.
+      ⚠️ يتقاطع مع فجوة مسجَّلة سابقاً (**لا مسار setup-link/password-reset في المنتج**)، لكن
+      `User.setupToken` + `setupTokenExp` موجودان بالـschema ⇒ الأساس جاهز جزئياً. **تحقيق أولاً.**
+      البنية التحتية جاهزة من 2B-4: إنشاء الحساب + الـpresets + reactivate كلها تعمل.
+
+**مفتوح للتحقيق (لم يُحسم، لم يُلمس):**
+
+- [ ] **`status=pending` مقابل رسالة "تم تأكيد حجزك بنجاح"** — مقصود (التاجر يؤكد) أم تعارض؟
+      يُحسم قبل بناء الإشعارات، لأن الجواب يحدد شكلها.
+- [ ] **UX:** اختيار التاريخ بالكتابة النصية — سلمان يفضّل تقويم/قائمة أيام جاهزة.
+- [ ] **توجيه Central WABA:** لا يعمل إلا عبر `wa.me/…?text=حجز {slug}`. رسالة "مرحبا" مباشرة لا
+      تُنتج شيئاً (`_resolve_client` → None قبل كتابة أي جلسة). مقصود لـStage 1 — يُراجَع إن أردنا
+      دعم بدء محادثة بلا رابط.
+- [ ] **`PATCH /admin/store/products/{id}` → 500** (`admin_catalog_repo.update_item`,
+      `updateMany.data.categoryId`). **سابق للتغيير**، أُثبت باختبار تحكّم بحساب TENANT_ADMIN قديم.
+- [ ] **نمط `Json(...)`** — رابع ظهور مستقل. مرشّح لقاعدة مكتوبة.
