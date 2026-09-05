@@ -170,7 +170,7 @@ export default function useReservationBooking() {
   // -> filter by metadata.requires_booking); now a single call against the real CatalogService
   // model (GET /reservations/catalog-services), which only ever returns real bookable services.
   useEffect(() => {
-    if (mode !== 'booking' || !slug) return
+    if (!slug) return
     setServicesLoading(true)
     publicApi.get('/reservations/catalog-services', { params: { client_slug: slug } })
       .then(({ data }) => {
@@ -188,7 +188,7 @@ export default function useReservationBooking() {
       })
       .catch(() => { if (mountedRef.current) setServices([]) })
       .finally(() => { if (mountedRef.current) setServicesLoading(false) })
-  }, [mode, slug])
+  }, [slug])
 
   // Staff<->Service filtering (Phase 3.7C, Commit 5) -- once a service is selected, re-fetch the
   // barber list scoped to that service (soft filter: the backend falls back to the full list when
