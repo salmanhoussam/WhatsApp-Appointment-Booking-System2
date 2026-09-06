@@ -1,0 +1,193 @@
+{
+  "_meta": {
+    "template": "rk-barbershop",
+    "source_tenant": "rk",
+    "source_db": "frankfurt (eu-central-1)",
+    "extracted": "2026-09-07",
+    "vertical": "barber",
+    "excluded_transactional": [
+      "reservations(26)",
+      "customers(21)",
+      "store_orders(9)",
+      "whatsapp_sessions(1)",
+      "bookings(0)"
+    ],
+    "excluded_contamination": [
+      "resources: 'Dr. Faisal','Dr. Sara' (type=doctor, inactive) — clinic experiment residue",
+      "services(legacy): 'تنظيف أسنان / Teeth Cleaning' (inactive, SAR) — dental residue",
+      "barbers: 'Test Staff QA' (inactive)",
+      "catalog_services: 'خدمة تجريبية QA' (inactive)",
+      "users: 7 of 8 (MANAGER_UNITS x3, STAFF x2, MANAGER_RESERVATIONS x2) — test accounts",
+      "gallery_images(3): URLs span three storage folders (properties/hr/, RK%20Barbar/, rk/) — unresolved folder drift, excluded pending consolidation",
+      "catalog_items with requires_booking=true (6) — duplicates catalog_services; the catalog_services model is authoritative here"
+    ],
+    "known_gaps": [
+      "barber_services: RK holds only 3 links and 2 belong to an INACTIVE barber — effectively 1 bookable combination of 21. The template below cross-links every active barber to every service instead of copying that."
+    ]
+  },
+  "client": {
+    "currency": "USD",
+    "primary_color": "#2F4F4F",
+    "page_type": "normal",
+    "service_type": "barbershop",
+    "vertical": "barber",
+    "payment_methods": [
+      "cash",
+      "card"
+    ],
+    "config": {
+      "working_hours": {
+        "open_time": "09:00",
+        "close_time": "21:00",
+        "closed_days": [
+          "monday"
+        ]
+      },
+      "hero": {
+        "title_ar": "مرحباً بكم",
+        "subtitle_ar": "احجز مكانك الآن"
+      },
+      "story": {
+        "body_ar": "قصتنا تبدأ من هنا. أضف وصف منشأتك من لوحة التحكم.",
+        "body_en": "Our story starts here. Add your venue description from the dashboard."
+      },
+      "font": "Cairo",
+      "catalog_layout": "grid",
+      "page_background": "ambient_grid"
+    }
+  },
+  "client_services": [
+    "reservations",
+    "store",
+    "whatsapp_ordering"
+  ],
+  "admin_user": {
+    "role": "TENANT_ADMIN",
+    "_regenerate": [
+      "email",
+      "password_hash",
+      "setupToken",
+      "setupTokenExp",
+      "phone",
+      "fullName"
+    ]
+  },
+  "barbers": [
+    {
+      "name": "حسين",
+      "working_hours": {
+        "open_time": "09:00",
+        "close_time": "21:00",
+        "closed_days": [
+          "monday"
+        ]
+      },
+      "image_url": null,
+      "description": ""
+    }
+  ],
+  "catalog_categories": [
+    {
+      "name_ar": "الخدمات",
+      "name_en": "Services",
+      "module_key": "catalog",
+      "sort_order": 0
+    },
+    {
+      "name_ar": "منتجات العناية",
+      "name_en": "Grooming Products",
+      "module_key": "store",
+      "sort_order": 1
+    }
+  ],
+  "catalog_services": [
+    {
+      "name_ar": "دقن",
+      "name_en": null,
+      "duration_min": 15,
+      "price": 5.0,
+      "currency": "USD"
+    },
+    {
+      "name_ar": "تمشيط أو تسريح",
+      "name_en": null,
+      "duration_min": 20,
+      "price": 5.0,
+      "currency": "USD"
+    },
+    {
+      "name_ar": "شعر",
+      "name_en": "Hair",
+      "duration_min": 20,
+      "price": 5.0,
+      "currency": "USD"
+    },
+    {
+      "name_ar": "شعر ودقن",
+      "name_en": "Haircut",
+      "duration_min": 30,
+      "price": 5.0,
+      "currency": "USD"
+    },
+    {
+      "name_ar": "حنة أو صبغة",
+      "name_en": null,
+      "duration_min": 45,
+      "price": 5.0,
+      "currency": "USD"
+    },
+    {
+      "name_ar": "كرياتين",
+      "name_en": "Keratin",
+      "duration_min": 90,
+      "price": 5.0,
+      "currency": "USD"
+    }
+  ],
+  "catalog_items_store": [
+    {
+      "name_ar": "واكس تصفيف الشعر",
+      "name_en": "Styling Wax",
+      "price": 10.0,
+      "currency": "USD",
+      "module_key": "store",
+      "sort_order": 0
+    },
+    {
+      "name_ar": "جل تصفيف الشعر",
+      "name_en": "Styling Gel",
+      "price": 7.0,
+      "currency": "USD",
+      "module_key": "store",
+      "sort_order": 0
+    },
+    {
+      "name_ar": "عطر ريحة رجالي",
+      "name_en": "Mens Cologne",
+      "price": 22.0,
+      "currency": "USD",
+      "module_key": "store",
+      "sort_order": 0
+    },
+    {
+      "name_ar": "زيت للشعر",
+      "name_en": "Hair oil",
+      "price": 5.0,
+      "currency": "USD",
+      "module_key": "store",
+      "sort_order": 0
+    },
+    {
+      "name_ar": "سبراي تثبيت الشعر",
+      "name_en": "Hair Fixing Spray",
+      "price": 8.0,
+      "currency": "USD",
+      "module_key": "store",
+      "sort_order": 0
+    }
+  ],
+  "barber_services": {
+    "strategy": "cross-link every active barber to every active catalog_service",
+    "expected_links": 6
+  }
+}
