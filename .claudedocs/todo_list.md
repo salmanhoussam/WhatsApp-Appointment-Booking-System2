@@ -836,3 +836,124 @@ and `.claudedocs/work/permission-model-investigation/2026-09-04/summary.md`.
 `app/services/whatsapp_notifications.py` **موجود ومربوط** — 5 دوال جاهزة، مُستدعاة من
 `reservation_service.py:131-141` و`admin/bookings.py:31`. أي أن **إشعار الزبون عند تأكيد الحلاق
 يعمل اليوم**. الناقص اتجاه واحد: **إبلاغ التاجر بحجز جديد**. ابنِ على هذا الملف، لا من الصفر.
+
+## ⚡ بطء الفرونت إند — Phase 1 مُنفَّذ ومُتحقَّق (2026-09-05)، غير مدفوع
+
+- [x] **CORS preflight على كل GET** — `publicApi.js` كان يفرض `Content-Type` إجبارياً. أُزيل.
+- [x] **Waterfall وهمي بصفحة الحجز** — `catalog-services` كان ينتظر `barbers` بلا سبب حقيقي.
+      `useReservationBooking.js` مُصلَح. تحقّق فعلي بمتصفح حقيقي (Playwright MCP): الطلبات تنطلق
+      معاً الآن، صفر OPTIONS، صفحة `/rk/reserve` تُحمَّل بالكامل، صفر أخطاء console.
+- [ ] **لم يُعمل commit/push بعد** — بانتظار توجيه سلمان.
+
+**مفتوح، يحتاج قرار سلمان صراحة، ليس اليوم:**
+- [ ] الرافعة الأكبر المتبقية: منطقة Supabase pooler (`ap-southeast-2`) مقابل منطقة Railway
+      الفعلية (dashboard فقط، غير موجود بالـrepo). دليل حي: cold miss على `/config` = **4.7 ثانية**
+      (وصلت مرة لأكثر من 8 ثوانٍ وانقطعت)، مقابل warm hit = 2.5 ملي‌ثانية.
+- [ ] الـtenant cache (5 دقائق) يُلغى جزئياً بـ`gunicorn -w 2` — يحتاج Redis/shared store.
+- [ ] `useAdminIdentity.js`'s `staleTime: 0` — قرار أمني متعمّد، خيار (لا قرار) لتقصيره لـ15-30 ث.
+
+## 🏁 حُسم 2026-09-05 — "الضبط" طريق مسدود، والهجرة لأوروبا هي الحل الوحيد
+
+**الحقائق النهائية (سلمان، من Supabase Dashboard):**
+- الخطة: **FREE Tier** (Micro/Nano) · اتصالات مستخدَمة حاليًا **~11** · Pool Size الافتراضي **15**
+- حجم قاعدة البيانات: **32 MB من 500** · التخزين **0.20 GB من 1** · Egress 0.03/5 GB
+
+**لماذا session mode مات:** 4 workers × 5 = **20 اتصال** > **Pool Size 15** ⇒ استنفاد ومهلات.
+تحليل سلمان صحيح: على الـFree Tier، الـcanary الرخيص **غير قابل للتطبيق**.
+⚠️ تصحيح مصطلح: session mode هو منفذ **5432** (مش 6543 — هيدا transaction mode).
+
+**⛔ الخلاصة: SYDNEY + FREE TIER + AMSTERDAM = "الضبط" (tuning) طريق مسدود.**
+لا Pool Size ولا connection_limit ولا أي إعداد بيحل ٣٣٠ms جغرافية متكررة بكل round trip.
+
+**ملاحظة على "رفع Pool Size لـ20 كمسكّن مؤقت":** ما في مشكلة سعة **مقاسة** اليوم —
+الإعداد الحالي: ١٣-١٥ اتصال من ٥٧، و**صفر أخطاء من ٣٠** تحت التوازي. المشكلة المقاسة **زمن**،
+والـPool Size **ما بيمسّ الزمن إطلاقًا**. يعني الرفع بيعالج مشكلة ما رصدناها. مش مؤذي، بس غير
+ضروري — والأفضل توفير التغيير للهجرة. **القرار لسلمان.**
+
+## 🌍 Supabase EU Migration Strategy — أعلى أولوية معمارية (سلمان، 2026-09-05)
+
+**القرار: مشروع Supabase جديد في `eu-central-1` (فرانكفورت).**
+
+**لماذا NOT إعادة استخدام `Miti-Restaurant-AI`:** موجود في **`ap-northeast-1` (طوكيو)** —
+والمنطقة **لا تتغيّر بمكانها**. أمستردام→طوكيو ≈٢٣٠ms مقابل →سيدني ≈٣٣٠ms: أفضل، وكارثي برضه.
+وهو منتج مختلف بمخططه وبياناته. *(وهون مصدر لبس "طوكيو" سابقًا — سلمان كان يقرأ هالمشروع.)*
+
+**لماذا فرانكفورت:** Railway بأمستردام ⇒ ~٣٦٠ كم، RTT **~١٠-١٥ms**، وDE-CIX↔AMS-IX أكبر
+نقطتَي تبادل بأوروبا وبينهم peering مباشر كثيف. بدائل مقبولة: `eu-west-2` لندن، `eu-west-3` باريس.
+**المكسب المتوقع على الساق القاتلة: ٣٣٠ms → ~١٢ms ≈ ٢٥×** — ومع الاحتفاظ بـ`pgbouncer=true`:
+**١.٦٥ث → ~٠.٠٨ث لكل query.**
+
+**✅ خبر مطمئن يقلّل المخاطرة كثيرًا:** قاعدة البيانات **٣٢ ميغا فقط** ⇒ `pg_dump`/`pg_restore`
+دقائق، مش ساعات.
+
+**⚠️ اللغم الحقيقي — مشروع جديد = project ref جديد = كل رابط مطلق بينكسر:**
+| المكان | العدد | الملاحظة |
+|---|---|---|
+| `app/` (باكند) | **0** ✅ | نظيف — بيستعمل env vars |
+| `frontend/src/` | **35** | ~١٥ ملف (smar, olivello, beit-al-fakhar, caracas) — find/replace |
+| `scripts/` | 11 | |
+| `prisma/` | 1 | |
+| **`gallery_images.url`** (DB) | **6 صفوف** | |
+| **`clients.config`** (DB) | **3 صفوف** | محتوى صفحات التنانت — فيديو/صور الأقسام |
+
+- **التخزين (~٢٠٠ ميغا) لا ينتقل مع `pg_dump`** — نسخ bucket→bucket منفصل، إلزامي.
+- env vars للتحديث: `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+- الأفضل بنفس الشغلة: تحويل الـ٣٥ رابط المطلق بالفرونت لمتغيّر بيئة بدل تكرارهن.
+
+**تحقق قبل البدء:** Free Tier بيسمح بمشروعين نشطين للمؤسسة — `Miti-Restaurant-AI` موقوف
+(paused)، فالغالب في مجال. لو انحظر الإنشاء ⇒ حذف/إبقاء الموقوف موقوفًا.
+⚠️ ولا تُحذف قاعدة البيانات القديمة إلا بعد التحقق الكامل — و[[migration-staging-discipline]]
+بتقول ما عنا staging rehearsal، فلازم snapshot صريح قبل أي شي.
+
+## 🔴 BLOCKING — ثلاث حقائق من الـdashboards (سلمان فقط يقدر يجيبها)
+
+مغلق عليها كل قرار أداء. **لا تغيير إنتاج قبلها** (قرار سلمان صراحةً 2026-09-05).
+
+- [ ] **Fact 1 (الأخطر):** Supabase → Database → Connection Pooling → **Pool Size** +
+      **Max Client Connections**. بيحدّ عملاء الـsession mode **مستقلاً عن `max_connections=60`**.
+      لو الافتراضي **15**، فالـ20 اتصال ما بتسع ⇒ **خيار session mode بيسقط لحاله.**
+- [ ] **Fact 2:** Railway → service → Settings → **Region** (الهيدر `x-railway-edge: cdg1` بيقول
+      باريس — بدنا تأكيد الإعداد نفسه).
+- [ ] **Fact 3:** أي خدمة تانية ماسكة اتصالات لنفس الـDB (Railway service تانية، n8n، أداة خارجية)
+      غير الـ~٨-١٠ الداخليين تبع Supabase.
+
+## ⚡ Canary — 5432 session mode (جاهز، غير منفَّذ، مشروط بـFact 1)
+
+تغييران فقط، ولا شي غيرهن:
+```
+DATABASE_URL      :6543?pgbouncer=true  →  :5432
+connection_limit  10                    →  5
+```
+**القياس بعده:** `/health` · `/admin/me` · `/rk/config` · `/reservations/barbers` · availability ·
+booking flow · طلبات متزامنة (error rate) · عدد الاتصالات الحيّة من `pg_stat_activity` ·
+p50/p95 · تحقق متصفح حقيقي `/rk` → Reserve → WhatsApp.
+**Rollback:** إرجاع `5432 → 6543` — متغيّر بيئة واحد، فوري.
+**متوقع:** 1.65ث → ~0.42ث لكل query (٣.٩×).
+
+## 🌍 Infrastructure Topology Migration — Supabase EU (مشروع مستقل، أولوية عالية)
+
+**ليس** امتداداً لشغل الـfrontend performance. السبب مُثبَت بالدليل:
+```
+Users (الشرق الأوسط) → Cloudflare → Railway AMSTERDAM 🇳🇱 → Supabase SYDNEY 🇦🇺   (~16,600 كم)
+```
+- **الدليل الفاصل:** نفس زمن الـDB من لبنان ومن الإنتاج (1.6-1.9ث مقابل 1.58-1.84ث) ⇒ البطء
+  بيسافر مع **قاعدة البيانات**، مش مع المستخدم ولا Cloudflare ولا Railway ولا الفرونت‌إند.
+- **القيمة:** بيقلّل **كل** round trip بكل flow (مش مرة وحدة) — ولهيك هو architectural fix مش tuning.
+  وبيخلّي كلفة `pgbouncer=true` شبه معدومة (٤ round trips = ~60ms بدل ~1.3ث) ⇒ **منحتفظ**
+  بأمان الـtransaction mode والـmultiplexing بدل ما نبيعهن.
+- ⚠️ **الرقم ~20× تقدير مبني على الـRTT الحالي، مش وعد إنّ كل endpoint بيصير أسرع ٢٠×**
+  (تصحيح سلمان، مُعتمَد).
+- **الكلفة الحقيقية:** منطقة Supabase ما بتتغيّر بمكانها ⇒ project جديد + ترحيل بيانات، على نظام
+  فيه tenants دافعين، وبلا staging rehearsal (فجوة مسجَّلة سابقاً).
+- **القرار:** مُسجَّل، غير منفَّذ، وما بينفَّذ إلا بخطة ورهرسة ونافذة صيانة وقرار صريح.
+
+**⛔ محسوم — لا يُعاد فتحه:** شيل `pgbouncer=true` مع البقاء على 6543. مقاس: **١٩/٣٠ فشل**
+تحت التوازي بـ`prepared statement "s6" does not exist` (code 26000). الـflag load-bearing.
+
+**Phase 2 — تدقيق فيديو (طلبه سلمان صراحة، رفض حل YouTube/Reels الافتراضي قبل دليل):**
+- [x] **الخلاصة: الفيديو ليس سبب بطء صفحة الحجز.** `ReservePage.jsx` صفر فيديو، صفر علاقة.
+- [ ] **لكن فيديو حقيقي بمشاكل تحميل، صفحات أخرى فقط** — هوم `rk` (`ProductsSection.jsx`) و`smar`
+      (`ShowcaseTemplate.jsx`/`SpatialPropertyDetails.jsx`) — autoplay بلا `preload="metadata"` ولا
+      `poster`. Railway لا يمرر بايتات الفيديو أبداً (Supabase URLs مباشرة) — فلا داعي لهجرة
+      استضافة؛ الإصلاح المرشَّح فرونت‌إند فقط (poster + preload=metadata + lazy). بانتظار قرار
+      البدء — بند منفصل، ليس مستعجلاً كصفحة الحجز.
