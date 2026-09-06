@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-const INTERIOR_IMG = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/special/gallery/02-vases-wide.jpg';
+const INTERIOR_IMG = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/special/gallery/02-vases-wide.jpg';
 
 export default function AboutSection() {
   return (

@@ -11,7 +11,7 @@
  */
 const FRAME_COUNT = 71;
 const BASE_URL =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/pages/home/hero/walkthrough';
+  'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/pages/home/hero/walkthrough';
 
 export const walkthroughAssets = {
   frameCount: FRAME_COUNT,

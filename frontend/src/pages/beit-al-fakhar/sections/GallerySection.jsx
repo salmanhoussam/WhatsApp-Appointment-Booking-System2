@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/special/gallery';
+const BASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beit-al-fakhar/special/gallery';
 
 const PHOTOS = [
   { src: `${BASE}/01-entrance.jpg`, label: 'المدخل' },

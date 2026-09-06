@@ -20,7 +20,7 @@ const BASE_URL = 'https://smar.salmansaas.com';
 
 // Premium default OG image — forest showcase shot
 const DEFAULT_OG_IMAGE =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/showcase/journey_forest.jpg';
+  'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/showcase/journey_forest.jpg';
 
 const DEFAULT_DESCRIPTION =
   'شاليهات وفيلل فاخرة في قلب جبال لبنان — إقامة لا تُنسى في أحضان الطبيعة. احجز عبر واتساب في دقيقة.';

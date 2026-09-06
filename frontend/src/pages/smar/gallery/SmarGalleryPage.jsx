@@ -19,7 +19,7 @@ import useTenantSlug                        from '../../../hooks/useTenantSlug';
 
 // ── Fallback images (homepage/ bucket) — used when gallery/ is still empty ───
 const BASE =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/';
+  'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/';
 
 const FALLBACK_IMAGES = [
   { id: 1,  src: BASE + 'beitsmar3.jpg',        category: 'chalet',  alt: 'شاليه 3',       ar: 'شاليه بيت سمار',        en: 'Beit Smar Chalet' },
@@ -142,7 +142,7 @@ export default function SmarGalleryPage() {
     >
       <SEO
         title="معرض الصور"
-        image="https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/gallery/beitsmar1.jpg"
+        image="https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/gallery/beitsmar1.jpg"
       />
       <TenantHeader />
 

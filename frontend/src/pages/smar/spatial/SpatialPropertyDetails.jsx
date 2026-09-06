@@ -29,7 +29,7 @@ import publicApi from '../../../utils/publicApi';
 import UnitImageGallery from '../../../components/ui/UnitImageGallery';
 
 // ─── Asset base ───────────────────────────────────────────────────────────────
-const BASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar';
+const BASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar';
 
 // ─── Video chapters ───────────────────────────────────────────────────────────
 // Update `time` (seconds) to match your actual video timeline

@@ -32,28 +32,28 @@ const CHAPTERS = [
     title: 'طاووق',
     desc: 'قطع دجاج طازة، متبّلة يومياً قبل ما تنزل عالنار',
     tag: 'Signature',
-    img: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/531c92f7-eae5-44ce-ab3a-e42eb79c1e99/main.jpg',
+    img: 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/531c92f7-eae5-44ce-ab3a-e42eb79c1e99/main.jpg',
   },
   {
     index: '02', stage: 'الشوي',
     title: 'ستيك حر',
     desc: 'ستيك حار عالفحم مباشرة — نكهة قوية لعشاق الحر',
     tag: 'Spicy',
-    img: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/2e914da3-6f9c-46bc-a9f0-2a2939c84c69/main.jfif',
+    img: 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/2e914da3-6f9c-46bc-a9f0-2a2939c84c69/main.jfif',
   },
   {
     index: '03', stage: 'اللف',
     title: 'توستر',
     desc: 'بعد الشوي، بنلفّها طازة بكل المكونات بلقطة وحدة',
     tag: 'Best Seller',
-    img: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/db79d24f-cbcd-4666-a36d-c95482095034/main.jfif',
+    img: 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/db79d24f-cbcd-4666-a36d-c95482095034/main.jfif',
   },
   {
     index: '04', stage: 'التقديم',
     title: 'فلادلفيا',
     desc: 'جبنة ذايبة، لحمة طرية، وخبز طازة — جاهز يوصلك',
     tag: "Chef's Pick",
-    img: 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/2093bcd2-3d1b-4267-89fe-57a299e20ff6/main.jfif',
+    img: 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/arizona/catalog/00ad9f6f-492d-4422-9265-20b458b1efcf/2093bcd2-3d1b-4267-89fe-57a299e20ff6/main.jfif',
   },
 ];
 

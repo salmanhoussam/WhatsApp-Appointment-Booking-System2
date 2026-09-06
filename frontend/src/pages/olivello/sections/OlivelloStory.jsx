@@ -20,7 +20,7 @@ import {
 import { ScrollProgressContext } from '../context/ScrollProgressContext';
 import OlivelloScene3D from '../canvas/OlivelloScene3D';
 
-const SUPABASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties';
+const SUPABASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties';
 
 // ── Story data ────────────────────────────────────────────────────────────────
 const SCENES = [

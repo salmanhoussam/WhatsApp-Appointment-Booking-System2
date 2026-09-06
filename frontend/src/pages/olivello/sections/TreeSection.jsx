@@ -12,7 +12,7 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 
-const SUPABASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties';
+const SUPABASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties';
 const TREE_IMG = `${SUPABASE}/olivello/pages/home/hero/olive-tree.png`;
 
 export default function TreeSection() {

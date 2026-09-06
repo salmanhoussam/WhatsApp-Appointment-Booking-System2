@@ -16,10 +16,10 @@ import { BlendFunction }                              from 'postprocessing';
 import * as THREE                                     from 'three';
 
 const RING_URL =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/smar_ring.png';
+  'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/smar_ring.png';
 
 const BG_URL =
-  'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar7.jpg';
+  'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/homepage/beitsmar7.jpg';
 
 // ─── Background plane — يصعد مع السكرول ──────────────────────────────────────
 function BackgroundPlane({ scrollRef }) {

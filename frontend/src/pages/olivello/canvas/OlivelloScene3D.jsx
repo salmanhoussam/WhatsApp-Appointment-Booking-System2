@@ -55,7 +55,7 @@ const SlotMat = shaderMaterial(
 extend({ SlotMat });
 
 // ── SLOTS — JSON-driven config ─────────────────────────────────────────────
-const SUPABASE = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties';
+const SUPABASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties';
 
 const SLOTS = [
   {

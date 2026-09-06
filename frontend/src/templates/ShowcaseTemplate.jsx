@@ -28,8 +28,8 @@ import { SEO }                       from '../design-system/atoms';
 gsap.registerPlugin(ScrollTrigger);
 
 // ─── Assets (showcase/ bucket — uploaded 2026-04-17) ─────────────────────────
-const SC = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/showcase/';
-const GL = 'https://wefjghagwpkotrrdiqyi.supabase.co/storage/v1/object/public/properties/beitsmar/gallery/';
+const SC = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/showcase/';
+const GL = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar/gallery/';
 
 const ASSETS = {
   heroVideo    : SC + 'hero_video.mp4',
