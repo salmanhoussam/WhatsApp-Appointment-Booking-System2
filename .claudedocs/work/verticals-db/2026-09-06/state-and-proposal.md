@@ -159,3 +159,71 @@ before any delete.
 2. Whether anything outside this repo reads `service_type` (the Google Sheet at
    `sheets_service.py:205` does receive it).
 3. Whether the 5 UNDECIDED tenants are yours to delete — still your call, unchanged from Phase B.
+
+---
+
+# EXECUTED — 2026-09-06
+
+## Step 1 ✅ `28839f1`
+`booking` removed from `VERTICAL_REGISTRY["barber"]`. Future barber tenants now provision
+`['catalog','reservations','whatsapp_ordering']`. No existing row touched.
+
+**Mid-flight correction:** the proposal called this "near-zero risk" before I had seen
+`demo_service.py:46-49`, whose comment claims `booking` is deliberate and cites
+`service-system.md`'s *"must seed both keys"*. Verified before proceeding: there is **no
+`require_service("booking")` anywhere** (real gates are only reservations 32 / store 22 /
+restaurant 18 / catalog 16), and the Reservations tab reads only `reservations`. The note is stale;
+its own stated mechanism does not support its conclusion. Recorded in the commit, **not silently
+changed in the rule file** — correcting `service-system.md` is a separate task.
+
+## Snapshot ✅ verified before any delete
+`frankfurt_pre-cleanup_20260906-225000.dump` (464K, `pg_dump -Fc`). Row parity vs live: **EXACT**
+across clients 37 · client_services 110 · barbers 20 · catalog_services 81 · reservations 40 ·
+bookings 1 · units 16 · catalog_items 238 · customers 26.
+⚠️ Stored in the session scratchpad — must be copied somewhere durable. Never commit it (production data).
+
+## Step 2 ✅ executed by Salman — 17 rows deleted
+
+The set was cut from 23 → 17 by a reference check run **before** deleting. The catch that mattered:
+
+> **`alzabt-demo` — 21 code references.** `App.jsx:232` routes `/alzabt` → `/alzabt-demo/reserve`,
+> which backs the live "جرّب عالزبط" demo. Deleting it would have broken a public flow.
+
+Also held: `store-pilot-20260731` (9 refs, has a `tenantRegistry` entry), `barberlab-test` (4 refs —
+**and 2 `services` rows, a RESTRICT FK that would have aborted the delete**), `pilot-test-20260720`
+(4), `store-pilot-test-20260727` (3), `test-fashion` (1).
+
+| table | before | after | removed |
+|---|---|---|---|
+| clients | 37 | **20** | 17 |
+| client_services | 110 | 51 | 59 |
+| catalog_services | 81 | **19** | 62 |
+| catalog_categories | 95 | 69 | 26 |
+| users | 54 | 37 | 17 |
+| barbers | 20 | 9 | 11 |
+| catalog_items | 238 | 230 | 8 |
+| reservations · store_orders · services | — | unchanged | 0 |
+
+Survivors: **REAL 9/9 · HELD 6/6 · UNDECIDED 5/5.**
+
+*(My pre-delete estimates were computed over 23 candidates, so they ran higher — e.g. 3 reservations
+and 1 store_order, which all turned out to belong to the 6 held tenants and were correctly not
+touched. Barbers: predicted 15 of 23, actual 11 of 17, difference 4 = alzabt-demo's 2 +
+barberlab-test's 2. Consistent.)*
+
+## Post-state verification
+
+- **`vertical` is now set on exactly 3 rows — `rk`, `mr-h`, `alzabt-demo`** — precisely the three the
+  2026-08-14 classification named. **The database now matches the ratified decision exactly.**
+- Orphan check after cascade: `client_services` **0**, `barbers` **0**, `users` **0**.
+- Production `/health` → `db: ok`, 0.36s. All 9 real tenants + `alzabt-demo` → **HTTP 200**.
+- Real browser: `alzabt.salmansaas.com/rk/reserve` renders services + barbers, no errors;
+  `demo.salmansaas.com/alzabt` correctly redirects to `/alzabt-demo/reserve` and renders
+  "صالون عالزبط" with real content.
+
+**Verticals are settled at the data level.** What remains is code-level, not data-level:
+`mr-h.service_type` (F2), `selected_services` (F3), map consolidation (F4) — all unstarted.
+
+**Side observation:** `alzabt-demo`'s public nav still shows "الوحدات" (Units) because it was
+provisioned **before** Step 1 and still carries `booking`. A live instance of the exact defect Step 1
+now prevents — cosmetic, on a demo tenant, not fixed here.
