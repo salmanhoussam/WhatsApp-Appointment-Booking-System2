@@ -221,15 +221,26 @@ function App() {
             <Route path="/home/*" element={<Suspense fallback={null}><ShowcaseRoutes /></Suspense>} />
           )}
 
-          {/* ── Demo subdomain: /alzabt → direct entry into the isolated alzabt-demo tenant ──
-              salmansaas.com Product IA decision, 2026-08-12: demo.salmansaas.com/alzabt is the
-              dedicated demo surface for the Alzabt product (distinct from /alzabt on the bare
-              domain, which is the marketing page). Redirects straight into the existing,
-              pre-seeded alzabt-demo tenant's reserve flow -- never creates a new tenant, never
-              touches RK. No /smart-order equivalent yet -- that product has no real tenant to
-              redirect to. */}
+          {/* ── Demo subdomain: /alzabt → the per-visitor demo BUILDER ──
+              Corrected 2026-09-06 (Salman, from a real screenshot of the wrong behaviour). This
+              route used to land on /alzabt-demo/reserve -- the pre-seeded alzabt-demo tenant's
+              booking flow. That is the CUSTOMER experience: a visitor booked an appointment at a
+              fictional salon that isn't theirs. The demo surface must instead be the OWNER
+              experience: fill in your business name, get your own demo tenant (slug + temp
+              password + dashboard, via POST /demo/create), and only THEN look at the booking flow
+              -- for your own salon.
+
+              The builder already existed and already did exactly this (DemoBuilderPage.jsx, the
+              same 2026-08-12 day as the old decision) but was reachable ONLY from the root
+              showcase homepage's Alzabt CTA -- never from the demo subdomain. This wires it up.
+              Target is /home/demo-builder because ShowcaseRoutes mounts at /home/* on this
+              subdomain (see the route just above).
+
+              alzabt-demo the tenant is NOT removed -- it stays as the seeded reference tenant
+              (demo_service.py, scripts/seed_alzabt_demo_tenant.py); it simply stops being the
+              front door. */}
           {IS_DEMO_SUBDOMAIN && (
-            <Route path="/alzabt" element={<Navigate to="/alzabt-demo/reserve" replace />} />
+            <Route path="/alzabt" element={<Navigate to="/home/demo-builder" replace />} />
           )}
 
           {/* ── Localhost dev preview: /showcase/* ── */}
