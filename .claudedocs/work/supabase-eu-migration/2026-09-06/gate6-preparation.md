@@ -166,3 +166,35 @@ Gate 6                ⏸ PAUSED — awaiting diff review and a chosen quiet win
 must ship **together**. With the code deployed but the env still on Sydney, five tenants would read
 media from Frankfurt while the database answers from Sydney. Both halves land in one cutover, or
 neither.
+
+---
+
+## 6. Credential sequence — STEP 1 COMPLETE ✅
+
+**Executed 2026-09-06, read-only (SELECT only, no writes, no config change).**
+
+**Question asked:** if we had to roll back right now, would the stored Sydney credentials actually
+let production reconnect?
+
+| path | port | result |
+|---|---|---|
+| `DATABASE_URL` — the exact production runtime path | 6543, `pgbouncer=true` | ✅ authenticated (connect 2.06 s) · real read OK |
+| `DIRECT_URL` — migrations / session mode | 5432 | ✅ authenticated (connect 1.98 s) · real read OK |
+
+Both authenticated as `postgres` and served a **real table read**, not merely `SELECT 1` — Sydney
+returns **37 clients / 38 reservations**, matching the live production figures. The rollback target
+is genuinely reachable and current.
+
+*(Masking was done in code rather than with a shell regex this time — the earlier cleartext
+exposure came from a `sed` pattern that failed silently. No password or full URI was printed.)*
+
+```
+STEP 1  validate current credential      ✅ DONE — rollback is real today
+STEP 2  rotate the Sydney password       ⏸ Salman's action
+STEP 3  re-validate on the NEW credential + update the held rollback values   ⏸ mandatory
+STEP 4  cutover                          ⏸ PAUSED
+```
+
+**Step 2 will invalidate both values above.** Step 3 is therefore not optional: without it, the
+cutover would proceed against a rollback path nobody has confirmed is reachable — the exact
+condition the rotation exists to remove.
