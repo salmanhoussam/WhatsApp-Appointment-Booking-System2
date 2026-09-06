@@ -905,6 +905,46 @@ and `.claudedocs/work/permission-model-investigation/2026-09-04/summary.md`.
 ⚠️ ولا تُحذف قاعدة البيانات القديمة إلا بعد التحقق الكامل — و[[migration-staging-discipline]]
 بتقول ما عنا staging rehearsal، فلازم snapshot صريح قبل أي شي.
 
+## ✅ هجرة أوروبا — نُفِّذت 2026-09-06. الإنتاج على فرانكفورت.
+
+Gates 0-7 و9 ✅ · **Gate 8 (تحقق الكتابة) هو الباقي الوحيد** · سيدني حيّة ولم تُحذف.
+الأداء المقاس: `/health` 1.70→**0.178 ث** · `/barbers` 2.95→**0.219 ث** = **10-13×**.
+الأدلة: `.claudedocs/work/supabase-eu-migration/2026-09-06/` (6 ملفات).
+
+- [ ] **Gate 8** — حجز حقيقي يُتحقَّق أنه كُتب بفرانكفورت. بلا بيانات وهمية.
+- [ ] لا تُحذف سيدني قبل Gate 8 + فترة مراقبة.
+
+## 📋 Phase B + Phase C — مفصولتان عن الهجرة عمدًا
+
+**الوثيقة الكاملة بكل الأدلة:** `.claudedocs/implementation/TENANT_MODEL_CLEANUP/HANDOFF.md`
+
+**Phase B — تنظيف:**
+- [ ] قرار الخمسة: `cafe` `tastybites` `sneakers-lb` `sneakers-beirut` `assi` (صفر محتوى)
+- [ ] حذف/أرشفة 14 DEMO + 9 EXPERIMENTAL
+- [ ] توحيد مجلدات التخزين: **`hr/` فيها 329 ملف (slug rk القديم)** · `mister-h/` + `mr-h/` مجلدان
+      لتينانت واحد · `RK Barbar/` فيها مسافة
+- [ ] حذف 10 ملفات ميتة (8 منها smar، و`SmarPage.jsx` غير موجّهة أصلاً)
+- [ ] ⚠️ `scripts/data/hr/page_content.json` — **إعادة تشغيل الـseeder تُرجع روابط سيدني**
+- [ ] `.claude/rules/storage-tenant.md` — يوثّق المشروع القديم كنمط قانوني
+- [ ] 12 صورة على مشروع ثالث ميت (caracas 10، arizona 2) — مكسورة أصلاً بالإنتاج
+- [ ] `Cache-Control: no-cache` — Supabase تجاهلت الهيدر بالرفع، **لم يُصلَح**
+
+**Phase C — نموذج النوع/القدرات:**
+- [ ] **٨ أعمدة + جدول** تحاول وصف "نوع التينانت"، **ومتناقضة**: `vertical` NULL عند 7 من 9 ·
+      `ecommerce` مقابل `store` لنفس المعنى · `rk`=barbershop و`mr-h`=services وهما حلاقان ·
+      `selected_services` يخالف `client_services` · `rk.features.booking=True` **بينما rk لا يملك
+      booking أصلاً** · `roz` يحمل `unit_types=['chalet']` وقدرته الوحيدة `catalog`
+- [ ] **`arizona` قدرته `restaurant` فقط بلا `catalog`** — ومعه 28 صنف كتالوج. هل هي مُتاحة أصلاً؟
+- [ ] **`booking` ≠ `reservations`** — والكود يمنح `booking` لكل barbershop بسطرين مكرّرين
+      (`registration_service.py:54` و`demo_service.py:49`) ⇒ **13 من 14 حلاق يحملونها بلا استعمال**
+- [ ] **ازدواج الخدمات القابلة للحجز**: `catalog_items.metadata.requires_booking` **و**جدول
+      `catalog_services` (rk 6/7 · mr-h 6/6). و**84٪ من صفوف `catalog_services` بيانات demo**
+- [ ] **`mr-h` يعرض قسم منتجات بلا قدرة `store`** — نفس صنف بغ الـnav
+
+**⚡ أرخص مكسب حقيقي، مستقل عن الاثنتين:**
+- [ ] **`catalog` → "Services"** بـ`service-catalog.js:97-103` — سطر data واحد، يُصلح **كل** tenant
+      متجر/مطعم، **بلا أي تغيير باك‌إند**. والسابقة الصحيحة بنفس الملف: `whatsapp_ordering → null`.
+
 ## 🔴 BLOCKING — ثلاث حقائق من الـdashboards (سلمان فقط يقدر يجيبها)
 
 مغلق عليها كل قرار أداء. **لا تغيير إنتاج قبلها** (قرار سلمان صراحةً 2026-09-05).
