@@ -1,7 +1,12 @@
 # Verticals — real DB state, and what "improving the database" actually means
 
-**Date:** 2026-09-06 · Read-only investigation against **Frankfurt** (`aws-0-eu-central-1`), the
-live production database. **Nothing written. No migration, no seed, no commit, no deploy.**
+**Date:** 2026-09-06 · Investigation against **Frankfurt** (`aws-0-eu-central-1`), the live
+production database.
+
+> ⚠️ **Status changed after this was written.** Parts 1-4 below were produced as a **read-only**
+> investigation with nothing written. The proposal was then approved and **executed the same day** —
+> see the **EXECUTED** section at the end of this file for what actually changed. Read that section
+> before treating anything above as the current state.
 
 Smar / real-estate is parked by decision; everything learned there is recorded in
 `.claudedocs/work/booking-experience/2026-09-06/`.
