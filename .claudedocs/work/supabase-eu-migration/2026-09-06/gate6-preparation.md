@@ -189,11 +189,36 @@ is genuinely reachable and current.
 exposure came from a `sed` pattern that failed silently. No password or full URI was printed.)*
 
 ```
-STEP 1  validate current credential      ✅ DONE — rollback is real today
-STEP 2  rotate the Sydney password       ⏸ Salman's action
-STEP 3  re-validate on the NEW credential + update the held rollback values   ⏸ mandatory
+STEP 1  validate current credential      ✅ DONE — rollback was real
+STEP 2  rotate the Sydney password       ✅ DONE — Salman, 2026-09-06
+STEP 3  re-validate on the NEW credential ✅ DONE — rollback restored
 STEP 4  cutover                          ⏸ PAUSED
 ```
+
+### STEP 2 + STEP 3 COMPLETE ✅ — the credential sequence is closed
+
+Salman rotated the Sydney password and updated `.env`. Re-validated read-only:
+
+| check | result |
+|---|---|
+| new password URI-safety | **16 chars, fully alphanumeric, zero URI-unsafe characters** ✅ |
+| `DATABASE_URL` (6543, `pgbouncer=true`) | ✅ authenticated (2.05 s) · real read OK |
+| `DIRECT_URL` (5432) | ✅ authenticated (1.98 s) · real read OK |
+| data returned | **37 clients / 38 reservations** — unchanged, still live |
+
+**Independent confirmation the rotation actually happened.** A passing test alone does not prove a
+rotation — it only proves whatever sits in `.env` works, which would also be true if nothing had
+changed. `.env`'s modification time was therefore checked against the Step-1 commit: it was edited
+**8 minutes 6 seconds after** Step 1 was recorded, which is consistent with a real rotation followed
+by an `.env` update. (Had the password been rotated in Supabase *without* updating `.env`, these
+connections would have failed outright — they did not.)
+
+**The URI-safety check was run deliberately**, because a `?` in the Frankfurt password broke
+connection-string parsing earlier in this migration and would have broken Prisma at cutover. The new
+Sydney password is clean.
+
+**The rollback path is verified working on the rotated credential.** The security finding in §3 is
+now closed: the exposed password is no longer valid, and rollback remains fully available.
 
 **Step 2 will invalidate both values above.** Step 3 is therefore not optional: without it, the
 cutover would proceed against a rollback path nobody has confirmed is reachable — the exact
