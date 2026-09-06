@@ -25,12 +25,25 @@ Ownership boundary (do not add anything outside this shape):
 
 VERTICAL_REGISTRY: dict[str, dict] = {
     "barber": {
-        # Same 4 keys demo_service.py's _SERVICE_MAP["barbershop"] and registration_service.py's
-        # _SERVICE_SEED_MAP["barbershop"] already use -- this Registry is the one place both should
-        # eventually read from instead of maintaining their own duplicate dicts (not done yet; both
-        # still write additively alongside vertical per the Migration Plan's own additive-only
-        # posture for this round).
-        "default_services": ["booking", "reservations", "catalog", "whatsapp_ordering"],
+        # `booking` REMOVED 2026-09-06. It was inherited from demo_service.py's
+        # _SERVICE_MAP["barbershop"] and registration_service.py's _SERVICE_SEED_MAP["barbershop"],
+        # which both cite service-system.md's "must seed both keys" note. That note is stale: its
+        # own stated mechanism is the Reservations tab, and the tab is driven solely by
+        # `hasReservations = activeServices.includes('reservations')` -- `booking` is never read.
+        # Verified 2026-09-06 against the real codebase: there is NO `require_service("booking")`
+        # anywhere (the only real gates are reservations/store/restaurant/catalog), and
+        # GenericAdminDashboard never checks 'booking'. `booking` means UNIT booking (chalets,
+        # rooms); a barbershop has no units. Live proof: `rk`, this project's reference Barber
+        # tenant, does NOT carry `booking` and its Reservations surface works -- while `mr-h` does
+        # carry it with 0 units and never uses it. So rk was the correct configuration and the
+        # outlier; this makes the Registry match it.
+        #
+        # Scope: this changes provisioning for FUTURE barber tenants only. No existing row is
+        # touched. The two duplicate dicts named above still contain `booking` -- deliberately left
+        # alone here, since consolidating them into this Registry is its own separate step (see
+        # this module's docstring, "not done yet"). The barber template already sends only
+        # `services: ['reservations']` (template-registry.js), so it agrees with this list.
+        "default_services": ["reservations", "catalog", "whatsapp_ordering"],
         # Not yet built -- Section System P3 (ALZABT_SECTION_SYSTEM_WORK_SEQUENCE.md). Left
         # explicitly None rather than pointing at a file that doesn't exist yet.
         "page_template": None,
