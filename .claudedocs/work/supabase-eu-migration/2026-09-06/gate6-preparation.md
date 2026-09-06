@@ -100,6 +100,57 @@ rotation happens before cutover, those must be refreshed to keep rollback viable
 
 ---
 
+## 4b. Cutover parameters — decided by Salman, 2026-09-06
+
+| parameter | value | meaning |
+|---|---|---|
+| **Quiet window** | **10 minutes** | the period cutover must complete within |
+| **Rollback window** | **30 minutes** | after this, rollback requires reconciling writes by hand |
+| **Sydney credential** | **rotate before cutover, after validating the rollback credential** | |
+| **ADR-0007** | **Accepted** | |
+| **`f6b1db6`** | approved *pending Salman's own diff inspection* | |
+| **Gate 6** | **PAUSED** until: credential handled + diff inspected + time chosen | |
+
+### The credential sequence — order matters, and the obvious order is wrong
+
+"Rotate before cutover, after validating the rollback credential" implies four steps, not two. A
+rotation that is not re-validated leaves an **unvalidated rollback path**, which is precisely the
+condition the rotation was meant to remove:
+
+```
+1. VALIDATE   the current Sydney credential actually opens a working connection
+                 → proves rollback is real today
+2. ROTATE     the Sydney password
+3. RE-VALIDATE with the NEW credential, and update the Sydney values held for rollback
+                 → without this, step 2 silently breaks rollback
+4. CUTOVER    only once rollback is proven working on the rotated credential
+```
+
+**Step 3 is not optional.** Rotating without re-validating would mean going into cutover with a
+rollback target nobody has confirmed is reachable.
+
+### ⚠️ Feasibility flag on the 10-minute quiet window
+
+Raised as a practical concern, not an objection. The window has to contain **all** of:
+
+1. updating 4 Railway environment variables,
+2. **a Railway redeploy** — this ships `f6b1db6` (the code half) as well, and Railway rebuilds a
+   Docker image rather than swapping a variable in place,
+3. enough verification to decide "keep" or "roll back".
+
+The local frontend build alone is ~22 s, but a Railway image build plus container start is
+routinely **several minutes**, and that duration has **not been measured for this project**. If the
+deploy consumes 7–8 minutes, verification is being done at or past the window's edge — which is
+exactly when a bad decision gets made under time pressure.
+
+**Recommendation:** measure one real Railway deploy duration *before* choosing the cutover moment
+(a no-op redeploy on the current Sydney config would time it without any risk). If it comfortably
+fits, 10 minutes stands. If it does not, either widen the window or accept that verification lands
+inside the 30-minute rollback window rather than the 10-minute quiet one. **Salman's call** — the
+figures above are recorded as decided either way.
+
+---
+
 ## 5. State at the end of preparation
 
 ```
