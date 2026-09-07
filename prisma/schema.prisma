@@ -62,9 +62,10 @@ model Client {
   galleryImages     GalleryImage[]
   // -- Module gate ------------------------------------------------------------
   clientServices    ClientService[]
-  // -- Restaurant module -------------------------------------------------------
-  restaurantConfigs RestaurantConfig[]
-  // -- Store module ------------------------------------------------------------
+  // -- Order engine (Order Engine Unification, 2026-09-07) ----------------------
+  // One engine for every vertical. The restaurant module's own parallel order trio was removed
+  // here -- it held 0 rows, and every route gated on its config table answered 404 platform-wide,
+  // so it had never taken an order. A restaurant's orders are these same StoreOrder rows now.
   storeCarts        StoreCart[]
   storeOrders       StoreOrder[]
   // -- Generic Catalog module --------------------------------------------------
@@ -510,7 +511,6 @@ model CatalogItem {
   client               Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category             CatalogCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   galleryImages        GalleryImage[]
-  restaurantOrderItems RestaurantOrderItem[]
   storeCartItems       StoreCartItem[]
   storeOrderItems      StoreOrderItem[]
 
@@ -621,66 +621,7 @@ model ClientService {
 // Migrated from Multi-Cafe-Saas -- renamed to avoid conflicts with booking Service
 // ================================================================================
 
-model RestaurantConfig {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId     String   @map("client_id") @db.Uuid
-  nameAr       String   @map("name_ar")
-  nameEn       String?  @map("name_en")
-  description  String?  @map("description")
-  imageUrl     String?  @map("image_url")
-  coverImage   String?  @map("cover_image")
-  phone        String?  @map("phone")
-  workingHours Json?    @map("working_hours")
-  currency     String   @default("LBP") @map("currency")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  client Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  orders RestaurantOrder[]
-
-  @@index([clientId])
-  @@map("restaurant_configs")
-  @@schema("public")
-}
-
 // MenuCategory + MenuItem removed - replaced by CatalogCategory/CatalogItem (module_key = 'restaurant')
-
-model RestaurantOrder {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  restaurantId  String   @map("restaurant_id") @db.Uuid
-  customerName  String   @map("customer_name")
-  customerPhone String   @map("customer_phone")
-  tableNumber   String?  @map("table_number")
-  totalPrice    Decimal  @map("total_price") @db.Decimal(10, 2)
-  currency      String   @default("LBP") @map("currency")
-  status        String   @default("pending") @map("status") // pending|preparing|ready|delivered|cancelled
-  notes         String?  @map("notes")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  restaurant RestaurantConfig      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  items      RestaurantOrderItem[]
-
-  @@index([restaurantId])
-  @@index([status])
-  @@map("restaurant_orders")
-  @@schema("public")
-}
-
-model RestaurantOrderItem {
-  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId       String  @map("order_id") @db.Uuid
-  catalogItemId String  @map("catalog_item_id") @db.Uuid
-  quantity      Int     @default(1) @map("quantity")
-  unitPrice     Decimal @map("unit_price") @db.Decimal(10, 2)
-  notes         String? @map("notes")
-
-  order       RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  catalogItem CatalogItem     @relation(fields: [catalogItemId], references: [id])
-
-  @@index([orderId])
-  @@map("restaurant_order_items")
-  @@schema("public")
-}
 
 // ================================================================================
 // STORE MODULE

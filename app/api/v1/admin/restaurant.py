@@ -20,7 +20,6 @@ from app.db.dependencies import get_current_admin_user
 from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.repositories import admin_catalog_repo as _cat_repo
-from app.repositories import restaurant_admin_repo as _rest_repo
 
 router = APIRouter()
 
@@ -92,15 +91,6 @@ def _fmt_order(order) -> dict:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-async def _get_restaurant(client_id: str):
-    restaurant = await _rest_repo.find_restaurant_config(client_id)
-    if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not configured.")
-    return restaurant
-
-
-# ── Category CRUD ─────────────────────────────────────────────────────────────
 
 class CategoryIn(BaseModel):
     name_ar:    str
@@ -302,80 +292,3 @@ class OrderStatusIn(BaseModel):
 
 # ── Orders ────────────────────────────────────────────────────────────────────
 
-@router.get("/orders")
-async def list_orders(
-    status: Optional[str] = None,
-    limit: int = 50,
-    user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("restaurant")),
-    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
-):
-    restaurant = await _get_restaurant(str(user.clientId))
-    if status and status not in ORDER_STATUSES:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Use: {ORDER_STATUSES}")
-
-    orders = await _rest_repo.list_orders(restaurant.id, status=status, limit=limit)
-    return {"success": True, "data": [_fmt_order(o) for o in orders]}
-
-
-@router.patch("/orders/{order_id}/status")
-async def update_order_status(
-    order_id: str,
-    body: OrderStatusIn,
-    user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("restaurant")),
-    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
-):
-    if body.status not in ORDER_STATUSES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid status '{body.status}'. Allowed: {ORDER_STATUSES}",
-        )
-
-    restaurant = await _get_restaurant(str(user.clientId))
-
-    order = await _rest_repo.find_order(restaurant.id, order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
-
-    allowed = RESTAURANT_TRANSITIONS.get(order.status, set())
-    if body.status not in allowed:
-        readable = sorted(allowed) if allowed else ["none — terminal state"]
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Cannot transition '{order.status}' → '{body.status}'. "
-                f"Allowed next states: {readable}"
-            ),
-        )
-
-    updated = await _rest_repo.update_order_status(order_id, restaurant.id, body.status)
-    return {"success": True, "data": _fmt_order(updated)}
-
-
-@router.get("/orders/stats")
-async def order_stats(
-    user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("restaurant")),
-    _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
-):
-    restaurant  = await _get_restaurant(str(user.clientId))
-    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
-    orders      = await _rest_repo.list_today_orders(restaurant.id, today_start)
-
-    stats = {s: {"count": 0, "total": 0.0} for s in ORDER_STATUSES}
-    for o in orders:
-        s = o.status
-        if s in stats:
-            stats[s]["count"] += 1
-            stats[s]["total"] += float(o.totalPrice)
-
-    return {
-        "success": True,
-        "data": {
-            "today_total_orders": len(orders),
-            "today_revenue":      sum(float(o.totalPrice) for o in orders if o.status != "cancelled"),
-            "currency":           restaurant.currency,
-            "by_status":          stats,
-        },
-    }

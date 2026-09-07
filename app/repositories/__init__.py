@@ -15,7 +15,6 @@ from . import service_repo
 from . import resource_repo
 from . import barber_repo
 from . import price_repo
-from . import restaurant_admin_repo
 from . import store_admin_repo
 from . import admin_client_repo
 from . import content_sections_repo
@@ -37,7 +36,6 @@ __all__ = [
     "resource_repo",
     "barber_repo",
     "price_repo",
-    "restaurant_admin_repo",
     "store_admin_repo",
     "admin_client_repo",
     "content_sections_repo",
