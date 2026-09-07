@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 import app.repositories.store_repo as store_repo
+from app.db.client import prisma_client
+from app.repositories.customer_repo import CustomerRepository
 
 router = APIRouter()
 
@@ -289,9 +291,29 @@ async def checkout(
         for ci in items
     ]
 
+    # -- Resolve [Customer] --------------------------------------------------------------------
+    # Phase 3a (2026-09-07). Same find-or-create-by-(phone, clientId) pattern reservation_service.py
+    # already runs for every reservation, so one person buying and booking at the same shop is one
+    # Customer row, not two identities the registry has to reconcile by phone string afterwards.
+    # Phone is the identity key here, and it is optional on a store order -- with no phone there is
+    # nothing to identify, so the order stays unlinked rather than inventing a row. The order keeps
+    # its own customer_name/phone snapshot either way.
+    customer_id = None
+    if body.customer_phone:
+        _customer_repo = CustomerRepository(prisma_client)
+        customer = await _customer_repo.get_by_phone(body.customer_phone, tenant["id"])
+        if not customer:
+            customer = await _customer_repo.create(tenant["id"], {
+                "phone": body.customer_phone,
+                "name":  body.customer_name,
+                "email": body.customer_email,
+            })
+        customer_id = customer.id
+
     order = await store_repo.create_store_order(
         client_id=tenant["id"],
         data={
+            "customer_id":      customer_id,
             "customer_name":    body.customer_name,
             "customer_phone":   body.customer_phone,
             "customer_email":   body.customer_email,

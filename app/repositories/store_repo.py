@@ -164,6 +164,10 @@ async def create_store_order(client_id: str, data: dict):
     """
     create_data = {
         "clientId":        client_id,
+        # Phase 3a (2026-09-07): the real Customer FK, resolved by the caller. Omitted rather than
+        # set to None when absent, so an order from a customer with no phone stays honestly
+        # unlinked instead of carrying a null-shaped link.
+        **({"customerId": data["customer_id"]} if data.get("customer_id") else {}),
         "customerName":    data["customer_name"],
         "customerPhone":   data.get("customer_phone"),
         "customerEmail":   data.get("customer_email"),

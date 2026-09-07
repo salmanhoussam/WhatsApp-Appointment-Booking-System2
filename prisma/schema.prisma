@@ -329,6 +329,11 @@ model Customer {
   // the Booking engine above is unchanged.
   reservations Reservation[]
 
+  // Store purchases by this same person (Phase 3a, 2026-09-07). Together with `bookings` and
+  // `reservations` above, Customer is now the single identity behind every kind of order a tenant
+  // takes -- which is what lets the Customer Registry join instead of matching phone strings.
+  storeOrders  StoreOrder[]
+
   @@unique([clientId, phone])
   @@index([clientId])
   @@index([phone])
@@ -697,7 +702,9 @@ model StoreCustomer {
   updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  orders StoreOrder[]
+  // `orders StoreOrder[]` removed 2026-09-07 (Phase 3a) -- StoreOrder.customer now points at
+  // Customer. This model is dead (0 rows, 0 code references) and is dropped in its own step,
+  // AFTER this change is deployed -- see the Phase 2d ordering lesson.
 
   @@unique([clientId, email])
   @@index([clientId])
@@ -758,7 +765,12 @@ model StoreOrder {
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  customer StoreCustomer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  // Repointed from StoreCustomer to Customer 2026-09-07 (Phase 3a). StoreCustomer held 0 rows and
+  // had 0 code references anywhere, so this column was NULL on every real order -- which is why
+  // the Customer Registry had to merge Reservation + StoreOrder by phone string at query time
+  // rather than by a foreign key. SetNull matches Reservation.customer_id: deleting a customer
+  // never takes the order with it, and the order keeps its own name/phone snapshot regardless.
+  customer Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
   items    StoreOrderItem[]
 
   @@index([clientId])
