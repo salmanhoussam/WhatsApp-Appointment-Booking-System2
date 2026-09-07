@@ -90,6 +90,15 @@ def client_ip_from(request) -> str:
     able to break a login.
     """
     try:
+        # Cloudflare fronts this API, and it is checked FIRST for a measured reason: on 2026-09-07
+        # the first live rows recorded ip=104.22.40.135 with xff="104.22.40.135, 79.127.178.81",
+        # while the real client was 185.187.131.151. 104.22.x is a published Cloudflare range --
+        # so X-Forwarded-For's first hop here is Cloudflare's edge, NOT the visitor, and the
+        # textbook "first hop is the client" rule is simply wrong behind this topology.
+        # CF-Connecting-IP is the single value Cloudflare sets to the true origin.
+        cf = request.headers.get("cf-connecting-ip")
+        if cf:
+            return cf.strip()
         xff = request.headers.get("x-forwarded-for")
         if xff:
             return xff.split(",")[0].strip()
@@ -126,10 +135,15 @@ async def record_auth_event(
     The raw submitted identifier goes in `detail`, truncated -- putting attacker-controlled text
     straight into an indexed column would fill it with noise and make it useless to query.
     """
+    _cf = request.headers.get("cf-connecting-ip")
     detail: dict = {
         "ip": client_ip_from(request),
-        # Recorded raw alongside the resolved value until Railway's real header behaviour is
-        # confirmed from live rows.
+        # Which header the address came from. Recorded because the first live rows proved the
+        # obvious choice was wrong -- without this, a future proxy change would silently poison
+        # every IP in the audit trail and nothing would reveal it.
+        "ip_src": "cf-connecting-ip" if _cf else (
+            "x-forwarded-for" if request.headers.get("x-forwarded-for") else
+            "x-real-ip" if request.headers.get("x-real-ip") else "peer"),
         "xff": (request.headers.get("x-forwarded-for") or "")[:_IDENTIFIER_MAX] or None,
     }
     if reason:
