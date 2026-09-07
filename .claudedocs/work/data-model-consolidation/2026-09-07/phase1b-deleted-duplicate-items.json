@@ -1,0 +1,128 @@
+{
+  "taken_at": "2026-09-07",
+  "reason": "pre-split CatalogItem fossils duplicating a real CatalogService",
+  "deleted": [
+    {
+      "id": "bac50fd1-0d45-40c5-af56-6ea6341d2632",
+      "slug": "mr-h",
+      "name_ar": "حنة أو صبغة",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "3d0ac432-ec5b-472e-8f9c-0704315276f7",
+      "slug": "mr-h",
+      "name_ar": "دقن",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "aa8fb893-53f5-4430-8bc3-9fc402ad4887",
+      "slug": "mr-h",
+      "name_ar": "شعر",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "bb6282f5-5392-4ef4-8da7-48e6eb42fc47",
+      "slug": "mr-h",
+      "name_ar": "شعر ودقن",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "60fa6f25-c3a6-4dcd-b072-2e36f072ebbe",
+      "slug": "mr-h",
+      "name_ar": "كرياتين",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "5f34412f-daae-4d31-afc6-e72e4e77fe95",
+      "slug": "rk",
+      "name_ar": "تمشيط أو تسريح",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "88a280b2-b9ff-483d-9929-af278b4f0bf4",
+      "slug": "rk",
+      "name_ar": "حنة أو صبغة",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "6e19f65e-f6f1-44ee-a73c-861a93d40401",
+      "slug": "rk",
+      "name_ar": "دقن",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "71502964-79f0-4840-b676-ab1882402a13",
+      "slug": "rk",
+      "name_ar": "شعر",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "2586960c-b896-4e36-8b7a-a8f91fcb5f3d",
+      "slug": "rk",
+      "name_ar": "شعر ودقن",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    },
+    {
+      "id": "067df2d2-c3ec-4c06-bceb-0571a4fa0230",
+      "slug": "rk",
+      "name_ar": "كرياتين",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    }
+  ],
+  "kept_no_twin": [
+    {
+      "id": "9163c4ee-46dd-4e2f-b4fa-5f9354b7a558",
+      "slug": "mr-h",
+      "name_ar": "تمشيط أو تسريح",
+      "price": "5.00",
+      "module_key": "catalog",
+      "order_lines": 0,
+      "cart_lines": 0,
+      "gallery_rows": 0
+    }
+  ]
+}
