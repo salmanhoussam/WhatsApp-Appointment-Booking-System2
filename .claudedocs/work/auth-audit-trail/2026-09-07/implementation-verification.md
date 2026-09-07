@@ -165,3 +165,73 @@ is an argument, not evidence — recorded as unproven rather than implied.
 - **No retention policy** on `security_audit_log`.
 - **Nothing reads the table yet** — recording is not detecting. Auto-ban is the next step and now
   has real data to read.
+
+---
+
+# Slice 3 — auto-ban (5 failures / 15 minutes, dual axis)
+
+`app/core/auth_lockout.py`. Reads the rows the audit trail began producing hours earlier —
+recording became detecting.
+
+## IP axis — proven end-to-end
+
+```
+1. wrong password         -> 429
+2. CORRECT credentials    -> 429   ← the decisive one
+3. client login path      -> 429   ← both paths gated
+4. /public/rk/config      -> 200   ← the block is scoped to auth, not global
+body: "تم تجاوز الحد الأقصى للمحاولات. يرجى المحاولة بعد 15 دقيقة."
+```
+
+**Correct credentials returning 429 is the proof that matters.** The gate runs *before*
+authentication, so a locked source is refused even once the attacker finally guesses right. And an
+ungated route still answering 200 proves the lockout is not a blanket outage.
+
+The message is identical for both axes and reveals neither the account's existence nor whether the
+source is already known.
+
+## Actor axis — NOT proven end-to-end, and it cannot be from here
+
+At the moment of the lockout:
+
+```
+by IP     185.187.131.174  12   ← locked
+          185.187.131.164  10   ← locked
+by actor  anon             21   ← deliberately EXEMPT (not an account)
+          customer:212ac3fc  1
+```
+
+No real account reached 5 failures, so the actor branch never fired. **It cannot be isolated from a
+single egress**: five failures against one account also puts that one source at five, so both axes
+trip together and the deliberately-identical message makes them indistinguishable — the property
+that protects an attacker's view also blocks a tester's.
+
+A follow-up test is queued that exploits a real property of this machine's egress: it is a **pool**
+(`.164` / `.174`). Hammering one account should split the IP counts below the threshold while the
+actor count climbs past it — isolating the actor axis without a second source.
+
+**Until that returns, the actor axis is wired, unit-reasoned, and unproven.** Recorded as such,
+exactly like the four unexercised success events above. Sharing a code path is an argument, not
+evidence.
+
+## Design notes worth keeping
+
+- **Fails open** on a query error. This does *not* contradict the morning's fail-closed rule for
+  webhook secrets: a missing secret was a gate that had never been configured, a permanent hole,
+  whereas a transient query failure is temporary and grants nobody anything — password verification
+  runs immediately afterwards, untouched. Failing closed would convert a database blip into a total
+  authentication outage.
+- **IP axis is a `Depends`; actor axis is not.** The actor check must know which account is being
+  attempted, which is only known after the identifier is resolved — after a dependency has already
+  run. It sits after resolution and before `verify_password`.
+- **Egress pools dilute IP limiting.** Measured here directly: this machine's own failures split
+  across two addresses. An attacker rotating sources gets `MAX_FAILURES` per address. That is
+  inherent to IP-based limiting and is precisely why the actor axis exists.
+
+## Still open
+
+- A success does **not** reset the counter (pure window count, as specified). Four mistypes, a
+  success, then one more mistype locks the user. Excluding failures older than that actor's last
+  success would fix it safely, but changes the specified rule.
+- No index on `detail->>'ip'`; the timestamp index narrows the scan first.
+- No retention policy on `security_audit_log` — failed-login rows grow without bound.
