@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "template": "rk-barbershop",
+    "version": 2,
+    "source_tenant": "rk",
+    "source_db": "frankfurt (eu-central-1)",
+    "extracted": "2026-09-07",
+    "vertical": "barber",
+    "location_note": "D5 — lives here, not .claudedocs/templates/, so the seeder reads it directly.",
+    "decisions_applied": {
+      "D1": "Two ACTIVE barbers. RK itself yields only one (its second, جعفر, is a real person at a live shop and is not copied). Names are neutral placeholders, overridable via --barbers.",
+      "D2": "alzabt-demo's researched prices, mapped 1:1 onto RK's six services by duration and meaning. RK's own 5.00-across-the-board placeholder pricing is NOT inherited.",
+      "D3": "catalog_services ONLY. catalog_items carrying metadata.requires_booking are ignored entirely -- that model duplicated catalog_services and its 11 surviving rows were deleted from production 2026-09-07. Store products below are real products, not that duplication.",
+      "D4": "This template is the cleaned EXTRACTION. RK itself is untouched -- it is a live production tenant.",
+      "D5": "scripts/data/rk/template.json"
+    },
+    "excluded_contamination": [
+      "resources: 'Dr. Faisal','Dr. Sara' (type=doctor, inactive) -- clinic experiment residue",
+      "services(legacy): 'تنظيف أسنان' -- dental residue; the legacy services table itself was dropped 2026-09-07",
+      "barbers: 'Test Staff QA' (inactive)",
+      "catalog_services: 'خدمة تجريبية QA' (inactive)",
+      "users: 7 of 8 test accounts",
+      "gallery_images(3): URLs span three storage folders -- unresolved drift",
+      "catalog_items with requires_booking -- see D3"
+    ],
+    "excluded_transactional": ["reservations", "customers", "store_orders", "whatsapp_sessions", "bookings"]
+  },
+
+  "client": {
+    "currency": "USD",
+    "primary_color": "#2F4F4F",
+    "page_type": "normal",
+    "service_type": "barbershop",
+    "vertical": "barber",
+    "payment_methods": ["cash", "card"],
+    "config": {
+      "working_hours": { "open_time": "09:00", "close_time": "21:00", "closed_days": ["monday"] },
+      "hero":  { "title_ar": "مرحباً بكم", "subtitle_ar": "احجز مكانك الآن" },
+      "story": {
+        "body_ar": "قصتنا تبدأ من هنا. أضف وصف منشأتك من لوحة التحكم.",
+        "body_en": "Our story starts here. Add your venue description from the dashboard."
+      },
+      "font": "Cairo",
+      "catalog_layout": "grid",
+      "page_background": "ambient_grid"
+    }
+  },
+
+  "client_services": ["reservations", "store", "whatsapp_ordering"],
+
+  "barbers": [
+    { "name": "سامي", "sort_order": 0, "_placeholder": true },
+    { "name": "زياد", "sort_order": 1, "_placeholder": true }
+  ],
+
+  "catalog_categories": [
+    { "name_ar": "الخدمات",        "name_en": "Services",          "module_key": "catalog", "sort_order": 0 },
+    { "name_ar": "منتجات العناية", "name_en": "Grooming Products", "module_key": "store",   "sort_order": 1 }
+  ],
+
+  "catalog_services": [
+    { "name_ar": "دقن",            "name_en": "Beard Trim",      "duration_min": 15, "price": 6.0,  "_d2_source": "alzabt لحية 15min $6" },
+    { "name_ar": "تمشيط أو تسريح", "name_en": "Styling",         "duration_min": 20, "price": 5.0,  "_d2_source": "alzabt تصفيف 15min $5" },
+    { "name_ar": "شعر",            "name_en": "Haircut",         "duration_min": 20, "price": 8.0,  "_d2_source": "alzabt شعر 20min $8" },
+    { "name_ar": "شعر ودقن",       "name_en": "Haircut & Beard", "duration_min": 30, "price": 12.0, "_d2_source": "alzabt شعر ولحية 30min $12" },
+    { "name_ar": "حنة أو صبغة",    "name_en": "Hair Color",      "duration_min": 45, "price": 15.0, "_d2_source": "alzabt صبغة 40min $15" },
+    { "name_ar": "كرياتين",        "name_en": "Keratin",         "duration_min": 90, "price": 25.0, "_d2_source": "alzabt كرياتين 75min $25" }
+  ],
+
+  "catalog_items_store": [
+    { "name_ar": "واكس تصفيف الشعر", "name_en": "Styling Wax",       "price": 10.0, "sort_order": 0 },
+    { "name_ar": "جل تصفيف الشعر",   "name_en": "Styling Gel",       "price": 7.0,  "sort_order": 1 },
+    { "name_ar": "عطر ريحة رجالي",   "name_en": "Mens Cologne",      "price": 22.0, "sort_order": 2 },
+    { "name_ar": "زيت للشعر",        "name_en": "Hair oil",          "price": 5.0,  "sort_order": 3 },
+    { "name_ar": "سبراي تثبيت الشعر","name_en": "Hair Fixing Spray", "price": 8.0,  "sort_order": 4 }
+  ],
+
+  "barber_services": {
+    "strategy": "cross-link every barber to every service",
+    "expected_links": 12
+  }
+}
