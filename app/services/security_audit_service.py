@@ -65,3 +65,82 @@ async def log_security_event(
             "Security audit log write failed — event_type=%s client_id=%s endpoint=%s: %s",
             event_type, client_id, endpoint, exc,
         )
+
+# ── Authentication events (Auth Audit Trail, 2026-09-07) ──────────────────────
+#
+# One helper, deliberately, so the five auth paths NOT wired in this first slice
+# (magic-link, set-password, register, customer register/login) each become a single call rather
+# than a fifth copy-paste. That is not a style preference: copy-pasting `_verify_secret` is exactly
+# how the fail-open webhook defect ended up living in two files at once, found on production the
+# same day this was written.
+
+_IDENTIFIER_MAX = 120
+
+
+def client_ip_from(request) -> str:
+    """Best guess at the real client IP.
+
+    Railway terminates TLS at a proxy, so `request.client.host` is the PROXY's address, not the
+    visitor's -- the only place in this codebase reading it today (ai_chat.py:137) has that same
+    blind spot. X-Forwarded-For's FIRST hop is the originating client; everything after it is
+    infrastructure. X-Real-IP is the common single-value fallback.
+
+    NOT yet verified against Railway's actual headers -- both values are recorded so the question
+    can be settled from real rows instead of assumption. Never raises: an audit helper must not be
+    able to break a login.
+    """
+    try:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()
+        real = request.headers.get("x-real-ip")
+        if real:
+            return real.strip()
+        return request.client.host if request.client else "unknown"
+    except Exception:  # noqa: BLE001 - see module docstring
+        return "unknown"
+
+
+async def record_auth_event(
+    request,
+    event_type: str,
+    actor: str,
+    client_id: Optional[str] = None,
+    reason: Optional[str] = None,
+    identifier: Optional[str] = None,
+) -> None:
+    """Record one authentication outcome.
+
+    event_type is one of exactly four strings -- admin_login_success / admin_login_failed /
+    client_login_success / client_login_failed. The FAILURE REASON is deliberately not part of the
+    event type: event_type is indexed and is what you group by ("how many failures today"), so
+    splitting it per reason would fragment the vocabulary and destroy that. The reason travels in
+    `detail` where it belongs, as a filter.
+
+    `actor` stays clean and queryable:
+        user:{id} / client:{id}   whenever the account is known -- INCLUDING a wrong-password
+                                  attempt against a real account, which is the case that makes
+                                  "show me every failed attempt on this account" answerable, and
+                                  is the foundation any future brute-force lockout would build on
+        anon                      identifier matched nothing
+    The raw submitted identifier goes in `detail`, truncated -- putting attacker-controlled text
+    straight into an indexed column would fill it with noise and make it useless to query.
+    """
+    detail: dict = {
+        "ip": client_ip_from(request),
+        # Recorded raw alongside the resolved value until Railway's real header behaviour is
+        # confirmed from live rows.
+        "xff": (request.headers.get("x-forwarded-for") or "")[:_IDENTIFIER_MAX] or None,
+    }
+    if reason:
+        detail["reason"] = reason
+    if identifier:
+        detail["identifier_submitted"] = str(identifier)[:_IDENTIFIER_MAX]
+
+    await log_security_event(
+        event_type=event_type,
+        client_id=client_id,
+        endpoint=str(getattr(getattr(request, "url", None), "path", "")) or None,
+        detail=detail,
+        actor=actor,
+    )

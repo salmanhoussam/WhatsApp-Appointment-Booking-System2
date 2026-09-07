@@ -9,7 +9,7 @@ Two login flows:
 
 import logging
 import re
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Request, Response, BackgroundTasks
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.core.security import (
@@ -20,6 +20,7 @@ from app.services import registration_service as _reg_service
 from app.repositories import user_repo as _user_repo
 from app.repositories import admin_client_repo as _client_repo
 from app.core.limiter import limiter
+from app.services.security_audit_service import record_auth_event
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
 # On localhost the domain kwarg is omitted (browsers reject .salmansaas.com there).
@@ -83,7 +84,8 @@ class UserLoginResponse(BaseModel):
 
 @router.post("/login", response_model=ClientLoginResponse)
 @limiter.limit("5/minute")
-async def client_login(request: Request, body: ClientLoginRequest, response: Response):
+async def client_login(request: Request, body: ClientLoginRequest, response: Response,
+                       background_tasks: BackgroundTasks = None):
     """
     Authenticates the tenant root account (Client model).
     Accepts slug, email, or phone as the identifier.
@@ -96,14 +98,30 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
 
         if not client:
             logger.warning("❌ Client not found: '%s'", body.identifier)
+            # Awaited, not backgrounded: a BackgroundTask added before `raise HTTPException` is
+            # SILENTLY DROPPED -- the exception handler builds a fresh response and the tasks go
+            # with the old one. Measured, not assumed. Backgrounding the failure path would have
+            # lost exactly the events that reveal an attack. The cost lands only on a failed
+            # attempt, which is already rate-limited, and making an attacker wait is a feature.
+            await record_auth_event(
+                request, "client_login_failed", actor="anon",
+                reason="not_found", identifier=body.identifier)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
         if not verify_password(body.password, client.password_hash):
             logger.warning("❌ Password mismatch for client: %s", client.slug)
+            # The account IS known here -- recording its real id is what makes "every failed
+            # attempt against this account" answerable, and is what a future lockout would key on.
+            await record_auth_event(
+                request, "client_login_failed", actor=f"client:{client.id}",
+                client_id=client.id, reason="bad_password", identifier=body.identifier)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
         if not client.isActive:
             logger.warning("⚠️  Inactive client: %s", client.slug)
+            await record_auth_event(
+                request, "client_login_failed", actor=f"client:{client.id}",
+                client_id=client.id, reason="inactive", identifier=body.identifier)
             raise HTTPException(status_code=403, detail="هذا الحساب غير نشط حالياً")
 
         token = create_access_token(data={
@@ -115,6 +133,12 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
 
         _set_auth_cookie(response, token)
         logger.info("✅ Client login success: %s", client.slug)
+        # Backgrounded: runs after the response is sent, so it adds nothing to the customer's
+        # perceived login time. Client has no lastLoginAt column -- only the audit row here.
+        if background_tasks is not None:
+            background_tasks.add_task(
+                record_auth_event, request, "client_login_success",
+                actor=f"client:{client.id}", client_id=client.id)
         return ClientLoginResponse(
             token=token,
             client_id=client.id,
@@ -139,7 +163,8 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
 
 @router.post("/users/login", response_model=UserLoginResponse)
 @limiter.limit("5/minute")
-async def user_login(request: Request, body: UserLoginRequest, response: Response):
+async def user_login(request: Request, body: UserLoginRequest, response: Response,
+                     background_tasks: BackgroundTasks = None):
     """
     Authenticates a staff member or manager (User model).
     Returns a JWT with type='admin', user_id, client_id, and role.
@@ -164,14 +189,23 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
 
         if not user:
             logger.warning("❌ User not found: '%s'", body.email)
+            await record_auth_event(
+                request, "admin_login_failed", actor="anon",
+                reason="not_found", identifier=body.email)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
         if not verify_password(body.password, user.password_hash):
             logger.warning("❌ Password mismatch for user: %s", user.email)
+            await record_auth_event(
+                request, "admin_login_failed", actor=f"user:{user.id}",
+                client_id=user.clientId, reason="bad_password", identifier=body.email)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
         if not user.isActive:
             logger.warning("⚠️  Inactive user: %s", user.email)
+            await record_auth_event(
+                request, "admin_login_failed", actor=f"user:{user.id}",
+                client_id=user.clientId, reason="inactive", identifier=body.email)
             raise HTTPException(status_code=403, detail="هذا الحساب غير نشط حالياً")
 
         token = create_access_token(data={
@@ -190,6 +224,12 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
 
         _set_auth_cookie(response, token)
         logger.info("✅ User login success: %s (role=%s)", user.email, user.role)
+        # Both backgrounded -- after the response, so zero added latency on the success path.
+        if background_tasks is not None:
+            background_tasks.add_task(
+                record_auth_event, request, "admin_login_success",
+                actor=f"user:{user.id}", client_id=user.clientId)
+            background_tasks.add_task(_user_repo.touch_last_login, user.id)
         return UserLoginResponse(
             token=token,
             user_id=user.id,

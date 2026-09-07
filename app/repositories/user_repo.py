@@ -5,6 +5,8 @@ All queries MUST filter by clientId where applicable. No business logic here.
 
 import re
 
+from datetime import datetime, timezone
+
 from app.db.client import prisma_client
 
 _LEBANON_COUNTRY_CODE = "961"
@@ -107,6 +109,22 @@ async def find_user_by_barber_id(barber_id: str):
     at the DB anyway.
     """
     return await prisma_client.user.find_first(where={"barberId": barber_id})
+
+
+async def touch_last_login(user_id: str):
+    """Stamp User.lastLoginAt (Auth Audit Trail, 2026-09-07).
+
+    The column has existed since the model was written, under a comment block headed
+    "Auth lifecycle" -- and nothing ever wrote it: 0 of 31 users had a value. Called only from the
+    login SUCCESS path, and only via BackgroundTasks, so it adds no latency to the response.
+
+    update_many, not update: this runs after the response has been sent, so a row that vanished in
+    between (a deleted account) must be a no-op, never an unhandled error in a background task.
+    """
+    return await prisma_client.user.update_many(
+        where={"id": user_id},
+        data={"lastLoginAt": datetime.now(timezone.utc)},
+    )
 
 
 async def find_admin_user_for_client(client_id: str, role: str = "TENANT_ADMIN"):
