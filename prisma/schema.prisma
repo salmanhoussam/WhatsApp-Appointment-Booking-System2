@@ -226,7 +226,8 @@ model Property {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   manager       User?     @relation("manager_properties", fields: [managerId], references: [id])
-  services      Service[]
+  services      Service[]        // legacy -- retired by Data Model Consolidation Phase 2
+  catalogServices CatalogService[]
   units         Unit[]
 
   @@map("properties")
@@ -570,6 +571,24 @@ model CatalogService {
   // Promoted to a real column (not buried in metadata like CatalogItem's duration_min was) --
   // reservation_service.py's slot-generation math needs a hard int, not a JSON dig.
   durationMin   Int      @default(30) @map("duration_min")
+  // -- Stay add-on fields (Data Model Consolidation Phase 2a, 2026-09-07) -------------------
+  // The three things the legacy `services` table carried and this model did not, added so smar's
+  // real hotel add-ons (إفطار / مساج / دخول المسبح / سرير أطفال) could move here instead of
+  // keeping a second parallel services table alive for one tenant. Salman's decision 2026-09-07.
+  //
+  // Real columns rather than metadata JSON -- the same call durationMin above already documents.
+  // What a guest is charged by is load-bearing, not decoration.
+  //
+  // All three are inert for an appointment-style service: a barber service is not tied to a
+  // property, has no pricing unit, and is not bundled into a stay. NULL/false is the honest value
+  // there, so every pre-existing row is already correct with no backfill.
+  //
+  // durationMin above stays NOT NULL for these rows and is meaningless for them (breakfast has no
+  // slot length). Deliberately NOT made nullable: reservation_service.py's slot math needs a hard
+  // int, and stay add-ons attach to Booking, never to Reservation, so they never reach it.
+  propertyId    String?  @map("property_id") @db.Uuid
+  pricingUnit   String?  @map("pricing_unit")   // "per_person" | "per_stay" | "per_night"
+  isIncluded    Boolean  @default(false) @map("is_included")  // bundled vs paid
   isActive      Boolean  @default(true) @map("is_active")
   isFeatured    Boolean  @default(false) @map("is_featured")
   sortOrder     Int      @default(0) @map("sort_order")
@@ -579,11 +598,13 @@ model CatalogService {
 
   client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category       CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  property       Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   reservations   Reservation[]
   barberServices BarberService[]
 
   @@index([clientId])
   @@index([categoryId])
+  @@index([propertyId])
   @@map("catalog_services")
   @@schema("public")
 }
