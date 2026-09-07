@@ -9,7 +9,7 @@ Two login flows:
 
 import logging
 import re
-from fastapi import APIRouter, Header, HTTPException, Request, Response, BackgroundTasks
+from fastapi import APIRouter, Header, HTTPException, Request, Response, BackgroundTasks, Depends
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.core.security import (
@@ -21,6 +21,7 @@ from app.repositories import user_repo as _user_repo
 from app.repositories import admin_client_repo as _client_repo
 from app.core.limiter import limiter
 from app.services.security_audit_service import record_auth_event
+from app.core.registration_gate import require_self_registration_enabled
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
 # On localhost the domain kwarg is omitted (browsers reject .salmansaas.com there).
@@ -254,7 +255,8 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
 # ── Magic link — one-time setup login ─────────────────────────────────────────
 
 @router.get("/setup", tags=["Authentication"])
-async def magic_link_login(token: str, response: Response):
+async def magic_link_login(token: str, request: Request, response: Response,
+                           background_tasks: BackgroundTasks = None):
     """
     One-time setup link sent to new tenants after pipeline onboarding.
     Validates the token, issues a TENANT_ADMIN JWT, and invalidates the token.
@@ -265,12 +267,21 @@ async def magic_link_login(token: str, response: Response):
     user = await _user_repo.find_user_by_setup_token(token)
 
     if not user:
+        await record_auth_event(
+            request, "setup_login_failed", actor="anon",
+            client_id=None, reason="invalid_token")
         raise HTTPException(status_code=404, detail="رابط غير صالح أو منتهي الصلاحية")
 
     if user.setupTokenExp and user.setupTokenExp < datetime.now(tz.utc):
+        await record_auth_event(
+            request, "setup_login_failed", actor=f"user:{user.id}",
+            client_id=user.clientId, reason="expired_token")
         raise HTTPException(status_code=410, detail="انتهت صلاحية الرابط — يُستخدم لمرة واحدة خلال 7 أيام")
 
     if not user.isActive:
+        await record_auth_event(
+            request, "setup_login_failed", actor=f"user:{user.id}",
+            client_id=user.clientId, reason="inactive")
         raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
 
     # Staff Invite (2026-09-07): an invited account has no password yet. Answer "this link needs a
@@ -301,6 +312,11 @@ async def magic_link_login(token: str, response: Response):
         "barber_id": str(user.barberId) if user.barberId else None,
     })
     _set_auth_cookie(response, jwt)
+    if background_tasks is not None:
+        background_tasks.add_task(
+            record_auth_event, request, "setup_login_success",
+            actor=f"user:{user.id}", client_id=user.clientId)
+        background_tasks.add_task(_user_repo.touch_last_login, user.id)
 
     return {
         "success": True,
@@ -388,7 +404,8 @@ class SetPasswordRequest(BaseModel):
 
 @router.post("/set-password", tags=["Authentication"])
 @limiter.limit("5/minute")
-async def set_password(request: Request, body: SetPasswordRequest, response: Response):
+async def set_password(request: Request, body: SetPasswordRequest, response: Response,
+                       background_tasks: BackgroundTasks = None):
     """
     Complete a staff invite: exchange a one-time setup token for a real password.
 
@@ -405,12 +422,21 @@ async def set_password(request: Request, body: SetPasswordRequest, response: Res
 
     user = await _user_repo.find_user_by_setup_token(body.token)
     if not user:
+        await record_auth_event(
+            request, "password_set_failed", actor="anon",
+            client_id=None, reason="invalid_token")
         raise HTTPException(status_code=404, detail="رابط غير صالح أو منتهي الصلاحية")
 
     if user.setupTokenExp and user.setupTokenExp < datetime.now(tz.utc):
+        await record_auth_event(
+            request, "password_set_failed", actor=f"user:{user.id}",
+            client_id=user.clientId, reason="expired_token")
         raise HTTPException(status_code=410, detail="انتهت صلاحية الرابط — يُستخدم لمرة واحدة خلال 7 أيام")
 
     if not user.isActive:
+        await record_auth_event(
+            request, "password_set_failed", actor=f"user:{user.id}",
+            client_id=user.clientId, reason="inactive")
         raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
 
     await _user_repo.set_password_and_clear_setup_token(
@@ -427,6 +453,11 @@ async def set_password(request: Request, body: SetPasswordRequest, response: Res
         "barber_id": str(user.barberId) if user.barberId else None,
     })
     _set_auth_cookie(response, jwt)
+    if background_tasks is not None:
+        background_tasks.add_task(
+            record_auth_event, request, "password_set_success",
+            actor=f"user:{user.id}", client_id=user.clientId)
+        background_tasks.add_task(_user_repo.touch_last_login, user.id)
 
     return {
         "success": True,
@@ -456,7 +487,9 @@ async def set_password(request: Request, body: SetPasswordRequest, response: Res
 
 @router.post("/register", tags=["Authentication"])
 @limiter.limit("3/minute")
-async def register_tenant(request: Request, body: TenantRegistrationRequest, response: Response):
+async def register_tenant(request: Request, body: TenantRegistrationRequest, response: Response,
+                          background_tasks: BackgroundTasks = None,
+                          _gate=Depends(require_self_registration_enabled)):
     """
     New-tenant self-onboarding via demo.salmansaas.com/register.
     Creates Client (trial) + TENANT_ADMIN User, issues JWT, sets HttpOnly cookie.
@@ -502,6 +535,11 @@ async def register_tenant(request: Request, body: TenantRegistrationRequest, res
     })
 
     _set_auth_cookie(response, token)
+    if background_tasks is not None:
+        background_tasks.add_task(
+            record_auth_event, request, "tenant_register_success",
+            actor=f"user:{user.id}", client_id=client.id)
+        background_tasks.add_task(_user_repo.touch_last_login, user.id)
     logger.info("✅ New tenant registered: %s (role=%s)", slug, user.role)
 
     return {

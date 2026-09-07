@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     ONBOARDING_SECRET: Optional[str] = os.getenv("ONBOARDING_SECRET")  # ASCII only
 
+    # 🔒 Self-service tenant creation — CLOSED BY DEFAULT (Salman's decision, 2026-09-07)
+    # Three routes could create a full tenant + TENANT_ADMIN with no authentication:
+    # POST /public/demo/create, POST /public/register, POST /auth/register. Their only limit was a
+    # rate cap that is 2x its stated value anyway (slowapi's MemoryStorage is per-worker and the
+    # app runs gunicorn -w 2), which is meaningless against a distributed source.
+    # Provisioning is admin/invite-driven now. Set to "true" only to deliberately reopen it.
+    SELF_REGISTRATION_ENABLED: bool = os.getenv("SELF_REGISTRATION_ENABLED", "false").lower() == "true"
+
     # 📱 إعدادات واتساب
     WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "my_secure_token")
     WHATSAPP_ACCESS_TOKEN: Optional[str] = os.getenv("WHATSAPP_ACCESS_TOKEN")

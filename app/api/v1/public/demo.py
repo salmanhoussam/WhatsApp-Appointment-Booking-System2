@@ -16,12 +16,13 @@ Response:
     temp_password : One-time 8-character password
     expires_at    : ISO-8601 trial expiry (7 days from now)
 """
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel, field_validator
 
 from app.db.client import prisma_client
 from app.core.limiter import limiter
 from app.services.demo_service import create_demo_tenant
+from app.core.registration_gate import require_self_registration_enabled
 
 router = APIRouter()
 
@@ -71,7 +72,8 @@ class DemoCreateRequest(BaseModel):
 
 @router.post("/demo/create", tags=["Public — Demo"])
 @limiter.limit("3/hour")
-async def create_demo(request: Request, payload: DemoCreateRequest):
+async def create_demo(request: Request, payload: DemoCreateRequest,
+    _gate=Depends(require_self_registration_enabled)):
     """
     Provision a 7-day trial tenant instantly.
 

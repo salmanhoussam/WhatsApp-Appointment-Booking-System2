@@ -1,11 +1,12 @@
 import re
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel, EmailStr, field_validator
 
 from app.db.client import prisma_client
 from app.services import registration_service
 from app.core.limiter import limiter
+from app.core.registration_gate import require_self_registration_enabled
 
 router = APIRouter()
 
@@ -58,7 +59,8 @@ class TenantRegistrationRequest(BaseModel):
 
 @router.post("/register", tags=["Public — Registration"])
 @limiter.limit("3/minute")
-async def register_tenant(request: Request, payload: TenantRegistrationRequest):
+async def register_tenant(request: Request, payload: TenantRegistrationRequest,
+    _gate=Depends(require_self_registration_enabled)):
     """
     Self-onboarding: creates a new tenant (Client) + TENANT_ADMIN user in one call.
     Returns the new slug and a direct dashboard URL for immediate redirect.

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException, Depends, Request
+from fastapi import APIRouter, Query, HTTPException, Depends, Request, BackgroundTasks
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ from app.services import catalog_service
 import app.repositories.public_repo as public_repo
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.repositories.customer_repo import CustomerRepository
+from app.services.security_audit_service import record_auth_event
 
 router = APIRouter()
 
@@ -122,7 +123,8 @@ class CustomerAuthResponse(BaseModel):
 # (app/core/security.py) -- a third real token `type`, "customer", alongside "client"/"admin".
 @router.post("/{slug}/auth/register", response_model=CustomerAuthResponse, tags=["Public Tenant"])
 @limiter.limit("3/minute")
-async def customer_register(request: Request, slug: str, body: CustomerRegisterRequest):
+async def customer_register(request: Request, slug: str, body: CustomerRegisterRequest,
+                            background_tasks: BackgroundTasks = None):
     if len(body.password) < 8:
         raise HTTPException(status_code=422, detail="كلمة المرور يجب أن تكون 8 أحرف على الأقل")
 
@@ -131,6 +133,11 @@ async def customer_register(request: Request, slug: str, body: CustomerRegisterR
     customer_repo = CustomerRepository(prisma_client)
     existing = await customer_repo.get_by_phone(body.phone, tenant["id"])
     if existing and existing.passwordHash:
+        # Awaited, not backgrounded -- a BackgroundTask added before `raise HTTPException` is
+        # silently dropped (measured 2026-09-07).
+        await record_auth_event(
+            request, "customer_register_failed", actor=f"customer:{existing.id}",
+            client_id=tenant["id"], reason="already_registered", identifier=body.phone)
         raise HTTPException(status_code=409, detail="يوجد حساب مسجّل مسبقاً بهذا الرقم")
 
     password_hash = get_password_hash(body.password)
@@ -150,6 +157,10 @@ async def customer_register(request: Request, slug: str, body: CustomerRegisterR
         "slug":        slug,
         "phone":        customer.phone,
     })
+    if background_tasks is not None:
+        background_tasks.add_task(
+            record_auth_event, request, "customer_register_success",
+            actor=f"customer:{customer.id}", client_id=tenant["id"])
     return CustomerAuthResponse(
         token=token, customer_id=customer.id, client_id=tenant["id"],
         slug=slug, name=customer.name, phone=customer.phone,
@@ -158,12 +169,21 @@ async def customer_register(request: Request, slug: str, body: CustomerRegisterR
 
 @router.post("/{slug}/auth/login", response_model=CustomerAuthResponse, tags=["Public Tenant"])
 @limiter.limit("5/minute")
-async def customer_login(request: Request, slug: str, body: CustomerLoginRequest):
+async def customer_login(request: Request, slug: str, body: CustomerLoginRequest,
+                         background_tasks: BackgroundTasks = None):
     tenant = await resolve_tenant_status(slug, endpoint=request.url.path)
 
     customer_repo = CustomerRepository(prisma_client)
     customer = await customer_repo.get_by_phone(body.identifier, tenant["id"])
     if not customer or not verify_password(body.password, customer.passwordHash):
+        # The two cases are distinguished in `detail.reason` but NOT in the response, which stays a
+        # single generic 401 -- telling a caller which half failed is account enumeration.
+        await record_auth_event(
+            request, "customer_login_failed",
+            actor=f"customer:{customer.id}" if customer else "anon",
+            client_id=tenant["id"],
+            reason="bad_password" if customer else "not_found",
+            identifier=body.identifier)
         raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
 
     token = create_access_token(data={
@@ -173,6 +193,10 @@ async def customer_login(request: Request, slug: str, body: CustomerLoginRequest
         "slug":        slug,
         "phone":        customer.phone,
     })
+    if background_tasks is not None:
+        background_tasks.add_task(
+            record_auth_event, request, "customer_login_success",
+            actor=f"customer:{customer.id}", client_id=tenant["id"])
     return CustomerAuthResponse(
         token=token, customer_id=customer.id, client_id=tenant["id"],
         slug=slug, name=customer.name, phone=customer.phone,
