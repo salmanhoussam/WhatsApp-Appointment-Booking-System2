@@ -57,7 +57,6 @@ model Client {
   customers         Customer[]
   prices            Price[]
   properties        Property[]
-  services          Service[]
   units             Unit[]
   users             User[]
   galleryImages     GalleryImage[]
@@ -226,7 +225,6 @@ model Property {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   manager       User?     @relation("manager_properties", fields: [managerId], references: [id])
-  services      Service[]        // legacy -- retired by Data Model Consolidation Phase 2
   catalogServices CatalogService[]
   units         Unit[]
 
@@ -306,34 +304,6 @@ model Price {
   @@index([date])
   @@index([clientId])
   @@map("prices")
-  @@schema("public")
-}
-
-model Service {
-  id           String           @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  clientId     String           @map("client_id") @db.Uuid
-  propertyId   String?          @map("property_id") @db.Uuid
-  name_ar      String           @map("name_ar")
-  name_en      String           @map("name_en")
-  description  String?          @map("description")
-  image_url    String?          @map("image_url")
-  duration     Int?             @map("duration")
-  basePrice    Decimal          @map("base_price") @db.Decimal(10, 2)
-  currency     String           @default("SAR") @map("currency")
-  isActive     Boolean          @default(true) @map("is_active")
-  is_included  Boolean          @default(false) @map("is_included") // free vs paid
-  pricing_unit String?          @map("pricing_unit") // "per_person" | "per_stay" | "per_night"
-  sort_order   Int?             @default(0) @map("sort_order")
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  // `bookings BookingService[]` removed 2026-09-07 (Phase 2c): BookingService.serviceId now
-  // references CatalogService. This model is retired and dropped in Phase 2d.
-  client       Client           @relation(fields: [clientId], references: [id])
-  property     Property?        @relation(fields: [propertyId], references: [id])
-
-  @@index([clientId])
-  @@index([propertyId])
-  @@map("services")
   @@schema("public")
 }
 
