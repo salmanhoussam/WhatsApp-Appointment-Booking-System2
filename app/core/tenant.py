@@ -97,9 +97,9 @@ async def _assert_status_allowed(
     Hard Block only. Does not check Lifecycle State — see
     _assert_lifecycle_allowed() for the separate Soft Block check
     (ADR-0002). Deliberately kept separate so callers that must stay
-    Tenant-Status-only (webhooks, ai_settings_agent.py, per ADR-0002's
-    Implementation Contract §4) can call this function alone without
-    picking up Soft Block behavior.
+    Tenant-Status-only (webhooks, and the public read/booking routes that
+    call assert_client_active(), per ADR-0002's Implementation Contract §4)
+    can call this function alone without picking up Soft Block behavior.
     """
     if status not in _BLOCKED_STATUSES:
         return
@@ -487,10 +487,14 @@ async def assert_client_active(client, endpoint: Optional[str] = None) -> None:
     implementation.
 
     Hard Block only — deliberately NOT Soft-Block-aware. Per ADR-0002's
-    Implementation Contract §4, this function's only caller today
-    (app/api/v1/ai_settings_agent.py) keeps reading Tenant Status only in
-    this slice; whether it should also respect Soft Block is out of scope
-    here, not decided.
+    Implementation Contract §4, its callers keep reading Tenant Status only
+    in this slice; whether they should also respect Soft Block is out of
+    scope here, not decided.
+
+    The "only caller today (ai_settings_agent.py)" this docstring used to name
+    was doubly wrong by 2026-09-07: that endpoint was retired (zero callers,
+    n8n-era), and the real callers are and were the public property/unit/
+    booking reads — public/properties.py, public/units.py, public/bookings.py.
     """
     await _assert_client_active(client, endpoint=endpoint)
 
