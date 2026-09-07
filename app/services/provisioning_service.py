@@ -76,6 +76,14 @@ async def provision_barber_domain(
         "sortOrder": 0,
     })
 
+    # F1 (RK Template blueprint §5, fixed 2026-09-07): currency was the hardcoded literal "USD",
+    # so a tenant provisioned on SAR or LBP got USD-priced services -- silently, with no error and
+    # nothing in the UI to reveal it. Derived from the tenant's own Client row instead.
+    # `or "USD"` keeps the previous behaviour exactly for any client whose currency is unset, so no
+    # existing tenant changes.
+    client = await admin_client_repo.find_client_by_id(client_id)
+    currency = (getattr(client, "currency", None) or "USD") if client else "USD"
+
     created_service_ids = []
     for i, (svc_name_ar, svc_name_en, duration_min, price) in enumerate(services):
         service = await catalog_service_repo.create_catalog_service({
@@ -85,7 +93,7 @@ async def provision_barber_domain(
             "nameEn":      svc_name_en,
             "durationMin": duration_min,
             "price":       price,
-            "currency":    "USD",
+            "currency":    currency,
             "isActive":    True,
             "isFeatured":  True,
             "sortOrder":   i,
