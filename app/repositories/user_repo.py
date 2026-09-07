@@ -127,7 +127,17 @@ async def deactivate_user(user_id: str, client_id: str) -> int:
     """
     return await prisma_client.user.update_many(
         where={"id": user_id, "clientId": client_id},
-        data={"isActive": False},
+        # barberId is released together with the deactivation (2026-09-07, Salman's decision while
+        # replacing rk's legacy جعفر account). User.barberId is @unique, and deactivation used to
+        # leave it held: a deactivated account kept a real staff member linked, so creating the
+        # replacement account for that same person returned 409 with no way out through the API
+        # (team.py has no edit route -- create + deactivate/reactivate only). A switched-off
+        # account must not hold a live staff member hostage.
+        #
+        # KNOWN CONSEQUENCE, accepted: reactivate_user() restores the account WITHOUT its barber
+        # link, so a reactivated staff account has to be re-linked. Preferred over the alternative
+        # (a whole PATCH /team/{id} edit surface) as the smaller change for the real case at hand.
+        data={"isActive": False, "barberId": None},
     )
 
 
