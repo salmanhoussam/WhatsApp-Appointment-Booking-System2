@@ -75,3 +75,70 @@ topology fix, not by frontend work. The remaining ~740 ms cascade does not justi
 
 If a next performance question is wanted, it is **cold start (~2.9 s TTFB)**, and it belongs to
 infrastructure, not to the frontend.
+
+---
+
+# Addendum — host challenge, and what it exposed
+
+**Salman asked why the measurement used `demo.salmansaas.com/rk` and not
+`alzabt.salmansaas.com/rk`.** Fair challenge: `demo.` was chosen out of session habit, not
+verified beforehand. Two things were then checked properly.
+
+## 1. Which host is correct for `rk` — and does it matter
+
+**Correct: `demo.`** — `rk` carries `lifecycle_state = 'trial'` (measured), and
+`rules/frontend/routing.md` assigns trial tenants to `demo.` and subscribed tenants to `alzabt.`.
+
+**But it makes no measurable difference**, verified rather than argued:
+
+```
+demo.salmansaas.com/rk    HTTP 200   bundle index-PnxR8Gfi.js
+alzabt.salmansaas.com/rk  HTTP 200   bundle index-PnxR8Gfi.js
+HTML byte-identical:      YES
+API host used by both:    api.salmansaas.com
+```
+
+`alzabt` re-measured directly, and its warm number matches:
+
+| host | run | TTFB | last resource | API window |
+|---|---|---:|---:|---:|
+| demo | warm-2 | 164 ms | 1,673 ms | 784 ms |
+| demo | warm-3 | 130 ms | 1,561 ms | 740 ms |
+| **alzabt** | **warm-2** | **178 ms** | **1,762 ms** | **877 ms** |
+
+The original 2026-09-05 audit does **not name** the frontend host it browsed — only
+`api.salmansaas.com/health` appears in it. So the earlier claim of "same methodology" held for the
+page and metric, **not** for the host. Corrected here rather than left implied.
+
+## 2. What the extra runs actually exposed — and it corrects this document's own recommendation
+
+`alzabt` run 1 came in at **7,142 ms**, and the cause was visible in the timings:
+
+```
+alzabt run 1 (cold)   rk/config  started 3,667  ended 5,718   (2,051 ms)
+alzabt run 2 (warm)   rk/config  started   561  ended   860   (  300 ms)
+```
+
+Not a host difference — **a second cold start**.
+
+**That is the finding.** Across five runs in roughly twenty minutes, **two were cold**
+(demo run 1: 5,546 ms; alzabt run 1: 7,142 ms). Cold start was filed above as a disclosed artifact.
+At 2-in-5 it is not an artifact.
+
+`rk` is a trial tenant with near-zero organic traffic, so an idle container is its **normal**
+state — meaning a real first visitor plausibly meets 5.5-7.1 s more often than they meet 1.6 s.
+
+### Corrected recommendation
+
+The waterfall conclusion stands: ~740-877 ms across three levels, not worth restructuring.
+
+**The cold-start conclusion is upgraded from footnote to headline.** It is the dominant cost of a
+real visit to a low-traffic tenant, it is 3-4× the entire API cascade, and it is infrastructure
+(container spin-up), not frontend.
+
+### Still unknown
+
+- **Cold-start frequency was not measured deliberately** — 2-in-5 is an observation from runs taken
+  for another purpose, not a controlled sample. A real answer needs timed probes after known idle
+  gaps.
+- Whether Railway's plan for this service supports always-on / min-instances was not checked.
