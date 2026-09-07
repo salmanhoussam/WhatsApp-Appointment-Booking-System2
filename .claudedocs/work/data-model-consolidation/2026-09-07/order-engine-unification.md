@@ -83,3 +83,50 @@ were deleted immediately afterwards; `store_orders` back to 15.
 Code removal shipped and deployed **before** the tables were dropped — the Phase 2d lesson, where
 dropping `services` in the same breath as the code change took smar's listings down until the
 deploy landed.
+
+## Executed — tables dropped
+
+Only after the code removal deployed and was confirmed live:
+
+```
+POST /restaurant/orders          -> 404 (unrouted)
+GET  /restaurant/menu            -> 404 (unrouted)
+GET  /restaurant/menu/categories -> 200   ← kept
+GET  /store/cart/... (caracas)   -> 200   ← caracas admitted to the one engine
+
+dropped restaurant_order_items · restaurant_orders · restaurant_configs
+tables remaining: 36        (41 at the start of this session)
+```
+
+Regression sweep: caracas + arizona menus 200 · smar listings 200 · rk services 200 ·
+rk store products 200 · db ok. caracas's live menu page renders **byte-identically** to the
+pre-drop measurement (`rootLen` 22900, 11 categories, prices present) — real browser, not inferred
+from status codes.
+
+---
+
+## Deliberately NOT done — renaming `store_*`
+
+`store_orders` / `store_carts` are misnamed: 9 of 15 orders belong to `rk`, a barber shop, and
+caracas now writes there too. Renaming them to `orders` / `carts` is honest and was in the plan.
+
+**It is not being done now, and the reason is risk, not effort.** The code side is small — 19
+references across 2 Python files. The problem is that a table rename is **not backward compatible**:
+the instant it lands, every deployed instance still querying the old name fails. These are **live**
+tables carrying real orders and active carts, so that window means real customers hitting errors —
+the exact failure Phase 2d already caused once with `services`, but on a busier path and for **zero
+functional gain**.
+
+Worth doing with a deliberate cutover (or a compatibility view), not folded into a working session.
+Recorded here so it is a decision, not an omission.
+
+## Also open — merging `Barber` into `Resource`
+
+The remaining real reduction (−1 table). `Barber` (8 rows) and `Resource` (2 rows) are the same
+shape — `clientId`, `name`, `phone`, `isActive`, `workingHours`, `sortOrder`, `reservations` — and
+`Resource` already carries the `type` discriminator this needs. `VERTICAL_REGISTRY`'s
+`staff_backing_model` field exists only to paper over the duplication.
+
+**Carries real risk:** it moves `barber_services` (27 rows), `reservations.barber_id` (42 rows) and
+`users.barber_id` — i.e. `rk`'s live booking system, with a production deadline on it. Flagged for
+an explicit decision rather than started unilaterally.
