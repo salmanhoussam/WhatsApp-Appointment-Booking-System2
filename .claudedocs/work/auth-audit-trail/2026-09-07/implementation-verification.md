@@ -96,3 +96,72 @@ mislead the next person exactly as it misled me.
   without bound; nothing rotates them.
 - **Nothing reads this table yet.** Recording is not detecting — there is no alerting, no lockout,
   and no admin view.
+
+---
+
+# Slice 2 — self-registration closed, all seven paths audited
+
+## Self-registration: closed, and closed *visibly*
+
+```
+POST /api/v1/public/demo/create  -> 403
+POST /api/v1/public/register     -> 403
+POST /api/v1/auth/register       -> 403
+body: {"code":"FORBIDDEN","message":"التسجيل الذاتي مغلق حالياً. إنشاء الحسابات يتم عبر دعوة من الإدارة."}
+```
+
+**Gated, not deleted — deliberately.** All three have live frontend callers: three demo-builder
+surfaces (`DemoLandingPage.jsx:508`, `DemoBuilderPage.jsx:89`, `DemoLauncher.jsx:341`) and the
+canonical `/register` page (`TenantRegisterPage.jsx:207`, `SSOLoginPage.jsx:282`), which
+`routing.md` §0c documents as carrying real inbound CTAs. Deleting the routes would have left those
+buttons on a bare 404 — a broken surface rather than a closed door. A 403 with an explicit message
+is something a CTA can actually render.
+
+One gate (`app/core/registration_gate.py`), fails closed: `SELF_REGISTRATION_ENABLED` must be
+explicitly `"true"`. Reopening is one env var, no deploy.
+
+## All seven auth paths now record
+
+Probed live; every one landed:
+
+```
+19:23:47  setup_login_failed        actor=anon                    reason=invalid_token
+19:23:48  password_set_failed       actor=anon                    reason=invalid_token
+19:23:50  customer_login_failed     actor=anon                    reason=not_found
+19:23:51  customer_register_failed  actor=customer:212ac3fc-…     reason=already_registered
+```
+
+The duplicate-registration row carries the **real customer id** — same principle as the
+wrong-password case: the account is known, so it is recorded.
+
+**Vocabulary in the table:** `admin_login_failed` · `admin_login_success` · `client_login_failed` ·
+`customer_login_failed` · `customer_register_failed` · `password_set_failed` · `setup_login_failed`
+(+ the pre-existing `tenant_suspended`).
+
+`magic_link_login` had **no `Request` parameter at all** and now takes one — header-derived IP is
+the entire point of the record.
+
+`customer_login` records which half failed in `detail.reason` while the response stays a single
+generic 401. Distinguishing them to the caller is account enumeration.
+
+## Unknowns — success paths not exercised
+
+Four success events are wired but **unproven**, because each needs a credential or state this
+verification could not create without writing real data:
+
+| event | why not exercised |
+|---|---|
+| `setup_login_success` · `password_set_success` | need a live, unconsumed setup token |
+| `tenant_register_success` | now returns 403 — unreachable by design |
+| `customer_login_success` · `client_login_success` | need real customer / tenant-root credentials |
+
+Only `admin_login_success` is confirmed end-to-end (and it is the one that also stamps
+`lastLoginAt`). The other four share the identical backgrounded code path, but *share a code path*
+is an argument, not evidence — recorded as unproven rather than implied.
+
+## Also still open
+
+- **Frontend CTAs now surface the 403.** Not handled here; a follow-up.
+- **No retention policy** on `security_audit_log`.
+- **Nothing reads the table yet** — recording is not detecting. Auto-ban is the next step and now
+  has real data to read.
