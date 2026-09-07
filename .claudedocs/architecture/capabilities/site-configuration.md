@@ -49,25 +49,37 @@ storage locations, each a different failure shape — not one bug repeated three
    (`config.content.sections[type=hero].data.title_ar`, edited via `/content/hero-title`, rendered
    by `HeroSection.jsx` through `DynamicPage.jsx`'s real `SECTION_MAP`). Both are live and
    consumed today, depending on which rendering path a given tenant uses.
-2. **Hero Video — a dead pipeline.** `Client.hero_video_url` (root column) has two real Admin
-   write paths (`PATCH /settings` via `SettingsTab.jsx`'s form; `POST /upload/` with
-   `context=page_hero_video` via `upload.py`'s direct bypass write) but its only real frontend
-   *read* consumer, `frontend/src/design-system/organisms/TenantHero.jsx`, has **zero importers
-   anywhere in the codebase** (confirmed by grep) — nothing ever renders it. Unlike Hero Copy, this
-   isn't two live competing writers; it's a fully-wired write path with no live reader at the end of
-   it. The real Media Capability path already covers the *conceptually* equivalent slot
-   (`content.sections[hero].data.bg_image_url`, which already matches video file extensions in
-   `HeroSection.jsx`) — `Client.hero_video_url` is redundant with it, not complementary.
+2. **Hero Video — a dead pipeline. ✅ RESOLVED 2026-07-29 — see Known Boundary Debt below.**
+   *Historical description, kept as the record of what was found:* `Client.hero_video_url` (root
+   column) had two real Admin write paths (`PATCH /settings` via `SettingsTab.jsx`'s form;
+   `POST /upload/` with `context=page_hero_video` via `upload.py`'s direct bypass write) but its
+   only real frontend *read* consumer, `frontend/src/design-system/organisms/TenantHero.jsx`, had
+   **zero importers anywhere in the codebase** — nothing ever rendered it. Not two competing
+   writers; a fully-wired write path with no live reader at the end of it. The real Media Capability
+   path already covers the conceptually equivalent slot
+   (`content.sections[hero].data.bg_image_url`), so `Client.hero_video_url` was redundant with it,
+   not complementary.
+
+   **None of the three code artefacts named above still exist** — verified 2026-09-07:
+   `TenantHero.jsx`, `upload.py`'s `page_hero_video` context, and `settings.py`'s hero field are
+   all gone. Only the `Client.hero_video_url` DB column remains, deliberately (dropping a live
+   column is a real migration).
 3. **Hero Cover Image — a phantom reference.** `ConfigurableHero.jsx` (lines 59, 152) reads
    `config?.hero_image_url || config?.cover_url` — **neither field exists anywhere in
    `prisma/schema.prisma`**, confirmed by grep. For any tenant rendering through this fallback
    path, the hero cover image has never actually worked; this is a latent bug, not a duplication.
 
-None of these three are fixed yet — named here so any future Implementation Contract inherits them
-as explicit, evidenced decisions to make (migrate `config.hero.*` into `content.sections`? delete
-`TenantHero.jsx` and both its write paths since nothing renders it? wire a real field for
-`ConfigurableHero.jsx`'s cover image, or retire that fallback path entirely?), not silently
-rediscovered later.
+**One of these three is now fixed** (Hero Video, 2026-07-29). The other two are named here so any
+future Implementation Contract inherits them as explicit, evidenced decisions to make (migrate
+`config.hero.*` into `content.sections`? wire a real field for `ConfigurableHero.jsx`'s cover image,
+or retire that fallback path entirely?), not silently rediscovered later.
+
+> **Corrected 2026-09-07** (Interface Boundary Map decision pass, documentation only). This
+> paragraph previously read "None of these three are fixed yet" and asked whether to *delete*
+> `TenantHero.jsx` and its write paths — a question this same document already answers ✅ further
+> down, and which the code had settled in 2026-07-29. The document was contradicting itself, so a
+> reader hitting this section first would re-open a closed decision. Nothing in code or the schema
+> was changed to make this correction.
 
 ## Contract (Phase 1, Sprint 3)
 
