@@ -2,9 +2,12 @@
  * FeaturedItemsSection — Dynamic Section Renderer
  * data: { heading_ar, limit }
  *
- * Services only (Products/Services Separation, Track B, 2026-08-20) -- every item this component
- * fetches is a real CatalogService (bookable), never a real Store product (CatalogItem,
- * module_key='store') -- those now live in the separate ProductsSection.jsx. CTA is always
+ * Services FIRST, then catalog items (corrected 2026-09-07 -- this docstring previously claimed
+ * "every item this component fetches is a real CatalogService", which the code has never done:
+ * only the `reservations` branch reads CatalogService; the fallback below reads CatalogItem, and
+ * that is what caracas's restaurant menu and olivello's store front actually render). Store
+ * products (module_key='store') are still excluded here -- those live in ProductsSection.jsx.
+ * CTA is always
  * "احجز الآن"; the old per-item `metadata.requires_booking` check is gone -- it predated the real
  * CatalogService/CatalogItem model split (Phase 3.7C) and was fragile (real store products never
  * even return `metadata` from the public API, so it only ever worked by accident for tenants
@@ -55,18 +58,28 @@ export default function FeaturedItemsSection({ data, accent, slug, config, homep
 
     const limit = data.limit ?? 6
 
-    // P0.1 fix (2026-08-15, ALZABT_SECTION_SYSTEM_WORK_SEQUENCE.md): a Reservations-vertical
-    // tenant (e.g. Ali) has real CatalogService rows but no separately-activated "catalog"
-    // service -- the old catalogApi.js path 403s on such a tenant (its real backend route is
-    // gated behind require_service("catalog")). GET /reservations/catalog-services is the
-    // already-real, already-public, reservations-native endpoint (already proven working by
-    // useReservationBooking.js's own booking-page fetch) gated behind "reservations" instead.
-    // Branch on the ACTUAL gate the old path depends on ("catalog"), not merely on whether
-    // "reservations" is present -- a tenant can genuinely have both (e.g. RK: real Services
-    // AND real Store categories), and such a tenant must keep its existing, already-working
-    // multi-category walk below untouched, not be narrowed down to reservations-only services.
+    // Source of truth is the CAPABILITY, not an unrelated activation flag (2026-09-07).
+    //
+    // This used to read `reservations && !catalog`. The `!catalog` half was arbitrary: `catalog`
+    // says nothing about whether a tenant's bookable services exist, and a tenant holding BOTH
+    // keys fell through to the CatalogItem walk below. `alzabt-demo` is exactly that tenant --
+    // 6 real CatalogService rows, 0 CatalogItems -- so it rendered an empty Services section.
+    // Invisible today only because its page has no sections yet. Measured against production,
+    // not inferred.
+    //
+    // `reservations` alone is the honest condition, because it is the same gate that makes
+    // catalog_services reachable at all (require_service("reservations") on the route). A tenant
+    // holding it has a services table; one without it provably has none, and falls through to
+    // CatalogItems -- which is the correct source for a restaurant menu (caracas, module_key
+    // 'restaurant') or a store front (olivello, 'store'), both of which still render this section.
+    //
+    // STILL NOT the definitive split Salman asked for: `featured_items` is serving three
+    // different capabilities (services / store products / restaurant menu) through one component.
+    // A real split needs a restaurant-menu section that does not exist yet -- ProductsSection is
+    // store-only by construction (its own `hasStore` gate), so caracas has nowhere to move to.
+    // Recorded in .claudedocs/work/data-model-consolidation/2026-09-07/, not silently deferred.
     const activeServices = config?.active_services ?? []
-    if (activeServices.includes('reservations') && !activeServices.includes('catalog')) {
+    if (activeServices.includes('reservations')) {
       publicApi.get('/reservations/catalog-services', { params: { client_slug: slug } })
         .then(res => {
           if (!mountedRef.current) return
