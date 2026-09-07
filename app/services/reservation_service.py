@@ -27,6 +27,7 @@ from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
 from app.repositories import resource_repo, barber_repo, catalog_service_repo
 from app.repositories.customer_repo import CustomerRepository
+from app.repositories import user_repo
 from app.services import whatsapp_notifications
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,72 @@ def _fire_and_forget(coro) -> None:
     task = asyncio.create_task(coro)
     _background_notification_tasks.add(task)
     task.add_done_callback(_background_notification_tasks.discard)
+
+
+async def _notify_merchant_new_reservation(reservation_row) -> None:
+    """Alert the shop that a booking just arrived (2026-09-07, Salman's requirement).
+
+    Recipients, in his words: the owner always; the assigned staff member too when the booking is
+    for them ("إذا صار حجز عند manager، ينبعت لاثنين"). Deduplicated by number, because on a small
+    shop the owner IS often the only barber, and two identical WhatsApps would look like a bug.
+
+    Owner number: Client.whatsapp_number, falling back to Client.phone — whatsapp_number is the one
+    the tenant actually publishes, and every live tenant has both set today.
+    Staff number: User.phone on the account linked to that Barber via User.barberId (the Staff
+    Scoped Access link). A barber with no login account simply has no number here and is skipped —
+    not an error.
+
+    Never raises. A merchant alert must never roll back a customer's real booking, so every lookup
+    degrades to "skip that recipient" rather than propagating.
+    """
+    try:
+        client = await prisma_client.client.find_unique(where={"id": reservation_row.clientId})
+        if not client:
+            return
+
+        recipients: list[tuple[str, str]] = []          # (phone, label) — order = priority
+        owner_phone = getattr(client, "whatsapp_number", None) or getattr(client, "phone", None)
+        if owner_phone:
+            recipients.append((owner_phone, "owner"))
+
+        barber_name = ""
+        if reservation_row.barberId:
+            barber = await barber_repo.find_barber(reservation_row.clientId, reservation_row.barberId)
+            barber_name = barber.name if barber else ""
+            staff_user = await user_repo.find_user_by_barber_id(reservation_row.barberId)
+            staff_phone = getattr(staff_user, "phone", None) if staff_user else None
+            if staff_phone:
+                recipients.append((staff_phone, f"staff:{barber_name or reservation_row.barberId}"))
+
+        # Dedupe on the number itself, keeping the first (owner) label.
+        seen: set[str] = set()
+        unique = [(p, l) for p, l in recipients if not (p in seen or seen.add(p))]
+        if not unique:
+            logger.warning(
+                "No merchant number to alert for reservation %s (tenant %s) — nothing sent.",
+                reservation_row.id, reservation_row.clientId,
+            )
+            return
+
+        service_name = ""
+        if reservation_row.serviceId:
+            svc = await catalog_service_repo.find_catalog_service(
+                reservation_row.clientId, reservation_row.serviceId)
+            service_name = svc.nameAr if svc else ""
+
+        for phone, label in unique:
+            _fire_and_forget(whatsapp_notifications.send_new_reservation_to_merchant(
+                recipient_phone = phone,
+                recipient_label = label,
+                reservation_ref = reservation_row.id[:8].upper(),
+                customer_name   = reservation_row.customerName,
+                customer_phone  = reservation_row.customerPhone,
+                service_name    = service_name,
+                barber_name     = barber_name,
+                reserved_at     = reservation_row.reservedAt.strftime("%Y-%m-%d %H:%M"),
+            ))
+    except Exception as exc:
+        logger.error("🔥 _notify_merchant_new_reservation failed to prepare: %s", exc, exc_info=True)
 
 
 async def _notify_reservation_event(reservation_row, kind: str) -> None:
@@ -410,10 +477,17 @@ async def create_reservation(
         raise ValueError("This barber is already booked for that time. Please choose a different time.")
 
     # -- Post Actions --------------------------------------------------------------------------
-    # No-op today for every module_key — confirmed no pricing field on Reservation, no
-    # notification call anywhere in this path (Reservation Lifecycle & Workflow section of the
-    # design doc). Kept as an explicit, empty stage rather than omitted, so the fixed pipeline
-    # stays visible in the code even where a stage currently does nothing.
+    # Was an explicit no-op until 2026-09-07. It now carries exactly one action: telling the shop a
+    # booking arrived. Placed here, in the one Service every caller already goes through (website
+    # POST /public/reservations/, the WhatsApp bot flow, and the admin dashboard alike), rather than
+    # per-route — §9's "One Capability, One Service", the same reasoning _notify_reservation_event
+    # above was placed here for.
+    #
+    # NOTE this is the CREATE-time alert and is separate from _notify_reservation_event, which fires
+    # on status/reschedule changes and goes to the CUSTOMER. Nothing reached the merchant at all
+    # before this: the customer got a confirmation only once someone confirmed the booking in the
+    # dashboard, and the shop found out by opening the dashboard in the first place.
+    await _notify_merchant_new_reservation(reservation)
 
     return _fmt(reservation)
 

@@ -211,3 +211,55 @@ async def send_staff_setup_link(
             "🔥 Failed to send staff setup link to %s: %s",
             staff_phone, exc, exc_info=True,
         )
+
+
+# ── Merchant-side alert (2026-09-07) ──────────────────────────────────────────
+# Every notification above this line goes to the CUSTOMER. Until now nothing told the shop that a
+# booking had arrived — the owner only found out by opening the dashboard. Salman's requirement:
+# "أول ما يصير حجز، ينبعت لصاحب المحل، وإذا صار حجز عند manager، ينبعت لاثنين."
+#
+# Same "never raises, logs instead" contract as every helper above: a merchant alert that fails
+# must never roll back the customer's real booking.
+
+async def send_new_reservation_to_merchant(
+    recipient_phone: str,
+    recipient_label: str,
+    reservation_ref: str,
+    customer_name:   str,
+    customer_phone:  str,
+    service_name:    str,
+    barber_name:     str,
+    reserved_at:     str,
+) -> None:
+    """Tell the shop (owner, and the assigned staff member) that a booking just came in.
+
+    Deliberately includes the customer's real phone number: the whole point for the merchant is
+    being able to call back, and it is their own customer's data on their own tenant.
+    """
+    try:
+        wa = WhatsAppService()
+        lines = [
+            "🔔 *حجز جديد*",
+            "",
+            f"الزبون: *{customer_name or '—'}*",
+            f"الرقم: {customer_phone or '—'}",
+        ]
+        if service_name:
+            lines.append(f"الخدمة: {service_name}")
+        if barber_name:
+            lines.append(f"الموظف: {barber_name}")
+        lines += [
+            f"الموعد: {reserved_at}",
+            "",
+            f"رقم الحجز: *{reservation_ref}*",
+        ]
+        await wa.send_text(to=recipient_phone, text="\n".join(lines))
+        logger.info(
+            "✅ New-reservation alert sent to %s (%s) for ref=%s",
+            recipient_phone, recipient_label, reservation_ref,
+        )
+    except Exception as exc:
+        logger.error(
+            "🔥 Failed to send new-reservation alert to %s (%s): %s",
+            recipient_phone, recipient_label, exc, exc_info=True,
+        )
