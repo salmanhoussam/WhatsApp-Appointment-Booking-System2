@@ -147,7 +147,13 @@ function Field({ label, children }) {
   )
 }
 
-const EMPTY_MEMBER = { full_name: '', email: '', password: '', preset: 'staff', barber_id: '', addons: [] }
+// invite:true (Staff Invite, 2026-09-07) is the DEFAULT: the owner sends a WhatsApp setup link
+// and the employee chooses their own password. Setting one by hand stays available — the API
+// still accepts a password — but it means the owner knows their employee's credentials.
+const EMPTY_MEMBER = {
+  full_name: '', email: '', phone: '', password: '',
+  invite: true, preset: 'staff', barber_id: '', addons: [],
+}
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -160,6 +166,9 @@ export default function TeamTab({ color, activeServices }) {
   const [saving,    setSaving]    = useState(false)
   const [formError, setFormError] = useState(null)
   const [form,      setForm]      = useState(EMPTY_MEMBER)
+  // The one-time setup link of the account just created, kept so the owner can copy it if the
+  // WhatsApp send did not land. Never fetched again — the server returns the raw token once.
+  const [invite,    setInvite]    = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -222,8 +231,16 @@ export default function TeamTab({ color, activeServices }) {
 
   const save = async () => {
     setFormError(null)
-    if (!form.full_name.trim() || !form.email.trim() || !form.password) {
-      setFormError('الاسم والبريد وكلمة المرور مطلوبة')
+    if (!form.full_name.trim() || !form.email.trim()) {
+      setFormError('الاسم والبريد مطلوبان')
+      return
+    }
+    if (form.invite && !form.phone.trim()) {
+      setFormError('رقم الواتساب مطلوب لإرسال رابط التفعيل')
+      return
+    }
+    if (!form.invite && !form.password) {
+      setFormError('كلمة المرور مطلوبة')
       return
     }
     if (selectedPreset?.requiresBarber && !form.barber_id) {
@@ -237,13 +254,19 @@ export default function TeamTab({ color, activeServices }) {
       const payload = {
         full_name: form.full_name.trim(),
         email:     form.email.trim(),
-        password:  form.password,
         preset:    form.preset,
       }
+      // Omitting `password` is what puts the server on the invite path — it mints the one-time
+      // setup token and WhatsApps it. Sending one keeps the original direct-set behaviour.
+      if (form.invite) payload.phone = form.phone.trim()
+      else             payload.password = form.password
       if (selectedPreset?.requiresBarber) payload.barber_id = form.barber_id
       if (form.addons.length) payload.addons = form.addons
-      await adminApi.post('/team', payload)
+      const { data } = await adminApi.post('/team', payload)
       setShowModal(false)
+      // The setup link is shown even when WhatsApp reported success: delivery is best-effort
+      // server-side (the notification helper never raises), so the owner always keeps a fallback.
+      if (data?.setup_url) setInvite({ name: form.full_name.trim(), url: data.setup_url, sent: !!data.invite_sent })
       await load()
     } catch (e) {
       setFormError(e?.response?.data?.detail || 'تعذّر إنشاء الحساب')
@@ -353,6 +376,32 @@ export default function TeamTab({ color, activeServices }) {
         </div>
       )}
 
+      {invite && (
+        <div style={{
+          margin: '0 0 16px', padding: 14, borderRadius: 10,
+          border: `1px solid ${invite.sent ? '#16a34a' : '#f59e0b'}`,
+          background: invite.sent ? '#16a34a0d' : '#f59e0b0d',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: T.textPrimary }}>
+              {invite.sent
+                ? `تم إرسال رابط التفعيل إلى ${invite.name} على الواتساب`
+                : `حساب ${invite.name} جاهز — أرسل له هذا الرابط`}
+            </span>
+            <button onClick={() => setInvite(null)}
+              style={{ background: 'none', border: 'none', color: T.textMuted, fontSize: 18, cursor: 'pointer' }}>×</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <input readOnly value={invite.url} onFocus={e => e.target.select()}
+              style={{ ...inputStyle, direction: 'ltr', fontSize: 12, flex: 1 }} />
+            <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(invite.url)}>نسخ</Button>
+          </div>
+          <p style={{ fontSize: 11.5, color: T.textMuted, margin: '8px 0 0' }}>
+            الرابط لمرة واحدة وينتهي خلال 7 أيام — لن يظهر مرة أخرى.
+          </p>
+        </div>
+      )}
+
       {showModal && (
         <Modal title="حساب دخول جديد" onClose={() => setShowModal(false)} onSave={save} saving={saving}>
           <Field label="الاسم الكامل">
@@ -363,10 +412,36 @@ export default function TeamTab({ color, activeServices }) {
             <input style={{ ...inputStyle, direction: 'ltr' }} type="email" value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })} />
           </Field>
-          <Field label="كلمة المرور">
-            <input style={{ ...inputStyle, direction: 'ltr' }} type="password" value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })} />
-          </Field>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+            padding: '11px 13px', marginBottom: 16, borderRadius: 8,
+            border: `1px solid ${form.invite ? '#16a34a' : T.border}`,
+            background: form.invite ? '#16a34a0d' : T.cardBg,
+          }}>
+            <input type="checkbox" checked={form.invite}
+              onChange={e => setForm({ ...form, invite: e.target.checked })} />
+            <span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: T.textPrimary }}>
+                إرسال رابط تفعيل على الواتساب
+              </span>
+              <span style={{ display: 'block', fontSize: 12, color: T.textMuted, marginTop: 2 }}>
+                الموظف يختار كلمة السر بنفسه — أنت لا تعرفها
+              </span>
+            </span>
+          </label>
+
+          {form.invite ? (
+            <Field label="رقم الواتساب">
+              <input style={{ ...inputStyle, direction: 'ltr' }} type="tel" value={form.phone}
+                placeholder="70764479"
+                onChange={e => setForm({ ...form, phone: e.target.value })} />
+            </Field>
+          ) : (
+            <Field label="كلمة المرور">
+              <input style={{ ...inputStyle, direction: 'ltr' }} type="password" value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })} />
+            </Field>
+          )}
 
           <Field label="الصلاحية">
             <div style={{ display: 'grid', gap: 8 }}>

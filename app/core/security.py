@@ -10,6 +10,19 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
+# Staff Invite (2026-09-07) -- the value written to User.password_hash for an account created via
+# an invite link, before its holder has chosen a password. Deliberately NOT a bcrypt hash and not
+# NULL: password_hash is NOT NULL in the schema, and verify_password() below already fails closed
+# on anything that does not start with "$2", so an invited account can never be logged into until
+# POST /api/v1/auth/set-password replaces this with a real hash. Never reuse it as a password.
+PENDING_PASSWORD_SENTINEL = "!invite-pending"
+
+
+def is_password_pending(hashed_password: Optional[str]) -> bool:
+    """True when the account was invited but has not set a password yet."""
+    return hashed_password == PENDING_PASSWORD_SENTINEL
+
+
 def verify_password(plain_password: str, hashed_password: Optional[str]) -> bool:
     # No hash set at all (e.g. a Client root account that was never given a password) --
     # fail closed instead of crashing. Found 2026-08-28: client_login() passes

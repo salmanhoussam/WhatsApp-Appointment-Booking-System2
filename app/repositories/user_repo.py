@@ -63,6 +63,25 @@ async def invalidate_setup_token(user_id: str):
     )
 
 
+async def set_password_and_clear_setup_token(user_id: str, password_hash: str):
+    """Store a real bcrypt hash and consume the setup token in ONE update (Staff Invite,
+    2026-09-07).
+
+    Deliberately one statement rather than reusing invalidate_setup_token() alongside a separate
+    password write: two updates can interleave, and a crash between them would leave an account
+    whose token is spent but whose password is still the pending sentinel -- unusable and
+    un-reinvitable without an admin. One update makes that state unreachable.
+    """
+    return await prisma_client.user.update(
+        where={"id": user_id},
+        data={
+            "password_hash": password_hash,
+            "setupToken":    None,
+            "setupTokenExp": None,
+        },
+    )
+
+
 async def find_users_by_client(client_id: str) -> list:
     """All users for a tenant, ordered by creation date."""
     return await prisma_client.user.find_many(

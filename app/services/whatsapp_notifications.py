@@ -179,3 +179,35 @@ async def send_reservation_reschedule(
             "🔥 Failed to send reservation reschedule notice to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+
+
+# ── Staff invite (2026-09-07) ──────────────────────────────────────────────────
+# Sent from the CENTRAL WhatsApp number, the same transport every notification above uses. Same
+# "never raises, logs instead" contract: an invite whose WhatsApp delivery fails must not fail the
+# account creation that scheduled it -- the setup link is also returned in the API response, so the
+# owner can always deliver it by hand.
+
+async def send_staff_setup_link(
+    staff_phone: str,
+    staff_name: str,
+    setup_url: str,
+    client_name: str = "",
+) -> None:
+    """WhatsApp a new team member their one-time account-setup link."""
+    try:
+        wa = WhatsAppService()
+        message = (
+            f"مرحباً {staff_name} 👋\n\n"
+            f"تمّ إنشاء حسابك في *{client_name}*.\n"
+            f"لتفعيل الحساب واختيار كلمة السر، افتح هذا الرابط:\n"
+            f"{setup_url}\n\n"
+            f"⚠️ الرابط لمرة واحدة وينتهي خلال 7 أيام.\n"
+            f"لا تشاركه مع أحد."
+        )
+        await wa.send_text(to=staff_phone, text=message)
+        logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
+    except Exception as exc:
+        logger.error(
+            "🔥 Failed to send staff setup link to %s: %s",
+            staff_phone, exc, exc_info=True,
+        )

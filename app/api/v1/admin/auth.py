@@ -12,7 +12,9 @@ import re
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, field_validator
 
-from app.core.security import verify_password, create_access_token, get_password_hash
+from app.core.security import (
+    verify_password, create_access_token, get_password_hash, is_password_pending,
+)
 from app.core.config import settings
 from app.services import registration_service as _reg_service
 from app.repositories import user_repo as _user_repo
@@ -231,6 +233,22 @@ async def magic_link_login(token: str, response: Response):
     if not user.isActive:
         raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
 
+    # Staff Invite (2026-09-07): an invited account has no password yet. Answer "this link needs a
+    # password first" and return WITHOUT consuming the token -- the token is what POST
+    # /set-password authenticates with, so spending it here would strand the invitee with a dead
+    # link and an unusable account. Deliberately placed before the invalidate call below, and it
+    # changes nothing for the original tenant-registration links, whose accounts always carry a
+    # real hash and so never reach this branch.
+    if is_password_pending(user.password_hash):
+        return {
+            "success": True,
+            "data": {
+                "requires_password": True,
+                "full_name":         user.fullName,
+                "slug":              user.client.slug,
+            },
+        }
+
     # Invalidate token immediately (one-time use)
     await _user_repo.invalidate_setup_token(user.id)
 
@@ -247,10 +265,11 @@ async def magic_link_login(token: str, response: Response):
     return {
         "success": True,
         "data": {
-            "token":         jwt,
-            "slug":          user.client.slug,
-            "role":          user.role,
-            "dashboard_url": f"/{user.client.slug}/dashboard",
+            "requires_password": False,
+            "token":             jwt,
+            "slug":              user.client.slug,
+            "role":              user.role,
+            "dashboard_url":     f"/{user.client.slug}/dashboard",
         },
     }
 
@@ -307,6 +326,77 @@ class TenantRegistrationRequest(BaseModel):
             raise ValueError("Enter a valid phone number (7–15 digits, optional + prefix).")
         return normalized
 
+
+
+# ── Staff invite — set the account's first password ───────────────────────────
+
+class SetPasswordRequest(BaseModel):
+    token:    str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def _strong_enough(cls, v: str) -> str:
+        # 8 is the floor, 72 is bcrypt's hard truncation boundary (get_password_hash raises above
+        # it). Validated here so the caller gets a 422 naming the problem instead of a 500.
+        if len(v) < 8:
+            raise ValueError("كلمة السر يجب أن تكون 8 أحرف على الأقل")
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("كلمة السر طويلة جداً")
+        return v
+
+
+@router.post("/set-password", tags=["Authentication"])
+@limiter.limit("5/minute")
+async def set_password(request: Request, body: SetPasswordRequest, response: Response):
+    """
+    Complete a staff invite: exchange a one-time setup token for a real password.
+
+    Unauthenticated by design — the setup token IS the credential, exactly as it already is for
+    GET /setup. Rate-limited at the same 5/minute as the login routes so the token space cannot be
+    walked. The password is bcrypt-hashed here and the token consumed in the SAME update
+    (user_repo.set_password_and_clear_setup_token), so a crash cannot leave a spent token beside an
+    unset password.
+
+    On success the account is logged in immediately — the invitee already proved possession of the
+    link, so a second login prompt would add friction without adding a check.
+    """
+    from datetime import datetime, timezone as tz
+
+    user = await _user_repo.find_user_by_setup_token(body.token)
+    if not user:
+        raise HTTPException(status_code=404, detail="رابط غير صالح أو منتهي الصلاحية")
+
+    if user.setupTokenExp and user.setupTokenExp < datetime.now(tz.utc):
+        raise HTTPException(status_code=410, detail="انتهت صلاحية الرابط — يُستخدم لمرة واحدة خلال 7 أيام")
+
+    if not user.isActive:
+        raise HTTPException(status_code=403, detail="هذا الحساب غير نشط")
+
+    await _user_repo.set_password_and_clear_setup_token(
+        user.id, get_password_hash(body.password),
+    )
+    logger.info("🔑 Password set via invite for %s (tenant %s)", user.email, user.client.slug)
+
+    jwt = create_access_token(data={
+        "type":      "admin",
+        "user_id":   user.id,
+        "client_id": user.clientId,
+        "slug":      user.client.slug,
+        "role":      user.role,
+        "barber_id": str(user.barberId) if user.barberId else None,
+    })
+    _set_auth_cookie(response, jwt)
+
+    return {
+        "success": True,
+        "data": {
+            "token":         jwt,
+            "slug":          user.client.slug,
+            "role":          user.role,
+            "dashboard_url": f"/{user.client.slug}/dashboard",
+        },
+    }
 
 @router.post("/create-user", tags=["Authentication"])
 async def create_platform_user(

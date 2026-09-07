@@ -14,15 +14,20 @@ Authorization (Authorization Hardening, 2026-07-30 — approved matrix):
 """
 
 import logging
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from prisma import Json
 from pydantic import BaseModel, EmailStr
 
 from app.core.permissions import resolve_preset
 from app.core.tenant import get_current_tenant, require_roles
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL
+from app.services.whatsapp_notifications import send_staff_setup_link
+from app.repositories import admin_client_repo as _client_repo
 from app.repositories import barber_repo as _barber_repo
 from app.repositories import user_repo as _repo
 
@@ -48,6 +53,7 @@ def _project(u) -> dict:
         "permissions": getattr(u, "permissions", None),
         "scope":       getattr(u, "scope", None),
         "barber_id":   getattr(u, "barberId", None),
+        "phone":       getattr(u, "phone", None),
     }
 
 
@@ -68,7 +74,16 @@ class TeamMemberCreate(BaseModel):
     """
     full_name: str
     email:     EmailStr
-    password:  str
+    # Staff Invite (2026-09-07): optional. Omitted -> the account is created with no usable
+    # password and a one-time setup link is generated (and WhatsApped when `phone` is given), which
+    # the invitee exchanges for a password of their own via POST /api/v1/auth/set-password.
+    # Supplied -> the pre-existing behaviour, byte-identical: the owner sets the password directly.
+    # Both paths stay supported for the same reason the legacy `role` path below does: the smar
+    # TeamTab still posts a password and must keep working.
+    password:  Optional[str]       = None
+    # Stored on User.phone. Serves two purposes at once: it is where the invite is delivered, and
+    # find_user_by_phone() already backs phone login, so the invitee can sign in by number after.
+    phone:     Optional[str]       = None
     role:      Literal["MANAGER_RESERVATIONS", "MANAGER_UNITS"] = "MANAGER_RESERVATIONS"
     preset:    Optional[str]       = None
     addons:    Optional[list[str]] = None
@@ -99,6 +114,7 @@ async def list_team(
 @router.post("/team", status_code=201)
 async def create_team_member(
     body: TeamMemberCreate,
+    background_tasks: BackgroundTasks,
     tenant: dict = Depends(get_current_tenant),
     _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
 ):
@@ -115,13 +131,29 @@ async def create_team_member(
         if existing:
             raise HTTPException(status_code=409, detail="البريد الإلكتروني مستخدم بالفعل")
 
+        # Staff Invite (2026-09-07). No password supplied -> mint a one-time setup token and park
+        # the sentinel in password_hash (NOT NULL in the schema). verify_password() rejects any
+        # hash not starting with "$2", so the account is unreachable by login until
+        # POST /api/v1/auth/set-password writes a real bcrypt hash and consumes the token.
+        invited        = body.password is None
+        setup_token    = secrets.token_urlsafe(32) if invited else None
+        # 7 days, matching registration_service.py's existing tenant setup links — one lifetime for
+        # every setup link in the platform rather than a second, competing one.
+        setup_expires  = (datetime.now(timezone.utc) + timedelta(days=7)) if invited else None
+
         row: dict = {
             "clientId":      tenant["id"],   # CRITICAL: always the current tenant
             "fullName":      body.full_name,
             "email":         body.email,
-            "password_hash": get_password_hash(body.password),
+            "password_hash": PENDING_PASSWORD_SENTINEL if invited
+                             else get_password_hash(body.password),
             "role":          body.role,
         }
+        if body.phone:
+            row["phone"] = body.phone
+        if invited:
+            row["setupToken"]    = setup_token
+            row["setupTokenExp"] = setup_expires
 
         if body.preset:
             # The migration gate (PHASE_2B_2_DESIGN.md §1) is enforced HERE, not only in the UI:
@@ -178,10 +210,40 @@ async def create_team_member(
 
         user = await _repo.create_user(data=row)
 
-        logger.info("👤 New team member created: %s (role=%s preset=%s) for tenant %s",
-                    user.email, user.role, body.preset, tenant["slug"])
+        logger.info("👤 New team member created: %s (role=%s preset=%s invited=%s) for tenant %s",
+                    user.email, user.role, body.preset, invited, tenant["slug"])
 
-        return _project(user)
+        result = _project(user)
+
+        if invited:
+            base_url  = os.getenv("FRONTEND_URL", "https://salmansaas.com")
+            setup_url = f"{base_url}/setup?token={setup_token}"
+            # Returned to the OWNER as well as WhatsApped: delivery is best-effort (the helper
+            # never raises), so without this the owner would have no way to reach an invitee whose
+            # message failed to send. This is the only response that ever carries the raw token,
+            # and it goes only to the TENANT_ADMIN who just created the account.
+            result["setup_url"]   = setup_url
+            result["invite_sent"] = bool(body.phone)
+            if body.phone:
+                # get_current_tenant() resolves only {id, slug, currency} (core/tenant.py:206), so
+                # the shop's real display name is read here rather than sent as a bare slug — an
+                # invite reading "حسابك في rk" is not something to hand a real staff member. One
+                # extra read, only on the invite path.
+                client = await _client_repo.find_client_by_id(tenant["id"])
+                shop_name = (
+                    getattr(client, "name_ar", None)
+                    or getattr(client, "name_en", None)
+                    or tenant["slug"]
+                ) if client else tenant["slug"]
+                background_tasks.add_task(
+                    send_staff_setup_link,
+                    staff_phone=body.phone,
+                    staff_name=body.full_name,
+                    setup_url=setup_url,
+                    client_name=shop_name,
+                )
+
+        return result
     except HTTPException:
         raise
     except Exception as e:
