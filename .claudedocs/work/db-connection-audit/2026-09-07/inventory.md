@@ -193,3 +193,127 @@ here** — this is the inventory only.
   change (§C 🔴), what needs a naming decision (§D), and what must be left alone (📝).
 - **Decision:** none taken.
 - **Execution:** none. No file outside this document was modified.
+
+---
+
+# ADDENDUM — 2026-09-07, after Salman's `.env` rewrite
+
+Appended, not rewritten: the sections above are what was true when the inventory was taken.
+
+## 1. The naming decision was taken and applied — by Salman, in `.env`
+
+`EU_*` → the **standard** names (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_KEY`) now resolving to **Frankfurt**; the previous bare names → **`SY_*`**
+(Sydney). §D's concern is closed by role-based naming rather than a new geographic prefix.
+
+Verified after the rewrite, all four connection strings opened successfully with the new passwords:
+
+| variable | host | |
+|---|---|---|
+| `DATABASE_URL` | `aws-0-eu-central-1` | ✅ 20 clients · **`?pgbouncer=true` preserved** |
+| `DIRECT_URL` | `aws-0-eu-central-1` | ✅ no pgbouncer flag — correct for a direct connection |
+| `SY_DATABASE_URL` / `SY_DIRECT_URL` | `aws-1-ap-southeast-2` | ✅ reachable, 37 clients |
+
+The app boots and `settings.DATABASE_URL` / `settings.DIRECT_URL` both resolve to Frankfurt.
+
+**No production restart risk.** Frankfurt's password was rotated on Railway *before* Gate 6, and
+today's edit was local-only renaming — so the local value equals Railway's, and a local connection
+succeeding proves Railway's credential is valid. This was checked deliberately because rotating a
+password while updating only `.env` is exactly what took production down for ~40 minutes on
+2026-09-06 ([[credential-rotation-reaches-all-consumers]]).
+
+## 2. 🟢 CLOSED — Unknown #1: nothing has written to Sydney since cutover
+
+Salman made real reservations at `rk` on 2026-09-07 and asked whether they landed in one database
+or both. Measured on both sides, read-only:
+
+| | Frankfurt | Sydney |
+|---|---|---|
+| `rk` reservations | **28**, of which **2 created today** | 24, **0 today** |
+| `rk` customers | **23**, **2 today** | 20, **0 today** |
+
+Platform-wide newest row, every table:
+
+```
+                  Frankfurt              Sydney
+reservations      2026-09-07 07:29   ←   2026-09-05 14:36
+customers         2026-09-07 07:29   ←   2026-09-05 14:36
+users             2026-09-07 08:26   ←   2026-08-26 20:42
+store_orders      2026-09-07 07:19   ←   2026-09-04 07:52
+bookings / catalog_items / barbers / gallery_images —— identical timestamps on both sides
+```
+
+**Sydney has been frozen since 2026-09-05, before cutover.** Not one row was written there
+afterwards — no script, no application traffic, no WhatsApp flow. **There is no data divergence and
+nothing to reconcile.** The identical timestamps on the static tables also confirm the copy was
+faithful, so the whole difference is genuinely post-cutover writes.
+
+Corroborating, from a different angle: Sydney still holds 37 clients, 8 `rk` users and 3 `rk`
+barbers — the exact pre-cleanup state — while Frankfurt holds 20, 2 and 2. Every deletion performed
+this week landed only on Frankfurt, and Sydney was never touched.
+
+## 3. `SUPABASE_KEY` vs `SUPABASE_SERVICE_KEY` — resolved, and not the hazard it looked like
+
+Three readers, and they do not agree:
+
+| file | reads | live? |
+|---|---|---|
+| `storage_service.py:16` (uploads) | `SUPABASE_SERVICE_KEY` **or** `SUPABASE_KEY` | ✅ live — tolerates both |
+| `registration_service.py:64` | `SUPABASE_SERVICE_KEY` **or** `SUPABASE_KEY` | ✅ live — tolerates both |
+| `public_service.py:14` | `SUPABASE_SERVICE_KEY` **only** | ⚫ **dead** |
+
+The strict one is the only risk, and its sole consumer — `get_tenant_gallery_images`
+(`public_service.py:45`) — **is called from nowhere in the repository**; the route it would serve
+returns 404 on production. So Salman's "they're the same thing" holds for every path that actually
+runs. Had the strict path been live, a wrong name would have made the gallery return `[]` silently
+(`public_service.py:51`), with no error.
+
+Production confirmed serving from the correct project independently: `GET /public/rk/config` returns
+4 asset URLs, all `qjocpqokwmlpzaftltiy` (Frankfurt).
+
+**New finding for the ledger:** `public_service.get_tenant_gallery_images` is ⚫ **dead code** — no
+refactor now, per the classification.
+
+## 4. Applied — the guard, by role rather than region
+
+`scripts/_db_target.py` (new, commit `800b821`) implements *environment variable → validate target →
+connect*: it resolves `DIRECT_URL`/`DATABASE_URL` and **exits** if the host matches any `SY_*` legacy
+value `.env` declares, printing the resolved host either way.
+
+Deliberately **not** a region check. The two pre-existing guards asserted `"eu-central-1" in host`,
+which is right today and wrong the day production moves — structurally the same defect as the `EU_`
+prefix that was just removed. "Is not a declared legacy database" survives that move, and extends to
+a second retired database by adding one variable.
+
+Both existing guarded scripts migrated onto it, dropping their `.env` text-parsing workaround.
+`clean_rk_team.py`'s keep-list also gained جعفر: its rule is "delete everything not kept", so after
+his invite a re-run would have deleted a real staff account — `--dry-run` now reports 0 and 0.
+
+## 5. Still open — the remaining 24 scripts
+
+Unchanged, and now the only consumers left on the unguarded pattern. Priority order for the
+execution contract, by what each can destroy:
+
+1. **Credential writers (4)** — `create_super_admin` (the only break-glass since
+   `POST /auth/create-user` was deleted), `fix_passwords`, `reset_hr_admin_password`,
+   `create_admin_user`.
+2. **`migrate_images.py`** — the one hardcoded connection string with an embedded plaintext
+   password (`:54`), plus the old project ref as a runtime default (`:48`). Per memory the Sydney
+   password was rotated 2026-09-06, so the embedded value is probably already dead — verify, then
+   remove regardless.
+3. **Seeders that write live tenant content** — `seed_page_content`, `seed_unified_clients`,
+   `seed_client_services`, `seed_catalog`, and the per-tenant one-offs.
+4. **Historical migrations** — `unify_database`, `migrate_catalog`, `migrate_smar_config`,
+   `backfill_smar`. Lowest urgency; several are already superseded.
+
+Also unaddressed: the 8 `prisma/migrations/*.sql` headers telling a human to run
+`psql $DIRECT_URL` (🟠 now correct, since `DIRECT_URL` is production again — but they gained that
+correctness by accident, not by design), and `.env.example` still not mentioning `SY_*`.
+
+## Unknowns — updated
+
+1. ~~Whether any script wrote to Sydney after cutover~~ → **CLOSED, §2. Nothing did.**
+2. Whether `migrate_images.py:54`'s embedded password is still valid — still untested, deliberately.
+3. Whether Railway holds any other Sydney value — only the visible part of the variable list has
+   been seen. `FRONTEND_URL` (fixed today) and `ONBOARDING_SECRET` (added today) were both found
+   this way; a full read of that list is still outstanding.
