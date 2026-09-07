@@ -44,9 +44,26 @@ def _generate_password(length: int = 16) -> str:
 
 
 def _verify_secret(secret: str | None) -> None:
+    """Reject unless the caller presents the configured shared secret.
+
+    FAILS CLOSED (2026-09-07). This previously returned early when ONBOARDING_SECRET was unset —
+    a comment claimed that was "development only", but the same code runs in production, where the
+    variable was in fact missing. Measured live that day: an anonymous POST with no secret header
+    reached the tenant lookup and returned 404, proving the gate was open on production. Setting the
+    variable closed it; this makes a future missing variable a 503 instead of an open door, mirroring
+    app/api/v1/webhook.py's WhatsApp signature check, which has always failed closed.
+
+    n8n, the original caller of these webhooks, is RETIRED (Salman, 2026-09-07) and must not be
+    restored or treated as a dependency. Staff onboarding does not run through here — it is
+    POST /admin/team -> setup token -> WhatsApp link -> POST /auth/set-password.
+    """
     expected = getattr(settings, "ONBOARDING_SECRET", None)
     if not expected:
-        return                    # secret غير مُفعَّل في التطوير
+        logger.error(
+            "ONBOARDING_SECRET is not configured — every call to this webhook will be rejected "
+            "until it is set. This is a required Railway env var, not a code gap."
+        )
+        raise HTTPException(status_code=503, detail="Endpoint is not configured")
     if secret != expected:
         raise HTTPException(status_code=401, detail="Invalid onboarding secret")
 
