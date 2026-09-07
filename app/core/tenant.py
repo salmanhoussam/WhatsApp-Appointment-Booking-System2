@@ -397,12 +397,32 @@ async def require_super_admin(request: Request):
     """
     FastAPI dependency for Super Admin endpoints.
 
-    Accepts EITHER:
-      - Admin JWT (type='admin') with role='SUPER_ADMIN'
-      - Client JWT (type='client') whose slug matches settings.SUPER_ADMIN_SLUG
-        (used by the platform owner who logs in as a Client, not a User)
+    Accepts ONLY an Admin JWT (type='admin') whose backing User row is, right now, an ACTIVE
+    SUPER_ADMIN in the database. The token's own `role` claim is checked first as a cheap reject,
+    but it is never the authority.
 
-    Raises 401 for missing/invalid token, 403 for wrong role.
+    Raises 401 for missing/invalid token or a user that no longer qualifies, 403 for wrong role.
+
+    Two authorization holes were closed here 2026-09-07, both proven by direct measurement before
+    the change (evidence: .claudedocs/work/admin-api-boundary/2026-09-07/super-admin-boundary.md):
+
+    1. ROLE WAS READ FROM THE TOKEN ALONE. A token carrying role='SUPER_ADMIN' with a `user_id`
+       that exists nowhere in the database was ACCEPTED. So demoting, deactivating or deleting a
+       super admin did nothing until their token expired — up to 24h of retained platform-wide
+       access, with no way to revoke. `get_current_admin_user` above has always reloaded the row;
+       this dependency did not. The DB is now the authority here too, which is also what makes it
+       safe to grant this role to an automated agent for pre-release verification: revocation is
+       immediate.
+
+    2. A CLIENT TOKEN FOR THE OWNER SLUG WAS ACCEPTED AS SUPER ADMIN. A type='client' token whose
+       slug equalled settings.SUPER_ADMIN_SLUG (default "smar") was accepted with NO role claim at
+       all. That token is minted by POST /api/v1/auth/login against `Client.password_hash` — and
+       smar's client-level password is really set — so a single tenant's own login password was a
+       full platform-admin credential. The branch is removed: platform administration now requires
+       a real User account with the role. Salman confirmed (2026-09-07) he does not use that path.
+
+    settings.SUPER_ADMIN_SLUG is deliberately no longer consulted here. It still governs which
+    Client the platform-owner User belongs to elsewhere; it is not, by itself, an authorization fact.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -412,20 +432,28 @@ async def require_super_admin(request: Request):
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
-    token_type = payload.get("type")
+    if payload.get("type") != "admin":
+        raise HTTPException(status_code=401, detail="Unrecognised token type.")
 
-    if token_type == "admin":
-        role = payload.get("role", "")
-        if role == "SUPER_ADMIN":
-            return payload
+    if payload.get("role", "") != "SUPER_ADMIN":
         raise HTTPException(status_code=403, detail="SUPER_ADMIN role required.")
 
-    if token_type == "client":
-        if payload.get("slug") == settings.SUPER_ADMIN_SLUG:
-            return payload
-        raise HTTPException(status_code=403, detail="Platform owner access required.")
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Malformed token payload.")
 
-    raise HTTPException(status_code=401, detail="Unrecognised token type.")
+    # The authority. Not scoped by clientId: a super admin is platform-wide by definition, and
+    # scoping the lookup would let a stale client_id claim in the token decide the outcome.
+    user = await prisma_client.user.find_first(
+        where={"id": user_id, "role": "SUPER_ADMIN", "isActive": True},
+    )
+    if not user:
+        logger.warning(
+            "🚫 SUPER_ADMIN token rejected — user %s is no longer an active super admin.", user_id,
+        )
+        raise HTTPException(status_code=401, detail="User not found or no longer a super admin.")
+
+    return payload
 
 
 async def resolve_tenant_status(slug: str, endpoint: Optional[str] = None) -> dict:

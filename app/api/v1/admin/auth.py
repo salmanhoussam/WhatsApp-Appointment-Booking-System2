@@ -398,58 +398,21 @@ async def set_password(request: Request, body: SetPasswordRequest, response: Res
         },
     }
 
-@router.post("/create-user", tags=["Authentication"])
-async def create_platform_user(
-    payload: dict,
-    x_setup_key: str | None = Header(default=None),
-):
-    """
-    One-time route to seed admin User accounts in production without SSH.
-    Protected by SECRET_KEY — only the platform owner can call it.
-
-    POST /api/v1/auth/create-user
-    Headers: X-Setup-Key: <SECRET_KEY value from Railway env>
-    Body: { "email": "...", "password": "...", "role": "SUPER_ADMIN|TENANT_ADMIN", "full_name": "..." }
-    """
-    if x_setup_key != settings.SECRET_KEY:
-        raise HTTPException(status_code=403, detail="Invalid setup key.")
-
-    email     = payload.get("email", "").strip()
-    password  = payload.get("password", "")
-    role      = payload.get("role", "TENANT_ADMIN")
-    full_name = payload.get("full_name") or email.split("@")[0].title()
-
-    valid_roles = {"SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS"}
-    if role not in valid_roles:
-        raise HTTPException(status_code=422, detail=f"Invalid role. Choose: {sorted(valid_roles)}")
-    if not email or len(password) < 8:
-        raise HTTPException(status_code=422, detail="email required, password >= 8 chars.")
-
-    owner_slug = getattr(settings, "SUPER_ADMIN_SLUG", "smar")
-    owner = await _client_repo.find_client_by_slug(owner_slug)
-    if not owner:
-        raise HTTPException(status_code=500, detail=f"Platform owner client '{owner_slug}' not found.")
-
-    existing = await _user_repo.find_user_by_email(email)
-    if existing:
-        await _user_repo.update_user(existing.id, {
-            "password_hash": get_password_hash(password),
-            "role":          role,
-            "isActive":      True,
-            "fullName":      full_name,
-        })
-        return {"action": "updated", "email": email, "role": role}
-
-    await _user_repo.create_user(data={
-        "clientId":      owner.id,
-        "email":         email,
-        "password_hash": get_password_hash(password),
-        "fullName":      full_name,
-        "role":          role,
-        "isActive":      True,
-    })
-    return {"action": "created", "email": email, "role": role}
-
+# ── /create-user — REMOVED 2026-09-07 ──────────────────────────────────────────
+# Deleted on Salman's explicit decision, as part of closing the authorization boundary family.
+# It was an unauthenticated break-glass route that seeded admin User accounts "in production
+# without SSH", gated only by `x_setup_key != settings.SECRET_KEY` — i.e. the JWT SIGNING key
+# doubled as a bearer credential, so one leaked value meant both forged tokens and a live
+# account-takeover endpoint. Worse than its docstring implied: `find_user_by_email` is not tenant
+# scoped and the existing-user branch called update_user, so it could overwrite ANY user in ANY
+# tenant — resetting their password, setting isActive=True and raising their role to SUPER_ADMIN
+# — in a single unauthenticated request. No rate limit. Zero code callers; it was only ever
+# invoked by hand (see .claudedocs/sessions/2026-08-01.md and 2026-08-02 for the two real uses).
+#
+# Account recovery now runs through scripts/create_super_admin.py against the database directly,
+# which requires real infrastructure access rather than a header. If a recovery path ever needs to
+# exist over HTTP again, it belongs behind require_super_admin as a real /api/v1/super route with
+# an audit trail — not behind a shared secret.
 
 @router.post("/register", tags=["Authentication"])
 @limiter.limit("3/minute")
