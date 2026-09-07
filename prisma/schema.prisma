@@ -67,7 +67,6 @@ model Client {
   // -- Store module ------------------------------------------------------------
   storeCarts        StoreCart[]
   storeOrders       StoreOrder[]
-  storeCustomers    StoreCustomer[]
   // -- Generic Catalog module --------------------------------------------------
   catalogCategories CatalogCategory[]
   catalogItems      CatalogItem[]
@@ -687,30 +686,6 @@ model RestaurantOrderItem {
 // STORE MODULE
 // Migrated from Multy_store -- clientSlug -> clientId (UUID FK) for consistency
 // ================================================================================
-
-model StoreCustomer {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId              String   @map("client_id") @db.Uuid
-  firstName             String   @map("first_name")
-  lastName              String?  @map("last_name")
-  email                 String   @map("email")
-  phone                 String?  @map("phone")
-  password              String   @map("password")
-  isEmailVerified       Boolean  @default(false) @map("is_email_verified")
-  hasUsedSignupDiscount Boolean  @default(false) @map("has_used_signup_discount")
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  // `orders StoreOrder[]` removed 2026-09-07 (Phase 3a) -- StoreOrder.customer now points at
-  // Customer. This model is dead (0 rows, 0 code references) and is dropped in its own step,
-  // AFTER this change is deployed -- see the Phase 2d ordering lesson.
-
-  @@unique([clientId, email])
-  @@index([clientId])
-  @@map("store_customers")
-  @@schema("public")
-}
 
 // StoreBrand + StoreCategory + StoreProduct removed - replaced by CatalogCategory/CatalogItem (module_key = 'store')
 // Brand info moved to CatalogItem.metadata.brand
