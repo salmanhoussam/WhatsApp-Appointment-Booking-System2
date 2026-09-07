@@ -104,6 +104,7 @@ async def run(args) -> None:
     print(f"barbers  (D1) : {barbers}")
     print(f"services (D2) : {len(services)}  prices {[s[3] for s in services]}")
     print(f"store items   : {len(tpl['catalog_items_store'])}")
+    print(f"page sections (D6): {[x['type'] for x in tpl['page_content']['sections']]}")
     print(f"client_services: {tpl['client_services']}")
     print(f"expected barber_services links: {len(barbers)} x {len(services)} = {len(barbers)*len(services)}")
 
@@ -125,6 +126,17 @@ async def run(args) -> None:
         # hero+story but no working_hours; the alzabt script has working_hours but no hero/story --
         # each path loses what the other supplies. The template has all three.
         from datetime import datetime, timedelta, timezone
+
+        # D6: the page itself. Without content.sections the tenant renders
+        # "الصفحة قيد الإعداد" -- bookable but pageless, which fails
+        # rules/tenant-onboarding.md's own completion gate. {{name_ar}} is the only placeholder,
+        # substituted here so the hero carries the real shop name from the first render.
+        sections = json.loads(
+            json.dumps(tpl["page_content"]["sections"]).replace("{{name_ar}}", name_ar)
+        )
+        config = dict(c["config"])
+        config["content"] = {"sections": sections}
+
         client = await prisma_client.client.create(data={
             "name":            name_ar,
             "name_ar":         name_ar,
@@ -133,7 +145,7 @@ async def run(args) -> None:
             "phone":           phone,
             "primary_color":   colour,
             "currency":        currency,
-            "config":          Json(c["config"]),
+            "config":          Json(config),
             "payment_methods": c["payment_methods"],
             "unit_types":      [],
             "status":          "active",
@@ -221,9 +233,15 @@ async def run(args) -> None:
         print(f"  H3 stale clientId  {len(stale)} (MUST be 0)")
         currencies = {s.currency for s in svc_rows}
         print(f"  F1 service currency {currencies} (expect {{'{currency}'}})")
+        fresh = await prisma_client.client.find_unique(where={"id": client.id})
+        written = (((fresh.config or {}).get("content") or {}).get("sections")) or []
+        expected_sections = len(tpl["page_content"]["sections"])
+        print(f"  D6 page sections   {len(written)} (expect {expected_sections}) "
+              f"{[x.get('type') for x in written]}")
 
         ok = (len(barber_rows) == len(barbers) and len(svc_rows) == len(services)
-              and len(links) == expected and not stale and currencies == {currency})
+              and len(links) == expected and not stale and currencies == {currency}
+              and len(written) == expected_sections)
         print(f"\n  {'✅ ALL CHECKS PASSED' if ok else '❌ CHECKS FAILED — inspect before using this tenant'}")
         base = os.getenv("FRONTEND_URL", "https://demo.salmansaas.com")
         print(f"\n  public    {base}/{slug}")

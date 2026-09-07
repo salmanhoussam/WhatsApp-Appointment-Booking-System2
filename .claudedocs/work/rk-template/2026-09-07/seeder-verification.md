@@ -118,3 +118,66 @@ template, and it points straight at the gap above.
   over the public API, but no reservation was created, because that writes transactional rows the
   teardown guard deliberately refuses.
 - The **dashboard was not opened** for either fixture.
+
+---
+
+# D6 — page_content added, and verified in a browser
+
+**Salman, 2026-09-07:** *"متجر تجريبي بدون واجهة هبوط هو منتج معطل بيعياً وتسويقياً."*
+
+Four sections, the standard structure he named, written into `Client.config.content.sections`:
+
+| order | type | data |
+|---|---|---|
+| 0 | `hero` | `title_ar` (substituted with the real shop name), subtitle, CTA, `bg_type: "color"` |
+| 1 | `featured_items` | `heading_ar: "خدماتنا"`, limit 6 — **Services** |
+| 2 | `staff` | `heading_ar: "فريقنا"` — **Barbers** |
+| 3 | `products` | `heading_ar: "منتجاتنا"`, limit 6 — **Products** |
+
+**Every one is data-driven and needs no uploaded media.** Hero falls back to a colour background;
+the other three each fetch their own rows from the API the seeder has just populated. **RK's own
+section media was deliberately not copied** — its URLs sit on a different Supabase project and in
+one of the three drifted storage folders this template already excludes. Nothing is fabricated.
+
+`{{name_ar}}` is the only placeholder, substituted at seed time so the hero shows the real name from
+the first render.
+
+## Verified — fixture `rk-selftest-page`
+
+```
+D6 page sections   4 (expect 4) ['hero','featured_items','staff','products']
+barber_services   12 · H3 stale 0 · F1 {'USD'}      ✅ ALL CHECKS PASSED
+```
+
+Real browser on `demo.salmansaas.com/rk-selftest-page`:
+
+```
+emptyState        false          ← was true before D6
+rootLen           41,909         ← was 13,340
+headings          صالون الاختبار · خدماتنا · دقن · تمشيط أو تسريح · شعر ·
+                  شعر ودقن · حنة أو صبغة · كرياتين · فريقنا · منتجاتنا
+barbers rendered  ['سامي','زياد']
+products rendered ['واكس تصفيف الشعر','عطر ريحة رجالي']
+CTAs              احجز ✅   أضف للسلة ✅
+```
+
+Screenshot: `rk-template-page-renders.png`. Fixture deleted immediately after.
+
+**The template now satisfies `rules/tenant-onboarding.md`'s completion gate end-to-end:**
+Client → User → Services → Settings → **Page Content** → Public Page renders.
+
+## Side finding — the backend section enum is behind the renderer
+
+`app/schemas/page_content.py:68-76` lists **9** section types. `DynamicPage.jsx:62-76` renders **15**.
+`staff`, `products`, `hours`, `testimonials`, `offers` and `why_choose_us` render fine but are absent
+from the enum — and `rk` itself already stores `products`, `hours` and `testimonials` rows, so the
+enum is evidently not enforced on the path that writes them (config is written as raw JSON).
+
+Not a blocker and not touched. Recorded because the next person to trust that enum as the list of
+valid types will be wrong.
+
+## Unknowns (unchanged)
+
+- The booking flow itself was never exercised on a fixture — that writes transactional rows the
+  teardown guard deliberately refuses.
+- The dashboard was not opened for any fixture.

@@ -22,7 +22,7 @@ import psycopg2
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _db_target  # noqa: E402
 
-ALLOWED = ("rk-template-selftest", "rk-selftest-sar")
+ALLOWED = ("rk-template-selftest", "rk-selftest-sar", "rk-selftest-page")
 
 CHILD_COUNTS = [
     ("users", "client_id"), ("client_services", "client_id"), ("barbers", "client_id"),
