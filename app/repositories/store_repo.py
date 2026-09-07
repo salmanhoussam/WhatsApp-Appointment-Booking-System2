@@ -66,14 +66,23 @@ async def list_store_categories(client_id: str) -> list:
 
 # ── Cart ──────────────────────────────────────────────────────────────────────
 
+# The catalog module kinds that represent something a customer BUYS. Order Engine Unification
+# (2026-09-07): 'restaurant' joined 'store' here when the two order engines became one -- a menu
+# item is bought exactly like a shop product, and module_key classifies a catalog, it is not a
+# statement about whether something is purchasable. Deliberately an explicit list rather than
+# "any module": 'catalog' items are the pre-split service fossils, and nothing should be able to
+# put one in a cart by accident.
+PURCHASABLE_MODULE_KEYS = ["store", "restaurant"]
+
+
 async def find_product_for_cart(client_id: str, catalog_item_id: str):
-    """Verify a product is active and belongs to this tenant's store — for cart add."""
+    """Verify an item is active, purchasable and belongs to this tenant — for cart add."""
     return await prisma_client.catalogitem.find_first(
         where={
             "id":       catalog_item_id,
             "clientId": client_id,
             "isActive": True,
-            "category": {"moduleKey": "store"},
+            "category": {"moduleKey": {"in": PURCHASABLE_MODULE_KEYS}},
         }
     )
 
@@ -217,6 +226,9 @@ async def create_store_order(client_id: str, data: dict):
     }
     if data.get("shipping_address") is not None:
         create_data["shippingAddress"] = Json(data["shipping_address"])
+    # Same Json() wrapping and same omit-when-absent rule as shippingAddress above.
+    if data.get("metadata") is not None:
+        create_data["metadata"] = Json(data["metadata"])
 
     return await prisma_client.storeorder.create(
         data=create_data,

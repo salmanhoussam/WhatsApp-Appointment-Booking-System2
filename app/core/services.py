@@ -61,6 +61,38 @@ def require_service(service_key: str) -> Callable:
     return _check
 
 
+def require_any_service(*service_keys: str) -> Callable:
+    """Dependency factory — passes if the tenant has ANY ONE of these services active.
+
+    Added for the Order Engine Unification (2026-09-07). One order engine now serves every
+    vertical, so its routes must admit a restaurant tenant (`restaurant`) and a shop tenant
+    (`store`) alike -- caracas holds `restaurant` and has never held `store`, and would have been
+    403'd out of the very tab that is supposed to show its orders.
+
+    Deliberately a sibling of require_service() rather than a rewrite of it: single-key gating is
+    correct and unchanged for every other route in the app, and this only relaxes the ones that
+    genuinely serve more than one capability. Same with_db_resilience wrapper, same 403 shape.
+    """
+    async def _check(tenant: dict = Depends(get_current_tenant)):
+        svc = await with_db_resilience(
+            lambda: prisma_client.clientservice.find_first(
+                where={
+                    "clientId": tenant["id"],
+                    "serviceKey": {"in": list(service_keys)},
+                    "isActive": True,
+                }
+            ),
+            label=f"require_any_service:{'|'.join(service_keys)}",
+        )
+        if not svc:
+            raise HTTPException(
+                status_code=403,
+                detail=f"None of the services {list(service_keys)} are activated for this tenant.",
+            )
+        return svc
+    return _check
+
+
 async def seed_services_for_client(client_id: str, service_type: str) -> None:
     """Seed client_services rows when a new tenant is created.
     Called from registration_service.py after Client record is created.

@@ -736,6 +736,11 @@ model StoreOrder {
   paymentMethod   String?  @map("payment_method")
   shippingAddress Json?    @map("shipping_address")
   notes           String?  @map("notes")
+  // Vertical-specific fields on the one shared order engine (Order Engine Unification,
+  // 2026-09-07): `table_number` for a restaurant order, whatever the next vertical needs after
+  // that. Same escape hatch CatalogItem.metadata and Reservation.metadata already use -- the
+  // existing convention, not a new one.
+  metadata        Json?    @map("metadata")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

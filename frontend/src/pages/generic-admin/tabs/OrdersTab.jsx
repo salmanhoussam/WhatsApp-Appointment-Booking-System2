@@ -349,9 +349,19 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
   // as their own `moduleKey` prop unchanged -- those describe which type is currently being
   // rendered in this one tab instance, a legitimate local concept, not the tenant-wide collapse
   // this migration retires.
+  // Order Engine Unification (2026-09-07). `orderEndpoint` keeps its old job -- naming which KIND
+  // of order this tab is rendering, which still drives the status vocabulary and labels below,
+  // because a restaurant genuinely says "preparing/ready" where a shop says "processing/shipped".
+  //
+  // What it no longer decides is WHICH API to call. It used to select /admin/restaurant/orders for
+  // any tenant with the restaurant capability -- a table that has always been empty and always
+  // will be, since RestaurantConfig has 0 rows and every route gated on it answers 404. caracas's
+  // Orders tab has therefore been reading a permanently empty table. There is now one order engine
+  // for every vertical, so there is one path.
   const orderEndpoint = hasCapability(activeServices, 'restaurant') ? 'restaurant'
     : hasCapability(activeServices, 'store') ? 'store'
     : null
+  const ORDER_API = 'store'   // the single, unified order engine -- never branch this again
   const [orders,       setOrders]       = useState([])
   const [loading,      setLoading]      = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -382,7 +392,7 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
     if (!orderEndpoint) { setLoading(false); return }
     setLoading(true)
     try {
-      const res = await adminApi.get(`/${orderEndpoint}/orders`)
+      const res = await adminApi.get(`/${ORDER_API}/orders`)
       const raw = res?.data?.data ?? res?.data ?? []
       if (mountedRef.current) setOrders(Array.isArray(raw) ? raw : [])
     } catch {
@@ -396,7 +406,7 @@ export default function OrdersTab({ activeServices, color, currency = 'USD' }) {
 
   // ── Status update ──────────────────────────────────────────────────────────
   const handleStatusChange = useCallback(async (orderId, newStatus) => {
-    await adminApi.patch(`/${orderEndpoint}/orders/${orderId}/status`, { status: newStatus })
+    await adminApi.patch(`/${ORDER_API}/orders/${orderId}/status`, { status: newStatus })
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
   }, [orderEndpoint])
 

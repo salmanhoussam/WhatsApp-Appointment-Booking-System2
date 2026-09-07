@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.db.dependencies import get_current_tenant
-from app.core.services import require_service
+from app.core.services import require_service, require_any_service
 import app.repositories.store_repo as store_repo
 from app.db.client import prisma_client
 from app.repositories.customer_repo import CustomerRepository
@@ -160,7 +160,7 @@ class AddToCartIn(BaseModel):
 async def add_to_cart(
     body: AddToCartIn,
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     if body.quantity < 1:
         raise HTTPException(status_code=400, detail="Quantity must be at least 1.")
@@ -197,7 +197,7 @@ class AddToCartBulkIn(BaseModel):
 async def add_to_cart_bulk(
     body: AddToCartBulkIn,
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     """Sync every cart line in ONE request instead of one request per item (real bug, 2026-09-03:
     the checkout flow used to fire N sequential `/cart` requests, then N *parallel* ones after a
@@ -231,7 +231,7 @@ async def add_to_cart_bulk(
 async def get_cart(
     session_id: str,
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     cart = await store_repo.find_cart_by_session(session_id, tenant["id"])
     if not cart:
@@ -246,7 +246,7 @@ async def remove_from_cart(
     session_id:      str,
     catalog_item_id: str,
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     cart = await store_repo.find_cart_by_session(session_id, tenant["id"])
     if not cart:
@@ -266,13 +266,17 @@ class CheckoutIn(BaseModel):
     payment_method:  str = "cash"
     shipping_address: Optional[dict] = None
     notes:           Optional[str] = None
+    # Order Engine Unification (2026-09-07): a restaurant order's table number. Optional and
+    # ignored by every other vertical -- it lands in StoreOrder.metadata rather than earning a
+    # column that would be NULL on almost every row.
+    table_number:    Optional[str] = None
 
 
 @router.post("/orders")
 async def checkout(
     body: CheckoutIn,
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     cart = await store_repo.find_cart_by_session(body.session_id, tenant["id"])
     if not cart:
@@ -325,6 +329,7 @@ async def checkout(
             "payment_method":   body.payment_method,
             "shipping_address": body.shipping_address,
             "notes":            body.notes,
+            "metadata":         {"table_number": body.table_number} if body.table_number else None,
             "order_items":      order_items,
         },
     )
@@ -340,7 +345,7 @@ async def get_order(
     order_id: str,
     customer_phone: Optional[str] = Query(None),
     tenant: dict = Depends(get_current_tenant),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
 ):
     order = await store_repo.find_store_order(tenant["id"], order_id, customer_phone)
     if not order:

@@ -319,24 +319,16 @@ export default function CartPage() {
     try {
       const params = { client_slug: slug }
 
-      if (moduleKey === 'restaurant') {
-        const { data } = await publicApi.post(
-          '/restaurant/orders',
-          {
-            customer_name:  form.customer_name,
-            customer_phone: form.customer_phone,
-            table_number:   form.table_number || null,
-            notes:          form.notes || null,
-            items: cartItems.map((i) => ({
-              catalog_item_id: i.catalogItemId,
-              quantity:        i.quantity,
-            })),
-          },
-          { params }
-        )
-        setOrderId(data?.data?.id ?? null)
-
-      } else if (moduleKey === 'store') {
+      // Order Engine Unification (2026-09-07) -- ONE checkout path for every vertical.
+      //
+      // The `restaurant` branch that used to live here posted to /restaurant/orders against a
+      // second, parallel order engine. That engine was not merely unused: RestaurantConfig has 0
+      // rows platform-wide, and every route gated on it answers 404, so this branch could never
+      // have produced an order for anyone. Measured live before removing it.
+      //
+      // A restaurant order is a purchase like any other -- the only thing that was genuinely
+      // restaurant-shaped is table_number, which now travels in the order's metadata.
+      {
         // Sync local cart to server in ONE request, not one request per item -- real bug,
         // 2026-09-03: N sequential requests were the reported "took too long" slowdown; a first
         // attempt at N *parallel* requests instead made it worse (confirmed live: concurrent
@@ -359,6 +351,7 @@ export default function CartPage() {
               ? { address: form.shipping_address }
               : null,
             notes: form.notes || null,
+            table_number: form.table_number || null,
           },
           { params }
         )

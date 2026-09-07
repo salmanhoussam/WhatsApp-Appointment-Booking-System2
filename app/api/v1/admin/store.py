@@ -32,17 +32,33 @@ from prisma import Json
 
 from app.db.dependencies import get_current_admin_user
 from app.core.permissions import require_permission
-from app.core.services import require_service
+from app.core.services import require_service, require_any_service
 from app.repositories import admin_catalog_repo as _cat_repo
 from app.repositories import store_admin_repo as _store_repo
 
 router = APIRouter()
 
-ORDER_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]
+# Order Engine Unification (2026-09-07) -- one order table now serves every vertical, so this
+# vocabulary is the UNION of the two that used to exist in parallel:
+#   store      pending -> processing -> shipped -> delivered -> refunded
+#   restaurant pending -> preparing  -> ready   -> delivered
+# The restaurant half previously lived in app/api/v1/admin/restaurant.py against its own table.
+ORDER_STATUSES = [
+    "pending", "processing", "shipped",            # store path
+    "preparing", "ready",                          # restaurant path
+    "delivered", "cancelled", "refunded",          # shared terminal states
+]
 
+# Deliberately ONE merged map rather than a per-vertical lookup. A vertical is not reliably
+# knowable here -- Client.vertical is NULL for 17 of 20 tenants -- and branching on a capability
+# key would recreate exactly the "source chosen by an activation flag" defect fixed in the homepage
+# Services section this same day. Merging keeps every real guarantee that mattered: a pending order
+# still cannot jump straight to delivered, and the two paths never cross into each other's states.
 STORE_TRANSITIONS: dict[str, set] = {
-    "pending":    {"processing", "cancelled"},
+    "pending":    {"processing", "preparing", "cancelled"},
     "processing": {"shipped",    "cancelled"},
+    "preparing":  {"ready",      "cancelled"},
+    "ready":      {"delivered",  "cancelled"},
     "shipped":    {"delivered"},
     "delivered":  {"refunded"},
     "refunded":   set(),
@@ -347,7 +363,7 @@ async def list_orders(
     status: Optional[str] = None,
     limit:  int           = Query(50, le=200),
     user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
     _role=Depends(require_permission("store.read", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     if status and status not in ORDER_STATUSES:
@@ -361,7 +377,7 @@ async def update_order_status(
     order_id: str,
     body: OrderStatusIn,
     user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
     _role=Depends(require_permission("store.write", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     if body.status not in ORDER_STATUSES:
@@ -392,7 +408,7 @@ async def update_order_status(
 @router.get("/orders/stats")
 async def order_stats(
     user=Depends(get_current_admin_user),
-    _svc=Depends(require_service("store")),
+    _svc=Depends(require_any_service("store", "restaurant")),
     _role=Depends(require_permission("store.read", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
