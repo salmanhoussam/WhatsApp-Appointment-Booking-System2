@@ -26,29 +26,33 @@ Usage:
     venv/bin/python scripts/cleanup/clean_rk_team.py --dry-run
     venv/bin/python scripts/cleanup/clean_rk_team.py --execute
 """
-import re
+import os
 import sys
 
 import psycopg2
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _db_target  # noqa: E402  -- resolves the production URL and refuses a retired one
+
 SLUG = "rk"
-KEEP_USER_EMAILS   = {"rkbarber@dev.invalid"}          # the owner — never delete
+# The owner, plus every account created AFTER this script's original run. جعفر was invited on
+# 2026-09-07, after the cleanup — without him here, a re-run would delete a real staff account,
+# because the delete rule is "everything that is not kept". A one-shot cleanup script that becomes
+# destructive as the tenant grows is a trap; this list is what keeps it re-runnable.
+KEEP_USER_EMAILS   = {"rkbarber@dev.invalid", "jaafar@rk.salmansaas.com"}
 KEEP_BARBER_NAMES  = {"حسين", "جعفر"}                   # real staff — never delete
 DELETE_BARBER_NAMES = {"Test Staff QA"}                # QA residue, 0 collateral
 
 
-def db_url() -> str:
-    line = [l for l in open(".env") if l.startswith("EU_DATABASE_URL")][0]
-    return re.match(r'^EU_DATABASE_URL="?([^"\n]+)"?', line.strip()).group(1).split("?")[0]
 
 
 def main(execute: bool) -> None:
-    url = db_url()
-    host = url.split("@")[1].split(":")[0]
-    assert "eu-central-1" in host, f"ABORT: not the Frankfurt host ({host})"
-    assert "ap-southeast-2" not in host, "ABORT: this is Sydney — never touch it"
+    # 2026-09-07: was `assert "eu-central-1" in host`. That hardcoded the region, which becomes
+    # wrong the day production moves — the same defect as the old EU_ variable name. The shared
+    # helper checks by ROLE instead: the target must not be a declared legacy database.
+    url = _db_target.resolve(direct=False).split("?")[0]
     assert not (KEEP_BARBER_NAMES & DELETE_BARBER_NAMES), "ABORT: a kept barber is in the delete set"
-    print(f"host: {host}\n")
+    print()
 
     conn = psycopg2.connect(url, connect_timeout=60)
     cur = conn.cursor()

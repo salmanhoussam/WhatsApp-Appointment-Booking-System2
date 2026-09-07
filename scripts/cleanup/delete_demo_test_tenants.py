@@ -23,10 +23,13 @@ Usage:
     venv/bin/python scripts/cleanup/delete_demo_test_tenants.py --dry-run
     venv/bin/python scripts/cleanup/delete_demo_test_tenants.py --execute
 """
-import re
+import os
 import sys
 
 import psycopg2
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _db_target  # noqa: E402  -- resolves the production URL and refuses a retired one
 
 SAFE = [
     'bohussein-redirecttest-1786113608', 'bohussein-test-1786114296',
@@ -56,18 +59,13 @@ def guards() -> None:
     print("guards passed — no real / undecided / held slug in the target list")
 
 
-def db_url() -> str:
-    line = [l for l in open('.env') if l.startswith('EU_DATABASE_URL')][0]
-    return re.match(r'^EU_DATABASE_URL="?([^"\n]+)"?', line.strip()).group(1).split('?')[0]
-
-
 def main(execute: bool) -> None:
     guards()
-    url = db_url()
-    host = url.split('@')[1].split(':')[0]
-    assert 'eu-central-1' in host, f"ABORT: not the Frankfurt host ({host})"
-    assert 'ap-southeast-2' not in host, "ABORT: this is Sydney — never touch it"
-    print(f"host: {host}\n")
+    # 2026-09-07: was `assert 'eu-central-1' in host`, which hardcoded the region and would be
+    # wrong the day production moves. The shared helper checks by ROLE — the target must not be a
+    # declared legacy database — so it survives the next move.
+    url = _db_target.resolve(direct=False).split('?')[0]
+    print()
 
     conn = psycopg2.connect(url, connect_timeout=60)
     cur = conn.cursor()
