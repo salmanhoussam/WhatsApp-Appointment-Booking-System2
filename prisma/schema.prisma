@@ -326,7 +326,8 @@ model Service {
   sort_order   Int?             @default(0) @map("sort_order")
   createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookings     BookingService[]
+  // `bookings BookingService[]` removed 2026-09-07 (Phase 2c): BookingService.serviceId now
+  // references CatalogService. This model is retired and dropped in Phase 2d.
   client       Client           @relation(fields: [clientId], references: [id])
   property     Property?        @relation(fields: [propertyId], references: [id])
 
@@ -404,8 +405,12 @@ model BookingService {
   quantity  Int     @default(1) @map("quantity")
   price     Decimal @map("price") @db.Decimal(10, 2)
   notes     String? @map("notes")
-  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service   Service @relation(fields: [serviceId], references: [id])
+  booking   Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  // Repointed from the legacy Service model 2026-09-07 (Phase 2c). Kept rather than dropped:
+  // public_service.py's create_booking() still writes these rows for smar's stay add-ons, and
+  // dropping the table would fold the add-on money into totalPrice while losing which add-ons
+  // were actually bought.
+  service   CatalogService @relation(fields: [serviceId], references: [id])
 
   @@id([bookingId, serviceId])
   @@index([serviceId])
@@ -598,9 +603,10 @@ model CatalogService {
 
   client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category       CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  property       Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  reservations   Reservation[]
-  barberServices BarberService[]
+  property        Property?      @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  reservations    Reservation[]
+  barberServices  BarberService[]
+  bookingServices BookingService[]
 
   @@index([clientId])
   @@index([categoryId])

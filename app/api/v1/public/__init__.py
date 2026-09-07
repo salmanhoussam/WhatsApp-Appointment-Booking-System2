@@ -241,15 +241,17 @@ async def get_services_by_slug(
         raise HTTPException(status_code=404, detail="الشاليه غير موجود")
 
     services = await public_repo.list_active_services_for_client(unit.clientId)
+    # Response keys unchanged; only the source model's field names moved with Phase 2c
+    # (Service -> CatalogService). basePrice stays the public contract's name.
     return [
         {
             "id": s.id,
-            "name_ar": s.name_ar,
-            "name_en": s.name_en,
-            "image_url": getattr(s, 'image_url', ''),
-            "basePrice": float(s.basePrice),
+            "name_ar": s.nameAr,
+            "name_en": s.nameEn,
+            "image_url": s.imageUrl or '',
+            "basePrice": float(s.price) if s.price is not None else 0.0,
             "currency": s.currency,
-            "duration": getattr(s, 'duration', 0),
+            "duration": s.durationMin,
         } for s in services
     ]
 

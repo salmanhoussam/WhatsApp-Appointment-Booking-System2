@@ -19,8 +19,12 @@ async def find_unit_by_id(unit_id: str):
 
 
 async def list_active_services_for_client(client_id: str) -> list:
-    """All active add-on Services for a tenant."""
-    return await prisma_client.service.find_many(
+    """All active add-on services for a tenant.
+
+    Repointed to CatalogService 2026-09-07 (Data Model Consolidation, Phase 2c) -- the legacy
+    `Service` model is retired and its rows were migrated here.
+    """
+    return await prisma_client.catalogservice.find_many(
         where={"clientId": client_id, "isActive": True}
     )
 

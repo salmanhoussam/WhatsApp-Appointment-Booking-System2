@@ -55,16 +55,24 @@ class ServiceUpdate(BaseModel):
 # ── Serialiser ─────────────────────────────────────────────────────────────────
 
 def _fmt(s) -> dict:
+    """Serialise a CatalogService row into this route's long-standing response shape.
+
+    Data Model Consolidation Phase 2c (2026-09-07): the underlying model changed from the legacy
+    `Service` to `CatalogService`, and the field names differ (nameAr / price / durationMin /
+    descriptionAr / imageUrl / sortOrder). The RESPONSE KEYS are deliberately unchanged, so
+    smar's ServicesTab.jsx -- the only consumer of this route -- needs no edit and cannot break
+    on a rename. The mapping lives here, at the boundary, rather than leaking into the UI.
+    """
     return {
         "id":          s.id,
-        "name_ar":     s.name_ar,
-        "name_en":     s.name_en,
-        "description": getattr(s, "description", None),
-        "image_url":   getattr(s, "image_url",   None),
-        "duration":    getattr(s, "duration",    None),
-        "base_price":  float(s.basePrice),
+        "name_ar":     s.nameAr,
+        "name_en":     s.nameEn,
+        "description": s.descriptionAr,
+        "image_url":   s.imageUrl,
+        "duration":    s.durationMin,
+        "base_price":  float(s.price) if s.price is not None else 0.0,
         "currency":    s.currency,
-        "sort_order":  getattr(s, "sort_order",  0),
+        "sort_order":  s.sortOrder,
         "is_active":   s.isActive,
     }
 
@@ -87,19 +95,27 @@ async def create_service(
     _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_UNITS")),
 ):
     prop = await _repo.find_first_property(tenant["id"])
+    # CatalogService.categoryId is NOT NULL -- a real requirement of the target model that the
+    # legacy Service row did not have. Reuses the tenant's own 'الخدمات' category, the same one the
+    # Phase 2b migration landed the existing rows in.
+    category = await _repo.find_or_create_services_category(tenant["id"])
 
     service = await _repo.create_service(data={
-        "clientId":    tenant["id"],
-        "propertyId":  prop.id if prop else None,
-        "name_ar":     body.name_ar,
-        "name_en":     body.name_en,
-        "description": body.description,
-        "image_url":   body.image_url,
-        "duration":    body.duration,
-        "basePrice":   body.base_price,
-        "currency":    body.currency or tenant.get("currency", "SAR"),
-        "sort_order":  body.sort_order,
-        "isActive":    True,
+        "clientId":      tenant["id"],
+        "categoryId":    category.id,
+        "propertyId":    prop.id if prop else None,
+        "nameAr":        body.name_ar,
+        "nameEn":        body.name_en,
+        "descriptionAr": body.description,
+        "imageUrl":      body.image_url,
+        # durationMin is NOT NULL on CatalogService. A stay add-on genuinely has no slot length,
+        # so the model's own default stands in when the caller sends none -- the same value the
+        # Phase 2b migration used for smar's seven rows, for the same reason.
+        "durationMin":   body.duration if body.duration is not None else 30,
+        "price":         body.base_price,
+        "currency":      body.currency or tenant.get("currency", "SAR"),
+        "sortOrder":     body.sort_order,
+        "isActive":      True,
     })
     return _fmt(service)
 
@@ -116,15 +132,16 @@ async def update_service(
         raise HTTPException(status_code=404, detail="Service not found.")
 
     patch: dict = {}
-    if body.name_ar     is not None: patch["name_ar"]     = body.name_ar
-    if body.name_en     is not None: patch["name_en"]     = body.name_en
-    if body.description is not None: patch["description"] = body.description
-    if body.image_url   is not None: patch["image_url"]   = body.image_url
-    if body.duration    is not None: patch["duration"]    = body.duration
-    if body.base_price  is not None: patch["basePrice"]   = body.base_price
-    if body.currency    is not None: patch["currency"]    = body.currency
-    if body.sort_order  is not None: patch["sort_order"]  = body.sort_order
-    if body.is_active   is not None: patch["isActive"]    = body.is_active
+    # Request keys stay as they were; only the column names on the right changed with the model.
+    if body.name_ar     is not None: patch["nameAr"]        = body.name_ar
+    if body.name_en     is not None: patch["nameEn"]        = body.name_en
+    if body.description is not None: patch["descriptionAr"] = body.description
+    if body.image_url   is not None: patch["imageUrl"]      = body.image_url
+    if body.duration    is not None: patch["durationMin"]   = body.duration
+    if body.base_price  is not None: patch["price"]         = body.base_price
+    if body.currency    is not None: patch["currency"]      = body.currency
+    if body.sort_order  is not None: patch["sortOrder"]     = body.sort_order
+    if body.is_active   is not None: patch["isActive"]      = body.is_active
 
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")

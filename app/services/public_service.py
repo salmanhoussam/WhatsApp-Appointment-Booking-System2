@@ -98,20 +98,25 @@ async def get_unit_services_data(db: Prisma, slug: str, unit_id: str) -> Optiona
         if not unit:
             return None
 
-        services = await db.service.find_many(
+        # Repointed to CatalogService 2026-09-07 (Phase 2c). Response keys unchanged.
+        # description_en: the legacy Service model had a single `description` column, so this
+        # serialiser's getattr for `description_en` always fell back to "". CatalogService has real
+        # descriptionAr/descriptionEn, so this now returns actual content where a tenant entered
+        # any -- a fix that fell out of the move, not a behaviour change to guard against.
+        services = await db.catalogservice.find_many(
             where={"clientId": unit.clientId, "isActive": True}
         )
         return [
             {
                 "id":             s.id,
-                "name_ar":        s.name_ar,
-                "name_en":        s.name_en,
-                "description_ar": getattr(s, "description_ar", ""),
-                "description_en": getattr(s, "description_en", ""),
-                "image_url":      getattr(s, "image_url", ""),
-                "basePrice":      float(s.basePrice),
+                "name_ar":        s.nameAr,
+                "name_en":        s.nameEn,
+                "description_ar": s.descriptionAr or "",
+                "description_en": s.descriptionEn or "",
+                "image_url":      s.imageUrl or "",
+                "basePrice":      float(s.price) if s.price is not None else 0.0,
                 "currency":       s.currency,
-                "duration":       getattr(s, "duration", 0),
+                "duration":       s.durationMin,
             }
             for s in services
         ]
@@ -375,7 +380,7 @@ async def get_client_catalog(
     try:
         client = await db.client.find_first(
             where={"slug": slug, "isActive": True},
-            include={"services": {"where": {"isActive": True}}}
+            include={"catalogServices": {"where": {"isActive": True}}}
         )
         
         if not client:
@@ -464,13 +469,15 @@ async def get_client_catalog(
                     ),
                 } for unit in available_units
             ],
+            # Response key stays "services" -- the public catalog contract. Only the relation it
+            # reads moved with Phase 2c (Client.services -> Client.catalogServices).
             "services": [
                 {
                     "id": s.id,
-                    "name_ar": s.name_ar,
-                    "name_en": s.name_en,
-                    "price": float(s.basePrice)
-                } for s in getattr(client, 'services', [])
+                    "name_ar": s.nameAr,
+                    "name_en": s.nameEn,
+                    "price": float(s.price) if s.price is not None else 0.0
+                } for s in (getattr(client, 'catalogServices', None) or [])
             ]
         }
     except Exception as e:
@@ -549,7 +556,7 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             # onto this tenant's booking as a real BookingService row. Scoped lookup + an explicit
             # 404 replaces that: a foreign or unknown id can no longer be silently priced, and a
             # customer whose selection is invalid is told, rather than quietly charged less.
-            svc = await db.service.find_first(
+            svc = await db.catalogservice.find_first(
                 where={"id": s_req.get("service_id"), "clientId": client.id}
             )
             if not svc:
@@ -563,7 +570,7 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
             if not getattr(svc, "isActive", True):
                 continue
             qty = s_req.get("quantity", 1)
-            price = float(svc.basePrice)
+            price = float(svc.price) if svc.price is not None else 0.0
             total_service_price += price * qty
             valid_services.append({
                 "serviceId": svc.id,
