@@ -78,6 +78,10 @@ from app.core.db_resilience import with_db_resilience
 
 logger = logging.getLogger(__name__)
 
+# The opener whatsapp_service.build_central_booking_link() pre-fills into its wa.me link. Kept in
+# one place so the producer and this consumer cannot drift apart silently.
+_DEEPLINK_KEYWORD = "حجز"
+
 # States
 IDLE             = "IDLE"
 AWAITING_PROPERTY = "AWAITING_PROPERTY"
@@ -310,6 +314,18 @@ async def _dispatch(
             display_phone, bool(existing_session and existing_session.client_id),
         )
         return
+
+    # Phase 3c: if the resolved tenant is not the one this session was bound to, the customer
+    # deliberately opened a different shop's link. Carrying the old conversation state across would
+    # mean answering shop B with shop A's half-finished booking, so the stale session is cleared and
+    # a fresh one starts.
+    if existing_session and existing_session.client_id and existing_session.client_id != client.id:
+        logger.info(
+            "🔀 tenant switch for %s: %s -> %s — clearing stale session",
+            customer_phone, existing_session.client_id, client.id,
+        )
+        await _clear_session(phone_number_id, customer_phone, existing_session)
+        existing_session = None
 
     # Only now -- once a tenant is actually known -- fetch-or-create the real session.
     session = existing_session or await _get_session(phone_number_id, customer_phone)
@@ -702,16 +718,40 @@ async def _resolve_client(
     failure class (e.g. app/api/v1/public/reservations.py) — one retry, bounded wait, before
     giving up — rather than inventing a second, parallel resilience mechanism.
     """
+    # Phase 3c (Data Model Consolidation, 2026-09-07) -- a fresh deep link OUTRANKS a bound session.
+    #
+    # The bug this fixes: on the shared Central WABA number every tenant has the same display_phone,
+    # so the session binding was the only thing selecting a tenant, and step 1 below short-circuited
+    # before anything else could be read. A customer mid-booking with `rk` who then opened `mr-h`'s
+    # own deep link stayed bound to `rk` for the full 30-minute TTL -- their message routed to the
+    # wrong shop, silently. Bounded by the TTL, but real, and exactly the "client_id must be part of
+    # the identity" gap Salman named.
+    #
+    # Deliberately NOT any slug appearing anywhere in the text: slugs are short ("rk"), and a
+    # customer typing one as an answer mid-conversation must never switch shops. Only a message
+    # matching the real deep-link shape counts -- see _resolve_client_from_deeplink().
+    if message_text:
+        clients = await with_db_resilience(
+            lambda: prisma_client.client.find_many(),
+            label="whatsapp_resolve_client:deeplink",
+        )
+        explicit = _resolve_client_from_deeplink(message_text, clients)
+        if explicit:
+            return explicit
+    else:
+        clients = None
+
     if session and session.client_id:
         return await with_db_resilience(
             lambda: prisma_client.client.find_unique(where={"id": session.client_id}),
             label="whatsapp_resolve_client:bound",
         )
 
-    clients = await with_db_resilience(
-        lambda: prisma_client.client.find_many(),
-        label="whatsapp_resolve_client:unbound",
-    )
+    if clients is None:
+        clients = await with_db_resilience(
+            lambda: prisma_client.client.find_many(),
+            label="whatsapp_resolve_client:unbound",
+        )
 
     if display_phone:
         normalised = "".join(filter(str.isdigit, display_phone))
@@ -723,6 +763,22 @@ async def _resolve_client(
             return matches[0]
 
     return _resolve_client_from_text(message_text, clients)
+
+
+def _resolve_client_from_deeplink(message_text: str, clients: list):
+    """Match ONLY a real deep-link opener, so a mid-conversation reply can never switch tenants.
+
+    whatsapp_service.build_central_booking_link() produces exactly `حجز {slug}` -- the keyword is
+    cosmetic there, but here it is the discriminator that separates "this person just opened a
+    shop's QR/link" from "this person typed a word that happens to equal a slug". Requiring the
+    opener to START with that keyword is what makes overriding a bound session safe.
+    """
+    if not message_text:
+        return None
+    stripped = message_text.strip()
+    if not stripped.startswith(_DEEPLINK_KEYWORD):
+        return None
+    return _resolve_client_from_text(stripped, clients)
 
 
 def _resolve_client_from_text(message_text: str, clients: list):
