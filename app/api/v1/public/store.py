@@ -171,9 +171,12 @@ async def add_to_cart(
 
     expires = datetime.now(timezone.utc) + timedelta(days=_CART_TTL_DAYS)
 
+    # Phase 4a: the tenant check moved INTO the repository. get_or_create_cart returns None for a
+    # session id belonging to another tenant, so a foreign cart is indistinguishable from a missing
+    # one -- no per-call-site `cart.clientId != tenant["id"]` left to forget.
     cart = await store_repo.get_or_create_cart(tenant["id"], body.session_id, expires)
-    if cart.clientId != tenant["id"]:
-        raise HTTPException(status_code=403, detail="Cart mismatch.")
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found.")
 
     await store_repo.upsert_cart_item(cart.id, body.catalog_item_id, body.quantity)
 
@@ -212,8 +215,8 @@ async def add_to_cart_bulk(
 
     expires = datetime.now(timezone.utc) + timedelta(days=_CART_TTL_DAYS)
     cart = await store_repo.get_or_create_cart(tenant["id"], body.session_id, expires)
-    if cart.clientId != tenant["id"]:
-        raise HTTPException(status_code=403, detail="Cart mismatch.")
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found.")
 
     for item in body.items:
         product = await store_repo.find_product_for_cart(tenant["id"], item.catalog_item_id)
@@ -230,11 +233,11 @@ async def get_cart(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await store_repo.find_cart_by_session(session_id)
-    if not cart or cart.clientId != tenant["id"]:
+    cart = await store_repo.find_cart_by_session(session_id, tenant["id"])
+    if not cart:
         return {"success": True, "data": {"session_id": session_id, "items": []}}
 
-    items = await store_repo.list_cart_items(cart.id)
+    items = await store_repo.list_cart_items(cart.id, tenant["id"])
     return {"success": True, "data": _fmt_cart(cart, items)}
 
 
@@ -245,11 +248,11 @@ async def remove_from_cart(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await store_repo.find_cart_by_session(session_id)
-    if not cart or cart.clientId != tenant["id"]:
+    cart = await store_repo.find_cart_by_session(session_id, tenant["id"])
+    if not cart:
         raise HTTPException(status_code=404, detail="Cart not found.")
 
-    await store_repo.delete_cart_item(cart.id, catalog_item_id)
+    await store_repo.delete_cart_item(cart.id, catalog_item_id, tenant["id"])
     return {"success": True}
 
 
@@ -271,11 +274,11 @@ async def checkout(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("store")),
 ):
-    cart = await store_repo.find_cart_by_session(body.session_id)
-    if not cart or cart.clientId != tenant["id"]:
+    cart = await store_repo.find_cart_by_session(body.session_id, tenant["id"])
+    if not cart:
         raise HTTPException(status_code=404, detail="Cart not found.")
 
-    items = await store_repo.list_cart_items(cart.id)
+    items = await store_repo.list_cart_items(cart.id, tenant["id"])
     if not items:
         raise HTTPException(status_code=400, detail="Cart is empty.")
 
@@ -326,8 +329,8 @@ async def checkout(
         },
     )
 
-    await store_repo.delete_all_cart_items(cart.id)
-    await store_repo.delete_cart(cart.id)
+    await store_repo.delete_all_cart_items(cart.id, tenant["id"])
+    await store_repo.delete_cart(cart.id, tenant["id"])
 
     return {"success": True, "data": _fmt_order(order)}
 

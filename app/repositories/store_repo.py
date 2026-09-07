@@ -78,9 +78,20 @@ async def find_product_for_cart(client_id: str, catalog_item_id: str):
     )
 
 
-async def find_cart_by_session(session_id: str):
-    """Fetch cart by session UUID or None."""
-    return await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+async def find_cart_by_session(session_id: str, client_id: str):
+    """Fetch this tenant's cart by session UUID, or None.
+
+    Phase 4a (2026-09-07) -- client_id is REQUIRED, not optional. This used to be
+    `find_unique(where={"sessionId": ...})` with no tenant column at all: `sessionId` is globally
+    unique, so the function would happily hand back another tenant's cart, and the ONLY thing
+    preventing that was five separate route call sites each remembering to write
+    `if cart.clientId != tenant["id"]`. A sixth caller that forgot would have been an immediate
+    cross-tenant cart read. The check now lives where it cannot be forgotten, and a foreign cart is
+    indistinguishable from a missing one -- callers already 404 on None.
+    """
+    return await prisma_client.storecart.find_first(
+        where={"sessionId": session_id, "clientId": client_id}
+    )
 
 
 async def create_cart(client_id: str, session_id: str, expires_at: datetime):
@@ -105,7 +116,11 @@ async def get_or_create_cart(client_id: str, session_id: str, expires_at: dateti
     concurrent upsert() calls for the same new sessionId both raised
     prisma.errors.UniqueViolationError instead of one of them cleanly resolving to the existing
     row. Catching that error and re-fetching is the actual race-safe pattern here."""
-    cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+    # Phase 4a: scoped. A session id that already belongs to ANOTHER tenant is not ours to return
+    # or to write into -- None makes the caller 404, exactly as a missing cart does.
+    cart = await prisma_client.storecart.find_first(
+        where={"sessionId": session_id, "clientId": client_id}
+    )
     if cart is not None:
         return cart
     try:
@@ -115,14 +130,25 @@ async def get_or_create_cart(client_id: str, session_id: str, expires_at: dateti
     except UniqueViolationError:
         # Lost the race to a concurrent caller between the find above and this create -- the
         # cart now exists, fetch it instead of failing the request.
-        cart = await prisma_client.storecart.find_unique(where={"sessionId": session_id})
+        cart = await prisma_client.storecart.find_first(
+            where={"sessionId": session_id, "clientId": client_id}
+        )
         if cart is None:
             raise
         return cart
 
 
 async def upsert_cart_item(cart_id: str, catalog_item_id: str, quantity: int):
-    """Insert or update a cart item (quantity override)."""
+    """Insert or update a cart item (quantity override).
+
+    Phase 4a note -- the ONE cart function left unscoped, deliberately. Prisma's upsert() addresses
+    a single compound unique key and accepts no relation filter, so a tenant clause cannot be
+    expressed here. It is safe because every `cart_id` in the system now provably came from
+    find_cart_by_session() or get_or_create_cart(), both of which are tenant-scoped as of this
+    change -- there is no longer any path that produces an unscoped cart id to pass in. Adding a
+    per-item ownership SELECT would also cost one extra query per item on the bulk endpoint, for a
+    guarantee the resolvers already give.
+    """
     return await prisma_client.storecartitem.upsert(
         where={"cartId_catalogItemId": {"cartId": cart_id, "catalogItemId": catalog_item_id}},
         data={
@@ -132,18 +158,27 @@ async def upsert_cart_item(cart_id: str, catalog_item_id: str, quantity: int):
     )
 
 
-async def list_cart_items(cart_id: str) -> list:
-    """All items in a cart with their product data."""
+async def list_cart_items(cart_id: str, client_id: str) -> list:
+    """All items in this tenant's cart, with their product data.
+
+    Phase 4a: store_cart_items has no client_id column of its own, so isolation goes through the
+    parent relation -- which Prisma DOES support on find_many/delete_many. That makes the guard
+    part of the query rather than something the caller has to remember.
+    """
     return await prisma_client.storecartitem.find_many(
-        where={"cartId": cart_id},
+        where={"cartId": cart_id, "cart": {"is": {"clientId": client_id}}},
         include={"catalogItem": True},
     )
 
 
-async def delete_cart_item(cart_id: str, catalog_item_id: str):
-    """Remove a single item from a cart."""
+async def delete_cart_item(cart_id: str, catalog_item_id: str, client_id: str):
+    """Remove a single item from this tenant's cart."""
     return await prisma_client.storecartitem.delete_many(
-        where={"cartId": cart_id, "catalogItemId": catalog_item_id}
+        where={
+            "cartId": cart_id,
+            "catalogItemId": catalog_item_id,
+            "cart": {"is": {"clientId": client_id}},
+        }
     )
 
 
@@ -189,14 +224,22 @@ async def create_store_order(client_id: str, data: dict):
     )
 
 
-async def delete_all_cart_items(cart_id: str):
-    """Remove all items from a cart (post-checkout cleanup)."""
-    return await prisma_client.storecartitem.delete_many(where={"cartId": cart_id})
+async def delete_all_cart_items(cart_id: str, client_id: str):
+    """Remove all items from this tenant's cart (post-checkout cleanup)."""
+    return await prisma_client.storecartitem.delete_many(
+        where={"cartId": cart_id, "cart": {"is": {"clientId": client_id}}}
+    )
 
 
-async def delete_cart(cart_id: str):
-    """Delete the cart record itself (post-checkout cleanup)."""
-    return await prisma_client.storecart.delete(where={"id": cart_id})
+async def delete_cart(cart_id: str, client_id: str):
+    """Delete this tenant's cart record (post-checkout cleanup).
+
+    delete_many, not delete: it takes a scoped where-clause, and deleting nothing is the correct
+    outcome for a cart that is not ours.
+    """
+    return await prisma_client.storecart.delete_many(
+        where={"id": cart_id, "clientId": client_id}
+    )
 
 
 async def find_store_order(client_id: str, order_id: str, customer_phone: Optional[str] = None):
