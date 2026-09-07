@@ -21,6 +21,7 @@ from app.repositories import user_repo as _user_repo
 from app.repositories import admin_client_repo as _client_repo
 from app.core.limiter import limiter
 from app.services.security_audit_service import record_auth_event
+from app.core.auth_lockout import assert_ip_not_locked, assert_actor_not_locked
 from app.core.registration_gate import require_self_registration_enabled
 
 # Cookie lives on the root domain so all subdomains receive it automatically.
@@ -86,7 +87,8 @@ class UserLoginResponse(BaseModel):
 @router.post("/login", response_model=ClientLoginResponse)
 @limiter.limit("5/minute")
 async def client_login(request: Request, body: ClientLoginRequest, response: Response,
-                       background_tasks: BackgroundTasks = None):
+                       background_tasks: BackgroundTasks = None,
+                       _ip_gate=Depends(assert_ip_not_locked)):
     """
     Authenticates the tenant root account (Client model).
     Accepts slug, email, or phone as the identifier.
@@ -108,6 +110,11 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
                 request, "client_login_failed", actor="anon",
                 reason="not_found", identifier=body.identifier)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
+
+        # Actor axis. Deliberately placed AFTER the account is resolved and BEFORE the password
+        # is checked: a locked account must be refused even when the attacker finally guesses
+        # right, and the check is meaningless before we know which account is being attempted.
+        await assert_actor_not_locked(f"client:{client.id}")
 
         if not verify_password(body.password, client.password_hash):
             logger.warning("❌ Password mismatch for client: %s", client.slug)
@@ -165,7 +172,8 @@ async def client_login(request: Request, body: ClientLoginRequest, response: Res
 @router.post("/users/login", response_model=UserLoginResponse)
 @limiter.limit("5/minute")
 async def user_login(request: Request, body: UserLoginRequest, response: Response,
-                     background_tasks: BackgroundTasks = None):
+                     background_tasks: BackgroundTasks = None,
+                     _ip_gate=Depends(assert_ip_not_locked)):
     """
     Authenticates a staff member or manager (User model).
     Returns a JWT with type='admin', user_id, client_id, and role.
@@ -194,6 +202,8 @@ async def user_login(request: Request, body: UserLoginRequest, response: Respons
                 request, "admin_login_failed", actor="anon",
                 reason="not_found", identifier=body.email)
             raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
+
+        await assert_actor_not_locked(f"user:{user.id}")
 
         if not verify_password(body.password, user.password_hash):
             logger.warning("❌ Password mismatch for user: %s", user.email)
