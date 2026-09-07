@@ -543,16 +543,33 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
         valid_services = []
 
         for s_req in services_data:
-            svc = await db.service.find_unique(where={"id": s_req.get("service_id")})
-            if svc and getattr(svc, 'isActive', True):
-                qty = s_req.get("quantity", 1)
-                price = float(svc.basePrice)
-                total_service_price += price * qty
-                valid_services.append({
-                    "serviceId": svc.id,
-                    "quantity": qty,
-                    "price": price
-                })
+            # clientId is load-bearing here, not decorative. This id arrives in a PUBLIC,
+            # unauthenticated booking payload; looked up by id alone (the previous find_unique),
+            # another tenant's service resolved, was priced from ITS basePrice, and was written
+            # onto this tenant's booking as a real BookingService row. Scoped lookup + an explicit
+            # 404 replaces that: a foreign or unknown id can no longer be silently priced, and a
+            # customer whose selection is invalid is told, rather than quietly charged less.
+            svc = await db.service.find_first(
+                where={"id": s_req.get("service_id"), "clientId": client.id}
+            )
+            if not svc:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Requested service is not available for this property.",
+                )
+            # An inactive service is deliberately skipped, not rejected -- unchanged behaviour for
+            # the one case that was already legitimate (a real service the tenant has since turned
+            # off), so this commit changes exactly one thing: cross-tenant reachability.
+            if not getattr(svc, "isActive", True):
+                continue
+            qty = s_req.get("quantity", 1)
+            price = float(svc.basePrice)
+            total_service_price += price * qty
+            valid_services.append({
+                "serviceId": svc.id,
+                "quantity": qty,
+                "price": price
+            })
         
         final_total_price = unit_price + total_service_price
 
