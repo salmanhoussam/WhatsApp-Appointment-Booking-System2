@@ -211,9 +211,23 @@ async def send_staff_setup_link(
             f"⚠️ الرابط لمرة واحدة وينتهي خلال 7 أيام.\n"
             f"لا تشاركه مع أحد."
         )
-        await wa.send_text(to=staff_phone, text=message)
-        logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
-        return True
+        resp = await wa.send_text(to=staff_phone, text=message)
+
+        # WhatsAppService._send_request never raises: missing credentials return None, a Meta
+        # rejection (bad number, expired token, no balance) returns the non-200 response, and a
+        # network error returns None. So a try/except alone reports success for EVERY real failure
+        # mode -- measured 2026-09-08 by actually running this path with no credentials: it logged
+        # "Cannot send message" and still returned True. The result has to be inspected.
+        ok = resp is not None and getattr(resp, "status_code", None) == 200
+        if ok:
+            logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
+        else:
+            status = getattr(resp, "status_code", None) if resp is not None else "no-response"
+            logger.error(
+                "🔥 Staff setup link NOT delivered to %s (%s) — result=%s",
+                staff_phone, staff_name, status,
+            )
+        return ok
     except Exception as exc:
         logger.error(
             "🔥 Failed to send staff setup link to %s: %s",
