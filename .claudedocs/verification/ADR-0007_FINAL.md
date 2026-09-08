@@ -41,7 +41,7 @@ by inference.
   from Gate 8's criterion.
 
 ### NOT verified here
-- **Gate 8's own criterion** (two real bookings). See §G — verdict `UNKNOWN`.
+- **Gate 8's channel split** (which of website / WhatsApp produced the writes). See §G — the core write claim is now VERIFIED; only the originating channel is `UNKNOWN`.
 - Sydney's decommissioning — deliberately not attempted; Sydney is live by decision.
 - Any claim requiring a DB operation: this task forbade INSERT/UPDATE/DELETE, test bookings, and
   synthetic data. No query was run against any database while writing this document.
@@ -81,7 +81,7 @@ Status column reflects **only** what the cited evidence supports.
 | **5** | Storage parity | ✅ **PASSED** | same — **729 objects / 199,818,368 bytes**, exact parity |
 | **6** | Cutover | ✅ **DONE — EXECUTED 2026-09-06** | `gate6-cutover-executed.md` — Salman set the 4 variables, Railway redeployed. **Not reopened by this document.** |
 | **7** | Read verification (real tenants) | ✅ **DONE** | same — **all 9 REAL tenants HTTP 200, zero Sydney references**. Tenant list defined in `CONTRACT.md:113` (excludes `alzabt-demo` and every `demo-*`) |
-| **8** | **Write verification** | ⚠️ **UNKNOWN** — see §G | `gate8-write-verification.md`: `READINESS VERIFIED / BOOKINGS PENDING` |
+| **8** | **Write verification** | ✅ **VERIFIED (core)** / ⚠️ **UNKNOWN (channel split)** — see §G | Real post-cutover reservations measured on both databases: `db-connection-audit/2026-09-07/inventory.md:222-247` |
 | **9** | Performance | ✅ **DONE** | `gate6-cutover-executed.md` §Gate 9 + `post-migration-remeasure.md` |
 | **10** | Rollback | ✅ **CAPABILITY DOCUMENTED — not executed** | `gate6-cutover-executed.md`: "available, not needed". Rollback window **30 min** (ADR-0007); sharp edge stated in `CONTRACT.md:118` — any write landing on EU after Gate 6 does not exist in Sydney |
 
@@ -175,7 +175,69 @@ database — the deferred media-hygiene item, still open.
 
 ## G. Gate 8 — REAL WRITE VERIFICATION
 
-### Verdict: ⚠️ **UNKNOWN — the gate's own criterion is not met**
+### Verdict: ✅ **VERIFIED (core)** / ⚠️ **UNKNOWN (channel split)**
+
+> **Revision, 2026-09-08 (same day, later pass).** This section first ruled `UNKNOWN` outright. That
+> ruling was made **without having read `db-connection-audit/2026-09-07/inventory.md`**, which
+> already contained the decisive evidence. The earlier reasoning below is preserved — it remains
+> correct about *what it examined* — and the revision is recorded rather than overwritten, per this
+> project's own documentation rules. The gate is **not reopened as a feature**; only this
+> verification document is corrected.
+
+## G.0 — The decisive evidence (added 2026-09-08)
+
+`work/db-connection-audit/2026-09-07/inventory.md:222-247`, section titled
+*"🟢 CLOSED — Unknown #1: nothing has written to Sydney since cutover"*, states plainly:
+
+> **"Salman made real reservations at `rk` on 2026-09-07"**
+
+Measured **read-only on both databases** in the same pass:
+
+| | Frankfurt | Sydney |
+|---|---|---|
+| `rk` reservations | **28** — of which **2 created that day** | 24 — **0 that day** |
+| `rk` customers | **23** — **2 that day** | 20 — **0** |
+
+Platform-wide newest row:
+
+```
+                  Frankfurt              Sydney
+reservations      2026-09-07 07:29   ←   2026-09-05 14:36
+customers         2026-09-07 07:29   ←   2026-09-05 14:36
+store_orders      2026-09-07 07:19   ←   2026-09-04 07:52
+```
+
+**What this establishes, point by point against Gate 8's own criterion:**
+
+| Criterion | Verdict | Why |
+|---|---|---|
+| A **real** booking, no synthetic test data | ✅ | Human action by Salman, stated as such in the evidence |
+| Written to **Frankfurt** | ✅ | 28 vs 24; 2 new rows dated after the cutover |
+| **Read back** and confirmed | ✅ | Counts and newest-row timestamps queried read-only on both sides |
+| **Post-cutover** | ✅ | 2026-09-07 07:29 > cutover 2026-09-06 (~16:10–16:47) |
+| **Sydney received nothing** | ✅ | Frozen at 2026-09-05 14:36 — "not one row was written there afterwards" |
+
+The reservation **write path itself** — `reservation_service.create_reservation()`, the concern this
+section originally raised — is therefore exercised and confirmed on Frankfurt.
+
+## G.0b — What remains UNKNOWN, and why the gate is not fully closed
+
+Gate 8's wording named **two channels**: *"one from the website, one from WhatsApp."* The evidence
+records that real reservations were created and where they landed; it does **not** record **which
+channel produced them**. Consequences:
+
+- If both came through the website, **Path B (the WhatsApp webhook) is still unexercised
+  post-cutover** — and with it the `WHATSAPP_APP_SECRET` risk described below, which is the one
+  failure mode Gate 8's WhatsApp half exists to catch.
+- No artifact reviewed on 2026-09-08 resolves the channel. Marked `UNKNOWN — evidence not
+  available` rather than inferred.
+
+**`BF948302` remains excluded** as Gate 8 evidence and is not reinstated by this revision: it is
+dated 2026-09-05, **before** the cutover, and was therefore written to **Sydney**.
+
+---
+
+### Original ruling, preserved (2026-09-08, first pass)
 
 **Gate 8's criterion, as originally recorded** (`gate8-write-verification.md`, opening line):
 
@@ -274,16 +336,19 @@ the todo entry rather than competing with it.
 | | |
 |---|---|
 | **Gates 0–7, 9, 10** | ✅ Verified against evidence |
-| **Gate 8** | ⚠️ **UNKNOWN — not closed.** Blocked on two real human bookings |
+| **Gate 8** | ✅ **VERIFIED (core)** — real post-cutover reservations confirmed on Frankfurt, Sydney frozen / ⚠️ **UNKNOWN (channel split)** — website vs WhatsApp not recorded |
 | **ADR-0007 status** | **Accepted, implemented, in production, verification incomplete on one gate** |
 | **Sydney** | **Must not be deleted** — Gate 8 open + observation period |
 
 **Remaining gaps, named rather than closed:**
 
-1. Gate 8's two bookings — a human action.
+1. Gate 8's **channel split** — which channel produced the 2026-09-07 reservations. A WhatsApp booking through the Central WABA number would close it.
 2. `WHATSAPP_APP_SECRET` on Railway post-cutover — unproven from outside.
 3. 16 scripts still on the unguarded `DIRECT_URL` pattern (out of scope here).
 4. The 6 MB `no-cache` video (~22 s `lastResourceEnd`) — media hygiene, not database.
 
-**This document does not close ADR-0007.** Per `documentation-policy.md`, a Post-Implementation
-Review and archiving both wait on Gate 8.
+**ADR-0007's write verification is materially satisfied; one sub-criterion is not.** The Post-
+Implementation Review and archiving still wait on Gate 8's channel split being resolved or
+explicitly waived by decision.
+
+**Sydney must still not be deleted** — the channel split is open, and the observation period stands.
