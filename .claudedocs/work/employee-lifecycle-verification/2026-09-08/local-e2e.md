@@ -66,3 +66,37 @@ Running the send path locally returned `True` while sending nothing:
 returns the non-200 response, a network error returns `None`. The morning's try/except fix therefore
 still reported success in every real failure mode. Fixed in `91906f7` by inspecting the actual
 result; re-measured, now returns `False`. **Found by execution, not by reading.**
+
+---
+
+## Production verification after deploy (same day, `ec5217c` pushed)
+
+Deploy confirmed by bundle change: `index-PnxR8Gfi.js` → **`index-BMRIa-WX.js`** (~100 s after push).
+`GET https://api.salmansaas.com/health` → `{"status":"ok","db":"ok"}` throughout.
+
+**Real browser, real live tenant, real customer booking path** — `https://demo.salmansaas.com/rk/reserve`,
+walked as a customer would: service `شعر ودقن` → barber `حسين` → 11 Sep → `10:30` → *أكمل الحجز من الموقع*.
+**No booking was submitted** — the form was inspected, not sent.
+
+| Check | Result |
+|---|---|
+| Country selector present | ✅ **10 options**, `🇱🇧 +961` **selected by default** |
+| Accessible label | ✅ `aria-label="مفتاح الدولة"` |
+| Number input | ✅ `inputMode=numeric`, `autocomplete=tel-national`, computed `direction: ltr` inside the RTL page |
+| Console | ✅ **0 errors, 0 warnings** |
+| Booking wizard still works end to end | ✅ services, barber, 24 real slots, summary all rendered |
+
+**The 18-field migration did not break the live booking flow** — the highest-risk surface of this
+change, verified on a real tenant rather than assumed.
+
+### Still UNKNOWN after deploy
+
+**Real WhatsApp delivery.** Production's `SECRET_KEY` differs from the local one (a locally-minted
+admin JWT was rejected `401` by `api.salmansaas.com`) — correct security hygiene, and it means the
+staff-invite send cannot be exercised from here. **Closing it requires Salman to add a staff member
+from the live dashboard.**
+
+### Side observation (pre-existing, not caused by this change)
+
+The barber step offered **only حسين**, not جعفر — consistent with the already-recorded finding that
+`rk`'s barber×service links are contaminated (1 of 21 combinations working).
