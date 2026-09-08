@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PhoneField from '../design-system/molecules/PhoneField'
 
 export default function BookingModal({ unit, lang, onClose, onSubmit, onProceedToCardPayment }) {
   const [step, setStep] = useState(1);
@@ -69,7 +70,13 @@ export default function BookingModal({ unit, lang, onClose, onSubmit, onProceedT
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">{lang === 'ar' ? 'رقم الهاتف (واتساب)' : 'WhatsApp Number'}</label>
-                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition" placeholder="+961 70 000 000" dir="ltr" />
+                <PhoneField
+                  lang={lang}
+                  value={formData.phone}
+                  onChange={next => handleChange({ target: { name: 'phone', value: next } })}
+                  inputProps={{ className: "w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition" }}
+                  selectStyle={{ padding: '12px 8px', borderRadius: 12, border: '1px solid #e5e7eb', background: '#f9fafb' }}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

@@ -12,6 +12,8 @@ import base64
 import io
 import logging
 import os
+
+from app.core.phone import normalize_for_storage
 from typing import Any, Dict, List, Optional
 
 import qrcode
@@ -121,6 +123,12 @@ async def update_settings(
     raw = {k: v for k, v in body.model_dump().items() if v is not None}
     if not raw:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+
+    # Phone Numbers rule (.claude/rules/phone-numbers.md, 2026-09-08). This column is the merchant
+    # alert target -- _notify_merchant_new_reservation() reads Client.whatsapp_number to tell the
+    # shop a booking arrived. Stored without a country code, that alert is silently dropped by Meta.
+    if raw.get("whatsapp_number"):
+        raw["whatsapp_number"] = normalize_for_storage(raw["whatsapp_number"])
 
     try:
         updated = await site_configuration_service.update_settings(tenant["id"], raw)

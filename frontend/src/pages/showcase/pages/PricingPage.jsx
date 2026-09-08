@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import { WHATSAPP_NUMBER } from '../config';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -622,15 +623,13 @@ export default function PricingPage() {
                 }}>
                   {isAr ? 'رقم واتساب' : 'WhatsApp Number'}
                 </label>
-                <input
+                {/* Phone rule 2026-09-08 — country selector, Lebanon by default. */}
+                <PhoneField
                   required
-                  type="tel"
-                  placeholder="+961 XX XXX XXX"
+                  lang={isAr ? 'ar' : 'en'}
                   value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                  style={{ ...S.inputBase, direction: 'ltr' }}
-                  onFocus={e => (e.target.style.borderColor = 'rgba(255,26,85,0.45)')}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
+                  onChange={next => setForm(f => ({ ...f, phone: next }))}
+                  inputStyle={S.inputBase}
                 />
               </div>
 

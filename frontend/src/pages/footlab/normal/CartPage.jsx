@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 import { useNavigate } from 'react-router-dom';
 import { motion }      from 'framer-motion';
 import publicApi       from '../../../utils/publicApi';
@@ -129,7 +130,7 @@ export default function CartPage() {
           <p className="mb-4 text-xs font-semibold uppercase tracking-widest" style={{ color: colors.textMuted }}>بياناتك</p>
           <div className="flex flex-col gap-3">
             <Input label="الاسم *"             type="text"  error={errors.customer_name}  value={form.customer_name}  onChange={(e) => setForm({ ...form, customer_name:  e.target.value })} placeholder="اسمك الكامل" />
-            <Input label="رقم الهاتف"         type="tel"   value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} placeholder="+961..." />
+            <PhoneField label="رقم الهاتف" value={form.customer_phone} onChange={(next) => setForm({ ...form, customer_phone: next })} />
             <Input label="البريد الإلكتروني" type="email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} placeholder="example@email.com" />
             <Input label="ملاحظات"            type="text"  value={form.notes}          onChange={(e) => setForm({ ...form, notes:          e.target.value })} placeholder="أي تفاصيل إضافية" />
           </div>

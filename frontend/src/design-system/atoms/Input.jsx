@@ -15,7 +15,10 @@
  *
  * Usage:
  *   <Input type="date" label="تاريخ الدخول" error={errors.checkIn} />
- *   <Input ref={phoneRef} type="tel" placeholder="+961..." />
+ *   <Input ref={emailRef} type="email" placeholder="you@example.com" />
+ *
+ * For PHONE numbers use molecules/PhoneField instead -- it carries the country selector
+ * required by .claude/rules/phone-numbers.md (2026-09-08).
  */
 
 import { forwardRef } from 'react';

@@ -26,6 +26,7 @@ import { GlassCard, Input, Button, PriceTag, GoldDot } from '../atoms';
 import publicApi      from '../../utils/publicApi';
 import useTenantSlug  from '../../hooks/useTenantSlug';
 import useTenantConfig from '../../hooks/useTenantConfig';
+import PhoneField from '../molecules/PhoneField'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -145,16 +146,12 @@ function StepDetails({ form, errors, set, lang }) {
         error={errors.name}
         autoComplete="name"
       />
-      <Input
-        type="tel"
+      <PhoneField
         label={lang === 'ar' ? 'رقم واتساب' : 'WhatsApp Number'}
-        placeholder="+961 70 000 000"
+        lang={lang}
         value={form.phone}
-        onChange={e => set('phone', e.target.value)}
+        onChange={next => set('phone', next)}
         error={errors.phone}
-        autoComplete="tel"
-        hint={lang === 'ar' ? 'سيُرسل التأكيد على هذا الرقم' : 'Confirmation will be sent here'}
-        dir="ltr"
       />
       <Input
         type="email"

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCreateDatePage } from './hooks/useDatePage';
 import './dating.css';
+import PhoneField from '../../design-system/molecules/PhoneField'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -58,19 +59,15 @@ function Step1({ form, set }) {
         placeholder="مثال: سارة"
         required
       />
-      <Input
+      <PhoneField
         label="رقمك (واتساب) *"
         value={form.owner_phone}
-        onChange={e => set('owner_phone', e.target.value)}
-        placeholder="9613000000"
-        type="tel"
+        onChange={next => set('owner_phone', next)}
       />
-      <Input
+      <PhoneField
         label="رقمها (اختياري — لإرسال الرابط مباشرة)"
         value={form.her_phone}
-        onChange={e => set('her_phone', e.target.value)}
-        placeholder="9613000000"
-        type="tel"
+        onChange={next => set('her_phone', next)}
       />
       <Input
         label="slug مخصص (اختياري — تلقائي إذا تركته)"

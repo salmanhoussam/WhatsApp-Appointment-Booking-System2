@@ -16,6 +16,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect }     from 'react';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 import { useNavigate }             from 'react-router-dom';
 import { useTenantBase }           from '../../../hooks/useTenantSlug';
 import publicApi                   from '../../../utils/publicApi';
@@ -524,7 +525,9 @@ export default function SmarBookingDrawer({ unit, searchDates, slug, onClose, la
 
               {/* Personal info */}
               <GlassInput label={lang === 'ar' ? 'الاسم الكامل' : 'Full Name'} name="name" value={form.name} onChange={handleChange} placeholder={lang === 'ar' ? 'سلمان...' : 'Your name...'} />
-              <GlassInput label={lang === 'ar' ? 'رقم الواتساب' : 'WhatsApp Number'} name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="+961 70 000 000" dir="ltr" />
+              <PhoneField label={lang === 'ar' ? 'رقم الواتساب' : 'WhatsApp Number'} lang={lang}
+                value={form.phone}
+                onChange={(next) => handleChange({ target: { name: 'phone', value: next } })} />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <GlassInput label={lang === 'ar' ? 'عدد الأشخاص' : 'Guests'} name="guests" type="number" value={form.guests} onChange={handleChange} min={1} max={unit?.capacity || 20} />

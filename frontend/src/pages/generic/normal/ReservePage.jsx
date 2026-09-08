@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, CalendarDays, Timer, MessageCircle, Tag,
 } from 'lucide-react'
 import publicApi              from '../../../utils/publicApi'
+import PhoneField            from '../../../design-system/molecules/PhoneField'
 import useTenantSlug          from '../../../hooks/useTenantSlug'
 import { useTenantBase }      from '../../../hooks/useTenantSlug'
 import useReservationBooking  from '../../../hooks/useReservationBooking'
@@ -579,9 +580,12 @@ function ConfirmPanel({ booking, accent }) {
               fontSize: 14, fontFamily: FONT, outline: 'none',
             }}
           />
-          <input
-            required type="tel" placeholder={t('phonePlaceholder', lang)} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
-            style={{
+          {/* Phone Numbers rule (.claude/rules/phone-numbers.md, 2026-09-08) — country selector,
+              Lebanon by default; `customerPhone` now always holds the full international number. */}
+          <PhoneField
+            required lang={lang} value={customerPhone} onChange={setCustomerPhone}
+            placeholder={t('phonePlaceholder', lang)}
+            inputStyle={{
               width: '100%', padding: '11px 14px', boxSizing: 'border-box', borderRadius: 10,
               border: `1px solid ${DT.cardBorder}`, background: DT.pageBg, color: DT.textPrimary,
               fontSize: 14, fontFamily: FONT, outline: 'none',
@@ -847,7 +851,16 @@ function LegacyReserveForm({ config, slug, accent, base, navigate }) {
       }}
     >
       <Field label="الاسم" required placeholder="اسمك الكريم" {...f('customer_name')} />
-      <Field label="رقم الهاتف" type="tel" required placeholder="+961..." {...f('customer_phone')} />
+      <PhoneField
+        label="رقم الهاتف" required
+        value={form.customer_phone}
+        onChange={(next) => setForm((p) => ({ ...p, customer_phone: next }))}
+        inputStyle={{
+          width: '100%', padding: '11px 16px', boxSizing: 'border-box',
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 10, color: '#fff', fontSize: 14, outline: 'none', fontFamily: FONT,
+        }}
+      />
       <Field label="البريد الإلكتروني" type="email" placeholder="اختياري" {...f('customer_email')} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <Field label="التاريخ" type="date" required {...f('date')} />

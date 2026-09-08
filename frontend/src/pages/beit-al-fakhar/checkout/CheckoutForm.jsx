@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import PhoneField from '../../../design-system/molecules/PhoneField'
 import { motion } from 'framer-motion'
 
 /**
@@ -38,7 +39,9 @@ export default function CheckoutForm({ accent, submitting, error, onSubmit }) {
       <form onSubmit={(e) => { e.preventDefault(); if (canSubmit) onSubmit(form) }} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <p style={sectionLabel(accent)}>بيانات التواصل</p>
         <FieldLight label="الاسم الكامل" required placeholder="اسمك الكريم" {...f('customer_name')} />
-        <FieldLight label="رقم الهاتف" type="tel" required placeholder="+961..." {...f('customer_phone')} />
+        <PhoneField label="رقم الهاتف" required
+          value={form.customer_phone}
+          onChange={(next) => setForm((p) => ({ ...p, customer_phone: next }))} />
         <FieldLight label="البريد الإلكتروني (اختياري)" type="email" placeholder="you@example.com" {...f('customer_email')} />
 
         <p style={sectionLabel(accent)}>عنوان التوصيل</p>

@@ -27,6 +27,7 @@ import { useTenantBase } from '../../../hooks/useTenantSlug';
 import { motion, AnimatePresence } from 'framer-motion';
 import publicApi from '../../../utils/publicApi';
 import UnitImageGallery from '../../../components/ui/UnitImageGallery';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 // ─── Asset base ───────────────────────────────────────────────────────────────
 const BASE = 'https://qjocpqokwmlpzaftltiy.supabase.co/storage/v1/object/public/properties/beitsmar';
@@ -256,13 +257,10 @@ function BookingPanel({ unit, onSuccess }) {
       />
 
       {/* Phone */}
-      <input
-        type="tel"
-        placeholder="رقم الواتساب (مثال: 9665xxxxxxxx)"
+      <PhoneField
         value={form.phone}
-        onChange={e => set('phone', e.target.value)}
-        dir="ltr"
-        style={{ ...inputStyle, textAlign: 'left' }}
+        onChange={next => set('phone', next)}
+        inputStyle={{ ...inputStyle, textAlign: 'left' }}
         required
       />
 

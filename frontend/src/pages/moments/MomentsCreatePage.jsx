@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { registerCreator, loginCreator, createMomentPage } from './hooks/useMomentPage';
 import './moments.css';
+import PhoneField from '../../design-system/molecules/PhoneField'
 
 const spring = { type: 'spring', stiffness: 70, damping: 20, mass: 1.5 };
 
@@ -77,8 +78,9 @@ function AuthStep({ onAuth }) {
           <input className="moments-input" placeholder="اسمك الكريم *" value={form.name}
             onChange={e => set('name', e.target.value)} required />
         )}
-        <input className="moments-input" placeholder="رقم الهاتف *" value={form.phone}
-          onChange={e => set('phone', e.target.value)} required />
+        <PhoneField label="رقم الهاتف *" required value={form.phone}
+          onChange={next => set('phone', next)}
+          inputProps={{ className: 'moments-input' }} />
         <input className="moments-input" type="password" placeholder="كلمة المرور *" value={form.password}
           onChange={e => set('password', e.target.value)} required />
 

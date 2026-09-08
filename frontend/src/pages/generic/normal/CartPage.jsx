@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useNavigate }           from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import publicApi         from '../../../utils/publicApi'
+import PhoneField        from '../../../design-system/molecules/PhoneField'
 import useTenantConfig   from '../../../hooks/useTenantConfig'
 import useTenantSlug     from '../../../hooks/useTenantSlug'
 import { useTenantBase } from '../../../hooks/useTenantSlug'
@@ -596,7 +597,9 @@ export default function CartPage() {
               </h2>
 
               <Field label={lang === 'ar' ? 'الاسم' : 'Name'} required placeholder={lang === 'ar' ? 'اسمك الكريم' : 'Your name'} {...f('customer_name')} />
-              <Field label={lang === 'ar' ? 'رقم الهاتف' : 'Phone number'} type="tel" required placeholder="+961..." {...f('customer_phone')} />
+              <PhoneField label={lang === 'ar' ? 'رقم الهاتف' : 'Phone number'} required lang={lang}
+                value={form.customer_phone}
+                onChange={(next) => setForm((p) => ({ ...p, customer_phone: next }))} />
 
               {moduleKey === 'restaurant' && (
                 <Field label={lang === 'ar' ? 'رقم الطاولة' : 'Table number'} placeholder={lang === 'ar' ? 'A4 — اختياري' : 'A4 — optional'} {...f('table_number')} />

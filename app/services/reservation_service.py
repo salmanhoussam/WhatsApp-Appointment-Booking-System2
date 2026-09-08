@@ -29,6 +29,7 @@ from app.repositories import resource_repo, barber_repo, catalog_service_repo
 from app.repositories.customer_repo import CustomerRepository
 from app.repositories import user_repo
 from app.services import whatsapp_notifications
+from app.core.phone import normalize_for_storage
 
 logger = logging.getLogger(__name__)
 
@@ -422,6 +423,13 @@ async def create_reservation(
     # engine (BookingService.create_booking(), app/services/booking_service.py:19-25). Reservation
     # keeps its own customerName/Phone/Email fields as a permanent historical snapshot regardless
     # of this row (Hybrid decision) -- customerId is additive, not a replacement.
+    # Phone Numbers rule (.claude/rules/phone-numbers.md, 2026-09-08): normalise ONCE here, before
+    # the customer lookup, so the find-or-create keys on the canonical form and the reservation's
+    # own customerPhone snapshot matches it. This number is what the customer's confirmation
+    # WhatsApp is sent to -- a bare national number is silently rejected by Meta, which is exactly
+    # how جعفر's staff invite was lost on 2026-09-07.
+    customer_phone = normalize_for_storage(customer_phone) or customer_phone
+
     customer_repo = CustomerRepository(prisma_client)
     customer = await customer_repo.get_by_phone(customer_phone, client_id)
     if not customer:

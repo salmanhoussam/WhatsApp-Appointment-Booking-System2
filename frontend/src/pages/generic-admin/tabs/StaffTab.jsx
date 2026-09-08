@@ -6,6 +6,7 @@ import { T, FONT } from '../theme'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 // ── Staff Tab (Phase 3.7A, 2026-08-07) ──────────────────────────────────────────────────────────
 // Barber roster CRUD -- name/phone/description/image/working hours/active/sort order.
@@ -683,9 +684,9 @@ export default function StaffTab({ color }) {
           <Field label="الاسم *">
             <input style={inputStyle} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="مثال: حسين" />
           </Field>
-          <Field label="رقم الهاتف">
-            <input style={{ ...inputStyle, direction: 'ltr' }} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="96170123456" />
-          </Field>
+          <PhoneField label="رقم الهاتف" value={form.phone}
+            onChange={next => setForm(p => ({ ...p, phone: next }))}
+            inputStyle={inputStyle} />
           <Field label="الوصف">
             <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 64 }} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="وصف مختصر (اختياري)" />
           </Field>

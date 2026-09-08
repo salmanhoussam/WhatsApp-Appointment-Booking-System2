@@ -23,6 +23,7 @@ import ServicesTab  from './components/ServicesTab';
 import GalleryTab   from './components/GalleryTab';
 import VisualBuilder from './VisualBuilder';
 import { useAdminRole, canAccessTab, ROLE_TABS } from '../../../hooks/useAdminRole';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -1005,8 +1006,8 @@ function AdminBookingModal({ onClose, onCreated }) {
           </div>
           <div>
             <label style={labelStyle}>رقم الهاتف</label>
-            <input value={form.customer_phone} onChange={e => set('customer_phone', e.target.value)}
-              placeholder="+966xxxxxxxxx" style={inputStyle} />
+            <PhoneField value={form.customer_phone} onChange={next => set('customer_phone', next)}
+              inputStyle={inputStyle} />
           </div>
         </div>
 

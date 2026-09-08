@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from '../hooks/useTranslation';
 import LanguageSwitcher from '../components/layout/LanguageSwitcher';
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 const API_BASE = import.meta.env.VITE_PUBLIC_API_URL
   ? `${import.meta.env.VITE_PUBLIC_API_URL}/api/v1`
@@ -233,14 +234,12 @@ const RegistrationPage = () => {
           />
 
           {/* WhatsApp */}
-          <InputField
+          <PhoneField
             label={isAr ? 'رقم الواتساب' : 'WhatsApp Number'}
-            name="whatsapp_number"
-            type="tel"
+            lang={isAr ? 'ar' : 'en'}
             value={form.whatsapp_number}
-            onChange={handleChange}
+            onChange={next => handleChange({ target: { name: 'whatsapp_number', value: next } })}
             required
-            placeholder="+961 70 000 000"
           />
 
           {/* Password */}

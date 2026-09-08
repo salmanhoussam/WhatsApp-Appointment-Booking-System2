@@ -20,6 +20,7 @@ import {
   User, Phone, Building, Globe,
 } from 'lucide-react';
 import axios from 'axios';
+import PhoneField from '../../design-system/molecules/PhoneField'
 
 // SSO login — dashboard.salmansaas.com in production (2026-08-28 API domain split).
 const API_BASE = import.meta.env.VITE_ADMIN_API_URL || 'http://127.0.0.1:8000';
@@ -431,7 +432,8 @@ export default function SSOLoginPage() {
                 </div>
               </div>
 
-              <Field icon={Phone} type="tel" placeholder="رقم الواتساب (+961 ...)" value={reg.whatsapp_number} onChange={setR('whatsapp_number')} />
+              <PhoneField label="رقم الواتساب" value={reg.whatsapp_number}
+                onChange={next => setR('whatsapp_number')({ target: { value: next } })} />
 
               {/* Venue type selector */}
               <div>

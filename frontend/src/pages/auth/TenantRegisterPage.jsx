@@ -28,6 +28,7 @@ import { useNavigate }         from 'react-router-dom'
 import axios                   from 'axios'
 import { getTemplate }         from '../../config/template-registry'
 import adminApi                from '../../utils/admin.config'
+import PhoneField from '../../design-system/molecules/PhoneField'
 
 // ── API base (auth is outside /public and /admin prefixes, but is admin-domain traffic --
 //    registration leads straight into dashboard access) — dashboard.salmansaas.com in production
@@ -386,11 +387,10 @@ export default function TenantRegisterPage() {
           </Field>
 
           <Field label="رقم الواتساب *" error={errors.whatsapp_number}>
-            <input
-              style={{ ...inputBase, direction: 'ltr' }}
-              placeholder="9613xxxxxxx"
+            <PhoneField
               value={form.whatsapp_number}
-              onChange={e => setForm(p => ({ ...p, whatsapp_number: e.target.value }))}
+              onChange={next => setForm(p => ({ ...p, whatsapp_number: next }))}
+              inputStyle={inputBase}
             />
           </Field>
 

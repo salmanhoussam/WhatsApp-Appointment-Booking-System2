@@ -342,6 +342,13 @@ export default function GlobalAuthModal({ isOpen, onClose }) {
                   />
                 )}
 
+                {/* DELIBERATE EXCEPTION to .claude/rules/phone-numbers.md (2026-09-08).
+                    This one field accepts a phone number OR an email address, so a country
+                    selector in front of it would be wrong the moment someone types an email.
+                    It is also a LOGIN field, and login matching already normalises every format
+                    server-side via user_repo.normalize_local_phone -- so nothing is stored from
+                    here and nothing is sent to Meta from here. Do not "finish the migration" by
+                    converting this to PhoneField. */}
                 <Field
                   icon={Phone}
                   type="tel"

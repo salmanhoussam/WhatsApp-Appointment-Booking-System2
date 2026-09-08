@@ -3,6 +3,7 @@ import adminApi from '../../../utils/admin.config'
 import { T, FONT } from '../theme'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 const inputStyle = {
   width: '100%', padding: '11px 14px', borderRadius: 8, boxSizing: 'border-box',
@@ -898,9 +899,12 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
           <input style={inputStyle} value={form.name_en} onChange={set('name_en')} placeholder="e.g. Roz Salon" />
         </Field>
 
-        <Field label="رقم واتساب" hint="بدون مسافات — مثال: 96170123456">
-          <input style={inputStyle} value={form.whatsapp_number} onChange={set('whatsapp_number')} placeholder="96170123456" dir="ltr" />
-        </Field>
+        {/* Phone rule 2026-09-08. This number is the merchant-alert target
+            (_notify_merchant_new_reservation), so a missing country code silently kills the shop's
+            "new booking" WhatsApp -- the same failure mode as جعفر's invite. */}
+        <PhoneField label="رقم واتساب" value={form.whatsapp_number}
+          onChange={next => set('whatsapp_number')({ target: { value: next } })}
+          inputStyle={inputStyle} />
 
         <Field label="اللون الأساسي">
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
