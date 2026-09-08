@@ -130,12 +130,52 @@ Public/admin/super routes: no rate limit currently.
 |--------|---------|---------------|
 | JWT signing key | `SECRET_KEY` | `ValueError` if default `"my-super-secret-key..."` used |
 | WhatsApp verify token | `WHATSAPP_VERIFY_TOKEN` | `ValueError` if default used |
-| Supabase URL | `SUPABASE_URL` | Required — no default |
-| Supabase service key | `SUPABASE_SERVICE_ROLE_KEY` | Required — no default |
+| Supabase URL | `SUPABASE_URL` | ❌ None — see below |
+| Supabase service key | `SUPABASE_SERVICE_KEY` | ❌ None — see below |
 | Resend API key | `RESEND_API_KEY` | Optional |
 | Anthropic key | `ANTHROPIC_API_KEY` | Optional |
 
 Swagger UI (`/docs`, `/redoc`, `/openapi.json`) → **disabled in production** via `docs_url=None`.
+
+### Correction, 2026-09-08 — the two Supabase rows above were wrong on both columns
+
+Found during the two-week documentation review (`.claudedocs/sessions/2026-09-08.md`) and corrected
+here. Both errors are recorded rather than silently overwritten, because a rules file that misstates
+a secret's name is the failure mode this correction exists to prevent.
+
+**Error 1 — the variable name did not exist.** This table documented
+`SUPABASE_SERVICE_ROLE_KEY`. That string appears **nowhere** in `app/` or `scripts/`. The names the
+code actually reads (verified 2026-09-08 by counting real references):
+
+| Variable | References in `app/` + `scripts/` |
+|---|---|
+| `SUPABASE_URL` | 51 |
+| `SUPABASE_KEY` | 32 |
+| `SUPABASE_SERVICE_KEY` | 20 |
+
+`.env` and `.env.example` define exactly two: `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`.
+
+**Error 2 — there is no startup guard.** The "Required — no default" claim was false. Neither
+variable is declared in `app/core/config.py` at all (that file has **zero** Supabase references);
+both are read with raw `os.getenv()` inside services. The only real startup `ValueError` guards are
+`SECRET_KEY` (`config.py:120`) and `WHATSAPP_VERIFY_TOKEN` (`config.py:122`).
+
+**Real behaviour when the key is missing** — degrade at import, fail at request time, never at
+startup:
+
+```python
+# app/services/storage_service.py:15-20
+_SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
+_supabase = _create_supabase(...) if (_SUPABASE_URL and _SUPABASE_KEY) else None
+# -> later, per request: HTTPException(500, "Storage not configured — check
+#    SUPABASE_URL and SUPABASE_SERVICE_KEY")   (storage_service.py:141, :192)
+```
+
+**One real inconsistency between call sites, noted not fixed** (this is a documentation task; a code
+change needs its own decision): `registration_service.py:64` and `storage_service.py:16` both fall
+back `SUPABASE_SERVICE_KEY or SUPABASE_KEY`, while `public_service.py:14` reads **only**
+`SUPABASE_SERVICE_KEY` with no fallback. A deployment carrying just `SUPABASE_KEY` would therefore
+give working storage/registration and a silently `None` Supabase client in `public_service.py`.
 
 ---
 

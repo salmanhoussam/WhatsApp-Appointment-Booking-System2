@@ -30,7 +30,7 @@ model ClientService {
 | `booking`             | Booking    | ✅ Live |
 | `gallery`             | Booking    | ✅ Live |
 | `whatsapp_ordering`   | Booking    | ✅ Live |
-| `reservations`        | Generic Admin Dashboard | ✅ Live — gates `app/api/v1/admin/reservations.py` AND drives `GenericAdminDashboard.jsx`'s Reservations tab visibility (`hasReservations = activeServices.includes('reservations')`). **Distinct from `booking`** — found undocumented 2026-07-23 onboarding RK Barber Shop (first real Barbershop-type tenant on the generic dashboard): seeding only `booking` (no `reservations`) left the Admin Reservations tab/API silently unreachable despite Booking being fully active. Any generic-dashboard tenant needing the Reservations UI must seed both keys. |
+| `reservations`        | Generic Admin Dashboard | ✅ Live — gates `app/api/v1/admin/reservations.py` AND drives `GenericAdminDashboard.jsx`'s Reservations tab visibility (`hasReservations = activeServices.includes('reservations')`). **Distinct from `booking`** — found undocumented 2026-07-23 onboarding RK Barber Shop (first real Barbershop-type tenant on the generic dashboard): seeding only `booking` (no `reservations`) left the Admin Reservations tab/API silently unreachable despite Booking being fully active. Any generic-dashboard tenant needing the Reservations UI must seed `reservations`. ⚠️ This row historically ended "...must seed **both** keys" — **that instruction is STALE, see §2b below.** |
 | `restaurant`          | Restaurant | 🔄 Pending migration |
 | `store`               | Store      | 🔄 Pending migration |
 | `delivery_zones`      | Store      | 📋 Planned |
@@ -39,6 +39,48 @@ model ClientService {
 | `immersive_3d`        | Showcase   | 🔒 Ultra tier only ($35/mo) — 3D scroll-driven camera page |
 | `whatsapp_blast`      | Shared     | 📋 Planned |
 | `ai_bot`              | Shared     | 📋 Planned |
+
+### 2b. STALE RULE — "must seed both keys" (`booking` + `reservations`)
+
+**Status: HISTORICAL. Do not follow it as a current instruction.**
+Superseded in code 2026-09-06; this rules file was left out of sync until 2026-09-08 and is
+corrected here. The original wording is preserved above (struck through in meaning, not deleted)
+because it explains why `booking` is still present in real tenant rows today.
+
+**What was true (2026-07-23).** Onboarding RK Barber Shop, seeding only `booking` left the Admin
+Reservations tab and API unreachable. The conclusion drawn — "seed both keys" — fixed the symptom.
+
+**What is true now (verified 2026-09-08 against the codebase, not from memory).**
+
+| Check | Result |
+|---|---|
+| Real `require_service("booking")` call sites in `app/` | **0** |
+| Real `require_service("reservations")` call sites | **32** |
+| Other real gates | `catalog` 16 · `store` 13 · `restaurant` 12 |
+| Does `GenericAdminDashboard.jsx` ever read `booking`? | **No** — only `hasReservations = activeServices.includes('reservations')` |
+
+The single `grep` hit for `require_service("booking")` is a **comment** in
+`app/core/verticals.py:33` asserting that no such gate exists — not a call site.
+
+**Therefore: seeding `booking` gates nothing.** `reservations` alone drives both the API and the
+tab. The stale rule is inert rather than harmful — it over-provisions a key nobody reads.
+
+**Semantics, which is why the two are not interchangeable:** `booking` means **unit** booking
+(chalets, rooms). A barbershop has no units. Live proof on real tenants: `rk` — this project's
+reference Barber tenant — does **not** carry `booking` and its Reservations surface works, while
+`mr-h` carries it with 0 units and never uses it.
+
+**Where the code stands today (`app/core/verticals.py:26-45`).** `VERTICAL_REGISTRY["barber"]`
+dropped `booking` on 2026-09-06, affecting **future** provisioning only — no existing row was
+touched. Two duplicate maps still contain `booking`, deliberately left alone because consolidating
+them is a separate step: `SERVICE_TYPE_MAP` (`app/core/services.py`, for `real_estate`/`hotel`) and
+`_SERVICE_SEED_MAP["barbershop"]` (`app/services/registration_service.py:54`).
+
+**No replacement rule is invented here.** The current instruction is simply: seed `reservations`
+for the Reservations surface. Whether `booking` should be removed from the two remaining maps — or
+retired entirely — is an open decision, not settled by this documentation fix.
+
+---
 
 ## 3. `require_service()` Dependency (MANDATORY)
 
