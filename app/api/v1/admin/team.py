@@ -27,6 +27,7 @@ from app.core.permissions import resolve_preset
 from app.core.tenant import get_current_tenant, require_roles
 from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL
 from app.services.whatsapp_notifications import send_staff_setup_link
+from app.core.phone import normalize_for_storage
 from app.repositories import admin_client_repo as _client_repo
 from app.repositories import barber_repo as _barber_repo
 from app.repositories import user_repo as _repo
@@ -149,8 +150,12 @@ async def create_team_member(
                              else get_password_hash(body.password),
             "role":          body.role,
         }
+        # Phone Numbers rule (.claude/rules/phone-numbers.md, 2026-09-08): storage is always WITH
+        # the country code. The UI's country selector already sends that form, but normalising here
+        # too is the guarantee -- an API client or a seed script bypasses the UI entirely, and a
+        # bare national number is exactly what Meta rejected for جعفر on 2026-09-07.
         if body.phone:
-            row["phone"] = body.phone
+            row["phone"] = normalize_for_storage(body.phone)
         if invited:
             row["setupToken"]    = setup_token
             row["setupTokenExp"] = setup_expires
@@ -223,7 +228,11 @@ async def create_team_member(
             # message failed to send. This is the only response that ever carries the raw token,
             # and it goes only to the TENANT_ADMIN who just created the account.
             result["setup_url"]   = setup_url
-            result["invite_sent"] = bool(body.phone)
+            # Was `bool(body.phone)` until 2026-09-08 -- it reported the PRESENCE of a number, not
+            # the success of a send, so a failed invite looked identical to a delivered one. That is
+            # how جعفر sat locked out for six days while the dashboard said "sent". Now set from the
+            # send's real return value below. Default False: nothing was sent unless something was.
+            result["invite_sent"] = False
             if body.phone:
                 # get_current_tenant() resolves only {id, slug, currency} (core/tenant.py:206), so
                 # the shop's real display name is read here rather than sent as a bare slug — an
@@ -235,9 +244,12 @@ async def create_team_member(
                     or getattr(client, "name_en", None)
                     or tenant["slug"]
                 ) if client else tenant["slug"]
-                background_tasks.add_task(
-                    send_staff_setup_link,
-                    staff_phone=body.phone,
+                # Awaited, not backgrounded: the owner needs the real outcome in this response,
+                # and a BackgroundTask cannot report one. The helper still never raises, so a
+                # failed WhatsApp cannot roll back the account that was just created -- the owner
+                # simply sees invite_sent=false and hands over `setup_url` by other means.
+                result["invite_sent"] = await send_staff_setup_link(
+                    staff_phone=row["phone"],
                     staff_name=body.full_name,
                     setup_url=setup_url,
                     client_name=shop_name,

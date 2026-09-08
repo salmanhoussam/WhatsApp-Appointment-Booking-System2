@@ -192,8 +192,15 @@ async def send_staff_setup_link(
     staff_name: str,
     setup_url: str,
     client_name: str = "",
-) -> None:
-    """WhatsApp a new team member their one-time account-setup link."""
+) -> bool:
+    """WhatsApp a new team member their one-time account-setup link.
+
+    Returns True only if the send actually succeeded. Still never raises — a failed invite must not
+    roll back the account that was just created — but the caller now gets the real outcome instead
+    of having to assume one. Established 2026-09-08 (`.claude/rules/phone-numbers.md`, "A send is
+    not 'sent' until it succeeded"): جعفر's invite failed silently on 2026-09-07 while the owner was
+    shown "sent", and he was still locked out six days later.
+    """
     try:
         wa = WhatsAppService()
         message = (
@@ -206,11 +213,13 @@ async def send_staff_setup_link(
         )
         await wa.send_text(to=staff_phone, text=message)
         logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
+        return True
     except Exception as exc:
         logger.error(
             "🔥 Failed to send staff setup link to %s: %s",
             staff_phone, exc, exc_info=True,
         )
+        return False
 
 
 # ── Merchant-side alert (2026-09-07) ──────────────────────────────────────────

@@ -4,6 +4,7 @@ import { T, FONT } from '../theme'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
+import PhoneField from '../../../design-system/molecules/PhoneField'
 
 // ── Team Tab (Phase 2B-4, 2026-09-04) ───────────────────────────────────────────────────────────
 // Login accounts for this tenant — the merchant-facing surface for the permission model.
@@ -235,7 +236,7 @@ export default function TeamTab({ color, activeServices }) {
       setFormError('الاسم والبريد مطلوبان')
       return
     }
-    if (form.invite && !form.phone.trim()) {
+    if (form.invite && !form.phone) {
       setFormError('رقم الواتساب مطلوب لإرسال رابط التفعيل')
       return
     }
@@ -258,7 +259,7 @@ export default function TeamTab({ color, activeServices }) {
       }
       // Omitting `password` is what puts the server on the invite path — it mints the one-time
       // setup token and WhatsApps it. Sending one keeps the original direct-set behaviour.
-      if (form.invite) payload.phone = form.phone.trim()
+      if (form.invite) payload.phone = form.phone
       else             payload.password = form.password
       if (selectedPreset?.requiresBarber) payload.barber_id = form.barber_id
       if (form.addons.length) payload.addons = form.addons
@@ -431,11 +432,16 @@ export default function TeamTab({ color, activeServices }) {
           </label>
 
           {form.invite ? (
-            <Field label="رقم الواتساب">
-              <input style={{ ...inputStyle, direction: 'ltr' }} type="tel" value={form.phone}
-                placeholder="70764479"
-                onChange={e => setForm({ ...form, phone: e.target.value })} />
-            </Field>
+            // Phone Numbers rule (.claude/rules/phone-numbers.md, 2026-09-08): the country selector
+            // is what stops a bare national number ever being stored again. `form.phone` now always
+            // holds the full international value, which is exactly what the invite send needs.
+            <PhoneField
+              label="رقم الواتساب"
+              value={form.phone}
+              onChange={next => setForm({ ...form, phone: next })}
+              inputStyle={inputStyle}
+              placeholder="70 764 479"
+            />
           ) : (
             <Field label="كلمة المرور">
               <input style={{ ...inputStyle, direction: 'ltr' }} type="password" value={form.password}
