@@ -223,11 +223,41 @@ async def create_team_member(
                         detail="هذا الموظف مرتبط بحساب دخول آخر بالفعل",
                     )
                 row["barberId"] = body.barber_id
-            elif body.barber_id:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Preset '{body.preset}' does not take a barber link.",
-                )
+            else:
+                # Manager-as-Staff (2026-09-09, Salman's product requirement): one real person can
+                # hold BOTH a business staff identity and a manager account -- a barber who also
+                # runs the shop. Previously any non-self-scoped preset rejected a staff link with
+                # 422, which forced that person to exist twice in the system.
+                #
+                # The link is OPTIONAL here, not required: a manager with no staff identity stays
+                # equally valid. And it is inert for authorization -- scope is 'all' for these
+                # presets, so permissions.py never reads barberId. Its only effects are the ones a
+                # staff identity should have: the person appears on the calendar and can be booked,
+                # and _notify_merchant_new_reservation can reach them.
+                if body.new_staff_name and body.barber_id:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="اختر موظفاً موجوداً أو أنشئ واحداً جديداً — لا الاثنين معاً.",
+                    )
+                if body.new_staff_name:
+                    created_barber = await _barber_repo.create_barber({
+                        "clientId": tenant["id"],
+                        "name":     body.new_staff_name.strip(),
+                        "phone":    normalize_for_storage(body.new_staff_phone),
+                        "isActive": True,
+                    })
+                    body.barber_id = created_barber.id
+                if body.barber_id:
+                    barber = await _barber_repo.find_barber(tenant["id"], body.barber_id)
+                    if not barber:
+                        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+                    linked = await _repo.find_user_by_barber_id(body.barber_id)
+                    if linked:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="هذا الموظف مرتبط بحساب دخول آخر بالفعل",
+                        )
+                    row["barberId"] = body.barber_id
 
             row["role"] = resolved["role"]
             # permissions stays absent (NULL) for a legacy-shaped preset such as tenant_admin --
@@ -293,6 +323,132 @@ async def create_team_member(
         raise HTTPException(status_code=500, detail="Database connection failed")
 
 
+class TeamMemberUpdate(BaseModel):
+    """Edit an existing account's authorization and/or its staff link (2026-09-09).
+
+    Exists for two reasons that arrived together:
+      * Salman's product requirement: a protected owner must be offered "تعديل الصلاحيات" instead of
+        a deactivate button they are not allowed to press.
+      * It is the missing escape hatch that justified the destructive side effect in
+        deactivate_user() — a deactivated account holding a @unique barberId could not be released
+        any other way. With this route, releasing a staff link is an explicit action, so
+        deactivation no longer has to do it silently.
+
+    Same authority rules as creation, restated because they are load-bearing:
+      * `permissions` is NOT a field here and is ignored if sent — resolution is server-side only
+        (invariant I7), so a crafted request cannot grant itself anything.
+      * `role` is not editable — a preset resolves it. Nothing here can reach SUPER_ADMIN.
+      * clientId is never accepted; the tenant comes from the caller's token.
+    """
+    preset:    Optional[str]       = None
+    addons:    Optional[list[str]] = None
+    # Explicit staff-link control. None = leave as is; "" = release the link; an id = link to that
+    # staff member. Distinguishing "absent" from "cleared" is why this is Optional[str] and not str.
+    barber_id: Optional[str]       = None
+
+
+@router.patch("/team/{user_id}", status_code=200)
+async def update_team_member(
+    user_id: str,
+    body: TeamMemberUpdate,
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """Change an account's preset/add-ons and/or its staff link. Ownership verified first."""
+    try:
+        user = await _repo.find_user_by_id(user_id, tenant["id"])
+        if not user:
+            raise HTTPException(status_code=404, detail="العضو غير موجود")
+
+        patch: dict = {}
+
+        if body.preset is not None:
+            try:
+                resolved = resolve_preset(body.preset, body.addons)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+
+            # Never let an edit strand a self-scoped account without a staff link: that account
+            # would be 403'd on every scoped request (permissions.py:250-254). The link must either
+            # already exist or be supplied in this same request.
+            keeps_link = body.barber_id if body.barber_id is not None else getattr(user, "barberId", None)
+            if resolved["requires_barber"] and not keeps_link:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Preset '{body.preset}' is self-scoped and requires a staff link — "
+                        "supply barber_id in the same request."
+                    ),
+                )
+
+            # ── Owner protection, edit path (2026-09-09) ─────────────────────────────────
+            # The deactivate route is not the only way to lock a tenant out: demoting the last
+            # administrator's preset does it just as completely, and more quietly. Salman's
+            # requirement is explicit — an owner must not be able to "remove their own tenant-admin
+            # access". Same two invariants, applied to authorization instead of activation.
+            _role = lambda u: u.role.value if hasattr(u.role, "value") else str(u.role)
+            if _role(user) == "TENANT_ADMIN" and user.isActive and resolved["role"] != "TENANT_ADMIN":
+                if str(user.id) == str(getattr(_user, "id", None)):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="لا يمكنك سحب صلاحياتك الإدارية من حسابك بنفسك.",
+                    )
+                admins = [
+                    u for u in await _repo.find_users_by_client(tenant["id"])
+                    if _role(u) == "TENANT_ADMIN" and u.isActive
+                ]
+                if len(admins) <= 1:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            "هذا آخر حساب إداري نشط للمنشأة — سحب صلاحياته يقفل لوحة التحكم. "
+                            "عيّن حساباً إدارياً آخر أولاً."
+                        ),
+                    )
+
+            patch["role"]   = resolved["role"]
+            patch["scope"]  = resolved["scope"]
+            patch["preset"] = body.preset
+            # Same shape the create path writes (see the Json() wrap above): a resolved array is
+            # stored as Json, while 'tenant_admin' resolves to None and must land as a real NULL --
+            # that NULL is what makes the account resolve through the legacy role path (invariant
+            # I1), so writing an empty array here instead would silently change its authorization.
+            patch["permissions"] = (
+                Json(resolved["permissions"]) if resolved["permissions"] is not None else None
+            )
+
+        if body.barber_id is not None:
+            if body.barber_id == "":
+                patch["barberId"] = None          # explicit release
+            else:
+                # Ownership: the staff member must belong to the REQUESTING tenant. 404 (not 403)
+                # so another tenant's id space stays unprobeable — same rule as creation.
+                barber = await _barber_repo.find_barber(tenant["id"], body.barber_id)
+                if not barber:
+                    raise HTTPException(status_code=404, detail="الموظف غير موجود")
+                linked = await _repo.find_user_by_barber_id(body.barber_id)
+                if linked and str(linked.id) != str(user.id):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="هذا الموظف مرتبط بحساب دخول آخر بالفعل",
+                    )
+                patch["barberId"] = body.barber_id
+
+        if not patch:
+            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+
+        await _repo.update_user(user_id, patch)
+        logger.info("✏️  Team member updated: %s (%s) for tenant %s",
+                    user.email, sorted(patch.keys()), tenant["slug"])
+        return {"success": True, "data": _project(await _repo.find_user_by_id(user_id, tenant["id"]))}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔥 DB error updating user {user_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
 @router.delete("/team/{user_id}", status_code=200)
 async def deactivate_team_member(
     user_id: str,
@@ -304,6 +460,40 @@ async def deactivate_team_member(
         user = await _repo.find_user_by_id(user_id, tenant["id"])
         if not user:
             raise HTTPException(status_code=404, detail="العضو غير موجود")
+
+        # ── Owner protection (2026-09-09, Salman's decision) ─────────────────────────────────
+        # Enforced HERE, server-side, not by hiding a button: UI-only protection leaves a crafted
+        # request able to lock a tenant out of its own dashboard with no recovery path in the
+        # product. Two independent invariants, checked in order.
+        #
+        # 1. No self-deactivation. Signing your own account off is never a Team-lifecycle action;
+        #    an owner who wants to leave hands ownership over first.
+        if str(user.id) == str(getattr(_user, "id", None)):
+            raise HTTPException(
+                status_code=403,
+                detail="لا يمكنك تعطيل حسابك بنفسك. عيّن مالكاً آخر أولاً.",
+            )
+
+        # 2. Never remove the LAST usable administrator. Counted live rather than inferred from the
+        #    caller's role, because the caller may be SUPER_ADMIN acting on someone else's tenant.
+        #    Both storage shapes count as an administrator: a legacy TENANT_ADMIN row and a
+        #    permission-based account whose preset resolves to one (permissions.py's 'tenant_admin'
+        #    writes role=TENANT_ADMIN, so the role column covers both today -- kept as one check
+        #    rather than two so it cannot drift).
+        _role = lambda u: u.role.value if hasattr(u.role, "value") else str(u.role)
+        if _role(user) == "TENANT_ADMIN" and user.isActive:
+            admins = [
+                u for u in await _repo.find_users_by_client(tenant["id"])
+                if _role(u) == "TENANT_ADMIN" and u.isActive
+            ]
+            if len(admins) <= 1:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "هذا آخر حساب إداري نشط للمنشأة — تعطيله يقفل لوحة التحكم نهائياً. "
+                        "أنشئ حساباً إدارياً آخر أولاً."
+                    ),
+                )
 
         await _repo.deactivate_user(user_id, tenant["id"])
         logger.info("🗑️  Team member deactivated: %s for tenant %s", user.email, tenant["slug"])

@@ -234,3 +234,201 @@ TEAM: **GO** — implemented and verified
 SERVICES: **GO** — implemented and browser-verified
 MANAGER: **NEED DECISION** — M1 (after Slice 4) recommended; M3 needs the owner guard first
 BARBER → STAFF: **DESIGN READY** — every Barber field is generic, ids can be preserved, all phases reversible until 8
+
+---
+
+# Implementation pass 2 — account lifecycle, owner protection, manager-as-staff
+
+**Appended 2026-09-09.** Nothing above was rewritten; where this pass reverses an earlier decision
+it says so explicitly. **0 schema changes · 0 migrations · 0 destructive deletions of real data ·
+0 production employee writes · 0 deploys · 0 push.**
+
+## A. Staff/User separation — the lifecycle defect, fixed
+
+**Reversed:** `user_repo.deactivate_user()` no longer clears `barberId`.
+
+That side effect was added 2026-09-07 (`a0ccf41`) for a real reason, quoted from its own commit
+body: `User.barberId` is `@unique`, so a switched-off account held a live staff member hostage and
+creating the replacement account returned **409 with no way out** — *"team.py has no edit route"*.
+
+**That justification is now gone**, because this pass adds the edit route. So the destructive side
+effect could be dropped rather than traded against.
+
+Why it had to go — measured, not asserted:
+1. Reactivation restored an account that was then **403'd on every scoped request**
+   (`permissions.py:250-254` raises when a self-scoped account has no `barberId`).
+2. It stranded جعفر: deactivated, link released, holding a still-valid setup token he could no
+   longer use.
+
+**The principle now holds in code:** deactivating an *authentication* account never destroys the
+person's *business* identity. Releasing a staff link is an explicit action
+(`PATCH /team/{id}` with `barber_id: ""`), never a side effect.
+
+## B. `PATCH /team/{user_id}` — permission editing (§6)
+
+New route. Accepts `preset`, `addons`, `barber_id` only.
+
+- `permissions` is **not a field** — resolution stays server-side (invariant I7). A crafted request
+  cannot grant itself anything.
+- `role` is not editable; a preset resolves it. **SUPER_ADMIN is unreachable** — it is not a preset.
+- `clientId` is never accepted; the tenant comes from the caller's token.
+- `barber_id`: absent = leave as is · `""` = release · an id = link (404 on a foreign id, 409 if
+  already linked elsewhere).
+- Refuses to strand a self-scoped account: changing to a `requires_barber` preset without a link,
+  present or supplied, returns **422**.
+- Writes `permissions` in the same shape as the create path (`Json(...)`, or a real NULL for
+  `tenant_admin` — that NULL is what keeps the account on the legacy path, invariant I1).
+
+## C. Owner protection (§5, §10) — server-side, on both paths
+
+Enforced in `admin/team.py`, not by hiding a button.
+
+**Deactivate path** — two invariants, in order:
+1. **No self-deactivation** → 403.
+2. **Never the last active TENANT_ADMIN** → 403.
+
+**Edit path** — the same two, applied to authorization, because *demoting* the last administrator
+locks a tenant out just as completely as deactivating them, and more quietly:
+1. Owner cannot strip their own admin access → 403.
+2. Cannot demote the last active administrator → 403.
+
+### Honest note on reachability
+
+Invariant 2 (**last active admin**) is currently **defence-in-depth rather than a live path** on the
+deactivate route: `get_current_admin_user` requires the token's `client_id` to equal the user's own
+(`tenant.py:379-384`), so a SUPER_ADMIN cannot act cross-tenant here — and any tenant-admin caller
+is itself an active admin, so a *different* active admin target means there are ≥2. Invariant 1 is
+therefore the effective protection today. Invariant 2 is kept because it is correct, cheap, and
+becomes live the moment a demotion path or cross-tenant admin access exists — and on the **edit**
+route it is already reachable. Stated rather than claimed as a passing test.
+
+**UI** — the owner's row shows *"لا يمكنك تعطيل حسابك بنفسك"* (or the last-admin equivalent) in place
+of the deactivate button, and every row gains **"تعديل الصلاحيات"**. Deliberately not a disabled
+button: Salman's requirement is that the protection is explained, not shown as a dead control. The
+frontend check mirrors the server's and never replaces it.
+
+## D. Manager-as-Staff (§8)
+
+Previously any non-self-scoped preset rejected a staff link with `422 "does not take a barber link"`,
+which forced a barber-who-also-manages to exist twice. Now the link is **optional** for those
+presets: create or attach a staff identity alongside a manager account, or don't.
+
+The link is **inert for authorization** on those presets (`scope: 'all'`, so `permissions.py` never
+reads `barberId`). Its only effects are the ones a staff identity should have: the person appears on
+the calendar, can be booked, and `_notify_merchant_new_reservation` can reach them.
+
+Both states stay valid: **manager without a staff identity**, and **manager with one**.
+
+## E. Tenant Manager (§7, §9) — still NEED DECISION, not faked
+
+`shop_manager` was **not** renamed into `tenant_manager`, per the instruction not to do that
+silently. The blocker is unchanged and precise:
+
+```
+MIGRATED_AREAS : capabilities · customers · reservations · services · staff · store
+                 catalog is NOT migrated (Slice 4)
+```
+
+A full-tenant manager must include `catalog`, and `resolve_preset` refuses any preset touching an
+unmigrated area — **server-side**, so it cannot be worked around from the UI. Granting the strings
+anyway would produce an account the older `require_roles` routes still 403, i.e. exactly the "faked
+completeness" the task forbids.
+
+**Recommendation unchanged: M1 after Slice 4.** The design is written in §3 above; nothing about it
+changed in this pass.
+
+## F. Deactivate vs delete (§4)
+
+**No destructive deletion was added, and none should be exposed as a normal UI action.** The reason
+is concrete, not cautious: `reservations.barber_id` and `barber_services.barber_id` are real FKs, so
+deleting a staff identity would either orphan or cascade **42 live reservations and 39 service
+assignments**. Historical business identity must survive.
+
+| Case | Behaviour |
+|---|---|
+| A — Staff, no account | Deactivate (hide) on the Services page. Safe |
+| B — Staff with an active account | Deactivate the account; **the staff identity and its link survive** (fixed in A above) |
+| C — Staff with historical reservations | **Never delete.** Deactivate only — the reservations are the tenant's business record |
+| D — Staff assigned to services | Deactivate; assignments are preserved so re-activation restores the booking configuration |
+| E — Staff who is also a Manager | Two concerns, two actions: deactivate the account, or release the staff link — never one implying the other |
+| F — Account only | Deactivate/reactivate, both already exist |
+| G — Staff identity only | Hide/show on the Services page |
+
+Hard deletion remains available only through direct DB access for genuinely orphaned test rows —
+which is exactly how this pass's own fixtures were removed.
+
+## G. Tests
+
+Backend, run live against a local API on the **test tenant** `barberlab-test`; every fixture deleted
+afterwards (tenant verified back to its original 2 users / 2 barbers).
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| T1 | Owner deactivates self | 403 | ✅ 403 + Arabic reason |
+| T2a | Second admin deactivates the owner (2 active admins) | 200 | ✅ 200 |
+| T2b | Last remaining admin deactivates self | 403 | ✅ 403 |
+| T3 | Create `shop_manager` **+ new staff identity** | 201, linked | ✅ `scope: all`, `barber_id` set |
+| T4 | Owner demotes own preset to `shop_manager` | 403 | ✅ 403 |
+| T5 | Owner edits another member's preset | 200 | ✅ 200 |
+| T6 | `PATCH preset: "super_admin"` | 422 | ✅ 422 |
+| T7 | `PATCH` a user in another tenant | 404 | ✅ 404 |
+| T8 | **Deactivate keeps `barberId`** | preserved | ✅ preserved |
+| T9 | Reactivate restores a working account | link intact | ✅ `is_active=True`, link intact |
+| T10 | Explicit release via `barber_id: ""` | NULL | ✅ NULL |
+
+Earlier pass, re-verified unchanged: create-with-identity, mutual-exclusion 422, foreign barber 404,
+`reservations_manager` blocked by catalog 422, zero cross-tenant links.
+
+## H. Browser evidence (real Playwright, local)
+
+`/barberlab-test/dashboard/team`:
+```
+4 × "تعديل الصلاحيات"          (every row)
+3 × "تعطيل"                    (the owner has none)
+owner row: "لا يمكنك تعطيل حسابك بنفسك"
+owner label: "المالك"
+```
+`/barberlab-test/dashboard/staff` (Services), re-verified after this pass: heading الخدمات, only
+`+ خدمة جديدة`, no employee CRUD, and the Staff↔Service matrix still functional.
+
+One transient `500` on `/admin/settings` was observed and traced to the Supabase pooler
+(`Can't reach database server`), with the immediately following request returning `200` — **not
+caused by these changes**, recorded rather than ignored.
+
+## I. جعفر — WAITING FOR EXPLICIT PRODUCTION ACTION
+
+**Not touched.** Current state unchanged: `is_active = false`, `barber_id = NULL`, setup token valid
+until 2026-09-14.
+
+**After this fix, can he be used for B?** **Yes — with two explicit actions, both production writes
+needing approval:**
+1. **Reactivate** — without it, `auth.py:291/:446` reject the setup link with 403 before the token
+   is even checked.
+2. **Re-link his staff identity** — his preset is `staff` (`scope: self`); without a link he is
+   403'd on every scoped request. Reactivation alone is not enough.
+
+The lifecycle fix means **this will not happen again** — a future deactivation preserves the link,
+so only accounts damaged during the 2026-09-07→09 window need manual repair. جعفر is the only one.
+
+## J. Barber → Staff — DEFERRED
+
+Unchanged from §5-§7 above. No schema touched. The dependency map and 8-phase plan stand as the
+basis for a future, separate task.
+
+## K. Unresolved blockers
+
+1. 🔴 **`catalog` unmigrated (Slice 4)** — blocks the real Tenant Manager contract.
+2. 🟠 **جعفر** needs two approved production writes (above).
+3. 🟡 Owner-protection invariant 2 is unreachable on the deactivate route today (§C) — correct, but
+   do not describe it as a tested live path.
+4. 🟡 The Staff↔Service matrix staying on the Services page remains my judgment call from pass 1.
+
+---
+
+TEAM: **GO**
+SERVICES: **GO**
+OWNER PROTECTION: **GO**
+TENANT MANAGER: **NEED DECISION** — blocked by the catalog migration (Slice 4)
+MANAGER-AS-STAFF: **GO**
+BARBER → STAFF: **DEFERRED**
+JAAFAR: **WAITING FOR EXPLICIT PRODUCTION ACTION**

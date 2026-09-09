@@ -166,6 +166,13 @@ export default function TeamTab({ color, activeServices }) {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
   const [showModal, setShowModal] = useState(false)
+  // Edit-permissions surface (2026-09-09). Separate state from the create modal so neither can
+  // half-populate the other — the create flow carries fields (email, password, invite) that an
+  // edit must never send.
+  const [editMember, setEditMember] = useState(null)
+  const [editPreset, setEditPreset] = useState('')
+  const [editAddons, setEditAddons] = useState([])
+  const [editErr, setEditErr]       = useState('')
   const [saving,    setSaving]    = useState(false)
   const [formError, setFormError] = useState(null)
   const [form,      setForm]      = useState(EMPTY_MEMBER)
@@ -292,6 +299,41 @@ export default function TeamTab({ color, activeServices }) {
     }
   }
 
+  // Mirrors admin/team.py's server-side owner protection (2026-09-09). The BACKEND is the
+  // authority — this only decides which action to OFFER, so a protected owner is shown "تعديل
+  // الصلاحيات" instead of a button they would be 403'd on. Never the only guard.
+  const myUserId = (() => {
+    try { return JSON.parse(atob(localStorage.getItem('admin_access_token').split('.')[1]))?.user_id ?? null }
+    catch { return null }
+  })()
+  const activeAdmins = members.filter(m => m.is_active && (m.role === 'TENANT_ADMIN' || m.preset === 'tenant_admin')).length
+  const isProtectedOwner = (m) =>
+    m.is_active && (
+      String(m.id) === String(myUserId) ||
+      ((m.role === 'TENANT_ADMIN' || m.preset === 'tenant_admin') && activeAdmins <= 1)
+    )
+
+  const openEditPerms = (member) => {
+    setEditMember(member)
+    setEditPreset(member.preset ?? (member.role === 'TENANT_ADMIN' ? 'tenant_admin' : ''))
+    setEditAddons([])
+    setEditErr('')
+  }
+
+  const saveEditPerms = async () => {
+    if (!editPreset) { setEditErr('اختر صلاحية'); return }
+    setSaving(true); setEditErr('')
+    try {
+      // Only the preset/add-ons go up. The server resolves them into permissions/scope/role —
+      // the client never sends a permission array (invariant I7).
+      await adminApi.patch(`/team/${editMember.id}`, { preset: editPreset, addons: editAddons })
+      setEditMember(null)
+      await load()
+    } catch (e) {
+      setEditErr(e?.response?.data?.error?.message ?? e?.response?.data?.detail ?? 'تعذّر حفظ الصلاحيات')
+    } finally { setSaving(false) }
+  }
+
   const deactivate = async (member) => {
     if (!confirm(`تعطيل حساب "${member.full_name}"؟ يمكن إعادة تفعيله لاحقاً.`)) return
     await adminApi.delete(`/team/${member.id}`)
@@ -381,11 +423,20 @@ export default function TeamTab({ color, activeServices }) {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
-                {member.is_active ? (
-                  <Button variant="danger" size="sm" onClick={() => deactivate(member)}>تعطيل</Button>
-                ) : (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Button variant="ghost" size="sm" onClick={() => openEditPerms(member)}>تعديل الصلاحيات</Button>
+                {!member.is_active ? (
                   <Button variant="primary" color={color} size="sm" onClick={() => reactivate(member)}>إعادة تفعيل</Button>
+                ) : isProtectedOwner(member) ? (
+                  // Deliberately NOT a disabled button: Salman's requirement is that owner
+                  // protection is explained, not shown as an unexplained dead control.
+                  <span style={{ fontSize: 11, color: T.textMuted }}>
+                    {String(member.id) === String(myUserId)
+                      ? 'لا يمكنك تعطيل حسابك بنفسك'
+                      : 'آخر حساب إداري نشط — لا يمكن تعطيله'}
+                  </span>
+                ) : (
+                  <Button variant="danger" size="sm" onClick={() => deactivate(member)}>تعطيل</Button>
                 )}
               </div>
             </Card>
@@ -417,6 +468,36 @@ export default function TeamTab({ color, activeServices }) {
             الرابط لمرة واحدة وينتهي خلال 7 أيام — لن يظهر مرة أخرى.
           </p>
         </div>
+      )}
+
+      {editMember && (
+        <Modal title={`صلاحيات ${editMember.full_name}`} onClose={() => setEditMember(null)}
+               onSave={saveEditPerms} saving={saving}>
+          <Field label="الصلاحية">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {PRESETS.map(p => (
+                <label key={p.id} style={{
+                  display: 'flex', gap: 10, alignItems: 'flex-start',
+                  opacity: p.assignable ? 1 : 0.5, cursor: p.assignable ? 'pointer' : 'not-allowed',
+                }}>
+                  <input type="radio" name="editpreset" disabled={!p.assignable}
+                    checked={editPreset === p.id}
+                    onChange={() => setEditPreset(p.id)}
+                    style={{ marginTop: 3, accentColor: color }} />
+                  <span>
+                    <span style={{ fontSize: 13, color: T.textPrimary }}>{p.label}</span>
+                    {!p.assignable && (
+                      <span style={{ display: 'block', fontSize: 11, color: T.textMuted }}>{p.reason}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Field>
+          {editErr && (
+            <p style={{ color: '#e5484d', fontSize: 12, marginTop: 10 }}>{editErr}</p>
+          )}
+        </Modal>
       )}
 
       {showModal && (

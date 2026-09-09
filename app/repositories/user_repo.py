@@ -164,17 +164,25 @@ async def deactivate_user(user_id: str, client_id: str) -> int:
     """
     return await prisma_client.user.update_many(
         where={"id": user_id, "clientId": client_id},
-        # barberId is released together with the deactivation (2026-09-07, Salman's decision while
-        # replacing rk's legacy جعفر account). User.barberId is @unique, and deactivation used to
-        # leave it held: a deactivated account kept a real staff member linked, so creating the
-        # replacement account for that same person returned 409 with no way out through the API
-        # (team.py has no edit route -- create + deactivate/reactivate only). A switched-off
-        # account must not hold a live staff member hostage.
+        # REVERSED 2026-09-09 (Salman's decision): deactivation no longer clears barberId.
         #
-        # KNOWN CONSEQUENCE, accepted: reactivate_user() restores the account WITHOUT its barber
-        # link, so a reactivated staff account has to be re-linked. Preferred over the alternative
-        # (a whole PATCH /team/{id} edit surface) as the smaller change for the real case at hand.
-        data={"isActive": False, "barberId": None},
+        # It did between 2026-09-07 and today, for a real reason: User.barberId is @unique, so a
+        # switched-off account held a live staff member hostage and creating that person's
+        # replacement account returned 409 with no way out -- "team.py has no edit route" was the
+        # stated justification for choosing the smaller change at the time.
+        #
+        # That justification is now gone: PATCH /team/{user_id} exists (added in the same pass as
+        # this reversal) and can re-link or release a staff identity explicitly. So the 409 has a
+        # real escape hatch, and the destructive side effect can be dropped.
+        #
+        # Why it had to be dropped: an account's DEACTIVATION is an authentication concern; the
+        # person's STAFF IDENTITY is a business one. Clearing the link silently destroyed the second
+        # while operating on the first -- which broke two things measurably. (1) Reactivation
+        # restored an account that was then 403'd on every scoped request, because
+        # permissions.py:250-254 raises when a self-scoped account has no barberId. (2) It stranded
+        # جعفر: deactivated 2026-09-08, link released, a still-valid setup token he could no longer
+        # use. Releasing the link is now an explicit, separate action, never a side effect.
+        data={"isActive": False},
     )
 
 
@@ -184,6 +192,9 @@ async def reactivate_user(user_id: str, client_id: str) -> int:
     The exact inverse of deactivate_user, with the same tenant scoping — Dashboard Architecture
     Review 1 pattern P2 ("soft-delete without a restore path", two independent real cases: this
     one and StaffTab's hide-without-unhide). There is no hard delete anywhere in this lifecycle.
+
+    Since 2026-09-09 this is a true inverse again: deactivation keeps barberId, so reactivation
+    restores a working account rather than one that is 403'd on every scoped request.
     """
     return await prisma_client.user.update_many(
         where={"id": user_id, "clientId": client_id},
