@@ -1,0 +1,50 @@
+{
+  "taken_at": "2026-09-09T12:35:01.979473+00:00",
+  "tenant": "rk",
+  "users": [
+    {
+      "id": "81edde7e-49f2-4485-9008-cc190dd7a7ec",
+      "email": "rkbarber@dev.invalid",
+      "full_name": "حسين رقا",
+      "role": "TENANT_ADMIN",
+      "preset": "None",
+      "scope": "None",
+      "permissions": "None",
+      "barber_id": "None",
+      "is_active": "True",
+      "phone": "96176985477",
+      "token_live": "True",
+      "token_exp": "2026-07-30 13:42:28.047000+00:00",
+      "last_login_at": "2026-09-08 19:22:45.753000+00:00",
+      "has_password": "True"
+    },
+    {
+      "id": "fc599fa0-5579-49a7-b0b1-2211379b0e81",
+      "email": "jaafar@rk.salmansaas.com",
+      "full_name": "جعفر صالح",
+      "role": "TENANT_ADMIN",
+      "preset": "tenant_manager",
+      "scope": "all",
+      "permissions": "['reservations.write', 'staff.write', 'services.write', 'catalog.write', 'store.write', 'customers.read']",
+      "barber_id": "c75b89c3-03bb-4171-8f98-d971837dd162",
+      "is_active": "True",
+      "phone": "96170764479",
+      "token_live": "False",
+      "token_exp": "None",
+      "last_login_at": "2026-09-09 12:32:49+00:00",
+      "has_password": "True"
+    }
+  ],
+  "barbers": [
+    {
+      "id": "f64ce71e-682c-4f3c-b17d-5fc48e0adaf5",
+      "name": "حسين",
+      "is_active": true
+    },
+    {
+      "id": "c75b89c3-03bb-4171-8f98-d971837dd162",
+      "name": "جعفر",
+      "is_active": false
+    }
+  ]
+}

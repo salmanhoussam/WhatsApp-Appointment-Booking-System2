@@ -1,0 +1,11 @@
+{
+  "after": {
+    "role": "TENANT_ADMIN",
+    "preset": "tenant_manager",
+    "scope": "all",
+    "permissions": "['reservations.write', 'staff.write', 'services.write', 'catalog.write', 'store.write', 'customers.read']",
+    "barber_id": "c75b89c3-03bb-4171-8f98-d971837dd162",
+    "is_active": "True",
+    "last_login_at": "2026-09-09 12:32:49+00:00"
+  }
+}
