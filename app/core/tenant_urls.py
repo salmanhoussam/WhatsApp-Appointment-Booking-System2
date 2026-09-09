@@ -39,6 +39,17 @@ def admin_base_url(lifecycle_state: Optional[str]) -> str:
     return _SUBSCRIBED_HOST if (lifecycle_state or "").lower() in _SUBSCRIBED_STATES else _TRIAL_HOST
 
 
-def setup_link(lifecycle_state: Optional[str], token: str) -> str:
-    """The one-time account-setup URL for a tenant's invitee."""
-    return f"{admin_base_url(lifecycle_state)}/setup?token={token}"
+def setup_link(lifecycle_state: Optional[str], token: str, slug: Optional[str] = None) -> str:
+    """The one-time account-setup URL for a tenant's invitee.
+
+    `slug` is carried in the URL at Salman's request (2026-09-09) even though the page does not
+    strictly need it: the API answers `GET /auth/setup` with the slug already. Two real reasons to
+    include it anyway — the owner can SEE which shop a link belongs to before sending it, and the
+    page has somewhere to route to if that API call ever fails.
+
+    It is CONTEXT, never AUTHORITY. The page must keep taking the slug it routes to from the API
+    response, because a URL parameter is client-supplied: trusting it would let anyone holding a
+    valid token land themselves on another tenant's dashboard path.
+    """
+    url = f"{admin_base_url(lifecycle_state)}/setup?token={token}"
+    return f"{url}&slug={slug}" if slug else url

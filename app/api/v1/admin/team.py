@@ -329,7 +329,7 @@ async def create_team_member(
             # was unset on Railway and this line fell back to the APEX domain, which serves an
             # older frontend build that cannot handle a setup token. See app/core/tenant_urls.py.
             _c = await _client_repo.find_client_by_id(tenant["id"])
-            setup_url = setup_link(getattr(_c, "lifecycle_state", None), setup_token)
+            setup_url = setup_link(getattr(_c, "lifecycle_state", None), setup_token, tenant["slug"])
             # Returned to the OWNER as well as WhatsApped: delivery is best-effort (the helper
             # never raises), so without this the owner would have no way to reach an invitee whose
             # message failed to send. This is the only response that ever carries the raw token,
@@ -590,7 +590,7 @@ async def resend_invite(
         await _repo.update_user(user_id, {"setupToken": token, "setupTokenExp": expires})
 
         client = await _client_repo.find_client_by_id(tenant["id"])
-        setup_url = setup_link(getattr(client, "lifecycle_state", None), token)
+        setup_url = setup_link(getattr(client, "lifecycle_state", None), token, tenant["slug"])
         shop_name = (
             getattr(client, "name_ar", None) or getattr(client, "name_en", None) or tenant["slug"]
         ) if client else tenant["slug"]
