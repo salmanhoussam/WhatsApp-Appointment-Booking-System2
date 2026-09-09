@@ -29,7 +29,7 @@ from app.core.tenant import get_current_tenant, require_roles
 from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL, is_password_pending
 from app.services.whatsapp_notifications import send_staff_setup_link
 from app.core.phone import normalize_for_storage
-from app.core.tenant_urls import setup_link
+from app.core.tenant_urls import setup_link, mint_setup_token
 from app.core.config import settings as _settings
 from app.repositories import admin_client_repo as _client_repo
 from app.repositories import barber_repo as _barber_repo
@@ -190,7 +190,7 @@ async def create_team_member(
         # hash not starting with "$2", so the account is unreachable by login until
         # POST /api/v1/auth/set-password writes a real bcrypt hash and consumes the token.
         invited        = body.password is None
-        setup_token    = secrets.token_urlsafe(32) if invited else None
+        setup_token    = mint_setup_token(tenant["slug"]) if invited else None
         # 7 days, matching registration_service.py's existing tenant setup links — one lifetime for
         # every setup link in the platform rather than a second, competing one.
         setup_expires  = (datetime.now(timezone.utc) + timedelta(days=7)) if invited else None
@@ -585,7 +585,7 @@ async def resend_invite(
                 detail="لا يوجد رقم لهذا الحساب — أضف رقماً أولاً.",
             )
 
-        token   = secrets.token_urlsafe(32)
+        token   = mint_setup_token(tenant["slug"])
         expires = datetime.now(timezone.utc) + timedelta(days=7)
         await _repo.update_user(user_id, {"setupToken": token, "setupTokenExp": expires})
 

@@ -53,3 +53,38 @@ def setup_link(lifecycle_state: Optional[str], token: str, slug: Optional[str] =
     """
     url = f"{admin_base_url(lifecycle_state)}/setup?token={token}"
     return f"{url}&slug={slug}" if slug else url
+
+
+def mint_setup_token(slug: str) -> str:
+    """A setup token that says which tenant it belongs to: `<slug>_<32 random bytes>`.
+
+    Salman's request 2026-09-09: "بدي الـslug يكون كمان جزء من الـlink token … ليعرف حاله وين عم
+    يشتغل عند أي client." Three real benefits, none of them security:
+
+      * **Self-describing.** A token in a log, a support message or a pasted URL can be traced to a
+        tenant instantly, without a database lookup.
+      * **The invitee knows where they are joining** before any API call answers — the page can read
+        the prefix straight off the URL.
+      * **Operable.** Two invites for two shops are told apart by eye.
+
+    It adds NO guessability: the slug is public (it is in every tenant URL), and the random half is
+    still a full 32-byte `token_urlsafe`. The prefix is a LABEL, never a credential — the server
+    keeps matching the whole string against `users.setup_token`, and the tenant it acts on comes
+    from the matched USER ROW, never from the prefix. Anything else would let a crafted prefix aim a
+    valid token at another tenant.
+    """
+    import re as _re
+    import secrets as _secrets
+    safe = _re.sub(r"[^a-z0-9-]", "", (slug or "").lower()) or "tenant"
+    return f"{safe}_{_secrets.token_urlsafe(32)}"
+
+
+def slug_from_setup_token(token: str) -> Optional[str]:
+    """The label half of a token minted above, or None for a legacy/unprefixed one.
+
+    For DISPLAY only. Never use it to choose a tenant.
+    """
+    if not token or "_" not in token:
+        return None
+    prefix = token.split("_", 1)[0]
+    return prefix or None
