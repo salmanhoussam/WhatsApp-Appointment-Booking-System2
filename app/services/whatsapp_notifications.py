@@ -30,6 +30,29 @@ from app.services.whatsapp_service import WhatsAppService
 logger = logging.getLogger(__name__)
 
 
+def _report(result, what: str, who: str, ref: str = "") -> bool:
+    """Log the REAL outcome of one send, and hand it back to the caller.
+
+    Phase 0 — Channel Proof (2026-09-10). Every helper below used to log an unconditional "✅ sent"
+    the moment `await wa.send_text(...)` returned without raising — and it never raises. So the
+    server log asserted delivery in every failure mode there is: no credentials, a dead token, a
+    closed 24-hour window, a bad recipient. `send_staff_setup_link` was fixed on 2026-09-08 after
+    that cost جعفر six days locked out; this generalises the same discipline to all of them.
+
+    The helpers keep their "never raises" contract — a failed notification must not roll back the
+    real booking or account that scheduled it — but a swallowed exception is no longer allowed to
+    read as success.
+    """
+    tail = f" (ref={ref})" if ref else ""
+    if result:
+        logger.info("✅ %s delivered to %s%s — wamid=%s", what, who, tail,
+                    getattr(result, "wamid", None) or "—")
+        return True
+    logger.error("🔥 %s NOT delivered to %s%s — %s", what, who, tail,
+                 result.log_suffix() if hasattr(result, "log_suffix") else result)
+    return False
+
+
 async def send_booking_confirmation(
     customer_phone: str,
     booking_ref: str,
@@ -37,7 +60,7 @@ async def send_booking_confirmation(
     check_in: str,
     check_out: str,
     client_name: str = "",
-) -> None:
+) -> bool:
     """
     Send a booking confirmation WhatsApp message to the customer.
     Designed to run as a BackgroundTask — never raises, logs errors instead.
@@ -53,20 +76,21 @@ async def send_booking_confirmation(
             f"شكراً لاختيارك {client_name} 🏡\n"
             f"للاستفسار أو التعديل تواصل معنا."
         )
-        await wa.send_text(to=customer_phone, text=message)
-        logger.info("✅ Booking confirmation sent to %s (ref=%s)", customer_phone, booking_ref)
+        return _report(await wa.send_text(to=customer_phone, text=message),
+                       "Booking confirmation", customer_phone, booking_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send booking confirmation to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+        return False
 
 
 async def send_booking_cancellation(
     customer_phone: str,
     booking_ref: str,
     client_name: str = "",
-) -> None:
+) -> bool:
     """
     Notify the customer that their booking has been cancelled.
     Designed to run as a BackgroundTask — never raises.
@@ -79,13 +103,14 @@ async def send_booking_cancellation(
             f"إذا كان الإلغاء بالخطأ أو تريد إعادة الحجز،\n"
             f"تواصل مع {client_name} مباشرةً."
         )
-        await wa.send_text(to=customer_phone, text=message)
-        logger.info("✅ Cancellation notice sent to %s (ref=%s)", customer_phone, booking_ref)
+        return _report(await wa.send_text(to=customer_phone, text=message),
+                       "Cancellation notice", customer_phone, booking_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send cancellation notice to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+        return False
 
 
 # ── Reservation Engine notifications (Phase D, Customer Experience, 2026-08-24) ────────────────
@@ -100,7 +125,7 @@ async def send_reservation_confirmation(
     barber_name: str,
     reserved_at: str,
     client_name: str = "",
-) -> None:
+) -> bool:
     """Sent when a reservation's status is explicitly moved to "confirmed" -- distinct from the
     WhatsApp bot's own immediate "we received your booking" ack (sent at creation time, while the
     real status is still "pending") -- this is the first real notification tied to the actual
@@ -116,20 +141,21 @@ async def send_reservation_confirmation(
             f"الموعد: {reserved_at}\n\n"
             f"نراك قريباً في {client_name} 💈"
         )
-        await wa.send_text(to=customer_phone, text=message)
-        logger.info("✅ Reservation confirmation sent to %s (ref=%s)", customer_phone, reservation_ref)
+        return _report(await wa.send_text(to=customer_phone, text=message),
+                       "Reservation confirmation", customer_phone, reservation_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation confirmation to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+        return False
 
 
 async def send_reservation_cancellation(
     customer_phone: str,
     reservation_ref: str,
     client_name: str = "",
-) -> None:
+) -> bool:
     """Sent when a reservation's status is moved to "cancelled" -- whether by an admin/STAFF
     action (update_status()) or the customer's own self-cancel (cancel_by_customer()); both real
     callers of this function share the same message, since either way the customer's real-world
@@ -142,13 +168,14 @@ async def send_reservation_cancellation(
             f"إذا كان الإلغاء بالخطأ أو تريد حجز موعد آخر،\n"
             f"تواصل مع {client_name} مباشرةً."
         )
-        await wa.send_text(to=customer_phone, text=message)
-        logger.info("✅ Reservation cancellation notice sent to %s (ref=%s)", customer_phone, reservation_ref)
+        return _report(await wa.send_text(to=customer_phone, text=message),
+                       "Reservation cancellation notice", customer_phone, reservation_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation cancellation notice to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+        return False
 
 
 async def send_reservation_reschedule(
@@ -158,7 +185,7 @@ async def send_reservation_reschedule(
     barber_name: str,
     reserved_at: str,
     client_name: str = "",
-) -> None:
+) -> bool:
     """Sent when edit_reservation() actually changes the schedule (time/duration/barber) -- never
     fired for a name/phone/service-only edit, matching edit_reservation()'s own
     schedule_changed distinction."""
@@ -172,13 +199,14 @@ async def send_reservation_reschedule(
             f"الموعد الجديد: {reserved_at}\n\n"
             f"نراك في {client_name} 💈"
         )
-        await wa.send_text(to=customer_phone, text=message)
-        logger.info("✅ Reservation reschedule notice sent to %s (ref=%s)", customer_phone, reservation_ref)
+        return _report(await wa.send_text(to=customer_phone, text=message),
+                       "Reservation reschedule notice", customer_phone, reservation_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation reschedule notice to %s: %s",
             customer_phone, exc, exc_info=True,
         )
+        return False
 
 
 # ── Staff invite (2026-09-07) ──────────────────────────────────────────────────
@@ -211,35 +239,12 @@ async def send_staff_setup_link(
             f"⚠️ الرابط لمرة واحدة وينتهي خلال 7 أيام.\n"
             f"لا تشاركه مع أحد."
         )
-        resp = await wa.send_text(to=staff_phone, text=message)
-
-        # WhatsAppService._send_request never raises: missing credentials return None, a Meta
-        # rejection (bad number, expired token, no balance) returns the non-200 response, and a
-        # network error returns None. So a try/except alone reports success for EVERY real failure
-        # mode -- measured 2026-09-08 by actually running this path with no credentials: it logged
-        # "Cannot send message" and still returned True. The result has to be inspected.
-        ok = resp is not None and getattr(resp, "status_code", None) == 200
-        if ok:
-            logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
-            return True
-
-        # Say WHY, not just that it failed. Added 2026-09-09 after a real invite silently failed on
-        # production and the only way to tell "credentials missing" from "Meta rejected us" was
-        # server logs the merchant cannot see. The distinction decides who fixes it: an unset env
-        # var is Salman's Railway console; a 401 from Meta is an expired access token; a 4xx on the
-        # recipient is the phone number.
-        if not (wa.phone_number_id and wa.access_token):
-            reason = "credentials_missing"
-        elif resp is None:
-            reason = "network_error"
-        else:
-            reason = f"meta_{getattr(resp, 'status_code', 'unknown')}"
-        logger.error(
-            "🔥 Staff setup link NOT delivered to %s (%s) — reason=%s body=%s",
-            staff_phone, staff_name, reason,
-            (getattr(resp, "text", "") or "")[:300] if resp is not None else "",
-        )
-        return False
+        # The reason classification this function used to derive by hand moved into SendResult
+        # (2026-09-10, Phase 0) so that every other helper gets the same diagnosis instead of only
+        # this one. `reason` still says WHO fixes it — credentials_missing is a Railway env var,
+        # meta_401 is a dead access token, meta_400 with code 131047 is the 24-hour window.
+        return _report(await wa.send_text(to=staff_phone, text=message),
+                       f"Staff setup link ({staff_name})", staff_phone)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send staff setup link to %s: %s",
@@ -265,7 +270,7 @@ async def send_new_reservation_to_merchant(
     service_name:    str,
     barber_name:     str,
     reserved_at:     str,
-) -> None:
+) -> bool:
     """Tell the shop (owner, and the assigned staff member) that a booking just came in.
 
     Deliberately includes the customer's real phone number: the whole point for the merchant is
@@ -288,13 +293,12 @@ async def send_new_reservation_to_merchant(
             "",
             f"رقم الحجز: *{reservation_ref}*",
         ]
-        await wa.send_text(to=recipient_phone, text="\n".join(lines))
-        logger.info(
-            "✅ New-reservation alert sent to %s (%s) for ref=%s",
-            recipient_phone, recipient_label, reservation_ref,
-        )
+        return _report(await wa.send_text(to=recipient_phone, text="\n".join(lines)),
+                       f"New-reservation alert ({recipient_label})", recipient_phone,
+                       reservation_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send new-reservation alert to %s (%s): %s",
             recipient_phone, recipient_label, exc, exc_info=True,
         )
+        return False

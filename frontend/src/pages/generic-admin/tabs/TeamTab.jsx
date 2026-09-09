@@ -476,7 +476,7 @@ export default function TeamTab({ color, activeServices }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: T.textPrimary }}>
               {invite.sent
-                ? `تم إرسال رابط التفعيل إلى ${invite.name} على الواتساب`
+                ? `أُرسل طلب التفعيل إلى ${invite.name} على الواتساب`
                 : `⚠️ حساب ${invite.name} أُنشئ، لكن رسالة الواتساب لم تُرسل`}
             </span>
             <button onClick={() => setInvite(null)}
@@ -489,7 +489,7 @@ export default function TeamTab({ color, activeServices }) {
           </div>
           <p style={{ fontSize: 11.5, color: T.textMuted, margin: '8px 0 0' }}>
             {invite.sent
-              ? 'الرابط لمرة واحدة وينتهي خلال 7 أيام.'
+              ? 'قبلت واتساب الطلب — لكن الوصول الفعلي غير مؤكَّد، فتأكّد منه أنه استلمه. الرابط لمرة واحدة وينتهي خلال 7 أيام.'
               : invite.waConfigured
                 ? 'الحساب سليم — واتساب مُعدّ لكن ميتا رفضت الإرسال (غالباً توكن منتهي أو رقم غير صالح). أرسل الرابط يدوياً الآن، وبعد المعالجة استخدم «إعادة إرسال الدعوة». الرابط لمرة واحدة وينتهي خلال 7 أيام.'
                 : 'الحساب سليم — لا توجد إعدادات واتساب على هذا الخادم إطلاقاً، فلم تُحاول المنصة الإرسال. أرسل الرابط يدوياً الآن. الرابط لمرة واحدة وينتهي خلال 7 أيام.'}

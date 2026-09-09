@@ -630,7 +630,22 @@ async def create_public_booking(db: Prisma, slug: str, data: dict):
                 f"طلبك الآن قيد المراجعة، وسنتواصل معك قريباً جداً لتأكيده.\n"
                 f"شكراً لاختيارك لنا! 🌊"
             )
-            await wa_service.send_text(to=customer.phone, text=message)
+            wa_result = await wa_service.send_text(to=customer.phone, text=message)
+            # Phase 0 — Channel Proof (2026-09-10). send_text never raises, so this try/except
+            # reported success for every real failure mode. The booking still stands either way
+            # (that is why this block is guarded at all), but a customer who was never actually
+            # told must show up in the log as not told.
+            if wa_result:
+                logger.info(
+                    "✅ Booking ack delivered to %s (booking=%s) — wamid=%s",
+                    customer.phone, new_booking.id, getattr(wa_result, "wamid", None) or "—",
+                )
+            else:
+                logger.error(
+                    "🔥 Booking ack NOT delivered to %s (booking=%s) — %s",
+                    customer.phone, new_booking.id,
+                    wa_result.log_suffix() if hasattr(wa_result, "log_suffix") else wa_result,
+                )
         except Exception as wa_error:
             logger.error(f"Failed to send WhatsApp confirmation: {wa_error}")
 
