@@ -154,6 +154,8 @@ function Field({ label, children }) {
 const EMPTY_MEMBER = {
   full_name: '', email: '', phone: '', password: '',
   invite: true, preset: 'staff', barber_id: '', addons: [],
+  // '' = link an existing Staff identity; '__new__' = create one here (2026-09-09).
+  new_staff_name: '', new_staff_phone: '',
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -244,6 +246,10 @@ export default function TeamTab({ color, activeServices }) {
       setFormError('كلمة المرور مطلوبة')
       return
     }
+    if (selectedPreset?.requiresBarber && form.barber_id === '__new__' && !form.new_staff_name.trim()) {
+      setFormError('اكتب اسم الموظف الجديد')
+      return
+    }
     if (selectedPreset?.requiresBarber && !form.barber_id) {
       // The server enforces this too (422) — this is the friendly first line of defence, not the
       // authority. A self-scoped account with no barber link fails closed on every request.
@@ -261,7 +267,17 @@ export default function TeamTab({ color, activeServices }) {
       // setup token and WhatsApps it. Sending one keeps the original direct-set behaviour.
       if (form.invite) payload.phone = form.phone
       else             payload.password = form.password
-      if (selectedPreset?.requiresBarber) payload.barber_id = form.barber_id
+      if (selectedPreset?.requiresBarber) {
+        // Team is now the one place an employee is created (2026-09-09). '__new__' asks the server
+        // to create the Staff identity and link it in the same request; anything else is an
+        // existing identity's id. The two are mutually exclusive server-side (team.py).
+        if (form.barber_id === '__new__') {
+          payload.new_staff_name  = form.new_staff_name.trim()
+          payload.new_staff_phone = form.new_staff_phone
+        } else {
+          payload.barber_id = form.barber_id
+        }
+      }
       if (form.addons.length) payload.addons = form.addons
       const { data } = await adminApi.post('/team', payload)
       setShowModal(false)
@@ -514,12 +530,33 @@ export default function TeamTab({ color, activeServices }) {
                 {availableBarbers.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
+                <option value="__new__">➕ موظف جديد…</option>
               </select>
               <span style={{ display: 'block', fontSize: 11, color: T.textMuted, marginTop: 6 }}>
                 هذا الربط هو ما يجعل الحساب يرى حجوزاته هو فقط.
-                {availableBarbers.length === 0 && ' — لا يوجد موظف بلا حساب دخول حالياً.'}
+                {availableBarbers.length === 0 && ' — لا يوجد موظف بلا حساب دخول حالياً، أنشئ واحداً.'}
               </span>
             </Field>
+          )}
+
+          {/* Team as the employee-management surface (2026-09-09). Creating the Staff identity here
+              is what removes the old two-step "make a barber on one page, then an account on
+              another". The two stay SEPARATE database rows — this is a UI unification, not a
+              merge. */}
+          {selectedPreset?.requiresBarber && form.barber_id === '__new__' && (
+            <>
+              <Field label="اسم الموظف الجديد">
+                <input style={inputStyle} value={form.new_staff_name}
+                  placeholder="مثال: جعفر"
+                  onChange={e => setForm({ ...form, new_staff_name: e.target.value })} />
+              </Field>
+              <PhoneField
+                label="رقم الموظف (اختياري)"
+                value={form.new_staff_phone}
+                onChange={next => setForm({ ...form, new_staff_phone: next })}
+                inputStyle={inputStyle}
+              />
+            </>
           )}
 
           {formError && (

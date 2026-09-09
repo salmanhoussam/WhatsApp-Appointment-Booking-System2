@@ -106,7 +106,10 @@ export default function StaffTab({ color }) {
   // `?view=services|employees` (SettingsTab.jsx's CapabilityLink) so opening "الخدمات"/"فريقنا"
   // from the Section Editor lands directly on the matching sub-view, not always the default.
   const [searchParams] = useSearchParams()
-  const [subView, setSubView] = useState(() => searchParams.get('view') === 'services' ? 'services' : 'employees')
+  // Pinned to 'services' since 2026-09-09: this page no longer has an employees sub-view (that
+  // moved to Team). Kept as a constant rather than deleted because the services loader below
+  // still guards on it, and the ?view= param is a real URL other surfaces may still link to.
+  const subView = 'services'
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   useEffect(() => {
@@ -459,42 +462,17 @@ export default function StaffTab({ color }) {
 
   return (
     <div style={{ fontFamily: FONT }}>
-      {/* الموظفون / الخدمات toggle -- Staff/Store IA Separation, 2026-08-09. Same pill style as
-          ReservationsTab.jsx's Today/Week/List switcher. */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {[['employees', 'الموظفون'], ['services', 'الخدمات']].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSubView(id)}
-            style={{
-              padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', fontFamily: FONT, border: 'none',
-              background: subView === id ? color : T.cardBg,
-              color: subView === id ? '#0a0a0f' : T.textSecond,
-              transition: 'background 0.15s ease, color 0.15s ease',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>
-          {subView === 'employees' ? 'الموظفون' : 'الخدمات'}
+          الخدمات
         </span>
-        {subView === 'employees' ? (
-          <Button variant="primary" color={color} onClick={openCreate}>+ موظف جديد</Button>
-        ) : (
-          <Button variant="primary" color={color} onClick={openCreateService} disabled={catOptions.length === 0}>+ خدمة جديدة</Button>
-        )}
+        <Button variant="primary" color={color} onClick={openCreateService} disabled={catOptions.length === 0}>+ خدمة جديدة</Button>
       </div>
 
       {/* Employee <-> Service two-panel view (#7/C, 2026-08-10) -- only in الموظفون sub-view, only
           once real staff exist (an empty roster has nothing to select). Coexists with the card
           grid below, unchanged, and with the edit-modal checklist (G3 default). */}
-      {subView === 'employees' && !loading && staff.length > 0 && (
+      {!loading && staff.length > 0 && (
         <Card padding={0} style={{ marginBottom: 16, overflow: 'hidden' }}>
           <div style={{
             display: 'grid',
@@ -576,8 +554,12 @@ export default function StaffTab({ color }) {
         </Card>
       )}
 
-      {subView === 'services' ? (
-        svcLoading ? (
+      {/* Services only (2026-09-09, Salman's decision). The employee card grid and its
+          '+ موظف جديد' button that used to live here moved to the Team tab, which is now the
+          one place an employee is created or managed. The Employee<->Service assignment matrix
+          above STAYS: it configures which services a service is delivered by, and removing it
+          would leave no way to configure the booking flow at all. */}
+      {svcLoading ? (
           <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
         ) : svcList.length === 0 ? (
           <Card padding={0} style={{ textAlign: 'center' }}>
@@ -622,57 +604,7 @@ export default function StaffTab({ color }) {
             ))}
           </div>
         )
-      ) : loading ? (
-        <p style={{ color: T.textMuted, fontSize: 13 }}>جاري التحميل...</p>
-      ) : staff.length === 0 ? (
-        <Card padding={0} style={{ textAlign: 'center' }}>
-          <EmptyState icon="👤" message="لا يوجد موظفون بعد — أضف أول موظف للبدء" />
-        </Card>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-          {staff.map(member => (
-            <Card key={member.id} padding={16} style={{ opacity: member.is_active ? 1 : 0.55 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                {member.image_url
-                  ? <img src={member.image_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                  : <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${color}18`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color }}>{member.name?.[0] ?? '?'}</div>
-                }
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {member.name}
-                  </div>
-                  {member.phone && (
-                    <div style={{ fontSize: 11, color: T.textMuted, direction: 'ltr', textAlign: 'right' }}>{member.phone}</div>
-                  )}
-                </div>
-                {!member.is_active && (
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: `${T.textMuted}22`, color: T.textMuted, fontWeight: 600, flexShrink: 0 }}>
-                    مخفي
-                  </span>
-                )}
-              </div>
-              {member.description && (
-                <div style={{ fontSize: 12, color: T.textSecond, marginBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                  {member.description}
-                </div>
-              )}
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 10 }}>
-                {member.working_hours?.open_time && member.working_hours?.close_time
-                  ? `${member.working_hours.open_time} – ${member.working_hours.close_time}`
-                  : 'لم تُحدد ساعات العمل'}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button variant="secondary" size="sm" onClick={() => openEdit(member)}>تعديل</Button>
-                {member.is_active ? (
-                  <Button variant="danger" size="sm" onClick={() => deactivate(member)}>إخفاء</Button>
-                ) : (
-                  <Button variant="primary" color={color} size="sm" onClick={() => activate(member)}>إظهار</Button>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      }
 
       {showModal && (
         <Modal

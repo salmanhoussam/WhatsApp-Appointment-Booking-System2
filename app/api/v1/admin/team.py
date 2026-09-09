@@ -89,6 +89,15 @@ class TeamMemberCreate(BaseModel):
     preset:    Optional[str]       = None
     addons:    Optional[list[str]] = None
     barber_id: Optional[str]       = None
+    # Team as the employee-management surface (2026-09-09, Salman's decision). A self-scoped preset
+    # needs a Staff identity to point at; until now the owner had to create the Barber on the Staff
+    # page FIRST and only then come here -- the two "new employee" buttons that made the two
+    # surfaces confusing. Supplying this creates the Staff identity in the same request and links
+    # it. Mutually exclusive with barber_id: pick an existing identity, or create one, never both.
+    # Deliberately NOT a merge -- Barber and User stay separate rows, exactly as investigated in
+    # .claudedocs/work/team-barber-user/2026-09-09/report.md.
+    new_staff_name:  Optional[str] = None
+    new_staff_phone: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -171,6 +180,27 @@ async def create_team_member(
                 raise HTTPException(status_code=422, detail=str(e))
 
             if resolved["requires_barber"]:
+                # Create the Staff identity first when the caller asked for a new one. Ordering is
+                # deliberate: the Barber row must exist before the User row is written, because
+                # User.barberId is a real FK -- and if the User create fails afterwards, an orphan
+                # Barber is a harmless, visible row on the Staff page, whereas the reverse would be
+                # an account that fails closed on every scoped request (permissions.py:250-254).
+                if body.new_staff_name and body.barber_id:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="اختر موظفاً موجوداً أو أنشئ واحداً جديداً — لا الاثنين معاً.",
+                    )
+                if body.new_staff_name:
+                    created_barber = await _barber_repo.create_barber({
+                        "clientId": tenant["id"],          # server-derived, never client-supplied
+                        "name":     body.new_staff_name.strip(),
+                        # Same Phone Numbers rule as the account's own number
+                        # (.claude/rules/phone-numbers.md): stored WITH the country code.
+                        "phone":    normalize_for_storage(body.new_staff_phone),
+                        "isActive": True,
+                    })
+                    body.barber_id = created_barber.id
+
                 if not body.barber_id:
                     raise HTTPException(
                         status_code=422,

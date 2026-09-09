@@ -204,7 +204,7 @@ function buildNav(hasReservations, activeServices, isOwner = false) {
     { id: 'overview',      labelAr: 'نظرة عامة',  Icon: IconOverview      },
     { id: 'calendar',      labelAr: 'التقويم',    Icon: IconCalendar      },
     { id: 'reservations',  labelAr: 'الحجوزات',   Icon: IconList          },
-    { id: 'staff',         labelAr: 'الموظفون',   Icon: IconStaff         },
+    { id: 'staff',         labelAr: 'الخدمات',    Icon: IconStaff         },  // renamed 2026-09-09 — employees moved to Team; id stays 'staff' so existing deep links keep working
     ...(hasStore ? [{ id: 'store', labelAr: 'المتجر', Icon: IconOrders }] : []),
     { id: 'customers',     labelAr: 'العملاء',    Icon: IconCustomers     },
     ...team,
