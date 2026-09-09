@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.core.tenant import require_roles
+from app.core.permissions import require_permission
 from app.core.services import require_service
 from app.core.db_resilience import with_db_resilience
 from app.db.client import prisma_client
@@ -42,6 +43,19 @@ async def _require_catalog_or_reservations(tenant: dict = Depends(get_current_te
 # other role's existing de-facto access exactly as it was (nothing removed for SUPER_ADMIN/
 # TENANT_ADMIN/MANAGER_RESERVATIONS/MANAGER_UNITS -- they simply weren't gated before either).
 CATALOG_ROLES = ("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS")
+
+# Slice 4 (2026-09-09) -- migrated to require_permission(), the same shape Slice 3 applied to
+# store.py/customers. CATALOG_ROLES is still passed through as the legacy fallback, which is what
+# makes this additive rather than a behaviour change: an account with permissions=NULL (every
+# account created before 2026-09-04) resolves through the role tuple exactly as before, invariant
+# I1. Only accounts carrying an explicit permissions array are newly able to reach these routes.
+#
+# Why this slice exists: catalog was the last unmigrated area, and PHASE_2B_2_DESIGN.md §1 forbids
+# offering a preset that grants an unmigrated area. That single gap blocked BOTH the registered
+# reservations_manager preset and any full-tenant manager -- so this is the dependency, not a
+# cleanup.
+_READ  = ("catalog.read",  *CATALOG_ROLES)
+_WRITE = ("catalog.write", *CATALOG_ROLES)
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -110,7 +124,7 @@ async def list_categories(
     module_key:       Optional[str] = Query(None),
     parent_id:        Optional[str] = Query(None),
     include_inactive: bool          = Query(False),
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_READ)),
     _svc = Depends(_require_catalog_or_reservations),
 ):
     data = await catalog_service.admin_list_categories(
@@ -125,7 +139,7 @@ async def list_categories(
 @router.post("/categories", status_code=201)
 async def create_category(
     body: CategoryCreate,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_create_category(
@@ -145,7 +159,7 @@ async def create_category(
 async def update_category(
     category_id: str,
     body: CategoryUpdate,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_update_category(
@@ -165,7 +179,7 @@ async def update_category(
 @router.delete("/categories/{category_id}")
 async def delete_category(
     category_id: str,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     await catalog_service.admin_delete_category(user.clientId, category_id)
@@ -175,7 +189,7 @@ async def delete_category(
 @router.post("/seed-from-template", status_code=201)
 async def seed_from_template(
     body: SeedFromTemplateRequest,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_seed_from_template(
@@ -195,7 +209,7 @@ async def list_items(
     category_id:      Optional[str] = Query(None),
     featured_only:    bool          = Query(False),
     include_inactive: bool          = Query(False),
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_READ)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_list_items(
@@ -210,7 +224,7 @@ async def list_items(
 @router.post("/items", status_code=201)
 async def create_item(
     body: ItemCreate,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_create_item(
@@ -234,7 +248,7 @@ async def create_item(
 async def update_item(
     item_id: str,
     body: ItemUpdate,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     data = await catalog_service.admin_update_item(
@@ -259,7 +273,7 @@ async def update_item(
 @router.delete("/items/{item_id}")
 async def delete_item(
     item_id: str,
-    user = Depends(require_roles(*CATALOG_ROLES)),
+    user = Depends(require_permission(*_WRITE)),
     _svc = Depends(require_service("catalog")),
 ):
     await catalog_service.admin_delete_item(user.clientId, item_id)

@@ -64,10 +64,10 @@ const PRESETS = [
   },
   {
     id: 'reservations_manager', label: 'مدير الحجوزات',
-    hint: 'يدير كل الحجوزات',
-    // Deliberately shown, not hidden (design §6.2): a visible disabled option with its reason makes
-    // the migration state legible instead of mysterious.
-    assignable: false, reason: 'غير متاح بعد — صلاحيات الكتالوج لم تُرحّل بعد',
+    hint: 'يدير كل الحجوزات، ويطّلع على الكتالوج وسجل العملاء',
+    // Became assignable 2026-09-09 when Slice 4 migrated the catalog area — the one dependency
+    // that had kept it registered-but-blocked since it was written.
+    assignable: true, requiresBarber: false,
   },
   {
     id: 'shop_manager', label: 'مدير المتجر',
@@ -75,6 +75,11 @@ const PRESETS = [
     assignable: true, requiresBarber: false,
     requiresService: 'store',
     serviceReason: 'غير متاح — هذا الحساب لا يملك خدمة المتجر',
+  },
+  {
+    id: 'tenant_manager', label: 'مدير المنشأة',
+    hint: 'يدير الحجوزات والخدمات والموظفين والكتالوج والمتجر والعملاء — لكنه ليس المالك، ولا يغيّر وحدات المنشأة',
+    assignable: true, requiresBarber: false,
   },
   {
     id: 'tenant_admin', label: 'المالك',

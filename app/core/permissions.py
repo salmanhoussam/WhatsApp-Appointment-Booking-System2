@@ -103,6 +103,43 @@ PRESETS: dict[str, dict] = {
         "legacy_role":     "STAFF",
         "requires_barber": False,
     },
+    # 'tenant_manager' (Slice 4, 2026-09-09) -- Salman's confirmed product definition: a Manager
+    # runs the tenant's business across the dashboard, but is NOT the owner and is NOT SUPER_ADMIN.
+    #
+    # Built as a real permission array rather than a second TENANT_ADMIN, deliberately:
+    #   * It is DISTINGUISHABLE. A tenant_admin-shaped manager is indistinguishable from the owner,
+    #     which is what made option M3 unsafe (report 2026-09-09 §3).
+    #   * It is BOUNDED. The array is every MIGRATED area's write permission -- so what a manager
+    #     can do is enumerable and reviewable, not "whatever TENANT_ADMIN happens to mean today".
+    #   * It cannot reach SUPER_ADMIN: no permission string grants it, and legacy_role is the
+    #     nearest tenant-level value, never an infrastructure one.
+    #
+    # legacy_role TENANT_ADMIN is what keeps a manager working on routes NOT yet migrated to
+    # require_permission() -- those still evaluate the role tuple (invariant I1). This is the one
+    # place the two systems must agree, and it is why this preset could not exist before Slice 4:
+    # every area it grants has to be migrated first (PHASE_2B_2_DESIGN.md §1).
+    #
+    # NOT granted: nothing outside the tenant. Team/account management stays with the owner --
+    # admin/team.py's own tuple is ("SUPER_ADMIN","TENANT_ADMIN") and a manager carrying an explicit
+    # permissions array is denied there by deny-by-default (I4), which is the intended boundary:
+    # a manager runs the business, the owner decides who has keys.
+    "tenant_manager": {
+        # Every string below is verified to gate a real route today; none was invented to round out
+        # the set. x.write satisfies x.read (I5), so the read side needs no separate entry.
+        #   reservations.write -> admin/reservations.py      staff.write    -> admin/barbers.py
+        #   services.write     -> admin/catalog_services.py  catalog.write  -> admin/catalog.py
+        #   store.write        -> admin/store.py             customers.read -> admin/customers.py
+        #
+        # capabilities.write is DELIBERATELY ABSENT. admin/client_services.py's own header states
+        # the approved boundary: "turning a tenant's modules on and off is a tenant-owner decision,
+        # not an operational one. Managers are denied." A manager runs the business the tenant has;
+        # deciding which modules the business BUYS stays with the owner.
+        "permissions":     ["reservations.write", "staff.write", "services.write",
+                            "catalog.write", "store.write", "customers.read"],
+        "scope":           "all",
+        "legacy_role":     "TENANT_ADMIN",
+        "requires_barber": False,
+    },
     # 'tenant_admin' is deliberately NOT permission-based (PHASE_2B_2_DESIGN.md §2): an owner is
     # stored exactly as owners are stored today (role=TENANT_ADMIN, permissions=NULL) so it resolves
     # through the legacy path and keeps working across migrated and unmigrated areas alike.
@@ -136,11 +173,12 @@ ADDONS: dict[str, list[str]] = {"inventory": ["store.write"]}
 # neither computes assignability independently.
 #
 #   Slice 1 -> capabilities   Slice 2 -> reservations, staff, services
-#   Slice 3 -> store, customers                      Slice 4 -> catalog (not yet)
+#   Slice 3 -> store, customers                      Slice 4 -> catalog
 MIGRATED_AREAS: frozenset[str] = frozenset({
     "capabilities",                          # Slice 1 (2B-1)
     "reservations", "staff", "services",     # Slice 2 (2B-3)
     "store", "customers",                    # Slice 3
+    "catalog",                               # Slice 4 (2026-09-09) -- admin/catalog.py's 9 routes
 })
 
 

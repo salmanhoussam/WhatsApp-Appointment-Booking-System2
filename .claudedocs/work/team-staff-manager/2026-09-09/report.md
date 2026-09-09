@@ -432,3 +432,134 @@ TENANT MANAGER: **NEED DECISION** — blocked by the catalog migration (Slice 4)
 MANAGER-AS-STAFF: **GO**
 BARBER → STAFF: **DEFERRED**
 JAAFAR: **WAITING FOR EXPLICIT PRODUCTION ACTION**
+
+---
+
+# Implementation pass 3 — Slice 4 (catalog) and the real Tenant Manager
+
+**Appended 2026-09-09.** Nothing above rewritten. **0 schema changes · 0 migrations · 0 deploys.**
+This pass removes the blocker §E named, then builds the preset that blocker was preventing.
+
+## A. Slice 4 — the catalog area migrated
+
+`app/api/v1/admin/catalog.py`: all **9 routes** moved from `require_roles(*CATALOG_ROLES)` to
+`require_permission(*_READ | *_WRITE)`, following Slice 3's shape verbatim (`store.py`), with
+`CATALOG_ROLES` still passed through as the legacy tuple.
+
+| | |
+|---|---|
+| GET `/categories`, `/items` | `catalog.read` |
+| POST/PATCH/DELETE `/categories`, `/items`, POST `/seed-from-template` | `catalog.write` |
+
+**Additive, not a behaviour change:** an account with `permissions = NULL` — every account created
+before 2026-09-04 — still resolves through the role tuple exactly as before (invariant I1). Only
+accounts carrying an explicit permissions array gain reach.
+
+`MIGRATED_AREAS` now contains all seven areas. Consequence, verified by running the module:
+
+```
+ASSIGNABLE_PRESETS : reservations_manager · shop_manager · staff · tenant_admin · tenant_manager
+```
+
+`reservations_manager` — registered but blocked since it was written — **became assignable by
+removing its dependency**, not by editing the preset.
+
+## B. `tenant_manager` — the confirmed product definition, as a real permission array
+
+```python
+"tenant_manager": {
+    "permissions": ["reservations.write", "staff.write", "services.write",
+                    "catalog.write", "store.write", "customers.read"],
+    "scope": "all", "legacy_role": "TENANT_ADMIN", "requires_barber": False,
+}
+```
+
+Built as a permission array rather than a second `TENANT_ADMIN` — deliberately, and this is the
+architectural decision of this pass:
+
+- **Distinguishable.** A `tenant_admin`-shaped manager is indistinguishable from the owner, which is
+  exactly what made option M3 unsafe.
+- **Bounded.** What a manager can do is enumerable and reviewable, not "whatever TENANT_ADMIN
+  happens to mean today".
+- **Cannot reach SUPER_ADMIN.** No permission string grants it; `legacy_role` is a tenant-level
+  value, never an infrastructure one.
+
+`legacy_role: TENANT_ADMIN` is what keeps a manager working on routes **not yet** migrated — those
+still evaluate the role tuple. That is the one place the two systems must agree, and it is why this
+preset could not exist before Slice 4.
+
+### Every string verified, none invented
+
+Checked against the real gates in `app/`: `reservations.write` · `staff.write` · `services.write` ·
+`catalog.write` · `store.write` · `customers.read`. `x.write` satisfies `x.read` (invariant I5), so
+the read side needs no separate entry.
+
+**`capabilities.write` is deliberately absent.** `admin/client_services.py`'s own header states the
+approved boundary: *"turning a tenant's modules on and off is a tenant-owner decision, not an
+operational one. Managers are denied."* A manager runs the business the tenant **has**; deciding
+which modules the business **buys** stays with the owner. Team/account management is excluded for
+the same reason — a manager runs the business, the owner decides who has keys.
+
+## C. Tests — a real manager account against real routes
+
+Created on the test tenant `barberlab-test`, exercised, then deleted. `catalog` and `store` were
+temporarily activated for the tenant (it had only `reservations`) and **removed again afterwards** —
+verified back to `['reservations']`.
+
+**Manager reach — identical to the owner on every business surface:**
+
+| Route | manager | owner |
+|---|---|---|
+| `catalog/categories` · `catalog/items` | **200** | 200 |
+| `store/products` | **200** | 200 |
+| `customers/` · `barbers/` · `catalog-services/` · `reservations/` | **200** | 200 |
+
+**Manager boundary — denied exactly where intended:**
+
+| Attempt | Result |
+|---|---|
+| `POST /client-services/activate` (change tenant modules) | **403** |
+| `GET /team` (account management) | **403** |
+
+**First run produced two 403s that were NOT the permission gate** — `catalog/items` and
+`store/products` — and the owner got 403 on the same routes. Traced to the **service gate**:
+`barberlab-test` had only `reservations` active. Recorded because it is exactly the kind of result
+that would otherwise be mistaken for a permission bug.
+
+**Tenant binding — proven, not assumed.** A manager token for `barberlab-test` calling
+`?client_slug=rk` first returned 200, which looked like a cross-tenant read. It is not: the JWT wins
+over the query param (`get_current_tenant`'s documented priority order). Proof — after `catalog` was
+removed from `barberlab-test`, the identical `client_slug=rk` request returned **403 "Service
+'catalog' is not activated for this tenant"**, i.e. the response tracks the **token's** tenant, not
+the parameter's. A client-supplied tenant id cannot cross tenants.
+
+## D. UI
+
+`TeamTab.jsx` gains **مدير المنشأة** (`tenant_manager`), placed between the narrower managers and
+المالك so the list reads staff → managers → owner. `مدير الحجوزات` loses its "not available yet"
+reason and becomes selectable, because its dependency is gone.
+
+Its hint states the boundary in the merchant's own words: manages reservations, services, staff,
+catalog, store and customers — **but is not the owner and does not change the tenant's modules.**
+
+## E. Architectural decision recorded
+
+> **A full-tenant Manager is expressed as a bounded permission array with a `TENANT_ADMIN` legacy
+> fallback — never as a second owner account.** The legacy fallback is a migration artefact that
+> shrinks as areas migrate; the array is the contract. This is what makes "manager" reviewable and
+> revocable rather than a synonym for "owner".
+
+Consequence to watch: while any area remains unmigrated, a manager reaches it through
+`legacy_role`, i.e. with owner-equivalent rights on that area. Today every area **is** migrated, so
+the gap is closed — but a **new** area added without a permission gate would silently re-open it.
+Recorded as the standing invariant for future slices, not as a present defect.
+
+## F. Status change
+
+Blocker §K.1 (`catalog` unmigrated) is **CLOSED**. Remaining: جعفر's two approved production writes,
+and the two 🟡 notes.
+
+---
+
+TENANT MANAGER: **GO** — implemented, tested, bounded
+SLICE 4 (catalog): **GO** — 9 routes migrated, additive
