@@ -66,6 +66,13 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload.")
 
+    # Delivery receipts. Log-only — no behaviour change, no state written, no task scheduled.
+    # Phase 0 — Channel Proof (2026-09-10): until now these were dropped unread, which meant
+    # "delivered" was unprovable and a message Meta accepted (HTTP 200) but never actually
+    # delivered looked identical to one the customer read. Nothing else in this vision can be
+    # trusted until this is observable, so it lands in Phase 0 rather than as an optimisation.
+    _log_statuses(payload)
+
     # Meta sends status updates (delivered, read) alongside messages —
     # skip them early to avoid unnecessary processing.
     if not _has_messages(payload):
@@ -101,6 +108,42 @@ def _verify_signature(raw_body: bytes, signature_header: Optional[str]) -> bool:
     ).hexdigest()
     provided = signature_header[len("sha256="):]
     return hmac.compare_digest(expected, provided)
+
+
+def _log_statuses(payload: dict) -> None:
+    """Log every delivery receipt Meta sends. Never raises — this runs inside the webhook's own
+    request path, and an exception here would return 500 to Meta and trigger a retry storm.
+
+    A status entry carries the `wamid` that `WhatsAppService._send_request` captured at send time,
+    so the two halves of one message can finally be correlated. `failed` entries carry an `errors`
+    array whose `code` is the same numeric namespace as a send-time rejection — `131047` for the
+    closed 24-hour customer-service window, `131026` for an undeliverable recipient — which is how
+    Gate 0's hypothesis gets settled with an observation instead of an assumption.
+    """
+    try:
+        for entry in payload.get("entry", []):
+            for change in entry.get("changes", []):
+                for st in (change.get("value", {}) or {}).get("statuses", []) or []:
+                    state = st.get("status")
+                    errors = st.get("errors") or []
+                    line = (
+                        f"wamid={st.get('id')} status={state} "
+                        f"recipient={st.get('recipient_id')} ts={st.get('timestamp')}"
+                    )
+                    if errors or state == "failed":
+                        first = errors[0] if isinstance(errors, list) and errors else {}
+                        detail = (first.get("error_data") or {}).get("details") if isinstance(
+                            first.get("error_data"), dict
+                        ) else None
+                        logger.error(
+                            "📵 WhatsApp delivery FAILED — %s meta_code=%s title=%s detail=%s",
+                            line, first.get("code"), first.get("title"),
+                            detail or first.get("message"),
+                        )
+                    else:
+                        logger.info("📬 WhatsApp delivery status — %s", line)
+    except Exception as exc:  # pragma: no cover — defensive, must never break the webhook
+        logger.warning("Could not read WhatsApp statuses[]: %s", exc)
 
 
 def _has_messages(payload: dict) -> bool:
