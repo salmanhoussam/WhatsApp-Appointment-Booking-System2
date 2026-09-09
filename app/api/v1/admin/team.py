@@ -29,12 +29,24 @@ from app.core.tenant import get_current_tenant, require_roles
 from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL, is_password_pending
 from app.services.whatsapp_notifications import send_staff_setup_link
 from app.core.phone import normalize_for_storage
+from app.core.tenant_urls import setup_link
+from app.core.config import settings as _settings
 from app.repositories import admin_client_repo as _client_repo
 from app.repositories import barber_repo as _barber_repo
 from app.repositories import user_repo as _repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Team"])
+
+
+def _whatsapp_configured() -> bool:
+    """Whether outbound WhatsApp is configured at all on THIS deployment.
+
+    Surfaced to the Team UI so a failed invite can say "the platform has no WhatsApp credentials"
+    instead of leaving the owner to guess. Reports only presence, never a value.
+    """
+    return bool(getattr(_settings, "WHATSAPP_PHONE_NUMBER_ID", None)
+                and getattr(_settings, "WHATSAPP_ACCESS_TOKEN", None))
 
 
 def _derive_email(phone: Optional[str], full_name: str, slug: str) -> str:
@@ -313,13 +325,17 @@ async def create_team_member(
         result = _project(user)
 
         if invited:
-            base_url  = os.getenv("FRONTEND_URL", "https://salmansaas.com")
-            setup_url = f"{base_url}/setup?token={setup_token}"
+            # Derived from the tenant's own lifecycle_state, never from FRONTEND_URL — that env var
+            # was unset on Railway and this line fell back to the APEX domain, which serves an
+            # older frontend build that cannot handle a setup token. See app/core/tenant_urls.py.
+            _c = await _client_repo.find_client_by_id(tenant["id"])
+            setup_url = setup_link(getattr(_c, "lifecycle_state", None), setup_token)
             # Returned to the OWNER as well as WhatsApped: delivery is best-effort (the helper
             # never raises), so without this the owner would have no way to reach an invitee whose
             # message failed to send. This is the only response that ever carries the raw token,
             # and it goes only to the TENANT_ADMIN who just created the account.
             result["setup_url"]   = setup_url
+            result["whatsapp_configured"] = _whatsapp_configured()
             # Was `bool(body.phone)` until 2026-09-08 -- it reported the PRESENCE of a number, not
             # the success of a send, so a failed invite looked identical to a delivered one. That is
             # how جعفر sat locked out for six days while the dashboard said "sent". Now set from the
@@ -330,12 +346,11 @@ async def create_team_member(
                 # the shop's real display name is read here rather than sent as a bare slug — an
                 # invite reading "حسابك في rk" is not something to hand a real staff member. One
                 # extra read, only on the invite path.
-                client = await _client_repo.find_client_by_id(tenant["id"])
                 shop_name = (
-                    getattr(client, "name_ar", None)
-                    or getattr(client, "name_en", None)
+                    getattr(_c, "name_ar", None)
+                    or getattr(_c, "name_en", None)
                     or tenant["slug"]
-                ) if client else tenant["slug"]
+                ) if _c else tenant["slug"]
                 # Awaited, not backgrounded: the owner needs the real outcome in this response,
                 # and a BackgroundTask cannot report one. The helper still never raises, so a
                 # failed WhatsApp cannot roll back the account that was just created -- the owner
@@ -574,10 +589,8 @@ async def resend_invite(
         expires = datetime.now(timezone.utc) + timedelta(days=7)
         await _repo.update_user(user_id, {"setupToken": token, "setupTokenExp": expires})
 
-        base_url  = os.getenv("FRONTEND_URL", "https://salmansaas.com")
-        setup_url = f"{base_url}/setup?token={token}"
-
         client = await _client_repo.find_client_by_id(tenant["id"])
+        setup_url = setup_link(getattr(client, "lifecycle_state", None), token)
         shop_name = (
             getattr(client, "name_ar", None) or getattr(client, "name_en", None) or tenant["slug"]
         ) if client else tenant["slug"]
@@ -588,7 +601,10 @@ async def resend_invite(
             setup_url=setup_url, client_name=shop_name,
         )
         logger.info("🔁 Invite resent for %s (delivered=%s) tenant %s", user.email, sent, tenant["slug"])
-        return {"success": True, "data": {"setup_url": setup_url, "invite_sent": sent}}
+        return {"success": True, "data": {
+            "setup_url": setup_url, "invite_sent": sent,
+            "whatsapp_configured": _whatsapp_configured(),
+        }}
 
     except HTTPException:
         raise

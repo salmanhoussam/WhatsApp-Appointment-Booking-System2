@@ -297,7 +297,7 @@ export default function TeamTab({ color, activeServices }) {
       setShowModal(false)
       // The setup link is shown even when WhatsApp reported success: delivery is best-effort
       // server-side (the notification helper never raises), so the owner always keeps a fallback.
-      if (data?.setup_url) setInvite({ name: form.full_name.trim(), url: data.setup_url, sent: !!data.invite_sent })
+      if (data?.setup_url) setInvite({ name: form.full_name.trim(), url: data.setup_url, sent: !!data.invite_sent, waConfigured: data.whatsapp_configured !== false })
       await load()
     } catch (e) {
       setFormError(e?.response?.data?.detail || 'تعذّر إنشاء الحساب')
@@ -325,7 +325,7 @@ export default function TeamTab({ color, activeServices }) {
     try {
       const { data } = await adminApi.post(`/team/${member.id}/resend-invite`)
       const d = data?.data ?? data
-      setInvite({ name: member.full_name, url: d.setup_url, sent: !!d.invite_sent })
+      setInvite({ name: member.full_name, url: d.setup_url, sent: !!d.invite_sent, waConfigured: d.whatsapp_configured !== false })
       await load()
     } catch (e) {
       alert(e?.response?.data?.error?.message ?? e?.response?.data?.detail ?? 'تعذّرت إعادة الإرسال')
@@ -490,7 +490,9 @@ export default function TeamTab({ color, activeServices }) {
           <p style={{ fontSize: 11.5, color: T.textMuted, margin: '8px 0 0' }}>
             {invite.sent
               ? 'الرابط لمرة واحدة وينتهي خلال 7 أيام.'
-              : 'الحساب سليم — المشكلة في إرسال الواتساب فقط. أرسل الرابط يدوياً الآن، أو استخدم «إعادة إرسال الدعوة» بعد معالجة الإرسال. الرابط لمرة واحدة وينتهي خلال 7 أيام.'}
+              : invite.waConfigured
+                ? 'الحساب سليم — واتساب مُعدّ لكن ميتا رفضت الإرسال (غالباً توكن منتهي أو رقم غير صالح). أرسل الرابط يدوياً الآن، وبعد المعالجة استخدم «إعادة إرسال الدعوة». الرابط لمرة واحدة وينتهي خلال 7 أيام.'
+                : 'الحساب سليم — لا توجد إعدادات واتساب على هذا الخادم إطلاقاً، فلم تُحاول المنصة الإرسال. أرسل الرابط يدوياً الآن. الرابط لمرة واحدة وينتهي خلال 7 أيام.'}
           </p>
         </div>
       )}

@@ -1,0 +1,44 @@
+"""Which host a tenant's own dashboard links must point at.
+
+Established 2026-09-09 from a real failure: a staff invite link was built from the global
+`FRONTEND_URL` env var, which was unset on Railway, so `admin/team.py` fell back to
+`https://salmansaas.com` — the APEX domain. The apex serves a DIFFERENT frontend build from
+`demo.`/`alzabt.` (measured the same day: `index-RDs22Cyx.js` vs `index-BUukhr3G.js`), and that
+older build cannot handle a setup token. The invite arrived at a page that answered
+"رابط غير صالح".
+
+Two defects in one line, both fixed by deriving the host instead of reading it from the environment:
+
+1. **A tenant-dependent value was stored in a single global variable.** `rules/frontend/routing.md`
+   §0b already defines the mapping — trial tenants live on `demo.`, subscribed ones on `alzabt.` —
+   so one env var can never be right for both at once.
+2. **`FRONTEND_URL` is documented as COMMA-SEPARATED** (`app/core/config.py:32`, for CORS) while
+   three call sites consumed it as a single base URL. Set it to two hosts to fix CORS and every
+   generated link silently becomes `https://a.com,https://b.com/setup?token=…`.
+
+This module does not read `FRONTEND_URL` at all. Nothing here needs an environment variable,
+because the answer is already in the tenant row.
+"""
+
+from typing import Optional
+
+# rules/frontend/routing.md §0b. Kept as data so a third host is a one-line change, not a new
+# branch, and so the mapping is readable next to the reason it exists.
+_TRIAL_HOST      = "https://demo.salmansaas.com"
+_SUBSCRIBED_HOST = "https://alzabt.salmansaas.com"
+
+# Only `evergreen` means "subscribed" today (the one real instance is `smar`); every other tenant
+# is `trial`. Defaulting the UNKNOWN case to the trial host is deliberate: a trial host serving a
+# subscribed tenant is a cosmetic wrong-domain link, while the reverse sends a trial tenant to a
+# host it may not be provisioned on.
+_SUBSCRIBED_STATES = {"evergreen", "subscribed", "active_paid"}
+
+
+def admin_base_url(lifecycle_state: Optional[str]) -> str:
+    """The host this tenant's dashboard — and therefore its setup/invite links — lives on."""
+    return _SUBSCRIBED_HOST if (lifecycle_state or "").lower() in _SUBSCRIBED_STATES else _TRIAL_HOST
+
+
+def setup_link(lifecycle_state: Optional[str], token: str) -> str:
+    """The one-time account-setup URL for a tenant's invitee."""
+    return f"{admin_base_url(lifecycle_state)}/setup?token={token}"

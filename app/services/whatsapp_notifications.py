@@ -221,13 +221,25 @@ async def send_staff_setup_link(
         ok = resp is not None and getattr(resp, "status_code", None) == 200
         if ok:
             logger.info("✅ Staff setup link sent to %s (%s)", staff_phone, staff_name)
+            return True
+
+        # Say WHY, not just that it failed. Added 2026-09-09 after a real invite silently failed on
+        # production and the only way to tell "credentials missing" from "Meta rejected us" was
+        # server logs the merchant cannot see. The distinction decides who fixes it: an unset env
+        # var is Salman's Railway console; a 401 from Meta is an expired access token; a 4xx on the
+        # recipient is the phone number.
+        if not (wa.phone_number_id and wa.access_token):
+            reason = "credentials_missing"
+        elif resp is None:
+            reason = "network_error"
         else:
-            status = getattr(resp, "status_code", None) if resp is not None else "no-response"
-            logger.error(
-                "🔥 Staff setup link NOT delivered to %s (%s) — result=%s",
-                staff_phone, staff_name, status,
-            )
-        return ok
+            reason = f"meta_{getattr(resp, 'status_code', 'unknown')}"
+        logger.error(
+            "🔥 Staff setup link NOT delivered to %s (%s) — reason=%s body=%s",
+            staff_phone, staff_name, reason,
+            (getattr(resp, "text", "") or "")[:300] if resp is not None else "",
+        )
+        return False
     except Exception as exc:
         logger.error(
             "🔥 Failed to send staff setup link to %s: %s",
