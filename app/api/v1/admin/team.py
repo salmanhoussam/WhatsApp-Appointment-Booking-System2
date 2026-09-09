@@ -15,6 +15,7 @@ Authorization (Authorization Hardening, 2026-07-30 — approved matrix):
 
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -25,7 +26,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.core.permissions import resolve_preset
 from app.core.tenant import get_current_tenant, require_roles
-from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL
+from app.core.security import get_password_hash, PENDING_PASSWORD_SENTINEL, is_password_pending
 from app.services.whatsapp_notifications import send_staff_setup_link
 from app.core.phone import normalize_for_storage
 from app.repositories import admin_client_repo as _client_repo
@@ -34,6 +35,21 @@ from app.repositories import user_repo as _repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Team"])
+
+
+def _derive_email(phone: Optional[str], full_name: str, slug: str) -> str:
+    """A stable placeholder address for a staff account created without one.
+
+    Shaped like the accounts this platform already has (جعفر is `jaafar@rk.salmansaas.com`), and
+    keyed on the PHONE so the same person re-added later collides on @unique instead of silently
+    creating a duplicate account. Falls back to a random suffix only when there is no phone either,
+    which the caller already rejects for an invite.
+    """
+    # Normalise FIRST: the whole point of keying on the phone is that the same person re-added as
+    # "70999888", "+961 70 999 888" or "0096170999888" collides on @unique instead of quietly
+    # creating a second account. Keying on the raw input would defeat that.
+    local = normalize_for_storage(phone) or f"staff{secrets.token_hex(4)}"
+    return f"{local}@{slug}.salmansaas.com"
 
 
 def _project(u) -> dict:
@@ -54,6 +70,9 @@ def _project(u) -> dict:
         "permissions": getattr(u, "permissions", None),
         "scope":       getattr(u, "scope", None),
         "barber_id":   getattr(u, "barberId", None),
+        # Lets the Team UI offer "resend invite" on exactly the accounts that can use one, instead
+        # of showing a button that would 409 (2026-09-09).
+        "invite_pending": is_password_pending(getattr(u, "password_hash", None)),
         "phone":       getattr(u, "phone", None),
     }
 
@@ -74,7 +93,12 @@ class TeamMemberCreate(BaseModel):
     resolution is server-side only (I7), so a crafted request cannot grant itself anything.
     """
     full_name: str
-    email:     EmailStr
+    # OPTIONAL since 2026-09-09 (Salman, from a real attempt to add a manager): for a merchant the
+    # essentials are the NAME and the PHONE -- most staff have no work email, and demanding one
+    # turned a two-field action into a blocked one. `users.email` is NOT NULL and @unique in the
+    # schema, so when it is omitted the server DERIVES a stable one from the phone and the tenant
+    # slug (see _derive_email below) rather than the column being relaxed. No schema change.
+    email:     Optional[EmailStr] = None
     # Staff Invite (2026-09-07): optional. Omitted -> the account is created with no usable
     # password and a one-time setup link is generated (and WhatsApped when `phone` is given), which
     # the invitee exchanges for a password of their own via POST /api/v1/auth/set-password.
@@ -137,7 +161,15 @@ async def create_team_member(
     barber link is validated. See TeamMemberCreate for why the legacy `role` path still works.
     """
     try:
-        existing = await _repo.find_user_by_email(body.email)
+        # Name + phone are the real essentials; email is a derived detail (see TeamMemberCreate).
+        if not body.email and not body.phone:
+            raise HTTPException(
+                status_code=422,
+                detail="أدخل رقم الهاتف أو البريد الإلكتروني — الاسم والرقم هما الأساس.",
+            )
+        email = body.email or _derive_email(body.phone, body.full_name, tenant["slug"])
+
+        existing = await _repo.find_user_by_email(email)
         if existing:
             raise HTTPException(status_code=409, detail="البريد الإلكتروني مستخدم بالفعل")
 
@@ -154,7 +186,7 @@ async def create_team_member(
         row: dict = {
             "clientId":      tenant["id"],   # CRITICAL: always the current tenant
             "fullName":      body.full_name,
-            "email":         body.email,
+            "email":         email,
             "password_hash": PENDING_PASSWORD_SENTINEL if invited
                              else get_password_hash(body.password),
             "role":          body.role,
@@ -503,6 +535,65 @@ async def deactivate_team_member(
         raise
     except Exception as e:
         logger.error(f"🔥 DB error deactivating user {user_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
+@router.post("/team/{user_id}/resend-invite", status_code=200)
+async def resend_invite(
+    user_id: str,
+    tenant: dict = Depends(get_current_tenant),
+    _user: dict = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """Mint a fresh setup link for an account that has not set a password yet, and WhatsApp it.
+
+    The gap this closes (2026-09-09): the platform could CREATE an invite and never re-send one.
+    It bit twice in three days — deactivation released a staff link because there was no edit route,
+    and an invite whose WhatsApp failed could only be recovered by deleting and recreating the
+    account. Both were real, both on جعفر.
+
+    Refuses on an account that already has a password: that account does not need an invite, and
+    minting a token for it would be a password-reset path wearing an invite's clothes — a different
+    feature with different rules.
+    """
+    try:
+        user = await _repo.find_user_by_id(user_id, tenant["id"])
+        if not user:
+            raise HTTPException(status_code=404, detail="العضو غير موجود")
+        if not is_password_pending(user.password_hash):
+            raise HTTPException(
+                status_code=409,
+                detail="هذا الحساب لديه كلمة مرور بالفعل — لا يحتاج رابط تفعيل.",
+            )
+        if not user.phone:
+            raise HTTPException(
+                status_code=422,
+                detail="لا يوجد رقم لهذا الحساب — أضف رقماً أولاً.",
+            )
+
+        token   = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(days=7)
+        await _repo.update_user(user_id, {"setupToken": token, "setupTokenExp": expires})
+
+        base_url  = os.getenv("FRONTEND_URL", "https://salmansaas.com")
+        setup_url = f"{base_url}/setup?token={token}"
+
+        client = await _client_repo.find_client_by_id(tenant["id"])
+        shop_name = (
+            getattr(client, "name_ar", None) or getattr(client, "name_en", None) or tenant["slug"]
+        ) if client else tenant["slug"]
+
+        # Awaited, like the create path: the owner needs the real outcome, not an assumption.
+        sent = await send_staff_setup_link(
+            staff_phone=user.phone, staff_name=user.fullName,
+            setup_url=setup_url, client_name=shop_name,
+        )
+        logger.info("🔁 Invite resent for %s (delivered=%s) tenant %s", user.email, sent, tenant["slug"])
+        return {"success": True, "data": {"setup_url": setup_url, "invite_sent": sent}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🔥 DB error resending invite for {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Database connection failed")
 
 

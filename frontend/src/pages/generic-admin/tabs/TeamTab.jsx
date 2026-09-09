@@ -246,8 +246,10 @@ export default function TeamTab({ color, activeServices }) {
 
   const save = async () => {
     setFormError(null)
-    if (!form.full_name.trim() || !form.email.trim()) {
-      setFormError('الاسم والبريد مطلوبان')
+    // Name + phone are the essentials for a merchant; email is optional and derived server-side
+    // when omitted (2026-09-09, Salman: "الايميل مش شي اساسي اختياري الرقم والاسم المهمين").
+    if (!form.full_name.trim() || (!form.email.trim() && !form.phone)) {
+      setFormError('الاسم والرقم مطلوبان')
       return
     }
     if (form.invite && !form.phone) {
@@ -272,7 +274,7 @@ export default function TeamTab({ color, activeServices }) {
     try {
       const payload = {
         full_name: form.full_name.trim(),
-        email:     form.email.trim(),
+        ...(form.email.trim() ? { email: form.email.trim() } : {}),
         preset:    form.preset,
       }
       // Omitting `password` is what puts the server on the invite path — it mints the one-time
@@ -317,6 +319,18 @@ export default function TeamTab({ color, activeServices }) {
       String(m.id) === String(myUserId) ||
       ((m.role === 'TENANT_ADMIN' || m.preset === 'tenant_admin') && activeAdmins <= 1)
     )
+
+  const resendInvite = async (member) => {
+    setSaving(true)
+    try {
+      const { data } = await adminApi.post(`/team/${member.id}/resend-invite`)
+      const d = data?.data ?? data
+      setInvite({ name: member.full_name, url: d.setup_url, sent: !!d.invite_sent })
+      await load()
+    } catch (e) {
+      alert(e?.response?.data?.error?.message ?? e?.response?.data?.detail ?? 'تعذّرت إعادة الإرسال')
+    } finally { setSaving(false) }
+  }
 
   const openEditPerms = (member) => {
     setEditMember(member)
@@ -430,6 +444,10 @@ export default function TeamTab({ color, activeServices }) {
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Button variant="ghost" size="sm" onClick={() => openEditPerms(member)}>تعديل الصلاحيات</Button>
+                {member.invite_pending && (
+                  <Button variant="secondary" size="sm" disabled={saving}
+                    onClick={() => resendInvite(member)}>إعادة إرسال الدعوة</Button>
+                )}
                 {!member.is_active ? (
                   <Button variant="primary" color={color} size="sm" onClick={() => reactivate(member)}>إعادة تفعيل</Button>
                 ) : isProtectedOwner(member) ? (
@@ -459,7 +477,7 @@ export default function TeamTab({ color, activeServices }) {
             <span style={{ fontSize: 13.5, fontWeight: 700, color: T.textPrimary }}>
               {invite.sent
                 ? `تم إرسال رابط التفعيل إلى ${invite.name} على الواتساب`
-                : `حساب ${invite.name} جاهز — أرسل له هذا الرابط`}
+                : `⚠️ حساب ${invite.name} أُنشئ، لكن رسالة الواتساب لم تُرسل`}
             </span>
             <button onClick={() => setInvite(null)}
               style={{ background: 'none', border: 'none', color: T.textMuted, fontSize: 18, cursor: 'pointer' }}>×</button>
@@ -470,7 +488,9 @@ export default function TeamTab({ color, activeServices }) {
             <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(invite.url)}>نسخ</Button>
           </div>
           <p style={{ fontSize: 11.5, color: T.textMuted, margin: '8px 0 0' }}>
-            الرابط لمرة واحدة وينتهي خلال 7 أيام — لن يظهر مرة أخرى.
+            {invite.sent
+              ? 'الرابط لمرة واحدة وينتهي خلال 7 أيام.'
+              : 'الحساب سليم — المشكلة في إرسال الواتساب فقط. أرسل الرابط يدوياً الآن، أو استخدم «إعادة إرسال الدعوة» بعد معالجة الإرسال. الرابط لمرة واحدة وينتهي خلال 7 أيام.'}
           </p>
         </div>
       )}
@@ -511,7 +531,7 @@ export default function TeamTab({ color, activeServices }) {
             <input style={inputStyle} value={form.full_name}
               onChange={e => setForm({ ...form, full_name: e.target.value })} />
           </Field>
-          <Field label="البريد الإلكتروني">
+          <Field label="البريد الإلكتروني (اختياري)">
             <input style={{ ...inputStyle, direction: 'ltr' }} type="email" value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })} />
           </Field>

@@ -88,15 +88,21 @@ export default function PhoneField({
 
       {/* dir="ltr" is not styling: a phone number is read left-to-right in every locale, and the
           country code must sit to the LEFT of the number even on an RTL page. */}
-      <div style={{ display: 'flex', gap: 6, direction: 'ltr' }}>
+      <div style={{ display: 'flex', gap: 6, direction: 'ltr', width: '100%' }}>
         <select
           value={countryCode}
           disabled={disabled}
           onChange={e => emit(e.target.value, national)}
           aria-label={lang === 'ar' ? 'مفتاح الدولة' : 'Country code'}
           style={{
-            flex: '0 0 auto', minWidth: 96, direction: 'ltr', cursor: disabled ? 'default' : 'pointer',
             ...inputStyle, ...selectStyle,
+            // AFTER the spread, deliberately: every call site passes a form's own inputStyle, and
+            // those are almost always `width: 100%`. Inherited as-is, the selector ate the entire
+            // row and pushed the number input out of view -- reported from a real dashboard,
+            // 2026-09-09. Sizing is this component's own responsibility, not the caller's.
+            flex: '0 0 auto', width: 'auto', minWidth: 92, maxWidth: 120,
+            direction: 'ltr', cursor: disabled ? 'default' : 'pointer',
+            paddingInline: 8,
           }}
         >
           {COUNTRIES.map(c => (
@@ -117,7 +123,9 @@ export default function PhoneField({
           // Strip non-digits as the user types so a pasted "+961 70 764 479" cannot double the
           // country code once joinPhone prefixes the selected one.
           onChange={e => emit(countryCode, e.target.value)}
-          style={{ flex: 1, minWidth: 0, direction: 'ltr', ...inputStyle }}
+          // Same reason as the selector above: `width` comes from flex here, never from the
+          // caller's 100%, or the two controls overflow their row.
+          style={{ ...inputStyle, flex: '1 1 auto', width: 'auto', minWidth: 0, direction: 'ltr' }}
           {...inputProps}
         />
       </div>
