@@ -80,6 +80,32 @@ prompts becoming architecture (`.claudedocs/evolution/prompt-system.md`).
   Abstraction Rule, `rules/team-roles.md`, applied here to documentation itself) — never on a
   single session's insight alone.
 
+## Plans — always `.claudedocs/plans/`
+
+Established 2026-09-09, Salman's explicit standing instruction: *"make sure we always use
+.claudedocs/plans every time to save the plans."*
+
+**Every plan is written to `.claudedocs/plans/<topic>.md` and committed.** No exceptions — not a
+harness scratch file, not a chat message, not a temporary path outside the repository.
+
+**Why this needed saying.** The folder already held nine plans, but this policy — the file that
+decides where a document lives — did not mention it. So a plan written under time pressure landed
+wherever the tool of the moment defaulted to, and a plan that lives outside the repo is invisible to
+the next session, un-reviewable in a diff, and lost on compaction. The gap was in the rule, not in
+anyone's discipline.
+
+- **Naming:** kebab-case describing the subject, matching the existing files
+  (`fleet-management-plan.md`, `whatsapp-outbound-reliability-and-templates.md`). Not dated — a plan
+  is revised in place; its history is the git log.
+- **A plan must be executable from a cold start.** State the tooling it needs, the files it touches,
+  the traps already paid for, and what is deliberately out of scope. A plan the next session cannot
+  act on without re-deriving the investigation has not been written yet.
+- **Superseded plans** move to `archive/` with a superseded-by header, same as every other document
+  (rule 2's immutability spirit) — never deleted.
+- **Distinct from `implementation/`**: a Plan proposes and sequences; an Implementation Contract is
+  the gate that authorises one ADR's execution. A plan may produce a contract; it does not replace
+  one.
+
 ## Folder structure — per ADR-0003 (Architecture Documentation System)
 
 Superseded 2026-07-27 (this migration's Phase 8) — the six-layer model below is ADR-0003 §4's real
@@ -92,6 +118,9 @@ real Domain (Tenant OS).
 ├── adr/                 ADR-000X.md (platform-wide) and TOS-XXX-*.md (Tenant-OS-scoped, same
 │                        folder, distinguished by prefix, not nesting) — the decision itself,
 │                        nothing else
+├── plans/               <topic>.md — every implementation/architecture plan, kebab-case.
+│                        MANDATORY HOME (Salman, 2026-09-09): a plan is a project artefact, not a
+│                        scratch note. See "Plans" below.
 ├── evolution/           <topic>.md — accumulating insight, pre-ADR (see above)
 ├── maturity/            <topic>.md — recurring Architecture (Maturity) Review ledger, one per
 │                        Capability/Interface/System, appended to over time — see
