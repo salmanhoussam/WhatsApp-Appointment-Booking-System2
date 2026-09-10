@@ -189,3 +189,43 @@ Recommended preset for the temporary account: **`reservations_manager`** — the
 presets whose `requires_barber` is `False` (`permissions.py`), so no barber link is needed and no
 unnecessary privilege is granted. Deactivate it afterwards; restoration is verified from the DB
 (`users` 2 → 3 → 2).
+
+---
+
+## Side Findings (added later the same day)
+
+### S1 — Phone login is broken for every account stored in the mandated format
+`user_repo.find_user_by_phone` normalises the **typed** input (`normalize_local_phone` strips `961`)
+and then compares it **literally** against the stored column. `.claude/rules/phone-numbers.md`
+mandates storing **with** the country code, so the two can never meet:
+
+```
+typed 96176985477 → normalised 76985477 → compared to stored "96176985477" → no match
+```
+
+Measured across all rows with a phone: every `rk` account fails this — `salman.houssam@gmail.com`,
+`jaafar@rk.salmansaas.com`, and `rkbarber@dev.invalid`, **حسين, the real owner of a live tenant.**
+Every other tenant stores the local form and matches. Nobody has reported it because email login
+works.
+
+`.claude/rules/phone-numbers.md` asserts the opposite — *"Live proof: `rkbarber@dev.invalid` is
+stored with `961` and logs in successfully (`last_login_at`)"*. That login was by **email**; the rule
+conflated the two paths. The rule needs correcting, not just the code.
+
+Storing the local form is not the fix either: `78727986` is already on `cafe` and twice on `smar`,
+and `find_first` has no ordering — a phone login could resolve to the wrong tenant.
+
+Planned in `.claudedocs/plans/tenant-identity-and-seeding.md` §2, Phase B. **Not fixed** — out of
+Phase 0's scope.
+
+### S2 — The login form burns the lockout budget at 2×
+Salman was locked out of `barberlab-test` at 13:58 after roughly three attempts. The audit log shows
+each attempt producing **two** failure rows — `admin_login_failed` *and* `client_login_failed` — as
+the form tries both endpoints with the same identifier. `MAX_FAILURES = 5` in a 15-minute window, so
+the real budget is two and a half attempts, not five. Recorded, not fixed.
+
+### S3 — Production drifted mid-session
+`smar.phone` and `barberlab-test.phone` both changed between two reads (Salman, editing directly).
+`barberlab-test.phone` is now `96178727986`, so its merchant alert resolves to a real number instead
+of the `+9613300771122` that returned `131026`. Noted because the earlier snapshot in this file is
+no longer the current state of those two columns.
