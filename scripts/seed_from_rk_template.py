@@ -54,6 +54,7 @@ import _db_target  # noqa: E402  -- validates the target before anything connect
 from prisma import Json  # noqa: E402
 from app.db.client import prisma_client  # noqa: E402
 from app.core.security import get_password_hash  # noqa: E402
+from app.core.phone import normalize_for_storage  # noqa: E402
 from app.services import provisioning_service  # noqa: E402
 from app.repositories import barber_repo, barber_service_repo  # noqa: E402
 # Same alias provisioning_service.py itself uses (its line 39) -- the module is
@@ -88,7 +89,22 @@ async def run(args) -> None:
     slug     = args.slug
     name_ar  = args.name_ar
     name_en  = args.name_en or slug
-    phone    = args.phone
+    # G1: the CLI takes whatever a human types (+961 70 ..., 0096170..., 70...); the DB gets the one
+    # storage form `.claude/rules/phone-numbers.md` mandates. This is the only conversion point --
+    # never format a number by hand here. A number Meta cannot dial is worth less than no number.
+    phone    = normalize_for_storage(args.phone)
+    if not phone:
+        sys.exit(f"❌ --phone '{args.phone}' is not a usable number.")
+
+    # G2: whatsapp_number was never written, so every seeded tenant lost its merchant alerts AND
+    # its whole customer-facing WhatsApp path -- reservation_service.py:119 reads
+    # `whatsapp_number or phone`, and the frontend hides the hero CTA and the WhatsApp checkout
+    # entirely when it is null (ConfigurableHero.jsx:365, CartPage.jsx:393). It defaults to the
+    # shop's own phone, which is the common case, and is overridable when alerts must go elsewhere.
+    whatsapp = normalize_for_storage(args.whatsapp) if args.whatsapp else phone
+    if not whatsapp:
+        sys.exit(f"❌ --whatsapp '{args.whatsapp}' is not a usable number.")
+
     email    = args.email or f"{slug}@demo.salmansaas.com"
     currency = args.currency or c["currency"]
     colour   = args.primary_color or c["primary_color"]        # F3: parameterised, not hardcoded
@@ -143,6 +159,7 @@ async def run(args) -> None:
             "name_en":         name_en,
             "slug":            slug,
             "phone":           phone,
+            "whatsapp_number": whatsapp,
             "primary_color":   colour,
             "currency":        currency,
             "config":          Json(config),
@@ -154,6 +171,9 @@ async def run(args) -> None:
             "service_type":    c["service_type"],
             "vertical":        c["vertical"],
             "pageType":        c["page_type"],
+            # G4: record WHICH template built this tenant. Nothing wrote it before, so no seeded
+            # row could ever be traced back to the template version that produced it.
+            "templateKey":     f"{tpl['_meta']['template']}-v{tpl['_meta']['version']}",
         })
         print(f"\n  1. Client            {client.id}")
 
@@ -170,6 +190,14 @@ async def run(args) -> None:
             "email":         email,
             "password_hash": get_password_hash(temp_password),
             "fullName":      name_en,
+            # G3: the owner had no phone identity at all. Decision Gate Q3 (2026-09-10) put owner
+            # identity on User, not on Client.phone -- so it has to actually be written here.
+            # NOTE: stored in the LOCAL form on purpose. users.phone is the login-matching column
+            # and find_user_by_phone() strips the country code from the typed input before an exact
+            # comparison, so a row stored WITH the country code can never be matched. That mismatch
+            # is a real open defect (audit §10); this line stays on the side that works today, and
+            # moves when the defect is fixed -- not before.
+            "phone":         normalize_for_storage(args.owner_phone or args.phone).removeprefix("961"),
             "role":          "TENANT_ADMIN",
             # H2: never a copied barberId -- it is @unique AND an FK to Barber.
             "barberId":      None,
@@ -257,6 +285,8 @@ if __name__ == "__main__":
     ap.add_argument("--name-ar", required=True)
     ap.add_argument("--name-en")
     ap.add_argument("--phone", required=True, help="Client.phone is UNIQUE NOT NULL")
+    ap.add_argument("--whatsapp", help="merchant-alert + customer-facing number; defaults to --phone")
+    ap.add_argument("--owner-phone", help="the owner's own login number; defaults to --phone")
     ap.add_argument("--email", help="defaults to {slug}@demo.salmansaas.com")
     ap.add_argument("--currency", help="overrides the template (F1: services inherit it)")
     ap.add_argument("--primary-color", help="overrides the template (F3)")
