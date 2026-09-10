@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
@@ -22,6 +24,25 @@ from app.api.v1.super.platform_services import router as super_platform_router
 from app.api.v1.super.maintenance import router as super_maintenance_router
 from app.api.v1.onboarding import router as onboarding_router
 from app.api.v1.webhooks.samsara import router as samsara_webhook_router
+
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# Nothing in this codebase ever configured the root logger, so it sat at Python's WARNING default
+# and EVERY logger.info() was discarded in production. Measured 2026-09-10 on real Railway output:
+# a failed delivery receipt (📵, ERROR) and an unresolved tenant (⚠️, WARNING) both appeared, while
+# the "✅ accepted by Meta (wamid=…)" line for the very same message and the 📬 delivered receipt
+# did not — so successes were invisible and a wamid could never be correlated with its receipt.
+#
+# That defeats the point of Phase 0: an outbound send whose success cannot be observed is exactly
+# the "silent success" this phase exists to remove, just moved from the code into the log config.
+# Third-party loggers stay at WARNING — httpx in particular logs one INFO line per request, which
+# would bury everything this is meant to surface.
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(levelname)s %(name)s: %(message)s",
+)
+for _noisy in ("httpx", "httpcore", "prisma", "urllib3", "asyncio"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
