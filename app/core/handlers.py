@@ -101,7 +101,13 @@ def register_handlers(app: FastAPI) -> None:
             422: "UNPROCESSABLE",
         }.get(exc.status_code, "HTTP_ERROR")
 
-        logger.info(
+        # 4xx is client behaviour, not system health — and it is unbounded: a single
+        # vulnerability-scanner sweep for /.env, /.git/config and //wp-includes/* produced
+        # hundreds of INFO lines on production 2026-09-10, which would bury the WhatsApp
+        # send/delivery lines Phase 0 exists to make observable. A raised HTTPException(5xx) is
+        # ours and stays loud. Set LOG_LEVEL=DEBUG to get the 4xx stream back when investigating.
+        logger.log(
+            logging.ERROR if exc.status_code >= 500 else logging.DEBUG,
             "HTTPException [%d %s] — %s %s",
             exc.status_code,
             code,
