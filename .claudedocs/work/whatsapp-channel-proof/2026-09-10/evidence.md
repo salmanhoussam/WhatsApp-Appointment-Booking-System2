@@ -70,3 +70,68 @@ no secret value was read.
 - **No `statuses[]` payload observed** (Step 7), and **no outbound test outside the 24-hour window**
   (Step 8). Both held at Salman's explicit instruction pending his reading of the logs.
 - Therefore **Gate 0 remains OPEN**: 3 of its 5 conditions are closed.
+
+---
+
+## Update — real Railway output for booking `0B803353`
+
+```
+22:17:44Z  ⚠️  No client resolved for display_phone=96179022398 (session bound=False)
+05:31:39Z  📵 WhatsApp delivery FAILED — wamid=wamid.HBgNOTYxMzMwMDc3MTEyMhUCABEYEkRCMTUwNDE0RjEwMDJBNzhGQgA=
+           status=failed recipient=9613300771122 ts=1789018292
+           meta_code=131026 title=Message undeliverable detail=Message Undeliverable.
+```
+
+### C6 — Backend deploy confirmed by behaviour
+The `📵` line is `webhook.py::_log_statuses`, which did not exist before `d49ec06`. Its presence in
+production output is the behavioural proof that the backend half shipped — the check I had said
+was unavailable because there is no version endpoint.
+
+### C7 — Gate 0 condition "one real statuses[] payload observed" is CLOSED
+A genuine Meta receipt, parsed correctly, carrying the wamid and the numeric error code.
+
+### C8 — Q5 answered: the access token is VALID
+Meta issued a `wamid` for this message, which means the send was accepted. A dead token fails
+synchronously with HTTP 401 / code 190 and never reaches a delivery receipt. **The access token is
+not the cause of anything we have seen.**
+
+### C9 — `131026` does NOT settle the 24-hour-window hypothesis
+`131026` is "Message undeliverable" — `9613300771122` is not a WhatsApp user. The send was
+business-initiated to a number that had never messaged this WABA, so under the window rule a
+synchronous `131047` was possible; instead Meta returned 200 and failed asynchronously on the
+recipient. Two explanations remain and this evidence cannot separate them:
+
+1. Meta validates the recipient before enforcing the window, so `131026` pre-empts `131047`.
+2. The window is not what blocked the earlier sends at all.
+
+**Step 8 — one free-form send to a real WhatsApp number that has not messaged the business in 24
+hours — is the only test that separates them.** It is now the single open question in Gate 0.
+
+### C10 — Production was discarding every INFO log *(fixed, `da91be2`)*
+In the output above, ERROR (`📵`) and WARNING (`⚠️`) appear; the `✅ accepted by Meta (wamid=…)`
+line for that same message and any `📬 delivered` receipt do not — although the grep pattern
+`wamid=` would have matched the first. There is no `logging.basicConfig` anywhere in `app/`, so the
+root logger sat at WARNING.
+
+Consequence: **only failures were observable.** This also made Gate 0's own statuses condition
+unreachable in the success direction, since a `delivered` receipt is logged at INFO. Fixed in
+`app/main.py`; level overridable via `LOG_LEVEL`; noisy third-party loggers pinned to WARNING.
+
+## Side Findings (added)
+
+- **G3 observed live, and it is worse than "no tenant".** At 22:17:44Z an inbound message resolved
+  to no client. `whatsapp_flow.py:311-316` logs a warning and `return`s — **the customer receives no
+  reply at all.** Anyone who messages the shared business number without a tenant deep link
+  (a saved contact, a forwarded number, an old thread) gets silence. This is the shared-number
+  anomaly D-B is meant to remove, and it is a live customer-experience hole today, not only an
+  architectural one.
+
+## Gate 0 — status after this update
+
+| Condition | State |
+|---|---|
+| No unconditional `✅` remains | ✅ |
+| A rejection logs Meta's error code and body | ✅ evidenced (`meta_code=131026`) |
+| One real inbound booking completes | ✅ `0B803353` |
+| One real `statuses[]` payload observed | ✅ |
+| **24-hour-window hypothesis confirmed or refuted** | ⬜ **the only item left — Step 8** |
