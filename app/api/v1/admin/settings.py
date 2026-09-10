@@ -65,6 +65,11 @@ class SettingsUpdateRequest(BaseModel):
     whatsapp_number: Optional[str]       = None
     instagram_url:   Optional[str]       = None
     maps_url:        Optional[str]       = None
+    # The shop's public contact address, rendered as a mailto: link in the footer. Deliberately a
+    # plain str, not EmailStr: this is the only way to CLEAR the field (send "") once set, and the
+    # value is displayed, never used to authenticate. Owner login identity lives on User.email
+    # (Decision Gate Q3, 2026-09-10) and is validated there.
+    email:           Optional[str]       = None
     currency:        Optional[str]       = None
     payment_methods: Optional[List[str]] = None
     unit_types:      Optional[List[str]] = None
@@ -96,6 +101,7 @@ async def get_settings(
             "whatsapp_number": client.whatsapp_number,
             "instagram_url":   getattr(client, "instagram_url", None),
             "maps_url":        getattr(client, "maps_url", None),
+            "email":           getattr(client, "email", None),
             "currency":        client.currency,
             "features":        client.features,
             "config":          getattr(client, "config", None) or {},

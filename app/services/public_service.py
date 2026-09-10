@@ -223,6 +223,11 @@ def _record_to_dict(record) -> Dict[str, Any]:
         "whatsapp_number": getattr(record, "whatsapp_number", None),
         "instagram_url":   getattr(record, "instagram_url",   None),
         "maps_url":        getattr(record, "maps_url",        None),
+        # Published 2026-09-10 (Salman: "email بيصير optional، منحطه رابط بالصفحة"). It was never
+        # in this payload, so the page could not render a contact link even when the column was
+        # set. Optional by design — the footer omits the icon when it is null, exactly like
+        # instagram_url and maps_url already do.
+        "email":           getattr(record, "email",           None),
         "currency":        getattr(record, "currency", "USD"),
         "features":        getattr(record, "features", {}),
         "config":          getattr(record, "config",   {}) or {},

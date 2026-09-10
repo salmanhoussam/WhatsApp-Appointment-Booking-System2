@@ -7,6 +7,7 @@
  * WhatsApp → wa.me/{whatsapp_number}
  * Instagram → config.instagram_url
  * Maps      → config.maps_url
+ * Email     → mailto:config.email        (added 2026-09-10, optional like the rest)
  */
 
 import useTenantConfig from '../../hooks/useTenantConfig';
@@ -83,6 +84,16 @@ function SocialLink({ href, label, children }) {
   );
 }
 
+function IconMail() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+      <path d="m3.5 6.5 8.5 6 8.5-6" />
+    </svg>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TenantFooter() {
@@ -91,7 +102,8 @@ export default function TenantFooter() {
   const waLink        = config.whatsapp_number ? `https://wa.me/${config.whatsapp_number}` : null;
   const igLink        = config.instagram_url   || null;
   const mapsLink      = config.maps_url        || null;
-  const hasSocialLink = waLink || igLink || mapsLink;
+  const mailLink      = config.email ? `mailto:${config.email}` : null;
+  const hasSocialLink = waLink || igLink || mapsLink || mailLink;
 
   return (
     <footer
@@ -144,6 +156,11 @@ export default function TenantFooter() {
             {mapsLink && (
               <SocialLink href={mapsLink} label="الموقع على الخريطة">
                 <IconMapPin />
+              </SocialLink>
+            )}
+            {mailLink && (
+              <SocialLink href={mailLink} label="البريد الإلكتروني">
+                <IconMail />
               </SocialLink>
             )}
           </div>
