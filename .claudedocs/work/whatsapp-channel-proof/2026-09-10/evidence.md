@@ -135,3 +135,57 @@ unreachable in the success direction, since a `delivered` receipt is logged at I
 | One real inbound booking completes | ✅ `0B803353` |
 | One real `statuses[]` payload observed | ✅ |
 | **24-hour-window hypothesis confirmed or refuted** | ⬜ **the only item left — Step 8** |
+
+---
+
+## Decision — how RC1 gets closed without Railway access (Salman, 2026-09-10)
+
+### The tooling limit, stated once
+This environment has no Railway CLI, no `~/.railway`, no `~/.config/railway`, no `RAILWAY_*` variable
+and no token in either `railway.json` (both are build config only). **Server logs are readable by
+Salman alone.** Four exchanges were spent rediscovering this; it is recorded here so a future session
+does not spend a fifth.
+
+### Rejected, deliberately
+- **A Railway read token** — refused: it grows the secret surface to fix an *agent's* blindness, not
+  a product defect.
+- **Persisting each send outcome to the DB** — refused *for now*: it is schema-adjacent, sits close to
+  the outbox table §5 of the plan explicitly excludes, and Phase A's scope is deliberately narrow
+  (logging + `wamid` + Meta error body, without letting a notification fail a booking).
+
+Salman's framing, adopted: the observability gap is **an independent tooling problem**, not a reason
+to reshape the WhatsApp architecture. A category error on my part — I proposed a schema-adjacent
+change to solve my own blindness — and it is named here rather than quietly dropped.
+
+### The approved experiment
+**One invite, from the Team tab of `barberlab-test`, to a real WhatsApp number Salman owns that has
+never messaged the business number.** No code, no DB, no Railway, no secrets, no Phase R, no G3,
+no RK, no Jafar.
+
+The Team banner is a faithful projection of the same value the gate turns on:
+
+```
+invite_sent  ←  send_staff_setup_link  ←  _report(result)  ←  result.ok  ←  HTTP 200 from Meta
+```
+
+`invite_sent: true` therefore means Meta returned 200 and issued a `wamid` — **exactly the plan's
+definition of `accepted`**.
+
+**The banner proves the accepted path only, never delivery.** `delivered` is a separate
+`statuses[]` callback and cannot be read from a screen. This distinction is the plan's own and is
+not to be blurred.
+
+Two possibilities are already ruled out by C8/C9 above: `190` (the token issued a wamid today) and
+`131026` (phone B is a real WhatsApp number).
+
+### Interpretation rules, agreed in advance
+
+| Banner | Verdict |
+|---|---|
+| «أُرسل طلب التفعيل» — accepted, wamid issued | **RC1 REFUTED, conclusively.** The 24-hour window did not block a business-initiated free-form message to a cold number. Gate 0 closes on RC1, and the real cause of the 2026-09-09 non-delivery becomes a **new investigation** rather than a standing assumption. |
+| «ميتا رفضت الإرسال» | **RC1 stays a STRONG HYPOTHESIS — not CONFIRMED.** Rejection at send time with 190 and 131026 excluded makes the window the nearest explanation, but the rejection family also contains rate limits and phone-number quality. The exact `meta_code` is recorded as a **missing piece of evidence**. No cause is invented. |
+
+Recommended preset for the temporary account: **`reservations_manager`** — the narrowest of the
+presets whose `requires_barber` is `False` (`permissions.py`), so no barber link is needed and no
+unnecessary privilege is granted. Deactivate it afterwards; restoration is verified from the DB
+(`users` 2 → 3 → 2).
