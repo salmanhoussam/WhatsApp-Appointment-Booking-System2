@@ -82,6 +82,33 @@ def fmt_reserved_at(dt) -> str:
         return str(dt)
 
 
+async def _remember_outbound(result, purpose: str, client_id, reservation_id,
+                             recipient: str) -> None:
+    """Store the wamid so the reply this message invites can be traced back to it.
+
+    The tap itself carries no booking reference — `context.id` is the only link, and it is
+    worthless unless the outbound wamid was written down first (see G8 in whatsapp_flow.py).
+    This is the step that turns a Phase 0 log field into a working correlation key.
+
+    Silent and total in its error handling, on purpose: this function sits inside a helper
+    whose whole contract is that a notification failure never disturbs the real booking. A
+    correlation row is strictly less important than the message that was already accepted, so
+    a failure here is logged and swallowed — never propagated, never retried.
+    """
+    wamid = getattr(result, "wamid", None)
+    if not (wamid and client_id):
+        return
+    try:
+        from app.db.client import prisma_client
+        from app.repositories.whatsapp_outbound_repo import WhatsAppOutboundRepository
+        await WhatsAppOutboundRepository(prisma_client).record(
+            wamid=wamid, client_id=client_id, purpose=purpose,
+            recipient=recipient, reservation_id=reservation_id,
+        )
+    except Exception as exc:
+        logger.error("🔥 Could not record outbound wamid=%s (%s): %s", wamid, purpose, exc)
+
+
 def _or_dash(value) -> str:
     """Never hand a template an empty parameter — Meta rejects the whole send.
 
@@ -338,6 +365,8 @@ async def send_new_reservation_to_merchant(
     barber_name:     str,
     reserved_at:     str,
     client_name:     str = "",
+    client_id:       str | None = None,
+    reservation_id:  str | None = None,
 ) -> bool:
     """Tell the shop (owner, and the assigned staff member) that a booking just came in.
 
@@ -373,8 +402,10 @@ async def send_new_reservation_to_merchant(
             f"الموعد: {_or_dash(reserved_at)}",
             f"رقم الحجز: *{_or_dash(reservation_ref)}*",
         ]
-        return _report(await wa.send_text(to=recipient_phone, text="\n".join(lines)),
-                       f"New-reservation alert ({recipient_label})", recipient_phone,
+        result = await wa.send_text(to=recipient_phone, text="\n".join(lines))
+        await _remember_outbound(result, "new_reservation_alert",
+                                 client_id, reservation_id, recipient_phone)
+        return _report(result, f"New-reservation alert ({recipient_label})", recipient_phone,
                        reservation_ref)
     except Exception as exc:
         logger.error(

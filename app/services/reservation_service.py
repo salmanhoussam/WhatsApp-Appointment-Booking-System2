@@ -163,6 +163,10 @@ async def _notify_merchant_new_reservation(reservation_row) -> None:
                     getattr(client, "name_ar", None) or client.name,
                     getattr(client, "vertical", None),
                 ),
+                # Correlation (2026-09-11): each recipient's send gets its OWN wamid, which is
+                # why this is recorded per-send and not once per reservation.
+                client_id       = reservation_row.clientId,
+                reservation_id  = reservation_row.id,
             ))
     except Exception as exc:
         logger.error("🔥 _notify_merchant_new_reservation failed to prepare: %s", exc, exc_info=True)

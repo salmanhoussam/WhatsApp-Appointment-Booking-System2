@@ -76,6 +76,8 @@ model Client {
   reservations      Reservation[]
   resources         Resource[]
   barbers           Barber[]
+  // -- WhatsApp outbound correlation (2026-09-11, Phase 3) --------------------
+  whatsappOutbound  WhatsAppOutbound[]
   // -- CRM snapshot -----------------------------------------------------------
   // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
@@ -1243,6 +1245,48 @@ model Subscription {
 // state. No Client relation (clientId stays a plain column, not an FK) -- this table is
 // deliberately isolated/high-churn (created and deleted within minutes for a normal
 // conversation), not worth coupling to the Client model's own relation graph.
+/// One outbound WhatsApp message we expect an answer to, keyed by the `wamid` Meta returns.
+///
+/// Why this exists (2026-09-11, Phase 3 / G8). A quick reply tapped on a template arrives as
+/// `{"type":"button","button":{"payload","text"}}` — and a quick reply authored in WhatsApp
+/// Manager has no separate payload field, so `payload` equals the button's own text. Two
+/// bookings in the same hour therefore produce two identical "تأكيد" taps. The ONLY thing that
+/// says which message is being answered is `context.id`, the wamid of the original send. We
+/// already capture that wamid (whatsapp_service.SendResult) and, until now, only logged it.
+///
+/// Why a TABLE and not a column on Reservation. One booking alert goes to up to TWO recipients
+/// — the owner, and the assigned staff member when they differ (reservation_service.py's
+/// _notify_merchant_new_reservation) — and each send gets its OWN wamid. A single column could
+/// hold only one of them, so whichever recipient tapped second would not resolve.
+///
+/// Deliberately NOT a general message log: only sends that expect a reply belong here. Rows are
+/// short-lived by nature (the template's validity is one hour, matching the hold), so a
+/// retention sweep will be wanted eventually — named here rather than silently assumed.
+model WhatsAppOutbound {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Meta's message id — the value that comes back as `context.id` on the reply.
+  wamid         String   @unique @map("wamid")
+  clientId      String   @map("client_id") @db.Uuid
+  /// What this send was, e.g. "new_reservation_alert" — so a reply is routed by intent,
+  /// never by guessing from the button's text (which is Arabic, and translatable).
+  purpose       String   @map("purpose")
+  reservationId String?  @map("reservation_id") @db.Uuid
+  /// The number it was sent to, in storage form (with country code) — lets an inbound reply be
+  /// matched to the right recipient when one alert went to both owner and staff.
+  recipient     String   @map("recipient")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  /// A real FK, unlike the sibling whatsapp_sessions table: the client-tenant data audit
+  /// (2026-09-10) named missing client_id FKs as a live hazard, and a new table has no reason
+  /// to inherit that. Cascade — correlation rows outlive nothing.
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([reservationId])
+  @@map("whatsapp_outbound")
+  @@schema("public")
+}
+
 model WhatsAppSession {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   phoneNumberId String   @map("phone_number_id")
