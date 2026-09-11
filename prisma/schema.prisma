@@ -698,6 +698,11 @@ model StoreOrder {
 
   @@index([clientId])
   @@index([status])
+  // Real production index created by prisma/migrations/repoint_store_orders_to_customer.sql
+  // (Customer Identity, commit ce25aa5). It reached the database but never this file, while its
+  // twin on Reservation did -- so `prisma db push` proposed DROPPING it. Declared here so the
+  // schema matches production and a future push cannot silently undo a deliberate index.
+  @@index([clientId, customerId])
   @@map("store_orders")
   @@schema("public")
 }
