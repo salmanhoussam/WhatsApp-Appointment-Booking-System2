@@ -3,26 +3,43 @@ User Repository — Prisma queries only.
 All queries MUST filter by clientId where applicable. No business logic here.
 """
 
+import logging
 import re
 
 from datetime import datetime, timezone
 
 from app.db.client import prisma_client
 
+logger = logging.getLogger(__name__)
+
 _LEBANON_COUNTRY_CODE = "961"
 
 
 def normalize_local_phone(phone: str) -> str:
-    """Strip everything but digits, then strip a leading Lebanon country code
-    (961) if present -- Salman's explicit request 2026-08-29: phone LOGIN
-    should match on the local number alone, regardless of whether "+", "00",
-    or "961" was typed/stored. Used only for users.phone (the login-matching
-    field) -- NEVER apply this to clients.phone, which must keep its full
-    country code for real outbound WhatsApp sends (whatsapp_service.py) to
-    keep working."""
+    """Reduce any way a Lebanese number can be typed or stored to its local form.
+
+    Salman's request 2026-08-29: phone LOGIN matches on the local number alone, whatever the
+    caller typed. NEVER apply this to clients.phone, which must keep its country code for real
+    outbound WhatsApp sends (whatsapp_service.py).
+
+    Extended 2026-09-11 after measuring production. The original stripped ONLY a leading "961",
+    which left two real forms unhandled:
+
+      * "0096170764479" does not start with "961", so the whole string survived intact and was
+        stored/compared as-is -- garbage either way.
+      * "070764479" -- the form a Lebanese merchant types by hand -- kept its national trunk "0"
+        and so matched nothing, even against a locally-stored row.
+
+    Order matters: international prefix, then country code, then the national trunk zero. Each
+    step is length-guarded so a short or malformed value is never eaten down to nothing.
+    """
     digits = re.sub(r"\D", "", phone or "")
+    if digits.startswith("00") and len(digits) > 2:
+        digits = digits[2:]
     if digits.startswith(_LEBANON_COUNTRY_CODE) and len(digits) > len(_LEBANON_COUNTRY_CODE):
         digits = digits[len(_LEBANON_COUNTRY_CODE):]
+    if digits.startswith("0") and len(digits) > 1:
+        digits = digits[1:]
     return digits
 
 
@@ -35,18 +52,55 @@ async def find_user_by_email(email: str):
 
 
 async def find_user_by_phone(phone: str):
-    """Find a user by phone (global — used for login), matching on the
-    normalized local number (see normalize_local_phone) so "+96176985477",
-    "96176985477", and "76985477" all resolve to the same account. phone has
-    no unique constraint (only STAFF-relevant fields do), so find_first, not
-    find_unique."""
+    """Find a user by phone — the login path Salman wants to be the ONLY one merchants see.
+
+    FIXED 2026-09-11. The previous version normalised the TYPED input and then compared it
+    LITERALLY against the stored column, so it could only ever match rows already stored in local
+    form. Its own docstring claimed "+96176985477", "96176985477" and "76985477" all resolved to
+    one account; they did not. Measured on production that day: 3 of 10 accounts were unreachable
+    by phone, including BOTH of rk's TENANT_ADMINs — the real owner of a live shop. Nobody
+    reported it because email login worked.
+
+    Worse, it contradicted this project's own rule. `rules/phone-numbers.md` MANDATES storing
+    with the country code, so the more faithfully a write path followed the rule, the more
+    certainly its user could not log in.
+
+    The fix compares against every form a real row is stored in rather than assuming one. No
+    migration, and no weakening of the storage rule.
+    """
     normalized = normalize_local_phone(phone)
     if not normalized:
         return None
-    return await prisma_client.user.find_first(
-        where={"phone": normalized},
+
+    # Every shape `users.phone` actually holds in production, plus the ones the storage rule
+    # produces going forward. Cheap: an IN over a handful of exact strings, not a scan.
+    candidates = [
+        normalized,                                     # 76985477   (legacy local rows)
+        f"{_LEBANON_COUNTRY_CODE}{normalized}",         # 96176985477 (what phone-numbers.md mandates)
+        f"0{normalized}",                               # 076985477
+        f"00{_LEBANON_COUNTRY_CODE}{normalized}",       # 0096176985477
+    ]
+
+    # `phone` carries no unique constraint, and in production one number really does sit on more
+    # than one account — one person owning two shops. Ordered by createdAt so the answer is at
+    # least STABLE rather than arbitrary, and logged loudly, because silently picking a tenant is
+    # exactly the failure a merchant could never diagnose. Choosing BETWEEN shops needs the
+    # multi-tenant membership model, which is a deliberate, separate decision.
+    matches = await prisma_client.user.find_many(
+        where={"phone": {"in": candidates}},
         include={"client": True},
+        order={"createdAt": "asc"},
     )
+    if not matches:
+        return None
+    if len(matches) > 1:
+        logger.warning(
+            "⚠️  Phone %s matches %d accounts (%s) — signing in the oldest. One person owning "
+            "several shops needs the membership model, not a guess here.",
+            normalized, len(matches),
+            ", ".join(getattr(m.client, "slug", "?") for m in matches),
+        )
+    return matches[0]
 
 
 async def find_user_by_setup_token(token: str):
