@@ -226,7 +226,7 @@ async def _clear_session(phone_number_id: str, customer_phone: str, session: Con
 def _extract_message(msg: dict) -> tuple[str, str, str]:
     """
     Returns (msg_type, text_or_id, display_title).
-    msg_type: "text" | "button_reply" | "list_reply" | "unknown"
+    msg_type: "text" | "button_reply" | "list_reply" | "template_button" | "unknown"
     """
     msg_type = msg.get("type", "unknown")
 
@@ -246,7 +246,43 @@ def _extract_message(msg: dict) -> tuple[str, str, str]:
             reply = interactive.get("list_reply", {})
             return "list_reply", reply.get("id", ""), reply.get("title", "")
 
+    # G8 (2026-09-11) — a quick-reply tapped on a TEMPLATE message.
+    #
+    # This is a FOURTH shape, not a variant of the three above, and that is exactly why it
+    # used to fall through to "unknown" and be dropped in silence:
+    #
+    #   interactive button  ->  {"type": "interactive",
+    #                            "interactive": {"type": "button_reply",
+    #                                            "button_reply": {"id", "title"}}}
+    #   TEMPLATE button     ->  {"type": "button",
+    #                            "button": {"payload", "text"}}
+    #
+    # `payload` is NOT a reliable identifier: a quick reply authored in WhatsApp Manager has
+    # no separate payload field, so it arrives equal to the button's own text. Two bookings in
+    # the same hour therefore produce two identical taps. The only thing that says WHICH
+    # message is being answered is msg["context"]["id"] -- see _extract_context_id() below.
+    if msg_type == "button":
+        button = msg.get("button", {})
+        text = (button.get("text") or "").strip()
+        return "template_button", (button.get("payload") or text), text
+
     return "unknown", "", ""
+
+
+def _extract_context_id(msg: dict) -> Optional[str]:
+    """The `wamid` of the message this one replies to, when there is one.
+
+    For a template button tap this is the ONLY link back to what was sent, because the tap
+    itself carries no booking reference (see _extract_message above). It resolves only if the
+    outbound `wamid` was stored against that booking when the alert was sent.
+
+    Absent for a plain inbound message, and absent even for a reply if the original was
+    deleted -- so every caller must treat None as ordinary, never as an error.
+    """
+    context = msg.get("context")
+    if not isinstance(context, dict):
+        return None
+    return context.get("id") or None
 
 
 def _parse_date(text: str) -> Optional[date]:
@@ -301,6 +337,20 @@ async def _dispatch(
     # before we know which Client this even is. Peeked (not vivified) first: an unresolvable
     # message must never leave a phantom empty session in the store -- see _peek_session().
     msg_type, value, title = _extract_message(msg)
+
+    # G8 (2026-09-11) — make a template button tap VISIBLE before anything acts on it.
+    #
+    # Recognising the shape and acting on it are two separate phases. Phase 3 ends here, at
+    # "we can see it": confirming a booking from WhatsApp needs an authorisation model (which
+    # sender phone may confirm which tenant's booking) that is Phase 4's, and is deliberately
+    # not improvised inside a parser. Without this line, "recognised" and "still silently
+    # dropped" would look identical in production.
+    if msg_type == "template_button":
+        logger.info(
+            "🔘 Template button tapped — text=%r payload=%r from=%s context_wamid=%s",
+            title, value, customer_phone, _extract_context_id(msg) or "—",
+        )
+
     existing_session = await _peek_session(phone_number_id, customer_phone)
 
     client = await _resolve_client(
