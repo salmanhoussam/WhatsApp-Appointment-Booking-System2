@@ -81,14 +81,14 @@ async def main():
             print(f"[OK] {len(barbers)} barber(s) already exist — reusing them.")
         else:
             b1 = await db.barber.create(data={
-                "clientId": client.id, "name": "Ali", "phone": "+96170111111",
+                "clientId": client.id, "name": "Ali", "phone": "96170111111",
                 "workingHours": Json({
                     "closed_days": ["sunday"], "open_time": "09:00", "close_time": "17:00",
                 }),
                 "sortOrder": 0,
             })
             b2 = await db.barber.create(data={
-                "clientId": client.id, "name": "Rami", "phone": "+96170222222",
+                "clientId": client.id, "name": "Rami", "phone": "96170222222",
                 "workingHours": Json({
                     "closed_days": [], "open_time": "10:00", "close_time": "20:00",
                 }),

@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from app.core.tenant import require_roles
 from app.core.permissions import require_permission
 from app.core.services import require_service
+from app.core.phone import normalize_for_storage
 from app.db.dependencies import get_current_tenant
 from app.repositories import barber_repo, barber_service_repo
 # Reused, not re-implemented -- this is the same fail-closed STAFF-scoping check
@@ -119,7 +120,13 @@ async def create_barber(
     data = {
         "clientId":    tenant["id"],  # CRITICAL: always the current tenant
         "name":        body.name,
-        "phone":       body.phone,
+        # Phone Numbers rule (.claude/rules/phone-numbers.md): Barber.phone is an
+        # OPERATIONAL, WhatsApp-capable phone field, so it is stored WITH the country code.
+        # Normalising here rather than trusting the UI is the rule's own instruction --
+        # StaffTab's PhoneField already sends a canonical value, but curl, an older client or
+        # a script does not. This says nothing about phones for Staff in general: Barber is a
+        # business resource, User is the auth identity, and no Staff/Person model exists.
+        "phone":       normalize_for_storage(body.phone),
         "description": body.description,
         "imageUrl":    body.image_url,
         "sortOrder":   body.sort_order or 0,
@@ -149,7 +156,10 @@ async def update_barber(
     if body.name is not None:
         patch["name"] = body.name
     if body.phone is not None:
-        patch["phone"] = body.phone
+        # Same rule as the create path above. Note the deliberate consequence: phone="" now
+        # stores NULL rather than an empty string, which is the correct representation of
+        # "no phone" -- and the shape three existing accounts already carry as a known defect.
+        patch["phone"] = normalize_for_storage(body.phone)
     if body.description is not None:
         patch["description"] = body.description
     if body.image_url is not None:

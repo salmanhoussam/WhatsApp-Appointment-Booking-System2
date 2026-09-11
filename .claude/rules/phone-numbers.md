@@ -50,6 +50,62 @@ tenant pages — no exceptions carved out for being "internal" or "just a demo".
 normaliser is the guarantee. Never rely on the UI alone — an API client, a seed script, or an
 un-migrated form will all eventually send a bare national number.
 
+### Two layers, two different responsibilities (2026-09-12, Salman's correction)
+
+Normalisation is an **action that happens at the API boundary, and only there.** Seed and test data
+is not normalised — it is **written canonical in the first place**, because it is not human input
+and crosses no boundary. Conflating the two makes the rule unenforceable, because it stops being
+clear where the guarantee actually lives:
+
+```
+API boundary          Seed / test data
+     ↓                       ↓
+normalize_for_storage()  already canonical
+     ↓                       ↓
+        Barber.phone storage
+```
+
+### Audit of every real write path to `Barber.phone` (2026-09-12)
+
+This file previously named `team.py` as the incident site and **did not mention
+`admin/barbers.py` at all** — so its own audit was incomplete, which is a way this failure recurs
+even while the rule is on the record. Measured, not assumed (repo-wide search, `app/` + `scripts/`
++ `prisma/migrations/*.sql` + `scripts/data/*.json` + `.claude/agent/*.md`):
+
+| Layer | Write path | State |
+|---|---|---|
+| API boundary | `app/api/v1/admin/team.py:243` · `:290` | ✅ normalised since 2026-09-08 |
+| API boundary | `app/api/v1/admin/barbers.py:122` (POST) · `:152` (PATCH) | ✅ **fixed 2026-09-12** — was raw, no import at all |
+| Seed fixture | `scripts/seed_barber_arch_test.py:84` · `:91` | ✅ **fixed 2026-09-12** — literals now canonical, no normaliser call |
+| — | `app/services/provisioning_service.py:64` (shared provisioning), `scripts/seed_from_rk_template.py`, `seed_alzabt_demo_tenant.py`, `seed_ali_tenant.py` | Write no phone at all ⇒ column stays `NULL` |
+| — | Raw SQL in any migration · `scripts/data/*.json` · `tenant-seeder`'s documented procedure | **Zero** write paths |
+
+**Why this was invisible until now:** `Barber.phone` is read in exactly two places
+(`admin/barbers.py:76`'s serializer, and `StaffTab.jsx:265` prefilling the edit modal) and is
+**never** a WhatsApp send target nor used to match an inbound sender. An unnormalised row therefore
+caused no visible failure, unlike `User.phone`, which produced the real جعفر incident above. That
+changes the moment the column becomes operational — which is why it was fixed *before* it does.
+
+### The scope of that fix, stated exactly
+
+```
+✅  Normalize Barber.phone at the API boundary because Barber.phone is an
+    operational WhatsApp-capable phone field.
+
+❌  Barber.phone is the canonical phone for all Staff.
+```
+
+The second form was proposed and **withdrawn** (Salman, 2026-09-12): it infers a `Staff` abstraction
+from one resource. `Barber` is a **business resource**; `User` is the **auth identity**; a
+`Staff`/Person model **does not exist** in this schema, and a person may hold several roles. Nothing
+here decides how phones work for Staff in general — that architecture is deliberately still open,
+and no refactor toward it is authorised by this rule.
+
+**One deliberate behaviour change from the 2026-09-12 fix:** on `PATCH /admin/barbers/{id}`,
+`phone: ""` now stores `NULL` instead of an empty string — the correct representation of "no phone",
+and the shape three existing accounts already carry as a separately-tracked defect. Recorded here
+rather than worked around.
+
 Frontend equivalent: `frontend/src/design-system/molecules/PhoneField.jsx`, whose `onChange` emits
 the already-normalised international value, so a call site never handles a partial number.
 
