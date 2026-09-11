@@ -15,6 +15,9 @@
 | Document | Why |
 |---|---|
 | `.claudedocs/plans/whatsapp-outbound-reliability-and-templates.md` | The 384-line Phase A/B plan. **Absorbed** here as Phase 0 and Phase 3 — do not duplicate or re-derive it |
+| `.claudedocs/plans/reservation-whatsapp-handoff-and-customer-identity.md` | **Added 2026-09-10 — a hard
+dependency, see §3 Phase 1 and Phase 2.** The website hands a booking to WhatsApp with no correlation and
+persists a placeholder customer identity; 16 real reservations on `rk` and `mr-h` are affected |
 | `.claudedocs/sessions/2026-09-09.md` | How we got here, and the four defects fixed and shipped today |
 | `.claudedocs/work/team-staff-manager/2026-09-09/report.md` | Team/Manager/owner-protection work that this builds on |
 | `.claude/rules/phone-numbers.md` | Storage with country code — load-bearing for every WhatsApp recipient |
@@ -174,6 +177,16 @@ Three deliverables, under `.claudedocs/work/whatsapp-architecture/<date>/`:
 `YYYY-MM-DD` strings** and the existing `_parse_date_text` accepts them unchanged — the only edit is
 accepting `list_reply` alongside `text`, with a "تاريخ آخر ✍️" row preserving the typed path.
 
+> 🔗 **Dependency added 2026-09-10 — booking completion is not only a WhatsApp-funnel problem.**
+> The **website** is the other entry point into the same reservation, and it hands off to WhatsApp
+> with no correlation at all: it creates the row with `customer_name='زبون واتساب'` /
+> `customer_phone='عبر واتساب'`, throws away the reservation id it is holding, and opens
+> `wa.me/{Client.whatsapp_number}` with a prose message. **16 real reservations on `rk` and `mr-h`
+> are already in that state.** If "funnel correctness" means a customer can complete a booking, this
+> path has to be corrected too — a customer who arrives from the website is inside the same funnel.
+> Lifecycle, correlation and identity are designed in the companion plan; **that design is a
+> prerequisite for calling Gate 1 closed, not a parallel track.**
+
 **Gate 1:** a booking for an **evening** slot completed with zero typed characters except the
 customer's name, verified against the stored `reservations.reservedAt` — **not the chat transcript**.
 `get_available_slots` uses naive-local-wall-clock labelled UTC (`reservation_service.py:555-563`);
@@ -183,6 +196,12 @@ that is the bug class not to re-introduce.
 
 Embedded Signup · per-tenant WABA/Phone Number ID/token on `Client` · tenant resolution from the
 inbound `phone_number_id` · retire the deep-link workaround once it is no longer load-bearing.
+
+> 🔗 **2026-09-10 — this phase is what makes the website handoff possible at all.** The handoff
+> targets `Client.whatsapp_number`, but the inbound bot resolves a tenant by matching Meta's
+> `display_phone_number` against **`Client.phone`** (`whatsapp_flow.py:756-762`). So today a
+> handoff lands on a number **no bot is listening on** — it reaches a human inbox, and a correlation
+> token would have nothing to correlate against. Per-tenant WABA closes that gap.
 
 **Gate 2:** two tenants send and receive on their own numbers · a customer messaging tenant A never
 sees tenant B's state · the deep-link path still works mid-migration.
