@@ -28,11 +28,18 @@ permission check here. This module adds no authorisation vocabulary; it derives 
 `staff_barber_id` scope `scope_barber_id()` produces for a logged-in staff account, and hands it
 to the one existing write path, `reservation_service.update_status()`.
 
+EVERY TAP IS RECORDED IN THE CHANNEL (2026-09-12). It goes into the conversation the alert it
+answers already lives in -- `origin.conversationId` -- and NOT into the customer's conversation.
+A tap is genuinely an inbound message FROM THE BARBER; filing it under the customer's phone with
+`direction: "IN"` would make the channel history assert the CUSTOMER sent it. The owner still sees
+it where he needs to, because the row carries `reservationId`: `Reservation.whatsappMessages` is
+the join A3 was built for, so the dashboard reads it off the reservation itself.
+
+Recording happens BEFORE the authorisation checks, so a refused tap is visible too -- "someone
+tapped and it did not work" and "nothing arrived" must not look identical. And because `wamid` is
+UNIQUE, the insert IS the idempotency claim: a Meta webhook retry cannot act twice.
+
 NOT IMPLEMENTED, DELIBERATELY:
-  * Recording these taps in `whatsapp_messages`. This handler runs BEFORE the flow's tenant
-    resolution on purpose (see below), so there is no conversation row yet; adding one would need
-    the merchant tenant resolution that is still step 1 of the A2 build order. Every tap, accepted
-    or refused, is recorded in `SecurityAuditLog` instead.
   * The SEND side. Today's merchant alert is free-form `send_text` with no buttons, so nothing can
     be tapped yet -- a button-bearing alert needs an approved Meta template. Built receive-first
     on purpose, the same order Gate 1 used: make it real before making it reachable.
@@ -151,6 +158,31 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
     # display_phone would resolve whichever tenant happens to hold it -- the defect this anchor
     # exists to avoid.
     client_id = origin.clientId
+
+    # ── Record the tap, and let the insert be the idempotency claim. ──
+    #
+    # Before the authorisation checks on purpose: the channel history should show that a tap
+    # arrived even when it is refused. `wamid` is UNIQUE, so a Meta retry loses the race here and
+    # returns False rather than acting a second time.
+    #
+    # `purpose` records what was REQUESTED. The outcome is not duplicated into it -- the
+    # reservation's own status is the outcome, and SecurityAuditLog says whether it was allowed.
+    tap_wamid = (msg or {}).get("id")
+    if tap_wamid:
+        claimed = await channel.claim_inbound(
+            wamid           = tap_wamid,
+            conversation_id = origin.conversationId,
+            client_id       = client_id,
+            message_type    = "button",
+            text            = title,
+            purpose         = f"barber_action:{new_status}",
+            context_type    = "reservation",
+            context_id      = origin.reservationId,
+            reservation_id  = origin.reservationId,
+        )
+        if not claimed:
+            logger.info("↩️  Barber tap %s already processed — ignoring Meta retry", tap_wamid)
+            return True
     reservations = ReservationRepository(prisma_client)
     reservation = await reservations.find_by_id(origin.reservationId, client_id)
     if reservation is None:

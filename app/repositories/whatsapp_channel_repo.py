@@ -106,6 +106,10 @@ class WhatsAppChannelRepository:
         client_id:       Optional[str],
         message_type:    str,
         text:            Optional[str] = None,
+        purpose:         Optional[str] = None,
+        context_type:    Optional[str] = None,
+        context_id:      Optional[str] = None,
+        reservation_id:  Optional[str] = None,
     ) -> bool:
         """Record an inbound message, and say whether THIS call is the one that claimed it.
 
@@ -120,15 +124,23 @@ class WhatsAppChannelRepository:
         conversation; it must always be that conversation's own clientId, never an independent
         value. See the schema's own note on this being derived, not a second source of truth.
         """
+        data: dict = {
+            "conversationId": conversation_id,
+            "clientId":       client_id,
+            "direction":      "IN",
+            "wamid":          wamid,
+            "messageType":    message_type,
+            "text":           text or None,
+        }
+        # The typed context (A3). Optional because a plain customer message answers nothing --
+        # only a button tap carries one. Added 2026-09-12 for merchant actions, which need the
+        # row to say WHY it exists, not just what it said.
+        for key, value in (("purpose", purpose), ("contextType", context_type),
+                           ("contextId", context_id), ("reservationId", reservation_id)):
+            if value:
+                data[key] = value
         try:
-            await self.db.whatsappmessage.create(data={
-                "conversationId": conversation_id,
-                "clientId":       client_id,
-                "direction":      "IN",
-                "wamid":          wamid,
-                "messageType":    message_type,
-                "text":           text or None,
-            })
+            await self.db.whatsappmessage.create(data=data)
             return True
         except UniqueViolationError:
             return False
