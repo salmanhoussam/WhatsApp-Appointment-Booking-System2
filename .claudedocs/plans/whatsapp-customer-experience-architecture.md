@@ -192,7 +192,22 @@ customer's name, verified against the stored `reservations.reservedAt` — **not
 `get_available_slots` uses naive-local-wall-clock labelled UTC (`reservation_service.py:555-563`);
 that is the bug class not to re-introduce.
 
-### Phase 2 — Per-tenant WABA (D-B)
+### Phase 2 — Per-tenant WABA (D-B) — ❌ **ملغاة 2026-09-11 بقرار سلمان**
+
+> **لا تنفَّذ.** سلمان: *"موضوع كل تينانت WABA ما بتزبط لأنه الناس بيهمها أرقامها تضل على
+> واتساب. أكثر شي فيني خليه يعمل حسابو بزنس."* والسبب تقني وقاطع: أي رقم بيدخل على Cloud API
+> بيخرج من تطبيق واتساب — فصاحب المحل بيخسر رسائلو على تلفونه.
+>
+> **البديل المصادق عليه:** رقم سنترال واحد للحجز والطلب · رقم صاحب المحل بيضل على واتسابو كزر
+> تواصل · الهوية بتنحمل بنصّ الرسالة. التفاصيل والفجوات بـ
+> `.claudedocs/plans/central-number-wiring-and-dashboard-notifications.md`.
+>
+> **WABA لكل vertical** ممكن تنُدرس لاحقاً — بس هي **أرقام منصّة جديدة لكل فئة، مش أرقام
+> أصحاب المحلات**، فما بتحقق الرغبة يلي كانت دافعة للفكرة.
+>
+> **الأثر على الترتيب:** بإلغائها، **Phase 3 صارت البوابة الجاية** — لا شي قبلها.
+
+<details><summary>النصّ الأصلي، محفوظ للسجل</summary>
 
 Embedded Signup · per-tenant WABA/Phone Number ID/token on `Client` · tenant resolution from the
 inbound `phone_number_id` · retire the deep-link workaround once it is no longer load-bearing.
@@ -205,6 +220,8 @@ inbound `phone_number_id` · retire the deep-link workaround once it is no longe
 
 **Gate 2:** two tenants send and receive on their own numbers · a customer messaging tenant A never
 sees tenant B's state · the deep-link path still works mid-migration.
+
+</details>
 
 ### Phase 3 — Templates + `_extract_message` (G5, G8)
 
