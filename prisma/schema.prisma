@@ -13,76 +13,77 @@ datasource db {
 }
 
 model Client {
-  id                String             @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  name              String             @map("name")
-  name_ar           String?            @map("name_ar")
-  name_en           String?            @map("name_en")
-  slug              String             @unique @map("slug")
-  phone             String             @unique @map("phone")
-  email             String?            @map("email")
-  password_hash     String?            @map("password_hash")
-  isActive          Boolean            @default(true) @map("is_active")
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  name                  String                 @map("name")
+  name_ar               String?                @map("name_ar")
+  name_en               String?                @map("name_en")
+  slug                  String                 @unique @map("slug")
+  phone                 String                 @unique @map("phone")
+  email                 String?                @map("email")
+  password_hash         String?                @map("password_hash")
+  isActive              Boolean                @default(true) @map("is_active")
   // -- Branding & config (merged from TenantConfig) --------------------------
-  primary_color     String?            @map("primary_color")
-  hero_video_url    String?            @map("hero_video_url")
-  whatsapp_number   String?            @map("whatsapp_number")
-  instagram_url     String?            @map("instagram_url")
-  maps_url          String?            @map("maps_url")
-  currency          String             @default("SAR") @map("currency")
-  features          Json?              @map("features")
-  config            Json?              @default("{}") @map("config")
-  unit_types        String[]           @map("unit_types")
-  payment_methods   String[]           @map("payment_methods")
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  primary_color         String?                @map("primary_color")
+  hero_video_url        String?                @map("hero_video_url")
+  whatsapp_number       String?                @map("whatsapp_number")
+  instagram_url         String?                @map("instagram_url")
+  maps_url              String?                @map("maps_url")
+  currency              String                 @default("SAR") @map("currency")
+  features              Json?                  @map("features")
+  config                Json?                  @default("{}") @map("config")
+  unit_types            String[]               @map("unit_types")
+  payment_methods       String[]               @map("payment_methods")
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
   // -- Subscription tier -------------------------------------------------------
   // regular=$15 | pro=$22 | ultra=$35 - set by SUPER_ADMIN only
   // ultra unlocks: immersive_3d showcase pages
-  tier              String             @default("regular") @map("tier")
+  tier                  String                 @default("regular") @map("tier")
   // -- Trial & Lifecycle -------------------------------------------------------
   // status: Tenant Status only going forward (ADR-0002) - valid values narrow
   //   to "active" | "suspended" (Hard Block, ADR-0001), enforced at the
   //   application layer, not a DB constraint. Existing "trial"/"demo" rows are
   //   migrated to lifecycle_state by scripts/migrate_lifecycle_state.py.
-  status            String             @default("trial") @map("status")
+  status                String                 @default("trial") @map("status")
   // lifecycle_state: Account Lifecycle State (ADR-0002) - separate from status.
   //   Values: trial | paid | grace_period | expired | cancelled | archived | evergreen.
   //   "expired" is Soft Block (allowlist-based), distinct from status="suspended"'s
   //   Hard Block. See .claudedocs/adr/ADR-0002.md and its Implementation Contract.
-  lifecycle_state   String             @default("trial") @map("lifecycle_state")
-  trial_ends_at     DateTime?          @map("trial_ends_at") @db.Timestamptz(6)
-  service_type      String?            @default("real_estate") @map("service_type")
-  notes             String?            @map("notes")
-  bookings          Booking[]
-  customers         Customer[]
-  prices            Price[]
-  properties        Property[]
-  units             Unit[]
-  users             User[]
-  galleryImages     GalleryImage[]
+  lifecycle_state       String                 @default("trial") @map("lifecycle_state")
+  trial_ends_at         DateTime?              @map("trial_ends_at") @db.Timestamptz(6)
+  service_type          String?                @default("real_estate") @map("service_type")
+  notes                 String?                @map("notes")
+  bookings              Booking[]
+  customers             Customer[]
+  prices                Price[]
+  properties            Property[]
+  units                 Unit[]
+  users                 User[]
+  galleryImages         GalleryImage[]
   // -- Module gate ------------------------------------------------------------
-  clientServices    ClientService[]
+  clientServices        ClientService[]
   // -- Order engine (Order Engine Unification, 2026-09-07) ----------------------
   // One engine for every vertical. The restaurant module's own parallel order trio was removed
   // here -- it held 0 rows, and every route gated on its config table answered 404 platform-wide,
   // so it had never taken an order. A restaurant's orders are these same StoreOrder rows now.
-  storeCarts        StoreCart[]
-  storeOrders       StoreOrder[]
+  storeCarts            StoreCart[]
+  storeOrders           StoreOrder[]
   // -- Generic Catalog module --------------------------------------------------
-  catalogCategories CatalogCategory[]
-  catalogItems      CatalogItem[]
-  catalogServices   CatalogService[]
+  catalogCategories     CatalogCategory[]
+  catalogItems          CatalogItem[]
+  catalogServices       CatalogService[]
   // -- Reservations module (restaurant tables, service appointments, viewings) --
-  reservations      Reservation[]
-  resources         Resource[]
-  barbers           Barber[]
-  // -- WhatsApp outbound correlation (2026-09-11, Phase 3) --------------------
-  whatsappOutbound  WhatsAppOutbound[]
+  reservations          Reservation[]
+  resources             Resource[]
+  barbers               Barber[]
+  // -- WhatsApp channel (2026-09-11, Implementation Gate 1) -------------------
+  // Tenant identity on this channel lives on the CONVERSATION, never on the number.
+  whatsappConversations WhatsAppConversation[]
   // -- CRM snapshot -----------------------------------------------------------
   // Denormalized list of active service keys - updated on every ClientService change.
   // Avoids a JOIN when rendering the CRM sheet or the /config endpoint.
   // Example: ["booking", "gallery", "restaurant.menu"]
-  selected_services Json?              @default("[]") @map("selected_services")
+  selected_services     Json?                  @default("[]") @map("selected_services")
 
   // -- Template & UX (Phase 49/50/51) -----------------------------------------
   // pageType: "normal" -> standard catalog/menu/store page
@@ -210,25 +211,25 @@ model User {
 }
 
 model Property {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  clientId      String    @map("client_id") @db.Uuid
-  managerId     String?   @map("manager_id") @db.Uuid
-  name          String    @map("name")
-  description   String?   @map("description")
-  image_url     String?   @map("image_url")
-  max_guests    Int       @map("max_guests")
-  bedrooms      Int       @map("bedrooms")
-  bathrooms     Int       @map("bathrooms")
-  isActive      Boolean   @default(true) @map("is_active")
-  property_type String?   @map("property_type") // "Bed & Breakfast" | "Chalet" | "Villa"
-  location      Json?     @map("location") // {area, region, distance_info}
-  facilities    Json?     @map("facilities") // ["Pool access...", "Dining / Clubhouse"]
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  manager       User?     @relation("manager_properties", fields: [managerId], references: [id])
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  clientId        String           @map("client_id") @db.Uuid
+  managerId       String?          @map("manager_id") @db.Uuid
+  name            String           @map("name")
+  description     String?          @map("description")
+  image_url       String?          @map("image_url")
+  max_guests      Int              @map("max_guests")
+  bedrooms        Int              @map("bedrooms")
+  bathrooms       Int              @map("bathrooms")
+  isActive        Boolean          @default(true) @map("is_active")
+  property_type   String?          @map("property_type") // "Bed & Breakfast" | "Chalet" | "Villa"
+  location        Json?            @map("location") // {area, region, distance_info}
+  facilities      Json?            @map("facilities") // ["Pool access...", "Dining / Clubhouse"]
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  manager         User?            @relation("manager_properties", fields: [managerId], references: [id])
   catalogServices CatalogService[]
-  units         Unit[]
+  units           Unit[]
 
   @@map("properties")
   @@schema("public")
@@ -310,21 +311,21 @@ model Price {
 }
 
 model Customer {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
-  clientId  String    @map("client_id") @db.Uuid
-  phone     String    @map("phone")
-  name      String?   @map("name")
-  email     String?   @map("email")
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @map("id") @db.Uuid
+  clientId     String    @map("client_id") @db.Uuid
+  phone        String    @map("phone")
+  name         String?   @map("name")
+  email        String?   @map("email")
   // Real customer self-service login (2026-09-01) -- nullable: every existing Customer row was
   // created server-side by the booking/reservation flow (no password ever set), and stays that
   // way unless/until that same phone number registers a real account through GlobalAuthModal.
   // Same bcrypt convention as Client.password_hash/User.password_hash (app/core/security.py) --
   // no separate hashing scheme.
-  passwordHash String? @map("password_hash")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bookings  Booking[]
-  client    Client    @relation(fields: [clientId], references: [id])
+  passwordHash String?   @map("password_hash")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookings     Booking[]
+  client       Client    @relation(fields: [clientId], references: [id])
 
   // Reservation Engine canonical identity (Phase A, Customer Identity + WhatsApp Booking Study,
   // 2026-08-24) -- Reservation.customerId's opposite side. Additive: Customer's own shape/usage by
@@ -334,7 +335,8 @@ model Customer {
   // Store purchases by this same person (Phase 3a, 2026-09-07). Together with `bookings` and
   // `reservations` above, Customer is now the single identity behind every kind of order a tenant
   // takes -- which is what lets the Customer Registry join instead of matching phone strings.
-  storeOrders  StoreOrder[]
+  storeOrders          StoreOrder[]
+  WhatsAppConversation WhatsAppConversation[]
 
   @@unique([clientId, phone])
   @@index([clientId])
@@ -377,11 +379,11 @@ model Booking {
 }
 
 model BookingService {
-  bookingId String  @map("booking_id") @db.Uuid
-  serviceId String  @map("service_id") @db.Uuid
-  quantity  Int     @default(1) @map("quantity")
-  price     Decimal @map("price") @db.Decimal(10, 2)
-  notes     String? @map("notes")
+  bookingId String         @map("booking_id") @db.Uuid
+  serviceId String         @map("service_id") @db.Uuid
+  quantity  Int            @default(1) @map("quantity")
+  price     Decimal        @map("price") @db.Decimal(10, 2)
+  notes     String?        @map("notes")
   booking   Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   // Repointed from the legacy Service model 2026-09-07 (Phase 2c). Kept rather than dropped:
   // public_service.py's create_booking() still writes these rows for smar's stay add-ons, and
@@ -510,11 +512,11 @@ model CatalogItem {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client               Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category             CatalogCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  galleryImages        GalleryImage[]
-  storeCartItems       StoreCartItem[]
-  storeOrderItems      StoreOrderItem[]
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category        CatalogCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  galleryImages   GalleryImage[]
+  storeCartItems  StoreCartItem[]
+  storeOrderItems StoreOrderItem[]
 
   @@index([clientId])
   @@index([categoryId])
@@ -568,8 +570,8 @@ model CatalogService {
   // slot length). Deliberately NOT made nullable: reservation_service.py's slot math needs a hard
   // int, and stay add-ons attach to Booking, never to Reservation, so they never reach it.
   propertyId    String?  @map("property_id") @db.Uuid
-  pricingUnit   String?  @map("pricing_unit")   // "per_person" | "per_stay" | "per_night"
-  isIncluded    Boolean  @default(false) @map("is_included")  // bundled vs paid
+  pricingUnit   String?  @map("pricing_unit") // "per_person" | "per_stay" | "per_night"
+  isIncluded    Boolean  @default(false) @map("is_included") // bundled vs paid
   isActive      Boolean  @default(true) @map("is_active")
   isFeatured    Boolean  @default(false) @map("is_featured")
   sortOrder     Int      @default(0) @map("sort_order")
@@ -577,9 +579,9 @@ model CatalogService {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category       CatalogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  property        Property?      @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category        CatalogCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   reservations    Reservation[]
   barberServices  BarberService[]
   bookingServices BookingService[]
@@ -805,6 +807,9 @@ model Reservation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // -- WhatsApp channel (2026-09-11): messages whose typed context is this reservation (A3).
+  whatsappMessages WhatsAppMessage[]
 
   @@index([clientId, moduleKey, reservedAt])
   @@index([clientId, status])
@@ -1250,45 +1255,154 @@ model Subscription {
 // state. No Client relation (clientId stays a plain column, not an FK) -- this table is
 // deliberately isolated/high-churn (created and deleted within minutes for a normal
 // conversation), not worth coupling to the Client model's own relation graph.
-/// One outbound WhatsApp message we expect an answer to, keyed by the `wamid` Meta returns.
+/// The platform's own WhatsApp numbers. NOT the tenants' numbers.
 ///
-/// Why this exists (2026-09-11, Phase 3 / G8). A quick reply tapped on a template arrives as
-/// `{"type":"button","button":{"payload","text"}}` — and a quick reply authored in WhatsApp
-/// Manager has no separate payload field, so `payload` equals the button's own text. Two
-/// bookings in the same hour therefore produce two identical "تأكيد" taps. The ONLY thing that
-/// says which message is being answered is `context.id`, the wamid of the original send. We
-/// already capture that wamid (whatsapp_service.SendResult) and, until now, only logged it.
+/// Per-tenant WABA was cancelled 2026-09-11 on a hard technical constraint: a number registered
+/// on the Cloud API can no longer be used in the WhatsApp app, so a shop owner would lose his own
+/// messages. The central number is therefore PERMANENT, and one `phoneNumberId` serves every
+/// tenant.
 ///
-/// Why a TABLE and not a column on Reservation. One booking alert goes to up to TWO recipients
-/// — the owner, and the assigned staff member when they differ (reservation_service.py's
-/// _notify_merchant_new_reservation) — and each send gets its OWN wamid. A single column could
-/// hold only one of them, so whichever recipient tapped second would not resolve.
+/// So this table answers "which channel did this message arrive on?" — never "which tenant is
+/// this?". `phone_number_id -> client_id` is impossible by construction; tenant identity comes
+/// from WhatsAppConversation (see its own docstring). The table exists to get `waba_id` /
+/// `phone_number_id` out of environment variables, and `scope` is what lets a second number
+/// (a vertical's own, or a delivery line) arrive later without a new table.
 ///
-/// Deliberately NOT a general message log: only sends that expect a reply belong here. Rows are
-/// short-lived by nature (the template's validity is one hour, matching the hold), so a
-/// retention sweep will be wanted eventually — named here rather than silently assumed.
-model WhatsAppOutbound {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  /// Meta's message id — the value that comes back as `context.id` on the reply.
-  wamid         String   @unique @map("wamid")
-  clientId      String   @map("client_id") @db.Uuid
-  /// What this send was, e.g. "new_reservation_alert" — so a reply is routed by intent,
-  /// never by guessing from the button's text (which is Arabic, and translatable).
-  purpose       String   @map("purpose")
-  reservationId String?  @map("reservation_id") @db.Uuid
-  /// The number it was sent to, in storage form (with country code) — lets an inbound reply be
-  /// matched to the right recipient when one alert went to both owner and staff.
-  recipient     String   @map("recipient")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+/// Design gate: .claudedocs/plans/whatsapp-channel-data-model.md §2, §4.
+model WhatsAppAccount {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Meta's API id for the number — the value that arrives as `metadata.phone_number_id`.
+  phoneNumberId      String   @unique @map("phone_number_id")
+  wabaId             String?  @map("waba_id")
+  /// The dialable number Meta shows in the chat header. Display/diagnostics only — deliberately
+  /// NOT a tenant-resolution key: matching it against Client.phone is the path being retired.
+  displayPhoneNumber String?  @map("display_phone_number")
+  /// "central" today. Future: "vertical:<name>" | "delivery". One column instead of a new table.
+  scope              String   @default("central") @map("scope")
+  status             String   @default("active") @map("status")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  /// A real FK, unlike the sibling whatsapp_sessions table: the client-tenant data audit
-  /// (2026-09-10) named missing client_id FKs as a live hazard, and a new table has no reason
-  /// to inherit that. Cascade — correlation rows outlive nothing.
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  conversations WhatsAppConversation[]
+
+  @@map("whatsapp_accounts")
+  @@schema("public")
+}
+
+/// The long-lived link between a customer identity, a WhatsApp channel, and one tenant context.
+///
+/// ★ THIS IS THE SOURCE OF TRUTH FOR TENANT IDENTITY on the WhatsApp channel. Every other
+/// carrier of `client_id` on this channel (WhatsAppMessage's) is derived from this row and must
+/// be written from it, never independently — rules/backend/architecture.md §9, one write path.
+///
+/// Distinct from WhatsAppSession, which is the 30-minute dialogue state machine. A conversation
+/// outlives its sessions: deleting a session must never mean the conversation disappeared. That
+/// is exactly today's defect — four expired sessions exist in production, all stuck at
+/// RES_AWAITING_SERVICE, and no record anywhere that those conversations ever happened.
+///
+/// `clientId` is NULLABLE on purpose, and it is not a convenience: a MERCHANT ONBOARDING
+/// conversation happens BEFORE the tenant exists. It is linked (NULL -> X) at provisioning time,
+/// in the same transaction that updates its messages.
+///
+/// Logical identity is (accountId, customerPhone, clientId). It is deliberately NOT
+/// (phoneNumberId, customerPhone) — that pair serves every tenant on the shared central number,
+/// so it would merge two different shops' conversations into one row.
+///
+/// PARTIAL UNIQUE INDEX, applied as raw SQL because Prisma cannot express it:
+///   at most one ACTIVE conversation per (account_id, customer_phone, client_id).
+/// Same shape as the existing `reservations_active_barber_slot_uidx`, with the same two paid
+/// lessons: `prisma migrate diff` cannot see it, so it neither drops it nor protects it. Note
+/// Postgres treats every NULL as distinct, so the constraint does not limit onboarding
+/// conversations (client_id IS NULL) to one per phone — intended, and stated rather than
+/// discovered later.
+///
+/// Design gate: .claudedocs/plans/whatsapp-channel-data-model.md §5.
+model WhatsAppConversation {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String    @map("account_id") @db.Uuid
+  clientId      String?   @map("client_id") @db.Uuid
+  customerId    String?   @map("customer_id") @db.Uuid
+  customerPhone String    @map("customer_phone")
+  /// active | closed
+  status        String    @default("active") @map("status")
+  startedAt     DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(6)
+  closedAt      DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  account  WhatsAppAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  client   Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  customer Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages WhatsAppMessage[]
 
   @@index([clientId])
+  @@index([customerPhone])
+  @@index([accountId, customerPhone, status])
+  @@map("whatsapp_conversations")
+  @@schema("public")
+}
+
+/// Every WhatsApp message, inbound and outbound. Absorbs the retired `whatsapp_outbound`.
+///
+/// The absorbed table answered TWO questions, and dropping the second would have re-created the
+/// problem it was built for, from the other side:
+///   what was sent?  -> direction, messageType, text, templateName, wamid
+///   why was it sent? -> purpose, contextType, contextId, reservationId
+/// `purpose` routes a reply BY INTENT, never by guessing from the button's text — which is Arabic
+/// and translatable.
+///
+/// A3 (decided 2026-09-11): `contextType`/`contextId` is the CANONICAL business context.
+/// `reservationId` is a TYPED CONVENIENCE REFERENCE for reservation contexts — a real FK, not a
+/// computed copy, maintained ATOMICALLY with the canonical context by the single writer. When
+/// contextType = "reservation" the two must name the same Reservation; no path may let them
+/// diverge. A message with no reservation carries reservationId = NULL while the generic context
+/// stays valid. (This is a different relationship to truth than `clientId` below, which IS a
+/// derived copy — the two are deliberately not described with the same word.)
+///
+/// `wamid` is UNIQUE and NULLABLE, and that is a CORRECTNESS boundary, not an optimisation:
+/// Meta retries webhooks and the inbound `messages[].id` is currently never read, so the state
+/// machine can re-run and create a duplicate booking. The unique insert itself is the claim —
+/// "check then process" races under `gunicorn -w 2`, "insert then process" does not. NULL is
+/// required because a failed send has no wamid, and Postgres permits many NULLs in a unique index.
+///
+/// `clientId` is DERIVED from the conversation, for the platform's clientId-on-every-query rule.
+/// It must never be accepted as an argument from a caller — see WhatsAppConversation's docstring.
+///
+/// Design gate: .claudedocs/plans/whatsapp-channel-data-model.md §4b, §4b-2, §6.
+model WhatsAppMessage {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String    @map("conversation_id") @db.Uuid
+  /// Derived from conversation.clientId. Never written independently.
+  clientId         String?   @map("client_id") @db.Uuid
+  /// IN | OUT
+  direction        String    @map("direction")
+  /// Meta's message id. NULL for a send that never reached Meta.
+  wamid            String?   @unique @map("wamid")
+  /// text | interactive | button | template | image | ... (Meta's own type, verbatim)
+  messageType      String    @map("message_type")
+  text             String?   @map("text")
+  templateName     String?   @map("template_name")
+  templateLanguage String?   @map("template_language")
+  /// Why this was sent, e.g. "new_reservation_alert". Routes a reply by intent.
+  purpose          String?   @map("purpose")
+  /// Canonical business context. e.g. contextType="reservation".
+  contextType      String?   @map("context_type")
+  contextId        String?   @map("context_id")
+  /// Typed convenience reference — see A3 above. Never an independent source of truth.
+  reservationId    String?   @map("reservation_id") @db.Uuid
+  sentAt           DateTime? @map("sent_at") @db.Timestamptz(6)
+  deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz(6)
+  readAt           DateTime? @map("read_at") @db.Timestamptz(6)
+  failedAt         DateTime? @map("failed_at") @db.Timestamptz(6)
+  errorCode        Int?      @map("error_code")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reservation  Reservation?         @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([conversationId, createdAt])
   @@index([reservationId])
-  @@map("whatsapp_outbound")
+  @@map("whatsapp_messages")
   @@schema("public")
 }
 
