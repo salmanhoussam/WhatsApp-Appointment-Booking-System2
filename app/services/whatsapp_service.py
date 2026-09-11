@@ -141,6 +141,75 @@ class WhatsAppService:
         }
         return await self._send_request(data)
 
+    # ── Template sends (2026-09-11, Phase 3 / G5) ────────────────────────────
+    #
+    # Everything above this line is a FREE-FORM send, which Meta accepts only inside the
+    # 24-hour customer-service window. Outside it, every one of them comes back 131047
+    # (proven on production, Gate 0). A template is the only way through, and it is a
+    # different message `type`, not a flag on the existing ones.
+
+    @staticmethod
+    def _clean_param(value) -> str:
+        """Meta rejects a template parameter that is empty, or that contains a newline, a tab,
+        or more than four consecutive spaces — and it rejects the WHOLE send, not the field.
+
+        Callers are expected to have filled blanks already (whatsapp_notifications._or_dash);
+        this is the last line of defence, and it degrades rather than raises, because a
+        merchant alert must never be lost to a formatting slip upstream.
+        """
+        text = " ".join(str(value or "").split())
+        return text or "—"
+
+    async def send_template(
+        self,
+        to: str,
+        name: str,
+        language: str = "ar",
+        body_params: Optional[List[str]] = None,
+        header_params: Optional[List[str]] = None,
+    ) -> SendResult:
+        """Send an APPROVED template. Works outside the 24-hour window; free-form does not.
+
+        `language` must match the approved template's own language EXACTLY. `ar` and `ar_LB`
+        are different translations to Meta, and asking for one that does not exist fails the
+        send with "template name does not exist in the translation" — which reads like a
+        missing template rather than a wrong locale, so it is worth getting right once here
+        rather than debugging it per caller.
+
+        Components are included only when they actually carry variables: a header made of
+        static text takes no header component, and quick-reply buttons take none at all. An
+        empty `parameters` list is itself a rejection, so nothing is sent for an empty list.
+
+        Positional parameters — they map to {{1}}, {{2}}, … in the order given, so the caller's
+        list order IS the contract with the approved template. A reordered list is a silently
+        wrong message, never an error.
+        """
+        components: List[Dict] = []
+        if header_params:
+            components.append({
+                "type": "header",
+                "parameters": [{"type": "text", "text": self._clean_param(p)}
+                               for p in header_params],
+            })
+        if body_params:
+            components.append({
+                "type": "body",
+                "parameters": [{"type": "text", "text": self._clean_param(p)}
+                               for p in body_params],
+            })
+
+        data = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": name,
+                "language": {"code": language},
+                **({"components": components} if components else {}),
+            },
+        }
+        return await self._send_request(data)
+
     async def send_interactive_buttons(self, to: str, text: str, buttons: List[Dict]):
         data = {
             "messaging_product": "whatsapp",
