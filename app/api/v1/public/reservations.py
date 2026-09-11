@@ -79,6 +79,7 @@ async def create_reservation(
             duration_min   = body.duration_min,
             notes          = body.notes,
             metadata       = body.metadata,
+            source         = "website",
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))

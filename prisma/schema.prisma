@@ -804,6 +804,18 @@ model Reservation {
   customerId String?   @map("customer_id") @db.Uuid
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
+  /// Which channel created this reservation: "whatsapp" | "website" | "admin".
+  ///
+  /// Gate 1 step 6 (2026-09-11). Until now the only trace of channel was a free-text prefix in
+  /// `notes` ("Booked via WhatsApp by ..."), which an edit silently destroys -- so nothing could
+  /// tell a WhatsApp booking from a website one without parsing prose. Booking has carried a real
+  /// `source` column since the start; Reservation never did.
+  ///
+  /// String with documented values, NOT a database enum -- matching Booking.source and this
+  /// project's stated convention on SecurityAuditLog.eventType ("extensible, not an enum by
+  /// design"). Nullable: rows written before this column have no known channel, and guessing one
+  /// would be inventing history.
+  source    String?  @map("source")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -1333,6 +1345,7 @@ model WhatsAppConversation {
   client   Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   customer Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   messages WhatsAppMessage[]
+  sessions WhatsAppSession[]
 
   @@index([clientId])
   @@index([customerPhone])
@@ -1407,16 +1420,34 @@ model WhatsAppMessage {
 }
 
 model WhatsAppSession {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  phoneNumberId String   @map("phone_number_id")
-  customerPhone String   @map("customer_phone")
-  clientId      String?  @map("client_id") @db.Uuid
-  step          String   @default("IDLE") @map("step")
-  stateData     Json?    @map("state_data")
-  expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phoneNumberId  String   @map("phone_number_id")
+  customerPhone  String   @map("customer_phone")
+  clientId       String?  @map("client_id") @db.Uuid
+  /// Gate 1 step 5 (2026-09-11) — which conversation this dialogue state belongs to.
+  ///
+  /// The session is the 30-minute state machine; the conversation is the durable history. This
+  /// column is what stops deleting the former from erasing the latter: a session is hard-deleted
+  /// on every successful booking (six call sites), and until now that erased the only trace that
+  /// the conversation had happened at all.
+  ///
+  /// NULLABLE because rows written before this column have no conversation, and because
+  /// _record_inbound fails open -- a session must still work when the conversation write failed.
+  /// Cascade: a session without its conversation is meaningless.
+  ///
+  /// NOTE: `clientId` above stays for now. The design names the CONVERSATION the source of truth
+  /// for tenant identity, but _resolve_client still reads the session's own copy; folding that
+  /// into a conversation lookup is its own step, not smuggled into this one.
+  conversationId String?  @map("conversation_id") @db.Uuid
+  step           String   @default("IDLE") @map("step")
+  stateData      Json?    @map("state_data")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  conversation WhatsAppConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([phoneNumberId, customerPhone])
+  @@index([conversationId])
   @@map("whatsapp_sessions")
   @@schema("public")
 }

@@ -43,6 +43,7 @@ class WhatsAppSessionRepository:
         client_id: Optional[str],
         step: str,
         state_data: dict,
+        conversation_id: Optional[str] = None,
     ):
         """Create or overwrite the session row for this conversation, refreshing expiresAt to a
         fresh 30-minute window (matches the in-memory version's own touch() semantics: every
@@ -50,6 +51,10 @@ class WhatsAppSessionRepository:
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=SESSION_TTL_SECONDS)
         data = {
             "clientId": client_id,
+            # Gate 1 step 5 (2026-09-11): which conversation this dialogue belongs to. Only ever
+            # SET, never cleared -- a later message whose conversation lookup failed must not
+            # erase a link an earlier one established.
+            **({"conversationId": conversation_id} if conversation_id else {}),
             "step": step,
             "stateData": Json(state_data),
             "expiresAt": expires_at,

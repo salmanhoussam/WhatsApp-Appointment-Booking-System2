@@ -202,7 +202,14 @@ async def _peek_session(phone_number_id: str, customer_phone: str) -> Optional[C
     return _session_from_row(row)
 
 
-async def _save_session(phone_number_id: str, customer_phone: str, session: ConversationSession) -> None:
+async def _save_session(phone_number_id: str, customer_phone: str, session: ConversationSession,
+                        conversation_id: str | None = None) -> None:
+    """Gate 1 step 5: the session now names the conversation it belongs to.
+
+    Defaulted to None so a caller that has no conversation (a failed-open record, a legacy path)
+    still saves a working session -- the link is an improvement to the record, never a condition
+    for the dialogue to function.
+    """
     repo = WhatsAppSessionRepository(prisma_client)
     await repo.upsert(
         phone_number_id=phone_number_id,
@@ -210,6 +217,7 @@ async def _save_session(phone_number_id: str, customer_phone: str, session: Conv
         client_id=session.client_id or None,
         step=session.state,
         state_data=_session_to_state_data(session),
+        conversation_id=conversation_id,
     )
 
 
@@ -325,8 +333,12 @@ async def handle_incoming_message(payload: dict) -> None:
 
 
 async def _record_inbound(phone_number_id, display_phone, customer_phone,
-                          client, msg, msg_type, title) -> bool:
-    """Persist this inbound message; return False only when it is a REPEAT of one already seen.
+                          client, msg, msg_type, title) -> tuple[bool, str | None]:
+    """Persist this inbound message. Returns (process_it, conversation_id).
+
+    `process_it` is False ONLY for a genuine repeat of a wamid already seen. The conversation id
+    is handed back so the session can be attached to it (Gate 1 step 5) -- None whenever the
+    conversation could not be resolved, which the caller must treat as ordinary.
 
     Two separate jobs, and the difference in how they fail is deliberate:
 
@@ -350,11 +362,11 @@ async def _record_inbound(phone_number_id, display_phone, customer_phone,
         repo = WhatsAppChannelRepository(prisma_client)
         account = await repo.get_or_create_account(phone_number_id, display_phone)
         if not account:
-            return True
+            return True, None
         conversation = await repo.resolve_or_open_conversation(
             account.id, customer_phone, client.id)
         if not conversation:
-            return True
+            return True, None
 
         if wamid:
             claimed = await repo.claim_inbound(
@@ -363,7 +375,7 @@ async def _record_inbound(phone_number_id, display_phone, customer_phone,
             )
             if not claimed:
                 logger.info("🔁 Duplicate inbound wamid=%s — already processed, ignoring", wamid)
-                return False
+                return False, conversation.id
         else:
             # No wamid on the payload: nothing to deduplicate against. Process it rather than
             # drop it, and say so, because silently skipping the record would look like success.
@@ -371,10 +383,11 @@ async def _record_inbound(phone_number_id, display_phone, customer_phone,
                            customer_phone)
 
         await repo.touch_conversation(conversation.id)
+        return True, conversation.id
     except Exception as exc:
         logger.error("🔥 _record_inbound failed (wamid=%s) — processing anyway: %s",
                      wamid or "—", exc, exc_info=True)
-    return True
+    return True, None
 
 
 async def _dispatch(
@@ -423,8 +436,9 @@ async def _dispatch(
     #
     # Placed HERE, after the tenant is known and before any state handler runs, because the
     # conversation row needs a tenant and the claim must precede every business mutation.
-    if not await _record_inbound(phone_number_id, display_phone, customer_phone,
-                                 client, msg, msg_type, title):
+    proceed, conversation_id = await _record_inbound(
+        phone_number_id, display_phone, customer_phone, client, msg, msg_type, title)
+    if not proceed:
         return
 
     # Phase 3c: if the resolved tenant is not the one this session was bound to, the customer
@@ -513,7 +527,7 @@ async def _dispatch(
     # one place, per message, that state actually becomes visible to the NEXT message -- which may
     # land on a different gunicorn worker (see this file's own module docstring).
     if not session._cleared:
-        await _save_session(phone_number_id, customer_phone, session)
+        await _save_session(phone_number_id, customer_phone, session, conversation_id)
 
 
 # ── State handlers ─────────────────────────────────────────────────────────────

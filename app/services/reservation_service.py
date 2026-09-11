@@ -339,6 +339,7 @@ async def create_reservation(
     notes:          str | None,
     metadata:       dict | None,
     customer_email: str | None = None,
+    source:         str | None = None,
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -472,6 +473,11 @@ async def create_reservation(
         create_data["barberId"] = barber.id
     if catalog_service:
         create_data["serviceId"] = catalog_service.id
+    # Gate 1 step 6 (2026-09-11): the channel, recorded as data instead of as a prose prefix in
+    # `notes` that an edit silently destroys. Set by the caller -- this Service is reached from
+    # the website, the WhatsApp bot and the dashboard, and only the caller knows which it is.
+    if source:
+        create_data["source"] = source
 
     # Phase C (Study 6 race-condition close, 2026-08-24): the Conflict Check block above is a
     # plain read-then-write and cannot, by itself, prevent two concurrent requests for the exact

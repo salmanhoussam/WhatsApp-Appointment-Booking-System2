@@ -399,6 +399,7 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
             duration_min   = session.res_duration_min,
             notes          = f"Booked via WhatsApp by {session.res_customer_name}",
             metadata       = {"barber_id": session.res_barber_id, "service_id": session.res_service_id},
+            source         = "whatsapp",
         )
 
         ref = reservation["id"][:8].upper()
