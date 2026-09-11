@@ -70,6 +70,7 @@ from app.services.whatsapp_service import WhatsAppService
 from app.services.booking_service import BookingService
 from app.repositories.booking_repo import BookingRepository
 from app.repositories.customer_repo import CustomerRepository
+from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.repositories.whatsapp_session_repo import WhatsAppSessionRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
@@ -323,6 +324,59 @@ async def handle_incoming_message(payload: dict) -> None:
         logger.error("🔥 handle_incoming_message crash: %s", exc, exc_info=True)
 
 
+async def _record_inbound(phone_number_id, display_phone, customer_phone,
+                          client, msg, msg_type, title) -> bool:
+    """Persist this inbound message; return False only when it is a REPEAT of one already seen.
+
+    Two separate jobs, and the difference in how they fail is deliberate:
+
+      * IDEMPOTENCY — Meta retries webhooks, and until now the inbound `messages[].id` was never
+        read, so a retry re-ran the whole state machine and could book twice. The INSERT is the
+        claim (whatsapp_messages.wamid is UNIQUE); a read-then-write would race under
+        `gunicorn -w 2`. A duplicate returns False and the message is dropped here.
+
+      * DURABILITY — the conversation record. Today a session is hard-deleted on success, so the
+        fact that a conversation ever happened is erased; four expired sessions sit in production
+        with no history behind them.
+
+    FAILS OPEN. Anything other than a genuine duplicate — a DB blip, a missing wamid — returns
+    True and the message is processed normally. Losing a real customer's booking message to a
+    bookkeeping failure would be a far worse bug than the double-processing this prevents, and
+    the catastrophic case is already covered independently: `reservations_active_barber_slot_uidx`
+    makes two active reservations on one barber's slot impossible regardless.
+    """
+    wamid = msg.get("id") or ""
+    try:
+        repo = WhatsAppChannelRepository(prisma_client)
+        account = await repo.get_or_create_account(phone_number_id, display_phone)
+        if not account:
+            return True
+        conversation = await repo.resolve_or_open_conversation(
+            account.id, customer_phone, client.id)
+        if not conversation:
+            return True
+
+        if wamid:
+            claimed = await repo.claim_inbound(
+                wamid=wamid, conversation_id=conversation.id, client_id=conversation.clientId,
+                message_type=msg_type, text=title,
+            )
+            if not claimed:
+                logger.info("🔁 Duplicate inbound wamid=%s — already processed, ignoring", wamid)
+                return False
+        else:
+            # No wamid on the payload: nothing to deduplicate against. Process it rather than
+            # drop it, and say so, because silently skipping the record would look like success.
+            logger.warning("Inbound message with no wamid from %s — recorded nothing, processing anyway",
+                           customer_phone)
+
+        await repo.touch_conversation(conversation.id)
+    except Exception as exc:
+        logger.error("🔥 _record_inbound failed (wamid=%s) — processing anyway: %s",
+                     wamid or "—", exc, exc_info=True)
+    return True
+
+
 async def _dispatch(
     phone_number_id: str,
     display_phone: str,
@@ -363,6 +417,14 @@ async def _dispatch(
             "⚠️  No client resolved for display_phone=%s (session bound=%s)",
             display_phone, bool(existing_session and existing_session.client_id),
         )
+        return
+
+    # Gate 1 step 4 (2026-09-11) — record the message, and stop if Meta already delivered it.
+    #
+    # Placed HERE, after the tenant is known and before any state handler runs, because the
+    # conversation row needs a tenant and the claim must precede every business mutation.
+    if not await _record_inbound(phone_number_id, display_phone, customer_phone,
+                                 client, msg, msg_type, title):
         return
 
     # Phase 3c: if the resolved tenant is not the one this session was bound to, the customer
