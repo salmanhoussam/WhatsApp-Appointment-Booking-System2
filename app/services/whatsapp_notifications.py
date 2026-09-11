@@ -30,6 +30,68 @@ from app.services.whatsapp_service import WhatsAppService
 logger = logging.getLogger(__name__)
 
 
+# ── Message presentation helpers (2026-09-11, Phase 3 / templates) ────────────
+# These shape what a merchant or customer actually READS. They live here, in the
+# notification layer, on purpose:
+#
+#   * the per-vertical emoji is NOT allowed into app/core/verticals.py -- that module
+#     states its own ownership boundary ("ALLOWED: default_services, page_template,
+#     staff_backing_model / NEVER: ... anything that varies per-tenant") and a message
+#     emoji is presentation, not provisioning;
+#   * the date format is a template PARAMETER value, never template text, so it stays
+#     ours to change without a new Meta approval cycle.
+
+# Salman, 2026-09-11: the vertical supplies the emoji ("الـvertical بيعطينا هيد الإشارة").
+# One template serves every vertical; putting 💈 in the template's static text would send
+# it to a restaurant too. VERTICAL_REGISTRY holds exactly one vertical today (barber), and
+# half of production carries vertical=NULL -- so absence is normal and must not be an error.
+_VERTICAL_EMOJI = {
+    "barber": "💈",
+}
+
+# Python's datetime.weekday(): Monday=0 … Sunday=6.
+# NOT interchangeable with the frontend's AR_WEEKDAYS (useReservationBooking.js:57), which is
+# indexed by JS getUTCDay() where Sunday=0 -- copying that array here shifts every day by one.
+_AR_DAYS = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+
+
+def shop_label(name: str | None, vertical: str | None = None) -> str:
+    """The shop's name as a customer/merchant sees it, with its vertical's emoji appended.
+
+    Takes plain values rather than a Client row so this layer stays free of the data model.
+    An unknown or missing vertical simply yields no emoji.
+    """
+    label = (name or "").strip()
+    emoji = _VERTICAL_EMOJI.get(vertical or "")
+    return f"{label} {emoji}" if (label and emoji) else label
+
+
+def fmt_reserved_at(dt) -> str:
+    """`الاثنين 15-09 · 16:30` — Salman's requested shape, 2026-09-11.
+
+    Deliberately renders `dt` exactly as stored. get_available_slots() writes a naive local
+    wall-clock labelled UTC (reservation_service.py:555-563) -- a known, separately-owned
+    defect. This formatter must MATCH what the dashboard already displays, never silently
+    correct the timezone, or one defect starts looking like two.
+    """
+    if dt is None:
+        return "—"
+    try:
+        return f"{_AR_DAYS[dt.weekday()]} {dt:%d-%m} · {dt:%H:%M}"
+    except Exception:
+        return str(dt)
+
+
+def _or_dash(value) -> str:
+    """Never hand a template an empty parameter — Meta rejects the whole send.
+
+    The free-form builders below could drop an empty line entirely; a template cannot drop a
+    line, so an absent service or staff member becomes a dash instead of a missing field.
+    """
+    text = (value or "").strip() if isinstance(value, str) else (value or "")
+    return text or "—"
+
+
 def _report(result, what: str, who: str, ref: str = "") -> bool:
     """Log the REAL outcome of one send, and hand it back to the caller.
 
@@ -275,28 +337,41 @@ async def send_new_reservation_to_merchant(
     service_name:    str,
     barber_name:     str,
     reserved_at:     str,
+    client_name:     str = "",
 ) -> bool:
     """Tell the shop (owner, and the assigned staff member) that a booking just came in.
 
     Deliberately includes the customer's real phone number: the whole point for the merchant is
-    being able to call back, and it is their own customer's data on their own tenant.
+    being able to call back, and it is their own customer's data on their own tenant. A link
+    button would not replace it -- Meta forbids wa.me in template buttons outright, and a call
+    button's number is fixed in the template, so it cannot carry the customer's.
+
+    `client_name` added 2026-09-11 (Salman): this alert arrives from the shared CENTRAL number,
+    so the merchant sees the platform's identity, not his own shop's -- the message was not
+    self-contained, least of all for an owner with more than one shop. Keyword-defaulted rather
+    than required so this helper keeps its "never breaks a caller" shape.
+
+    The field order below mirrors the `new_reservation_alert` template EXACTLY (submitted
+    2026-09-11). That is deliberate: when the approved template replaces this free-form send,
+    the merchant sees the same message he already knows, so the switchover is invisible to him
+    and any difference is a real defect rather than a cosmetic one.
+
+    Every field goes through _or_dash(): the free-form message below could drop an empty line,
+    but the template cannot, and Meta rejects an empty parameter outright. Matching that rule
+    here keeps the two paths byte-comparable.
     """
     try:
         wa = WhatsAppService()
         lines = [
             "🔔 *حجز جديد*",
             "",
-            f"الزبون: *{customer_name or '—'}*",
-            f"الرقم: {customer_phone or '—'}",
-        ]
-        if service_name:
-            lines.append(f"الخدمة: {service_name}")
-        if barber_name:
-            lines.append(f"الموظف: {barber_name}")
-        lines += [
-            f"الموعد: {reserved_at}",
-            "",
-            f"رقم الحجز: *{reservation_ref}*",
+            f"المحل: *{_or_dash(client_name)}*",
+            f"الزبون: {_or_dash(customer_name)}",
+            f"الرقم: {_or_dash(customer_phone)}",
+            f"الخدمة: {_or_dash(service_name)}",
+            f"الموظف: {_or_dash(barber_name)}",
+            f"الموعد: {_or_dash(reserved_at)}",
+            f"رقم الحجز: *{_or_dash(reservation_ref)}*",
         ]
         return _report(await wa.send_text(to=recipient_phone, text="\n".join(lines)),
                        f"New-reservation alert ({recipient_label})", recipient_phone,

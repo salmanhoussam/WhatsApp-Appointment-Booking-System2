@@ -154,7 +154,15 @@ async def _notify_merchant_new_reservation(reservation_row) -> None:
                 customer_phone  = reservation_row.customerPhone,
                 service_name    = service_name,
                 barber_name     = barber_name,
-                reserved_at     = reservation_row.reservedAt.strftime("%Y-%m-%d %H:%M"),
+                reserved_at     = whatsapp_notifications.fmt_reserved_at(reservation_row.reservedAt),
+                # The alert comes from the shared central number, so it must name the shop
+                # itself (Salman, 2026-09-11). name_ar first: this message is always Arabic by
+                # the convention useReservationBooking.js:57 already documents for merchant-
+                # facing text. Reverse by dropping `.name_ar or` if the Latin name is wanted.
+                client_name     = whatsapp_notifications.shop_label(
+                    getattr(client, "name_ar", None) or client.name,
+                    getattr(client, "vertical", None),
+                ),
             ))
     except Exception as exc:
         logger.error("🔥 _notify_merchant_new_reservation failed to prepare: %s", exc, exc_info=True)
@@ -193,7 +201,7 @@ async def _notify_reservation_event(reservation_row, kind: str) -> None:
             barber_name = barber.name if barber else ""
 
         ref = reservation_row.id[:8].upper()
-        reserved_at_str = reservation_row.reservedAt.strftime("%Y-%m-%d %H:%M")
+        reserved_at_str = whatsapp_notifications.fmt_reserved_at(reservation_row.reservedAt)
 
         if kind == "confirmation":
             _fire_and_forget(whatsapp_notifications.send_reservation_confirmation(
