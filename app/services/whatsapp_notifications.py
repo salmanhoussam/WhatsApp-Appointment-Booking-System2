@@ -45,10 +45,15 @@ def _report(result, what: str, who: str, ref: str = "") -> bool:
     """
     tail = f" (ref={ref})" if ref else ""
     if result:
-        logger.info("✅ %s delivered to %s%s — wamid=%s", what, who, tail,
+        # "accepted", not "delivered" — and the distinction is not pedantic. Proven on production
+        # 2026-09-11: this exact line logged "delivered" for a message Meta accepted with a wamid
+        # and then failed to deliver with 131047 (closed 24-hour window). Delivery is only ever
+        # knowable from the statuses[] callback in webhook.py, which arrives seconds to minutes
+        # later under the SAME wamid. A send helper can report acceptance and nothing more.
+        logger.info("✅ %s accepted by Meta for %s%s — wamid=%s", what, who, tail,
                     getattr(result, "wamid", None) or "—")
         return True
-    logger.error("🔥 %s NOT delivered to %s%s — %s", what, who, tail,
+    logger.error("🔥 %s REJECTED for %s%s — %s", what, who, tail,
                  result.log_suffix() if hasattr(result, "log_suffix") else result)
     return False
 

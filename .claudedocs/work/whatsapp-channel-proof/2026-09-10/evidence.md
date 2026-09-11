@@ -229,3 +229,80 @@ the real budget is two and a half attempts, not five. Recorded, not fixed.
 `barberlab-test.phone` is now `96178727986`, so its merchant alert resolves to a real number instead
 of the `+9613300771122` that returned `131026`. Noted because the earlier snapshot in this file is
 no longer the current state of those two columns.
+
+---
+
+# GATE 0 — CLOSED 2026-09-11 · RC1 **CONFIRMED**
+
+## The decisive observation
+
+```
+✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzA5ODUyMTIVAgARGBIwMDY0Q0M4MDVDNTIyRkQwM0EA)
+✅ Staff setup link (hussein) … 96170985212 — wamid=<same>
+📵 WhatsApp delivery FAILED — wamid=<same> status=failed recipient=96170985212 ts=1789117196
+   meta_code=131047 title=Re-engagement message
+   detail=Message failed to send because more than 24 hours have passed since the customer
+          last replied to this number.
+```
+
+**The 24-hour customer-service window is confirmed as the cause.** Not inferred — Meta's own code
+and text, on a real send, to a real working WhatsApp number that had never messaged the business.
+
+### Why this test is valid where every earlier one was not
+
+| Condition | Evidence |
+|---|---|
+| Recipient had **never** messaged the business | `whatsapp_sessions` for `96170985212` = **0** before the send |
+| Recipient is a **real, working** WhatsApp number | Confirmed by Salman — it is his father's number, in daily use. `131026` is therefore excluded |
+| The send was **business-initiated free-form** | `send_staff_setup_link` → `send_text`, the exact path that failed for جعفر |
+| The access token is valid | Meta issued a `wamid`; a dead token fails synchronously with 401/190 |
+
+Every previous success (Tunisia, Yemen, Salman's own number) was a **reply inside an open window** —
+the customer had messaged first. Those could never test the hypothesis, and were not treated as if
+they had.
+
+### The surprise worth recording
+
+**Meta accepted the message (HTTP 200 + wamid) and only rejected it asynchronously.** The window
+rejection did **not** arrive as a synchronous 400. So a system that checks only the send response
+would have reported success — which is exactly what this codebase did before 2026-09-10, and exactly
+why the `statuses[]` handling added in `d49ec06` was made part of Phase 0 rather than deferred.
+
+**Without the log-only statuses[] change, Gate 0 could not have been closed at all.**
+
+### Correlation proved end to end
+The same `wamid` appears in all three lines — outbound acceptance, the helper's own report, and the
+delivery receipt. That linkage did not exist before `7910d8a`.
+
+## Self-inflicted defect found in the same log *(fixed)*
+
+```
+✅ Staff setup link (hussein) delivered to 96170985212
+```
+
+`_report()` said **"delivered"** for a message that was merely **accepted** and then failed. The
+helper written on 2026-09-10 to remove "silent success" reintroduced it one level up, in its own
+wording. Corrected to `accepted by Meta for …` / `REJECTED for …`. Delivery is knowable only from
+the `statuses[]` callback, never from the send response.
+
+## What this unlocks, and what it costs
+
+`131047` applies to **every business-initiated free-form message** — staff invites, merchant alerts,
+and any customer notification sent outside an open window. The only remedy Meta offers is an
+**approved message template**.
+
+**Phase 3 (Templates) is therefore no longer optional or deferrable** — it is the gating path for
+every outbound notification in this product. It carries a hard external dependency: Meta template
+approval, manual, days to weeks.
+
+### Gate 0 — final
+
+| Condition | |
+|---|---|
+| No unconditional `✅` remains | ✅ |
+| A rejection logs Meta's error code and body | ✅ `131026`, then `131047` |
+| One real inbound booking completes | ✅ `0B803353` |
+| One real `statuses[]` payload observed | ✅ failure **and** success (`sent`/`delivered`/`read`) |
+| **24-hour-window hypothesis confirmed or refuted** | ✅ **CONFIRMED — `131047`** |
+
+**PHASE 0 — CHANNEL PROOF: COMPLETE.**
