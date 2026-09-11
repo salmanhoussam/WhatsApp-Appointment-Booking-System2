@@ -25,6 +25,8 @@ contract either way -- safe to schedule fire-and-forget through either mechanism
 """
 
 import logging
+import re
+from typing import Optional
 from app.services.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
@@ -387,3 +389,116 @@ async def send_new_reservation_to_merchant(
             recipient_phone, recipient_label, exc, exc_info=True,
         )
         return False
+
+
+# ── Barber alert template payload (A2, 2026-09-12) ────────────────────────────
+#
+# NOT WIRED. This builds the payload only, so the template can be reviewed, diffed and submitted
+# to Meta before anything sends it. Salman's instruction: prepare the builder, do not connect it.
+#
+# WHY A BUILDER AND NOT A send_template() CALL. `WhatsAppService.send_template()` states in its
+# own docstring that "quick-reply buttons take none at all" — it emits header/body components and
+# nothing else. That was true for `new_reservation_alert`, which has no buttons. This template
+# needs BUTTON components, because they are what makes the payload deterministic (see below), so
+# the sender has to grow before it can carry this. Returning the complete payload keeps the two
+# concerns separable: this function is reviewable today, the transport changes later.
+#
+# WHY THE BUTTON COMPONENTS ARE NOT OPTIONAL. A quick-reply button's payload can be set per-send
+# via {"type":"payload"} parameters. Supply it and the webhook receives `BARBER_DONE`; omit it and
+# what comes back is tied to the button's own visible text — Arabic, translatable, and therefore a
+# fragile thing to switch behaviour on. Sending the payload explicitly is what lets
+# `whatsapp_barber_actions._INTENTS` match a stable constant; its Arabic entries stay only as a
+# defensive fallback, not as the design.
+#
+# Meta allows at most 3 quick-reply buttons per template. This uses 2.
+
+BARBER_ALERT_TEMPLATE       = "barber_reservation_alert"
+BARBER_ALERT_LANGUAGE       = "ar"
+BARBER_ACTION_DONE_PAYLOAD    = "BARBER_DONE"
+BARBER_ACTION_NO_SHOW_PAYLOAD = "BARBER_NO_SHOW"
+
+
+def _param(value: Optional[str]) -> str:
+    """One body parameter, in the only shape Meta accepts.
+
+    Mirrors `WhatsAppService._clean_param` deliberately rather than importing it (it is a private
+    method on the sender, and this builder must stand alone): Meta rejects a parameter containing
+    a newline, a tab, or four or more consecutive spaces, and rejects an empty one outright — so
+    every field collapses its whitespace and falls back to an em dash.
+    """
+    text = re.sub(r"\s+", " ", (value or "").strip())
+    return text or "—"
+
+
+def build_barber_alert_payload(
+    to:              str,
+    client_name:     str,
+    customer_name:   str,
+    customer_phone:  str,
+    service_name:    str,
+    reserved_at:     str,
+    reservation_ref: str,
+) -> dict:
+    """The exact JSON to POST to Meta for a barber's actionable new-reservation alert.
+
+    THE TEMPLATE THIS MATCHES, to register in WhatsApp Manager (category: UTILITY, language: ar):
+
+        Body:
+            🔔 *حجز جديد*
+
+            المحل: *{{1}}*
+            الزبون: {{2}}
+            الرقم: {{3}}
+            الخدمة: {{4}}
+            الموعد: {{5}}
+            رقم الحجز: *{{6}}*
+        Buttons (quick reply):
+            [0] تم        [1] لم يحضر
+
+    Parameter ORDER IS THE CONTRACT — positional {{1}}..{{6}}. A reordered list is a silently
+    wrong message, never an error, exactly as `send_template` warns.
+
+    Differences from `new_reservation_alert` (the owner's template), both deliberate:
+      * No "الموظف" line. The recipient IS the barber; naming him to himself is noise.
+      * "المحل" is KEPT even so. The alert arrives from the shared central number, so without it
+        the message does not say who it is from — the same reason Salman added it to the owner's
+        template on 2026-09-11.
+    """
+    return {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": BARBER_ALERT_TEMPLATE,
+            "language": {"code": BARBER_ALERT_LANGUAGE},
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": _param(client_name)},
+                        {"type": "text", "text": _param(customer_name)},
+                        {"type": "text", "text": _param(customer_phone)},
+                        {"type": "text", "text": _param(service_name)},
+                        {"type": "text", "text": _param(reserved_at)},
+                        {"type": "text", "text": _param(reservation_ref)},
+                    ],
+                },
+                {
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": "0",
+                    "parameters": [
+                        {"type": "payload", "payload": BARBER_ACTION_DONE_PAYLOAD},
+                    ],
+                },
+                {
+                    "type": "button",
+                    "sub_type": "quick_reply",
+                    "index": "1",
+                    "parameters": [
+                        {"type": "payload", "payload": BARBER_ACTION_NO_SHOW_PAYLOAD},
+                    ],
+                },
+            ],
+        },
+    }

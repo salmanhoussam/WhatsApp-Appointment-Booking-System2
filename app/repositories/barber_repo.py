@@ -25,6 +25,25 @@ async def find_barber(client_id: str, barber_id: str):
     )
 
 
+async def find_active_barber_by_phones(client_id: str, phones: list[str]):
+    """The active Barber at this tenant whose phone matches any candidate form, or None.
+
+    A2-b (2026-09-12): the WhatsApp channel has no authenticated User, so a merchant action's
+    actor is derived from the inbound sender number. `phones` is a list because the caller owns
+    the matching policy (a row written before the Phone Numbers rule may lack its country code) --
+    this layer only queries, exactly as `user_repo` does for phone login.
+
+    `clientId` is mandatory here and comes from the RESERVATION, never from the message: the
+    central number is shared, so nothing in the envelope identifies a tenant.
+    Active-only on purpose -- a deactivated barber has no operational authority.
+    """
+    if not phones:
+        return None
+    return await prisma_client.barber.find_first(
+        where={"clientId": client_id, "isActive": True, "phone": {"in": phones}}
+    )
+
+
 async def create_barber(data: dict):
     """Insert a new Barber row."""
     return await prisma_client.barber.create(data=data)

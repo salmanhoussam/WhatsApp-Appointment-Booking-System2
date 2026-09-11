@@ -87,6 +87,18 @@ class WhatsAppChannelRepository:
 
     # ── Messages ─────────────────────────────────────────────────────────────
 
+    async def find_message_by_wamid(self, wamid: str):
+        """The message Meta says a button tap is answering — the anchor A3 defines.
+
+        `context.id` on an inbound tap is the wamid of OUR outbound alert. Resolving it here is
+        what lets a merchant action take its reservation and tenant from real recorded state
+        instead of from the button's own text, which a second booking in the same hour would
+        duplicate exactly.
+        """
+        if not wamid:
+            return None
+        return await self.db.whatsappmessage.find_unique(where={"wamid": wamid})
+
     async def claim_inbound(
         self,
         wamid:           str,
