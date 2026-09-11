@@ -347,8 +347,24 @@ export default function StaffTab({ color }) {
     }
   }
 
+  // Confirmation text approved by Salman, 2026-09-12. Every clause in it was checked against the
+  // backend before being promised to an owner, because a warning that overstates what happens is
+  // worse than none: an earlier draft said the member's bookings would be DELETED, which is false
+  // -- Reservation.barberId is onDelete: SetNull, and deactivate() writes isActive and nothing
+  // else. What the text now claims is what the code actually does:
+  //   hidden from public booking -> public/reservations.py and whatsapp_reservation_flow.py both
+  //                                call list_barbers(active_only=True)
+  //   no new bookings            -> enforced in the SERVICE, not just by hiding him from a list:
+  //                                reservation_service._resolve_barber() rejects an inactive
+  //                                barber, so a direct API call or a stale link is refused too
+  //   past bookings kept         -> nothing in this path touches the reservations table
+  // "يمكن إعادة تفعيله لاحقاً" is kept from the previous wording -- activate() below delivers it.
+  const DEACTIVATE_WARNING =
+    'إيقاف تفعيل الموظف سيخفيه من واجهة الحجز العامة ولن يتلقى حجوزات جديدة، ' +
+    'لكن حجوزاته السابقة ستبقى محفوظة لأغراض التقارير المالية.'
+
   const deactivate = async (member) => {
-    if (!confirm(`إخفاء "${member.name}"؟ يمكن إعادة تفعيله لاحقاً.`)) return
+    if (!confirm(`إيقاف تفعيل "${member.name}"؟\n\n${DEACTIVATE_WARNING}\n\nيمكن إعادة تفعيله لاحقاً.`)) return
     await adminApi.patch(`/barbers/${member.id}/deactivate`)
     loadStaff()
   }
