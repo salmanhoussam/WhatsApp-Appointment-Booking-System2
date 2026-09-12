@@ -466,7 +466,12 @@ async def send_new_reservation_to_merchant(
 # buttons that A2-a now handles. Seven positional parameters, in the order this module's own
 # free-form message has always built them.
 MERCHANT_ALERT_TEMPLATE     = "new_reservation_alert"
-MERCHANT_ALERT_LANGUAGE     = "ar"
+# ar_LB, NOT ar — read from Meta's own definition 2026-09-12
+# (probe_template_send.py new_reservation_alert reported language=ar_LB header=1 body=6).
+# A locale that does not match the approved template fails with 132001 "template name does not
+# exist in <locale>", which reads like a MISSING template rather than a wrong language — so this
+# would have looked like "still not approved" long after it was.
+MERCHANT_ALERT_LANGUAGE     = "ar_LB"
 
 BARBER_ALERT_TEMPLATE       = "barber_reservation_alert"
 BARBER_ALERT_LANGUAGE       = "ar"

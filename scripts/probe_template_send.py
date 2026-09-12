@@ -142,12 +142,31 @@ async def main() -> int:
         print("  from its Public Test Numbers. Credentials, request shape and reachability are")
         print("  all proven by getting a template-specific error at all. DO NOT stop D13 on it.")
         print(f"  Try this WABA's own template: {DEFAULT_TEMPLATE}")
+    elif status.upper() != "APPROVED":
+        # THIRD TIME THIS SCRIPT DREW A FALSE CONCLUSION, and the last one it can: it printed
+        # "THIS is the result Salman's gate means: fix the send path" for a template it had just
+        # read as PENDING, minutes after the path was PROVEN by a delivered message. The status is
+        # already in hand above -- not using it was the bug, so the fix is to use it, not to add
+        # another error-code special case.
+        print(f"  EXPECTED — this template is {status}, not APPROVED.")
+        print("  A template under review is not sendable at all, and Meta reports it as though")
+        print("  it does not exist in its locale (132001), which reads like a missing template")
+        print("  rather than a pending one. Nothing here says anything about the channel.")
+        print("  THE PATH IS ALREADY PROVEN: 3p_direct_integration_test_template was accepted")
+        print("  AND delivered from this number on 2026-09-12. Do NOT re-diagnose it.")
+        print("  Re-run this once Meta approves the template. Nothing to fix in our code from")
+        print("  this result alone — check the locale line above matches what Meta reports.")
     else:
-        print("  Rejected, and the parameter count came from Meta rather than a guess — so this")
-        print("  is the channel, not the request. `reason`: credentials_missing is an unset")
-        print("  variable, network_error is us, meta_<status> is Meta refusing us. 190/401 is the")
-        print("  token. THIS is the result Salman's gate means: fix the send path before D13.")
-    if result or code == 131058:
+        print("  Rejected, and the template IS approved and the parameter count came from Meta")
+        print("  rather than a guess — so this is the channel or the locale, not the shape.")
+        print("  `reason`: credentials_missing is an unset variable, network_error is us,")
+        print("  meta_<status> is Meta refusing us; 190/401 is the token; 132001 with an APPROVED")
+        print("  template means the LOCALE we sent does not match the one Meta has.")
+        print("  THIS is the result Salman's gate means: fix the send path before D13.")
+    # Exit non-zero ONLY for a rejection that actually implicates the channel. A PENDING
+    # template and 131058 are both "inconclusive by construction", and a non-zero exit would read
+    # as "the channel is broken" to anything scripting this.
+    if result or code == 131058 or status.upper() != "APPROVED":
         return 0
     return 2
 
