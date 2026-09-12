@@ -74,7 +74,7 @@ from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.repositories.whatsapp_session_repo import WhatsAppSessionRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
-from app.services import whatsapp_barber_actions
+from app.services import whatsapp_merchant_actions
 from app.services import whatsapp_reservation_flow
 from app.core.db_resilience import with_db_resilience
 
@@ -419,7 +419,8 @@ async def _dispatch(
             title, value, customer_phone, _extract_context_id(msg) or "—",
         )
 
-    # A2-b (2026-09-12) — a barber's own "تم" / "لم يحضر" tap, handled BEFORE tenant resolution.
+    # A2 (2026-09-12) — a merchant's button tap: the OWNER's تأكيد/إلغاء (A2-a) or a barber's
+    # own تم/لم يحضر (A2-b). Handled BEFORE tenant resolution.
     #
     # Placed ahead of _resolve_client() deliberately. That function resolves a tenant from
     # `display_phone`, which on the shared central number matches whichever tenant happens to
@@ -429,7 +430,7 @@ async def _dispatch(
     #
     # Returning on True covers refusals too, on purpose: a refused merchant tap must never fall
     # through into the customer state machine, where "تم" would be read as a customer's answer.
-    if await whatsapp_barber_actions.try_handle(
+    if await whatsapp_merchant_actions.try_handle(
         customer_phone, msg, msg_type, value, title, _extract_context_id(msg)
     ):
         return

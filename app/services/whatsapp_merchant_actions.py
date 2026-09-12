@@ -1,19 +1,26 @@
 """
-Barber actions from WhatsApp — A2-b.
+Merchant actions from WhatsApp — A2.
 
-A barber taps "تم" or "لم يحضر" on the alert for one of his own bookings, and the reservation
-moves to `arrived` / `no_show`. Decisions this implements, all Salman's (2026-09-12), recorded in
+Two actors, one machine. The OWNER taps "تأكيد"/"إلغاء" on the new-reservation alert and the
+booking moves pending -> confirmed/cancelled; a BARBER taps "تم"/"لم يحضر" on his own booking and
+it moves confirmed -> arrived/no_show. Decisions, all Salman's (2026-09-12), recorded in
 `.claudedocs/plans/a2-merchant-authorization-from-whatsapp.md` §6:
 
-  A2-a  Confirming stays the OWNER's. This module never produces `confirmed`.
+  A2-a  Confirming belongs to the OWNER, and only from WhatsApp. Managers and staff confirm from
+        the dashboard, which is why they receive an alert with no buttons.
   A2-b  The actor is a Barber resolved from the inbound sender number -- there is no
         authenticated User in a webhook.
   A2-c  An unauthorised tap fails SILENTLY to the sender and is written to the audit log,
         matching `whatsapp_flow.py`'s own suspended-tenant precedent.
-  A2-d  A barber may act only on TODAY's bookings, by BEIRUT local date. This is the project's
+  A2-d  A BARBER may act only on TODAY's bookings, by BEIRUT local date. This is the project's
         first action-time policy -- `update_status()` has never compared `reservedAt` to now --
         so it lives here, at the channel that needed it, rather than in the shared service where
         it would silently govern the dashboard too.
+
+        IT DOES NOT APPLY TO THE OWNER, deliberately. A booking that arrives today for Saturday
+        has to be confirmable NOW; a "today only" rule on the owner would break the core loop the
+        whole channel exists for. A2-d was settled in A2-b's context -- marking attendance, which
+        is same-day by nature -- and extending it to confirmation would be a decision nobody made.
 
 WHY "تم" MAPS TO `arrived` AND NOT A NEW STATUS. `arrived` ("وصل") is already a terminal state in
 the real transition graph and already carries the meaning "the appointment happened". Reservation
@@ -53,6 +60,7 @@ from zoneinfo import ZoneInfo
 from app.core.phone import normalize_for_storage
 from app.db.client import prisma_client
 from app.repositories import barber_repo
+from app.repositories.client_repo import ClientRepository
 from app.repositories.reservation_repo import ReservationRepository
 from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.services import reservation_service
@@ -82,34 +90,35 @@ _INTENTS: dict[str, str] = {
 }
 
 
-# The OWNER's buttons, on the template that is already live (`new_reservation_alert`, edited
-# 2026-09-11). They are listed here NOT to act on them -- A2-a's owner-confirm path does not
-# exist yet -- but to stop them.
+# The OWNER's buttons, on the template that has been live since 2026-09-11. Its body promises
+# "اضغط تأكيد ليصل الإشعار للزبون" -- and until this handler existed, tapping it did nothing, so
+# that promise was already published and unkept.
 #
-# THE BUG THIS CLOSES. Until now nothing matched "تأكيد", so an owner's tap fell straight through
-# `try_handle` into the customer booking state machine, where "تأكيد" is read as a CUSTOMER's
-# answer and can corrupt a real booking session. The template went live on 2026-09-11, which
-# turned that from theoretical into reachable. Recognising a tap we cannot serve, and dropping it,
-# is strictly safer than letting the wrong handler interpret it.
-#
-# Remove an entry from here the day its real handler is built -- never leave both.
-_OWNER_INTENTS: frozenset[str] = frozenset({
-    "OWNER_CONFIRM", "OWNER_CANCEL",
-    "تأكيد", "تاكيد", "إلغاء", "الغاء",
-})
+# Both spellings of each word: a quick-reply button authored with no payload field returns its own
+# visible Arabic text, and "تاكيد" without the hamza is what a phone keyboard often produces.
+_OWNER_INTENTS: dict[str, str] = {
+    "OWNER_CONFIRM": "confirmed",
+    "OWNER_CANCEL":  "cancelled",
+    "تأكيد":          "confirmed",
+    "تاكيد":          "confirmed",
+    "إلغاء":          "cancelled",
+    "الغاء":          "cancelled",
+}
+
+# Which actor a tap claims to be. Checked in this order because the two sets are disjoint by
+# design -- an overlap would be a real bug, not a precedence question.
+_OWNER, _BARBER = "owner", "barber"
 
 
-def _is_owner_action(payload: str, title: str) -> bool:
-    return any((c or "").strip() in _OWNER_INTENTS for c in (payload, title))
-
-
-def _intent(payload: str, title: str) -> Optional[str]:
-    """The requested status, or None when this tap is not a barber action at all."""
+def _actor_and_status(payload: str, title: str) -> tuple[Optional[str], Optional[str]]:
+    """(actor, requested status) for a tap, or (None, None) when it is not a merchant action."""
     for candidate in (payload, title):
-        hit = _INTENTS.get((candidate or "").strip())
-        if hit:
-            return hit
-    return None
+        key = (candidate or "").strip()
+        if key in _OWNER_INTENTS:
+            return _OWNER, _OWNER_INTENTS[key]
+        if key in _INTENTS:
+            return _BARBER, _INTENTS[key]
+    return None, None
 
 
 def _phone_candidates(sender: str) -> list[str]:
@@ -135,9 +144,9 @@ async def _refuse(reason: str, sender: str, detail: dict, client_id: Optional[st
     branch does the same, and its comment says telling the sender is a business decision made
     elsewhere. It also refuses to confirm to an impersonator that the number is watched.
     """
-    logger.warning("🚫 Barber action refused (%s) from %s — %s", reason, sender, detail)
+    logger.warning("🚫 Merchant action refused (%s) from %s — %s", reason, sender, detail)
     await log_security_event(
-        event_type = "whatsapp_barber_action_denied",
+        event_type = "whatsapp_merchant_action_denied",
         client_id  = client_id,
         endpoint   = _ENDPOINT,
         detail     = {"reason": reason, "sender_phone": sender, **detail},
@@ -147,24 +156,16 @@ async def _refuse(reason: str, sender: str, detail: dict, client_id: Optional[st
 
 async def try_handle(sender_phone: str, msg: dict, msg_type: str,
                      payload: str, title: str, context_wamid: Optional[str]) -> bool:
-    """Handle a barber's button tap. Returns True when this message was a barber action.
+    """Handle a merchant's button tap. Returns True when this message was a merchant action.
 
     True means "fully dealt with, stop processing" -- including every refusal, because a refused
-    tap must not then fall through into the customer booking state machine and be read as a
-    customer saying "تم".
+    tap must not then fall through into the customer booking state machine, where "تأكيد" would
+    be read as a CUSTOMER's answer and could corrupt a real booking session.
     """
     if msg_type != "template_button":
         return False
-    new_status = _intent(payload, title)
-    if new_status is None:
-        # Claimed and dropped, not passed on: an owner action we cannot serve must never be
-        # re-interpreted by the customer state machine. Returning True is the whole point.
-        if _is_owner_action(payload, title):
-            await _refuse("owner_action_not_implemented", sender_phone, {
-                "payload": payload, "button_text": title,
-                "context_wamid": context_wamid or "—",
-            })
-            return True
+    actor, new_status = _actor_and_status(payload, title)
+    if actor is None:
         return False
 
     # ── The anchor (A3). The reservation comes from recorded state, never from the tap. ──
@@ -204,13 +205,13 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
             client_id       = client_id,
             message_type    = "button",
             text            = title,
-            purpose         = f"barber_action:{new_status}",
+            purpose         = f"{actor}_action:{new_status}",
             context_type    = "reservation",
             context_id      = origin.reservationId,
             reservation_id  = origin.reservationId,
         )
         if not claimed:
-            logger.info("↩️  Barber tap %s already processed — ignoring Meta retry", tap_wamid)
+            logger.info("↩️  Merchant tap %s already processed — ignoring Meta retry", tap_wamid)
             return True
     reservations = ReservationRepository(prisma_client)
     reservation = await reservations.find_by_id(origin.reservationId, client_id)
@@ -220,37 +221,65 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
         }, client_id=client_id)
         return True
 
-    # ── The actor. Same scope value scope_barber_id() yields, derived from a phone. ──
-    barber = await barber_repo.find_active_barber_by_phones(
-        client_id, _phone_candidates(sender_phone))
-    if barber is None:
-        await _refuse("sender_not_staff", sender_phone, {
-            "reservation_id": reservation.id,
-        }, client_id=client_id)
-        return True
-    if reservation.barberId != barber.id:
-        await _refuse("not_own_reservation", sender_phone, {
-            "reservation_id":    reservation.id,
-            "reservation_barber": reservation.barberId,
-            "sender_barber":      barber.id,
-        }, client_id=client_id)
-        return True
-
-    # ── A2-d: today only, Beirut local date. ──
+    # ── The actor, and the scope that goes with it. ──
     #
-    # Placed AFTER the ownership checks on purpose: every refusal is silent either way, so
-    # ordering leaks nothing, and this way the audit trail distinguishes "a real barber acted on
-    # the wrong day" from "a stranger tapped a button" instead of collapsing both into one reason.
-    reserved_local = reservation.reservedAt.astimezone(_LOCAL_TZ)
-    today_local    = datetime.now(_LOCAL_TZ).date()
-    if reserved_local.date() != today_local:
-        await _refuse("out_of_time_window", sender_phone, {
-            "reservation_id":  reservation.id,
-            "reserved_local":  reserved_local.isoformat(),
-            "today_local":     today_local.isoformat(),
-            "requested":       new_status,
-        }, client_id=client_id)
-        return True
+    # scope_id is what reservation_service.update_status() re-checks independently: None means
+    # tenant-wide (the owner, whose scope is "all" in the permission model), a Barber id means
+    # that barber's own rows only -- the same value scope_barber_id() derives for a logged-in
+    # staff account, reached from a phone instead of a session.
+    actor_id: str
+    scope_id: Optional[str]
+
+    if actor == _OWNER:
+        # A2-a. The owner is whoever the shop's own alert goes to -- reservation_service.py:119's
+        # `whatsapp_number or phone`, read here rather than restated, so "who is the owner" has
+        # one answer across sending and acting.
+        client = await ClientRepository(prisma_client).get_by_id(client_id)
+        owner_numbers = [
+            normalize_for_storage(n) or n
+            for n in (getattr(client, "whatsapp_number", None),
+                      getattr(client, "phone", None)) if n
+        ] if client else []
+        if not any(c in owner_numbers for c in _phone_candidates(sender_phone)):
+            await _refuse("sender_not_owner", sender_phone, {
+                "reservation_id": reservation.id,
+            }, client_id=client_id)
+            return True
+        actor_id, scope_id = client_id, None
+    else:
+        # A2-b. Resolved from the sender number, scoped to his own rows.
+        barber = await barber_repo.find_active_barber_by_phones(
+            client_id, _phone_candidates(sender_phone))
+        if barber is None:
+            await _refuse("sender_not_staff", sender_phone, {
+                "reservation_id": reservation.id,
+            }, client_id=client_id)
+            return True
+        if reservation.barberId != barber.id:
+            await _refuse("not_own_reservation", sender_phone, {
+                "reservation_id":     reservation.id,
+                "reservation_barber": reservation.barberId,
+                "sender_barber":      barber.id,
+            }, client_id=client_id)
+            return True
+        actor_id, scope_id = barber.id, barber.id
+
+        # ── A2-d: today only, Beirut local date. BARBER ONLY. ──
+        #
+        # Not applied to the owner: a booking arriving today for Saturday must be confirmable now.
+        # Placed AFTER the ownership checks on purpose -- every refusal is silent either way, so
+        # ordering leaks nothing, and this way the audit trail distinguishes "a real barber acted
+        # on the wrong day" from "a stranger tapped a button".
+        reserved_local = reservation.reservedAt.astimezone(_LOCAL_TZ)
+        today_local    = datetime.now(_LOCAL_TZ).date()
+        if reserved_local.date() != today_local:
+            await _refuse("out_of_time_window", sender_phone, {
+                "reservation_id": reservation.id,
+                "reserved_local": reserved_local.isoformat(),
+                "today_local":    today_local.isoformat(),
+                "requested":      new_status,
+            }, client_id=client_id)
+            return True
 
     # ── The act. One existing write path; its transition graph is the real gate. ──
     try:
@@ -258,12 +287,12 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
             client_id       = client_id,
             reservation_id  = reservation.id,
             new_status      = new_status,
-            staff_barber_id = barber.id,
+            staff_barber_id = scope_id,
         )
     except ReservationAccessDenied:
         # Defence in depth: update_status() re-checks the same ownership independently.
         await _refuse("scope_denied", sender_phone, {
-            "reservation_id": reservation.id, "barber_id": barber.id,
+            "reservation_id": reservation.id, "actor_id": actor_id, "actor": actor,
         }, client_id=client_id)
         return True
     except ValueError as exc:
@@ -275,10 +304,10 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
         }, client_id=client_id)
         return True
 
-    logger.info("✅ Barber action: reservation %s -> %s by barber %s (%s)",
-                reservation.id, new_status, barber.id, barber.name)
+    logger.info("✅ Merchant action: reservation %s %s -> %s by %s %s",
+                reservation.id, reservation.status, new_status, actor, actor_id)
     await log_security_event(
-        event_type = "whatsapp_barber_action",
+        event_type = f"whatsapp_{actor}_action",
         client_id  = client_id,
         endpoint   = _ENDPOINT,
         detail     = {
@@ -290,6 +319,6 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
             "sender_phone":   sender_phone,
         },
         # §3c's contract: a resolved id, never a phone number and never blank.
-        actor      = barber.id,
+        actor      = actor_id,
     )
     return True
