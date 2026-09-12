@@ -149,6 +149,14 @@ async def _notify_merchant_new_reservation(reservation_row) -> None:
             _fire_and_forget(whatsapp_notifications.send_new_reservation_to_merchant(
                 recipient_phone = phone,
                 recipient_label = label,
+                # THE DISPLAY LABEL AND THE IDENTITY ARE TWO DIFFERENT THINGS, and conflating
+                # them is what left A2 unreachable. `reservation_ref` is `id[:8].upper()` -- a
+                # human-readable string for the merchant to read out, derived, unstored, and with
+                # no uniqueness constraint. `client_id`/`reservation_id` below are the real
+                # identity, recorded on the outbound row so a تأكيد/إلغاء tap resolves to THIS
+                # booking instead of being refused with `unknown_context`.
+                client_id       = reservation_row.clientId,
+                reservation_id  = reservation_row.id,
                 reservation_ref = reservation_row.id[:8].upper(),
                 customer_name   = reservation_row.customerName,
                 customer_phone  = reservation_row.customerPhone,
@@ -205,16 +213,19 @@ async def _notify_reservation_event(reservation_row, kind: str) -> None:
 
         if kind == "confirmation":
             _fire_and_forget(whatsapp_notifications.send_reservation_confirmation(
+                client_id=reservation_row.clientId, reservation_id=reservation_row.id,
                 customer_phone=reservation_row.customerPhone, reservation_ref=ref,
                 service_name=service_name, barber_name=barber_name,
                 reserved_at=reserved_at_str, client_name=client_name,
             ))
         elif kind == "cancellation":
             _fire_and_forget(whatsapp_notifications.send_reservation_cancellation(
+                client_id=reservation_row.clientId, reservation_id=reservation_row.id,
                 customer_phone=reservation_row.customerPhone, reservation_ref=ref, client_name=client_name,
             ))
         elif kind == "reschedule":
             _fire_and_forget(whatsapp_notifications.send_reservation_reschedule(
+                client_id=reservation_row.clientId, reservation_id=reservation_row.id,
                 customer_phone=reservation_row.customerPhone, reservation_ref=ref,
                 service_name=service_name, barber_name=barber_name,
                 reserved_at=reserved_at_str, client_name=client_name,

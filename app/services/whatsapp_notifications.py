@@ -27,6 +27,10 @@ contract either way -- safe to schedule fire-and-forget through either mechanism
 import logging
 import re
 from typing import Optional
+
+from app.core.config import settings
+from app.db.client import prisma_client
+from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.services.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
@@ -94,8 +98,135 @@ def _or_dash(value) -> str:
     return text or "—"
 
 
-def _report(result, what: str, who: str, ref: str = "") -> bool:
-    """Log the REAL outcome of one send, and hand it back to the caller.
+async def _record_out(
+    result,
+    *,
+    recipient_phone:   str,
+    message_type:      str,
+    text:              Optional[str] = None,
+    template_name:     Optional[str] = None,
+    template_language: Optional[str] = None,
+    client_id:         Optional[str] = None,
+    reservation_id:    Optional[str] = None,
+    purpose:           Optional[str] = None,
+) -> None:
+    """Write the outbound row that a later merchant tap resolves against. NEVER raises.
+
+    THE BUG THIS CLOSES, measured 2026-09-12 rather than reasoned about. `whatsapp_messages` held
+    19 rows, all `direction="IN"`; a repo-wide search for a write of `"OUT"` returned nothing. So
+    `whatsapp_merchant_actions.try_handle()` -- which takes the reservation and the tenant from
+    `context.id -> whatsapp_messages`, deliberately never from the button's own text -- looked up
+    an anchor row that no code path ever created. The live consequence, from the server log at
+    17:59: the `new_reservation_alert` template was delivered AND read, the owner tapped `تأكيد`,
+    `_CONFIRM_INTENTS` matched it, and the action was refused `unknown_context`. A2 was complete,
+    correct, and structurally unreachable.
+
+    WHY HERE AND NOT IN `WhatsAppService`. That class is pure transport: it holds no tenant, no
+    reservation, and no Prisma import, and it is called directly by probe scripts that must not
+    write rows. It also cannot satisfy `WhatsAppMessage.conversationId`, which is NOT NULL. This
+    module is the notification Service -- it already owns the outcome of every proactive send
+    through `_report()` -- so the recording belongs at that same chokepoint, one layer above the
+    wire and one below the callers who know what the message was about.
+
+    THE RECIPIENT IS THE CONVERSATION'S OTHER PARTY, whoever that is. For a merchant alert that is
+    the owner, so a conversation row is opened against HIS number under the reservation's tenant.
+    That is the shape `whatsapp_merchant_actions` already assumed: its own docstring says a tap is
+    filed into `origin.conversationId` and explicitly NOT into the customer's conversation, since
+    a row under the customer's phone with `direction="IN"` would make the history assert the
+    CUSTOMER sent it.
+
+    ONLY A SUCCESSFUL SEND IS RECORDED. A rejection has no wamid, so it can anchor nothing, and
+    writing it would put a message in the channel history that the recipient never received --
+    the exact "reported as sent" failure class this whole module was hardened against on
+    2026-09-08. Rejections stay in the log, where `_report` already puts them with Meta's code.
+    """
+    try:
+        if not getattr(result, "ok", False):
+            return
+        phone_number_id = settings.WHATSAPP_PHONE_NUMBER_ID
+        if not phone_number_id:
+            return
+        to = "".join(ch for ch in (recipient_phone or "") if ch.isdigit())
+        if not to:
+            return
+
+        # NO TENANT, NO ROW -- and this guard is not defensive padding, it prevents a real
+        # corruption. `resolve_or_open_conversation()` treats a NULL clientId as its own distinct
+        # conversation (deliberately, for merchant onboarding before a tenant exists). So writing
+        # an outbound row without a tenant would open a SECOND conversation for a phone that
+        # already has a real tenant-scoped one, and that phone's history would then be split
+        # across two rows with no way to join them.
+        #
+        # Senders that legitimately have no tenant to pass are the ones outside this phase's
+        # scope -- unit booking (Booking / real-estate) and the staff invite -- so the gap is
+        # logged at INFO rather than hidden, and closes when those senders are given their
+        # context in their own phase.
+        if not client_id:
+            logger.info(
+                "🧾 Outbound NOT recorded for %s (type=%s) — no client_id passed by the caller; "
+                "recording it would fork this phone's conversation history.", to, message_type,
+            )
+            return
+
+        channel = WhatsAppChannelRepository(prisma_client)
+        account = await channel.get_or_create_account(
+            phone_number_id, settings.WHATSAPP_CENTRAL_NUMBER or "")
+        if not account:
+            return
+        conversation = await channel.resolve_or_open_conversation(account.id, to, client_id)
+        if not conversation:
+            return
+
+        row_id = await channel.record_outbound(
+            wamid             = getattr(result, "wamid", None),
+            conversation_id   = conversation.id,
+            client_id         = client_id,
+            message_type      = message_type,
+            text              = text,
+            template_name     = template_name,
+            template_language = template_language,
+            purpose           = purpose,
+            # The typed context is what makes the row an ANCHOR rather than just history.
+            # `whatsapp_merchant_actions` refuses with `context_not_a_reservation` unless BOTH
+            # reservationId and clientId are present on it.
+            context_type      = "reservation" if reservation_id else None,
+            context_id        = reservation_id,
+            reservation_id    = reservation_id,
+        )
+        await channel.touch_conversation(conversation.id)
+        logger.info(
+            "🧾 Outbound recorded — to=%s type=%s wamid=%s reservation=%s row=%s",
+            to, message_type, getattr(result, "wamid", None) or "—",
+            reservation_id or "—", row_id or "—",
+        )
+    except Exception as exc:
+        # A notification helper must never break the booking that scheduled it -- the same
+        # contract every sender in this module already holds. A missed row is a gap in history,
+        # not a failed booking.
+        logger.error("🔥 Failed to record outbound message to %s: %s",
+                     recipient_phone, exc, exc_info=True)
+
+
+async def _report(
+    result,
+    what: str,
+    who: str,
+    ref: str = "",
+    *,
+    message_type:      str = "text",
+    text:              Optional[str] = None,
+    template_name:     Optional[str] = None,
+    template_language: Optional[str] = None,
+    client_id:         Optional[str] = None,
+    reservation_id:    Optional[str] = None,
+    purpose:           Optional[str] = None,
+) -> bool:
+    """Log the REAL outcome of one send, record it in the channel, and hand it back to the caller.
+
+    Became `async` on 2026-09-12 so the recording above happens at the one place every proactive
+    sender in this module already funnels through -- rather than being added per sender, where the
+    next sender added would silently miss it. That is the same reason the outbound row was missing
+    in the first place: the send side and the read side were wired independently.
 
     Phase 0 — Channel Proof (2026-09-10). Every helper below used to log an unconditional "✅ sent"
     the moment `await wa.send_text(...)` returned without raising — and it never raises. So the
@@ -109,6 +240,17 @@ def _report(result, what: str, who: str, ref: str = "") -> bool:
     """
     tail = f" (ref={ref})" if ref else ""
     if result:
+        await _record_out(
+            result,
+            recipient_phone   = who,
+            message_type      = message_type,
+            text              = text,
+            template_name     = template_name,
+            template_language = template_language,
+            client_id         = client_id,
+            reservation_id    = reservation_id,
+            purpose           = purpose,
+        )
         # "accepted", not "delivered" — and the distinction is not pedantic. Proven on production
         # 2026-09-11: this exact line logged "delivered" for a message Meta accepted with a wamid
         # and then failed to deliver with 131047 (closed 24-hour window). Delivery is only ever
@@ -145,7 +287,7 @@ async def send_booking_confirmation(
             f"شكراً لاختيارك {client_name} 🏡\n"
             f"للاستفسار أو التعديل تواصل معنا."
         )
-        return _report(await wa.send_text(to=customer_phone, text=message),
+        return await _report(await wa.send_text(to=customer_phone, text=message),
                        "Booking confirmation", customer_phone, booking_ref)
     except Exception as exc:
         logger.error(
@@ -172,7 +314,7 @@ async def send_booking_cancellation(
             f"إذا كان الإلغاء بالخطأ أو تريد إعادة الحجز،\n"
             f"تواصل مع {client_name} مباشرةً."
         )
-        return _report(await wa.send_text(to=customer_phone, text=message),
+        return await _report(await wa.send_text(to=customer_phone, text=message),
                        "Cancellation notice", customer_phone, booking_ref)
     except Exception as exc:
         logger.error(
@@ -194,6 +336,8 @@ async def send_reservation_confirmation(
     barber_name: str,
     reserved_at: str,
     client_name: str = "",
+    client_id: Optional[str] = None,
+    reservation_id: Optional[str] = None,
 ) -> bool:
     """Sent when a reservation's status is explicitly moved to "confirmed" -- distinct from the
     WhatsApp bot's own immediate "we received your booking" ack (sent at creation time, while the
@@ -210,8 +354,14 @@ async def send_reservation_confirmation(
             f"الموعد: {reserved_at}\n\n"
             f"نراك قريباً في {client_name} 💈"
         )
-        return _report(await wa.send_text(to=customer_phone, text=message),
-                       "Reservation confirmation", customer_phone, reservation_ref)
+        return await _report(
+            await wa.send_text(to=customer_phone, text=message),
+            "Reservation confirmation", customer_phone, reservation_ref,
+            text           = message,
+            client_id      = client_id,
+            reservation_id = reservation_id,
+            purpose        = "reservation_confirmation",
+        )
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation confirmation to %s: %s",
@@ -224,6 +374,8 @@ async def send_reservation_cancellation(
     customer_phone: str,
     reservation_ref: str,
     client_name: str = "",
+    client_id: Optional[str] = None,
+    reservation_id: Optional[str] = None,
 ) -> bool:
     """Sent when a reservation's status is moved to "cancelled" -- whether by an admin/STAFF
     action (update_status()) or the customer's own self-cancel (cancel_by_customer()); both real
@@ -237,8 +389,14 @@ async def send_reservation_cancellation(
             f"إذا كان الإلغاء بالخطأ أو تريد حجز موعد آخر،\n"
             f"تواصل مع {client_name} مباشرةً."
         )
-        return _report(await wa.send_text(to=customer_phone, text=message),
-                       "Reservation cancellation notice", customer_phone, reservation_ref)
+        return await _report(
+            await wa.send_text(to=customer_phone, text=message),
+            "Reservation cancellation notice", customer_phone, reservation_ref,
+            text           = message,
+            client_id      = client_id,
+            reservation_id = reservation_id,
+            purpose        = "reservation_cancellation",
+        )
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation cancellation notice to %s: %s",
@@ -254,6 +412,8 @@ async def send_reservation_reschedule(
     barber_name: str,
     reserved_at: str,
     client_name: str = "",
+    client_id: Optional[str] = None,
+    reservation_id: Optional[str] = None,
 ) -> bool:
     """Sent when edit_reservation() actually changes the schedule (time/duration/barber) -- never
     fired for a name/phone/service-only edit, matching edit_reservation()'s own
@@ -268,8 +428,14 @@ async def send_reservation_reschedule(
             f"الموعد الجديد: {reserved_at}\n\n"
             f"نراك في {client_name} 💈"
         )
-        return _report(await wa.send_text(to=customer_phone, text=message),
-                       "Reservation reschedule notice", customer_phone, reservation_ref)
+        return await _report(
+            await wa.send_text(to=customer_phone, text=message),
+            "Reservation reschedule notice", customer_phone, reservation_ref,
+            text           = message,
+            client_id      = client_id,
+            reservation_id = reservation_id,
+            purpose        = "reservation_reschedule",
+        )
     except Exception as exc:
         logger.error(
             "🔥 Failed to send reservation reschedule notice to %s: %s",
@@ -312,7 +478,7 @@ async def send_staff_setup_link(
         # (2026-09-10, Phase 0) so that every other helper gets the same diagnosis instead of only
         # this one. `reason` still says WHO fixes it — credentials_missing is a Railway env var,
         # meta_401 is a dead access token, meta_400 with code 131047 is the 24-hour window.
-        return _report(await wa.send_text(to=staff_phone, text=message),
+        return await _report(await wa.send_text(to=staff_phone, text=message),
                        f"Staff setup link ({staff_name})", staff_phone)
     except Exception as exc:
         logger.error(
@@ -340,8 +506,17 @@ async def send_new_reservation_to_merchant(
     barber_name:     str,
     reserved_at:     str,
     client_name:     str = "",
+    client_id:       Optional[str] = None,
+    reservation_id:  Optional[str] = None,
 ) -> bool:
     """Tell the shop (owner, and the assigned staff member) that a booking just came in.
+
+    `client_id` / `reservation_id` added 2026-09-12, and they are what make the alert TAPPABLE.
+    `reservation_ref` above is only the human-readable 8-char display label (`id[:8].upper()`) --
+    it is derived, unstored, and carries no uniqueness constraint, so it can never identify a
+    reservation to the webhook. The real ids are passed separately and recorded on the outbound
+    row, which is the anchor `whatsapp_merchant_actions` resolves a تأكيد/إلغاء tap against.
+    Keyword-defaulted so this helper keeps its "never breaks a caller" shape.
 
     Deliberately includes the customer's real phone number: the whole point for the merchant is
     being able to call back, and it is their own customer's data on their own tenant. A link
@@ -403,8 +578,18 @@ async def send_new_reservation_to_merchant(
                                                    barber_name, reserved_at, reservation_ref)],
         )
         if result:
-            return _report(result, f"New-reservation alert ({recipient_label}, template)",
-                           recipient_phone, reservation_ref)
+            return await _report(
+                result, f"New-reservation alert ({recipient_label}, template)",
+                recipient_phone, reservation_ref,
+                # The anchor. Without these four the tap on تأكيد/إلغاء is refused --
+                # `unknown_context` with no row, `context_not_a_reservation` without the ids.
+                message_type      = "template",
+                template_name     = MERCHANT_ALERT_TEMPLATE,
+                template_language = MERCHANT_ALERT_LANGUAGE,
+                client_id         = client_id,
+                reservation_id    = reservation_id,
+                purpose           = "new_reservation_alert",
+            )
 
         # ── Fallback: exactly today's behaviour, so nothing can regress. ──
         #
@@ -430,9 +615,17 @@ async def send_new_reservation_to_merchant(
             f"الموعد: {_or_dash(reserved_at)}",
             f"رقم الحجز: *{_or_dash(reservation_ref)}*",
         ]
-        return _report(await wa.send_text(to=recipient_phone, text="\n".join(lines)),
-                       f"New-reservation alert ({recipient_label}, free-form fallback)",
-                       recipient_phone, reservation_ref)
+        return await _report(
+            await wa.send_text(to=recipient_phone, text="\n".join(lines)),
+            f"New-reservation alert ({recipient_label}, free-form fallback)",
+            recipient_phone, reservation_ref,
+            # Recorded with the same anchor: this row cannot be tapped (free-form carries no
+            # buttons) but the history must still say which reservation it was about.
+            text           = "\n".join(lines),
+            client_id      = client_id,
+            reservation_id = reservation_id,
+            purpose        = "new_reservation_alert_fallback",
+        )
     except Exception as exc:
         logger.error(
             "🔥 Failed to send new-reservation alert to %s (%s): %s",
