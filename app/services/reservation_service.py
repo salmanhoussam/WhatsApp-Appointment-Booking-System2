@@ -514,6 +514,65 @@ async def create_reservation(
     return _fmt(reservation)
 
 
+# Arabic weekday names, indexed by date.weekday() -- Monday=0, matching Python, NOT the
+# frontend's getUTCDay()-indexed array. Same deliberate distinction already documented on
+# whatsapp_notifications.fmt_reserved_at; the two orders are NOT interchangeable.
+_AR_WEEKDAYS = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+_AR_MONTHS = ("كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران",
+              "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول")
+
+
+async def get_next_open_days(client_id: str, barber_id: str, count: int = 7) -> list[dict]:
+    """The next `count` days this barber is actually OPEN, starting today.
+
+    Salman's requirement, 2026-09-12, from a real drop-off: *"الناس عم توصل عند محل ما لازم يرسل
+    التاريخ وعم بوقفوا لأنه ما عم يعرفوا يكملوا"* — the date was the one step in the WhatsApp
+    flow that asked the customer to TYPE something, while service, barber and time were all
+    tappable lists. People stopped there.
+
+    CLOSED DAYS ARE SKIPPED, NOT SHOWN AS UNAVAILABLE — his own example: if today is Saturday and
+    Monday is the shop's day off, the list reads Saturday, Sunday, Tuesday, ... and the seventh
+    entry lands on next Saturday. So this walks forward until it has `count` open days rather
+    than taking a flat 7-day window.
+
+    Reads the same `Barber.workingHours` dict `get_available_slots` and `_check_working_hours`
+    read, with the same UTC treatment, so a day this list offers is a day those two accept. It
+    does NOT check slot availability: a fully-booked open day still appears, and the existing
+    NO_SLOTS_MESSAGE path answers that — it is one query per day otherwise, and the flow already
+    handles an empty slot list gracefully.
+
+    `count` is capped at 10 because a WhatsApp list section holds at most 10 rows; asking for
+    more would silently truncate at the send.
+    """
+    barber = await barber_repo.find_barber(client_id, barber_id)
+    if not barber:
+        raise ValueError("Barber not found for this tenant.")
+    if not barber.isActive:
+        raise ValueError("This barber is not currently accepting reservations.")
+
+    working_hours = barber.workingHours or {}
+    closed_days = {str(d).lower() for d in (working_hours.get("closed_days") or [])}
+    has_hours = bool(working_hours.get("open_time") and working_hours.get("close_time"))
+    if not has_hours:
+        # No hours configured at all: every day is unbookable, and offering dates would be a lie.
+        return []
+
+    out: list[dict] = []
+    day = datetime.now(timezone.utc).date()
+    # Bounded walk: 60 days is far past any plausible weekly closure pattern, and guarantees
+    # termination even if a tenant marks all seven days closed.
+    for _ in range(60):
+        if len(out) >= min(count, 10):
+            break
+        if day.strftime("%A").lower() not in closed_days:
+            out.append({
+                "date":  day.isoformat(),
+                "label": f"{_AR_WEEKDAYS[day.weekday()]} {day.day} {_AR_MONTHS[day.month - 1]}",
+            })
+        day += timedelta(days=1)
+    return out
+
+
 async def get_available_slots(
     client_id:      str,
     barber_id:      str,

@@ -385,17 +385,22 @@ async def send_new_reservation_to_merchant(
         # `whatsapp_merchant_actions._CONFIRM_INTENTS` already matches. That is also why
         # send_template()'s existing "no button components" limitation is not a blocker here.
         #
-        # PARAMETER ORDER IS THE CONTRACT and is UNVERIFIED against Meta from this machine (no
-        # credentials here, and the Railway CLI is not installed). It is taken from this module's
-        # own long-standing claim that the free-form body "mirrors the template EXACTLY", plus the
-        # approved template's rendered preview. Which is precisely why the fallback below exists.
-        params = [client_name, customer_name, customer_phone,
-                  service_name, barber_name, reserved_at, reservation_ref]
+        # THE PARAMETER SPLIT, corrected 2026-09-12 from Salman reading the template's own
+        # definition: SEVEN variables, but ONE of them is in the HEADER and six in the BODY.
+        # The first version sent all seven as body_params, which Meta rejects outright -- a
+        # component whose parameter count does not match the approved template is not a partial
+        # match, it is an error. That is why the very first live test arrived as the free-form
+        # fallback with no buttons.
+        #
+        # Header  {{1}} = the shop  ("💈 حجز جديد عند {{1}}")
+        # Body    {{1}}..{{6}} = customer, phone, service, staff, when, ref
         result = await wa.send_template(
-            to          = recipient_phone,
-            name        = MERCHANT_ALERT_TEMPLATE,
-            language    = MERCHANT_ALERT_LANGUAGE,
-            body_params = [_or_dash(p) for p in params],
+            to            = recipient_phone,
+            name          = MERCHANT_ALERT_TEMPLATE,
+            language      = MERCHANT_ALERT_LANGUAGE,
+            header_params = [_or_dash(client_name)],
+            body_params   = [_or_dash(p) for p in (customer_name, customer_phone, service_name,
+                                                   barber_name, reserved_at, reservation_ref)],
         )
         if result:
             return _report(result, f"New-reservation alert ({recipient_label}, template)",

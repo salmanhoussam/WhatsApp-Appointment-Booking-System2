@@ -247,22 +247,48 @@ async def _step_awaiting_barber(wa, customer_phone, session, client, msg_type, v
     session.res_barber_id = barber.id
     session.res_barber_name = barber.name
 
-    await wa.send_text(
-        customer_phone,
-        f"✅ اخترت: *{barber.name}*\n\nما هو اليوم الذي تريد الحجز فيه؟\n"
-        f"أرسل التاريخ بالصيغة: YYYY-MM-DD\nمثال: 2026-09-01",
-    )
+    # A TAPPABLE DAY LIST, not a typed date (Salman, 2026-09-12). This was the only step in the
+    # flow that asked the customer to type, and it was where real customers stopped. Closed days
+    # are skipped rather than shown greyed out, so the list is seven days the shop is genuinely
+    # open — see reservation_service.get_next_open_days for the walk.
+    days = await reservation_service.get_next_open_days(client.id, barber.id, count=7)
+    if days:
+        await wa.send_list_message(
+            to          = customer_phone,
+            header      = f"💈 {barber.name}",
+            body        = "اختر اليوم المناسب:",
+            button_text = "عرض الأيام",
+            sections    = [{
+                "title": "الأيام المتاحة",
+                "rows":  [{"id": d["date"], "title": d["label"], "description": ""}
+                          for d in days],
+            }],
+        )
+    else:
+        # No working hours configured for this barber: offering days would be a lie, so fall
+        # back to the old typed prompt rather than sending an empty list Meta would reject.
+        await wa.send_text(
+            customer_phone,
+            f"✅ اخترت: *{barber.name}*\n\nما هو اليوم الذي تريد الحجز فيه؟\n"
+            f"أرسل التاريخ بالصيغة: YYYY-MM-DD\nمثال: 2026-09-01",
+        )
     session.state = RES_AWAITING_DATE
 
 
 async def _step_awaiting_date(wa, customer_phone, session, client, msg_type, value):
-    if msg_type != "text":
-        await wa.send_text(customer_phone, "أرسل التاريخ بالصيغة: YYYY-MM-DD")
-        return
-
+    # A tap on the day list carries the ISO date as the row id; typing still works, both because
+    # a customer mid-conversation from before this change may still type, and because the barber
+    # step falls back to the typed prompt when no working hours are configured.
     target_date = _parse_date_text(value)
     if not target_date:
-        await wa.send_text(customer_phone, "❌ صيغة التاريخ غير صحيحة. استخدم: YYYY-MM-DD\nمثال: 2026-09-01")
+        # The prompt used to name ONE format while _parse_date_text accepted three, which made a
+        # perfectly valid "12-9-2026" look like it was about to be rejected. It now says what it
+        # really takes.
+        await wa.send_text(
+            customer_phone,
+            "❌ لم أفهم التاريخ. اختر يوماً من القائمة، أو اكتبه بأحد هذه الأشكال:\n"
+            "2026-09-12  ·  12-09-2026  ·  12/09/2026",
+        )
         return
 
     if target_date < datetime.now(timezone.utc).date():
@@ -403,15 +429,20 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
         )
 
         ref = reservation["id"][:8].upper()
+        # "CREATED", not "CONFIRMED" (Salman, 2026-09-12). The row this just wrote is `pending`;
+        # saying "تم تأكيد حجزك" told the customer the shop had accepted when nobody had even
+        # seen it yet. The real confirmation is sent by reservation_service on the pending ->
+        # confirmed transition (_notify_reservation_event -> send_reservation_confirmation), which
+        # is exactly what the owner/admin tapping تأكيد now triggers (A2-a). Two messages, two
+        # different facts -- and until this change the second one contradicted the first.
         await wa.send_text(
             customer_phone,
-            f"🎉 *تم تأكيد حجزك بنجاح!*\n\n"
+            f"✅ *تم إنشاء حجزك*\n\n"
             f"رقم الحجز: *{ref}*\n"
             f"الخدمة: {session.res_service_name}\n"
             f"الحلاق: {session.res_barber_name}\n"
             f"الموعد: {session.res_slot_datetime.strftime('%Y-%m-%d %H:%M')}\n\n"
-            f"شكراً لاختيارك {client.name} 💈\n"
-            f"للاستفسار أو التعديل تواصل معنا.",
+            f"⏳ بانتظار تأكيد {client.name} — سنُعلمك فوراً عند التأكيد.",
         )
         logger.info(
             "✅ Reservation created via WhatsApp: %s (client=%s, barber=%s)",
