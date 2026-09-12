@@ -175,10 +175,12 @@ async def handle(wa, customer_phone: str, session, msg_type: str, value: str, ti
         await _step_awaiting_date(wa, customer_phone, session, client, msg_type, value)
 
     elif session.state == RES_AWAITING_SLOT:
-        await _step_awaiting_slot(wa, customer_phone, session, msg_type, value)
+        await _step_awaiting_slot(wa, customer_phone, session, client, msg_type, value,
+                                  phone_number_id, clear_session_fn)
 
     elif session.state == RES_AWAITING_NAME:
-        await _step_awaiting_name(wa, customer_phone, session, msg_type, value)
+        await _step_awaiting_name(wa, customer_phone, session, client, msg_type, value,
+                                  phone_number_id, clear_session_fn)
 
     elif session.state == RES_CONFIRMING:
         await _step_confirming(wa, customer_phone, session, client, msg_type, value, phone_number_id, clear_session_fn)
@@ -247,15 +249,26 @@ async def _step_awaiting_barber(wa, customer_phone, session, client, msg_type, v
     session.res_barber_id = barber.id
     session.res_barber_name = barber.name
 
-    # A TAPPABLE DAY LIST, not a typed date (Salman, 2026-09-12). This was the only step in the
-    # flow that asked the customer to type, and it was where real customers stopped. Closed days
-    # are skipped rather than shown greyed out, so the list is seven days the shop is genuinely
-    # open — see reservation_service.get_next_open_days for the walk.
-    days = await reservation_service.get_next_open_days(client.id, barber.id, count=7)
+    await _offer_day_list(wa, customer_phone, session, client)
+    session.state = RES_AWAITING_DATE
+
+
+async def _offer_day_list(wa, customer_phone, session, client) -> None:
+    """A TAPPABLE DAY LIST, not a typed date (Salman, 2026-09-12).
+
+    This was the only step in the flow that asked the customer to type, and it was where real
+    customers stopped: "الناس عم توصل عند محل ما لازم يرسل التاريخ وعم بوقفوا". Closed days are
+    SKIPPED rather than shown greyed out — see reservation_service.get_next_open_days.
+
+    Its own function because two places need it: after the barber is chosen, and again when
+    create_reservation rejects the slot as taken.
+    """
+    days = await reservation_service.get_next_open_days(
+        client.id, session.res_barber_id, count=7)
     if days:
         await wa.send_list_message(
             to          = customer_phone,
-            header      = f"💈 {barber.name}",
+            header      = f"💈 {session.res_barber_name}",
             body        = "اختر اليوم المناسب:",
             button_text = "عرض الأيام",
             sections    = [{
@@ -264,15 +277,14 @@ async def _step_awaiting_barber(wa, customer_phone, session, client, msg_type, v
                           for d in days],
             }],
         )
-    else:
-        # No working hours configured for this barber: offering days would be a lie, so fall
-        # back to the old typed prompt rather than sending an empty list Meta would reject.
-        await wa.send_text(
-            customer_phone,
-            f"✅ اخترت: *{barber.name}*\n\nما هو اليوم الذي تريد الحجز فيه؟\n"
-            f"أرسل التاريخ بالصيغة: YYYY-MM-DD\nمثال: 2026-09-01",
-        )
-    session.state = RES_AWAITING_DATE
+        return
+    # No working hours configured for this barber: offering days would be a lie, so fall back to
+    # the typed prompt rather than sending an empty list Meta would reject.
+    await wa.send_text(
+        customer_phone,
+        f"✅ اخترت: *{session.res_barber_name}*\n\nما هو اليوم الذي تريد الحجز فيه؟\n"
+        f"أرسل التاريخ بأحد هذه الأشكال:\n2026-09-12  ·  12-09-2026  ·  12/09/2026",
+    )
 
 
 async def _step_awaiting_date(wa, customer_phone, session, client, msg_type, value):
@@ -334,7 +346,8 @@ async def _step_awaiting_date(wa, customer_phone, session, client, msg_type, val
     session.state = RES_AWAITING_SLOT
 
 
-async def _step_awaiting_slot(wa, customer_phone, session, msg_type, value):
+async def _step_awaiting_slot(wa, customer_phone, session, client, msg_type, value,
+                              phone_number_id, clear_session_fn):
     if msg_type != "list_reply":
         await wa.send_text(customer_phone, "الرجاء اختيار وقت من القائمة 👆")
         return
@@ -356,49 +369,35 @@ async def _step_awaiting_slot(wa, customer_phone, session, msg_type, value):
 
     if session.res_customer_name:
         # Phase D: a returning customer's name was already pre-filled in start() -- skip
-        # RES_AWAITING_NAME entirely and go straight to the confirmation summary.
-        await _send_confirmation_summary(wa, customer_phone, session)
+        # RES_AWAITING_NAME entirely and book.
+        await _create_and_report(wa, customer_phone, session, client,
+                                 phone_number_id, clear_session_fn)
         return
 
     await wa.send_text(customer_phone, "ما اسمك الكريم؟")
     session.state = RES_AWAITING_NAME
 
 
-async def _step_awaiting_name(wa, customer_phone, session, msg_type, value):
+async def _step_awaiting_name(wa, customer_phone, session, client, msg_type, value,
+                              phone_number_id, clear_session_fn):
     if msg_type != "text" or len(value.strip()) < 2:
         await wa.send_text(customer_phone, "الرجاء إدخال اسمك.")
         return
 
     session.res_customer_name = value.strip()
-    await _send_confirmation_summary(wa, customer_phone, session)
-
-
-async def _send_confirmation_summary(wa, customer_phone, session) -> None:
-    """Shared by both the new-customer path (_step_awaiting_name, after they type their name)
-    and the returning-customer path (_step_awaiting_slot, Phase D skip) -- same summary, same
-    buttons, same state transition, regardless of how res_customer_name got set."""
-    summary = (
-        f"📋 *ملخص الحجز*\n"
-        f"───────────────\n"
-        f"💈 الخدمة: {session.res_service_name}\n"
-        f"👤 الحلاق: {session.res_barber_name}\n"
-        f"📅 الموعد: {session.res_slot_datetime.strftime('%Y-%m-%d %H:%M')}\n"
-        f"───────────────\n"
-        f"هل تريد تأكيد الحجز؟"
-    )
-
-    await wa.send_interactive_buttons(
-        to=customer_phone,
-        text=summary,
-        buttons=[
-            {"type": "reply", "reply": {"id": "confirm", "title": "✅ تأكيد"}},
-            {"type": "reply", "reply": {"id": "cancel",  "title": "❌ إلغاء"}},
-        ],
-    )
-    session.state = RES_CONFIRMING
+    await _create_and_report(wa, customer_phone, session, client,
+                             phone_number_id, clear_session_fn)
 
 
 async def _step_confirming(wa, customer_phone, session, client, msg_type, value, phone_number_id, clear_session_fn):
+    """LEGACY STATE, kept only for sessions already sitting here when this deploy landed.
+
+    The customer no longer confirms (Salman, 2026-09-12): "ما بدي ياها الزبون يأكد". Nothing puts
+    a session INTO this state any more -- _step_awaiting_slot and _step_awaiting_name book
+    directly -- but a customer who was mid-conversation must not be stranded looking at a pair of
+    buttons nothing answers, so this still works. Delete it once no live session can be here,
+    which the 30-minute session expiry guarantees within the hour of any deploy.
+    """
     if msg_type != "button_reply":
         await wa.send_text(customer_phone, "الرجاء الضغط على أحد الأزرار أعلاه ✅ أو ❌")
         return
@@ -411,6 +410,21 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
     if value != "confirm":
         return
 
+    await _create_and_report(wa, customer_phone, session, client,
+                             phone_number_id, clear_session_fn)
+
+
+async def _create_and_report(wa, customer_phone, session, client,
+                             phone_number_id, clear_session_fn) -> None:
+    """Write the reservation and tell the customer what actually happened.
+
+    ONE creation path for the whole conversation (Salman, 2026-09-12). The customer's own
+    confirm step was removed -- they had just picked service, barber, day and time, so asking
+    "هل تريد تأكيد الحجز؟" made them answer a question they had already answered four times, and
+    the only confirmation that means anything is the SHOP's. Extracted from _step_confirming
+    rather than copied, so the returning-customer path, the new-customer path and the legacy
+    state all write through the same function.
+    """
     try:
         # Strict reuse (Phase C constraint): the SAME create_reservation() the website's own
         # POST /public/reservations/ calls -- already Customer-aware (Phase A find-or-create) and
@@ -437,7 +451,7 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
         # different facts -- and until this change the second one contradicted the first.
         await wa.send_text(
             customer_phone,
-            f"✅ *تم إنشاء حجزك*\n\n"
+            f"✅ *تم إنشاء حجزك بنجاح*\n\n"
             f"رقم الحجز: *{ref}*\n"
             f"الخدمة: {session.res_service_name}\n"
             f"الحلاق: {session.res_barber_name}\n"
@@ -456,11 +470,13 @@ async def _step_confirming(wa, customer_phone, session, client, msg_type, value,
         # either way, since the caller (this conversation) shouldn't need to know WHICH check
         # caught the conflict. Back to RES_AWAITING_DATE, service/barber context kept, so the
         # customer can immediately try a different time instead of restarting the whole flow.
-        await wa.send_text(
-            customer_phone,
-            f"❌ تعذّر إتمام الحجز: {exc}\nحاول باختيار يوم أو وقت آخر.",
-        )
+        await wa.send_text(customer_phone, f"❌ تعذّر إتمام الحجز: {exc}")
         session.state = RES_AWAITING_DATE
+        # RE-OFFER THE DAY LIST, don't just say "try another day". Before the list existed this
+        # branch could leave the customer to type a date; now that every other step is a tap,
+        # dropping them back to a bare sentence is a dead end -- the same dead end that made
+        # people abandon the typed date step in the first place.
+        await _offer_day_list(wa, customer_phone, session, client)
 
     except Exception as exc:
         logger.error("🔥 WhatsApp reservation creation failed: %s", exc, exc_info=True)
