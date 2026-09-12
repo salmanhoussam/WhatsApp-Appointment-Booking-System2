@@ -64,6 +64,7 @@ State machine (parallel to whatsapp_flow.py's own IDLE->...->CONFIRMING chain):
 import logging
 from datetime import datetime, timezone
 
+from app.core.customer_name import clean_customer_name, reject_reason
 from app.db.client import prisma_client
 from app.repositories import barber_repo, barber_service_repo
 from app.repositories.customer_repo import CustomerRepository
@@ -122,7 +123,25 @@ async def start(wa, customer_phone: str, session, client) -> None:
     upsert_system_customer path), gets the exact same generic greeting as before -- no regression."""
     customer_repo = CustomerRepository(prisma_client)
     existing_customer = await customer_repo.get_by_phone(customer_phone, client.id)
-    returning_name = existing_customer.name if (existing_customer and existing_customer.name) else None
+    stored_name = existing_customer.name if (existing_customer and existing_customer.name) else None
+
+    # A STORED NAME IS NOT AUTOMATICALLY A TRUSTED NAME (2026-09-12). Rows written before the
+    # validator existed carry whatever was typed then -- a real profanity on `barberlab-test`, and
+    # the "زبون واتساب" placeholder on every web-handoff row. Re-reading one here would do two
+    # things at once: greet this person by it, AND pre-fill `res_customer_name`, which makes
+    # `_step_awaiting_slot` skip the name question entirely -- so a bad stored name would
+    # perpetuate itself on every future booking with no way for the customer to correct it.
+    #
+    # Judging it on READ closes that loop without touching a single existing row (Salman's
+    # standing decision: historical data stays immutable, no backfill). An untrusted stored name
+    # is simply not used -- the greeting falls back to the generic one and the customer is asked
+    # again, which is also the only way the row ever gets a good value.
+    returning_name = clean_customer_name(stored_name)
+    if stored_name and not returning_name:
+        logger.info(
+            "🚫 Stored customer name not trusted (%s) for %s at %s — asking again, row untouched",
+            reject_reason(stored_name), customer_phone, client.slug,
+        )
     if returning_name:
         session.res_customer_name = returning_name
 
@@ -383,13 +402,49 @@ async def _step_awaiting_slot(wa, customer_phone, session, client, msg_type, val
     session.state = RES_AWAITING_NAME
 
 
+# The one sentence a refused name gets. Deliberately identical for every rule: telling a customer
+# WHICH rule they tripped is either useless ("too short") or an invitation to probe the blocklist.
+_BAD_NAME_REPLY = "عذراً، يرجى إدخال اسم صحيح لنتمكن من تأكيد حجزك."
+
+
 async def _step_awaiting_name(wa, customer_phone, session, client, msg_type, value,
                               phone_number_id, clear_session_fn):
-    if msg_type != "text" or len(value.strip()) < 2:
+    """The last inbound step, and the only place a customer types free text that becomes DATA.
+
+    VALIDATION HAPPENS HERE, BEFORE THE WRITE, and that ordering is the whole point.
+    `Reservation.customerName` is a permanent snapshot by design (the schema's own comment: never
+    rewritten if the Customer's info changes later), so a name accepted here can never be
+    corrected by fixing the Customer row afterwards. And `create_reservation()`'s find-or-create
+    writes this same string to `Customer.name`, which `start()` above reads back as the greeting
+    identity -- so an accepted name is what the bot calls this person for the rest of their life
+    with the shop, and what the merchant reads in every alert.
+
+    Proven on production 2026-09-12: Salman booked and typed a profanity as his name. The only
+    check was `len(value.strip()) >= 2`, so it was stored on BOTH rows. Refused now by
+    `app.core.customer_name`, which owns the rules -- this step only decides what to do about the
+    answer, exactly as the phone rule keeps its own logic in `app.core.phone`.
+
+    A refused name is stored NOWHERE and the session stays in this state, so the customer is
+    simply asked again. Nothing partial is written, because nothing is written until one passes.
+    """
+    if msg_type != "text":
         await wa.send_text(customer_phone, "الرجاء إدخال اسمك.")
         return
 
-    session.res_customer_name = value.strip()
+    cleaned = clean_customer_name(value)
+    if not cleaned:
+        # Logged with the raw value ON PURPOSE. A blocklist is never complete, so this log is how
+        # we learn what real customers actually type -- the list is meant to grow from evidence,
+        # not from guessing. `reject_reason` is for us; the customer only ever sees the neutral
+        # sentence above.
+        logger.warning(
+            "🚫 Customer name refused (%s) from %s at %s — raw=%r",
+            reject_reason(value), customer_phone, client.slug, (value or "")[:80],
+        )
+        await wa.send_text(customer_phone, _BAD_NAME_REPLY)
+        return
+
+    session.res_customer_name = cleaned
     await _create_and_report(wa, customer_phone, session, client,
                              phone_number_id, clear_session_fn)
 
