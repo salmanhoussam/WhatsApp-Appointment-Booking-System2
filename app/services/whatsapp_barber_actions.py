@@ -82,6 +82,27 @@ _INTENTS: dict[str, str] = {
 }
 
 
+# The OWNER's buttons, on the template that is already live (`new_reservation_alert`, edited
+# 2026-09-11). They are listed here NOT to act on them -- A2-a's owner-confirm path does not
+# exist yet -- but to stop them.
+#
+# THE BUG THIS CLOSES. Until now nothing matched "تأكيد", so an owner's tap fell straight through
+# `try_handle` into the customer booking state machine, where "تأكيد" is read as a CUSTOMER's
+# answer and can corrupt a real booking session. The template went live on 2026-09-11, which
+# turned that from theoretical into reachable. Recognising a tap we cannot serve, and dropping it,
+# is strictly safer than letting the wrong handler interpret it.
+#
+# Remove an entry from here the day its real handler is built -- never leave both.
+_OWNER_INTENTS: frozenset[str] = frozenset({
+    "OWNER_CONFIRM", "OWNER_CANCEL",
+    "تأكيد", "تاكيد", "إلغاء", "الغاء",
+})
+
+
+def _is_owner_action(payload: str, title: str) -> bool:
+    return any((c or "").strip() in _OWNER_INTENTS for c in (payload, title))
+
+
 def _intent(payload: str, title: str) -> Optional[str]:
     """The requested status, or None when this tap is not a barber action at all."""
     for candidate in (payload, title):
@@ -136,6 +157,14 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
         return False
     new_status = _intent(payload, title)
     if new_status is None:
+        # Claimed and dropped, not passed on: an owner action we cannot serve must never be
+        # re-interpreted by the customer state machine. Returning True is the whole point.
+        if _is_owner_action(payload, title):
+            await _refuse("owner_action_not_implemented", sender_phone, {
+                "payload": payload, "button_text": title,
+                "context_wamid": context_wamid or "—",
+            })
+            return True
         return False
 
     # ── The anchor (A3). The reservation comes from recorded state, never from the tap. ──
