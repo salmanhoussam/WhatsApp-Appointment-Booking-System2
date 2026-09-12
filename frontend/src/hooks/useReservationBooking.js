@@ -284,8 +284,14 @@ export default function useReservationBooking() {
       setReservationId(id)
       setConfirmMethod('whatsapp')
 
+      // The booking REF goes in the message (2026-09-12). Without it the shop received two
+      // unrelated things -- a merchant alert from the central number carrying only the
+      // placeholder identity this path creates, and the customer's own message carrying the
+      // service/time but no identifier -- with nothing to join them. The ref is what lets the
+      // owner find this exact row in the dashboard, or match it to the alert.
       const message = [
         'مرحباً، أريد تأكيد الحجز.',
+        `رقم الحجز: ${String(id).slice(0, 8).toUpperCase()}`,
         `الخدمة: ${selectedService.name_ar}`,
         `الحلاق: ${selectedBarber.name}`,
         `الموعد: ${formatArabicDate(selectedDate)} - ${selectedSlot.time}`,

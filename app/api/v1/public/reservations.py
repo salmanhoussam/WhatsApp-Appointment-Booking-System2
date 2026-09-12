@@ -65,7 +65,18 @@ async def create_reservation(
     # body.reserved_at is a naive-local wall-clock value labeled UTC (no real conversion) -- `now`
     # must be built the same way, not the TRUE UTC instant, or this guard is wrong by the tenant's
     # real UTC offset (confirmed: this is the guard a real customer hits when confirming a booking).
-    if body.reserved_at < datetime.now().replace(tzinfo=timezone.utc):
+    # A NAIVE `reserved_at` USED TO 500 HERE (found 2026-09-12 while testing this endpoint by
+    # hand). `body.reserved_at` is whatever the client sent: the availability endpoint returns
+    # "...T14:00:00+00:00" so the real frontend is fine, but a client that omits the offset --
+    # curl, a script, an integration -- produced a naive datetime, and comparing naive to aware
+    # raises TypeError, which surfaces as an opaque 500 on a PUBLIC route. The value is already
+    # treated as naive-local-labelled-UTC everywhere downstream (see the note below), so stamping
+    # UTC on it here is the same interpretation, made explicit instead of crashing.
+    reserved_at = body.reserved_at
+    if reserved_at.tzinfo is None:
+        reserved_at = reserved_at.replace(tzinfo=timezone.utc)
+
+    if reserved_at < datetime.now().replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="Cannot reserve a past time slot.")
 
     try:
@@ -75,7 +86,7 @@ async def create_reservation(
             customer_name  = body.customer_name,
             customer_phone = body.customer_phone,
             customer_email = body.customer_email,
-            reserved_at    = body.reserved_at,
+            reserved_at    = reserved_at,
             duration_min   = body.duration_min,
             notes          = body.notes,
             metadata       = body.metadata,
