@@ -243,11 +243,18 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
     #
     # Three resolutions, highest authority first, all scoped to the RESERVATION's tenant:
     #
-    #   1. the shop itself   -> Client.whatsapp_number|phone, scope "all"
-    #   2. a staff account   -> User at this tenant, judged by the SAME predicate the dashboard
-    #                           uses (is_authorized + scope_of) -- this is how a manager and an
-    #                           admin confirm from WhatsApp
-    #   3. a barber          -> Barber at this tenant, own rows only
+    #   1. the shop itself -> Client.whatsapp_number|phone, tenant-wide
+    #   2. a User account  -> judged by the SAME predicate the dashboard uses (is_authorized +
+    #                         scope_of); tenant-wide becomes "admin", self-scoped becomes "staff"
+    #   3. a Barber row    -> no login account at all, own rows only
+    #
+    # THE WORDS, fixed by Salman 2026-09-12 and used from here on (see rules/backend/security.md):
+    #   owner  = the person who owns the shop      (he had been saying "admin")
+    #   admin  = the person who RUNS the shop      (he had been saying "manager")
+    #   barber = the chair
+    # Real rows today: حسين (rk) and Ali (mr-h) are owners -- TENANT_ADMIN with permissions NULL;
+    # جعفر (rk) is an admin -- his array matches the `tenant_manager` preset exactly. All three
+    # also hold Barber rows, which is why the precedence below matters.
     #
     # Order matters and is deliberate: one person is often two of these (جعفر at rk is both a
     # TENANT_ADMIN User and a Barber). Highest authority wins, so he is not narrowed to self-scope
@@ -285,7 +292,7 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
                     "reservation_id": reservation.id, "user_id": user.id,
                 }, client_id=client_id)
                 return True
-            actor, actor_id = "staff", user.id
+            actor_id = user.id
             # A self-scoped account (STAFF, or scope="self") may only touch its own rows. Reuses
             # the same resolver the dashboard uses; it raises 403 for a self-scoped account with
             # no barber link, which is the documented fail-closed behaviour, so it is caught and
@@ -297,6 +304,10 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
                     "reservation_id": reservation.id, "user_id": user.id,
                 }, client_id=client_id)
                 return True
+            # The tier is DERIVED from scope, never stored twice: tenant-wide is an admin,
+            # self-scoped is staff. So the audit log says which tier acted without this module
+            # keeping its own opinion about roles.
+            actor = "admin" if scope_id is None else "staff"
         else:
             barber = await barber_repo.find_active_barber_by_phones(client_id, candidates)
             if barber is None:

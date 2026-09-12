@@ -79,6 +79,32 @@ await prisma.unit.find_first(where={"id": unit_id, "clientId": tenant["id"]})
 | `MANAGER_RESERVATIONS` | Booking/reservation management only |
 | `MANAGER_UNITS` | Unit management only |
 
+### The words we use for people — fixed 2026-09-12, Salman's standing instruction
+
+*"أنا بالـadmin قصدي الـowner، وبالـmanager قصدي الـadmin. خلينا نعتمد هالتسميات من اليوم ورايح."*
+
+The confusion was real and it was ours: the enum value above is spelled `TENANT_ADMIN`, so "admin"
+got used in conversation for the shop's OWNER, while Salman used "admin" for the person who RUNS
+the shop. Three tiers, named once:
+
+| The word, from today | What it means | How it is stored | Real rows, 2026-09-12 |
+|---|---|---|---|
+| **owner** | owns the shop | `role=TENANT_ADMIN`, `permissions=NULL` — the `tenant_admin` preset, deliberately legacy | حسين رقا (`rk`), Ali (`mr-h`) |
+| **admin** | RUNS the shop, is not the owner | the `tenant_manager` preset: a real permission array, `scope="all"`, with `legacy_role=TENANT_ADMIN` as an **inert placeholder** | جعفر صالح (`rk`) — his array matches that preset exactly |
+| **barber** | holds a chair | a `Barber` row; with a login account, the `staff` preset (`scope="self"`, `requires_barber=True`) | all three of the above also hold Barber rows |
+
+**The enum is NOT renamed, and this is the point.** `TENANT_ADMIN` is a Postgres enum value carried
+by real rows and read across the codebase; renaming it would be a migration with no behavioural
+gain. What is fixed is the *vocabulary* — what we call these people in conversation, in plans, in
+commit messages, and in any NEW label we invent. `app/services/whatsapp_merchant_actions.py` is the
+first module to use it: its audit `actor` is one of `owner` / `admin` / `staff` / `barber`, and the
+tier is **derived from scope** rather than stored a second time.
+
+**A person is often more than one tier.** جعفر is an admin AND a barber; حسين is an owner AND a
+barber. So anything resolving a person must decide precedence explicitly — the WhatsApp channel
+takes the highest authority first, so an owner is never narrowed to self-scope for also cutting
+hair.
+
 **Role check pattern:**
 ```python
 from app.core.tenant import require_roles
