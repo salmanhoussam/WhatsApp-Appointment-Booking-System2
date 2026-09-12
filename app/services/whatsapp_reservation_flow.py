@@ -263,8 +263,13 @@ async def _offer_day_list(wa, customer_phone, session, client) -> None:
     Its own function because two places need it: after the barber is chosen, and again when
     create_reservation rejects the slot as taken.
     """
+    # duration_min is load-bearing: a day that has room for a 15-minute trim may be full for a
+    # 90-minute keratin, so the list is built for the service this customer actually chose.
     days = await reservation_service.get_next_open_days(
-        client.id, session.res_barber_id, count=7)
+        client.id, session.res_barber_id,
+        duration_min = session.res_duration_min,
+        count        = 7,
+    )
     if days:
         await wa.send_list_message(
             to          = customer_phone,

@@ -522,27 +522,36 @@ _AR_MONTHS = ("كانون الثاني", "شباط", "آذار", "نيسان", "
               "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول")
 
 
-async def get_next_open_days(client_id: str, barber_id: str, count: int = 7) -> list[dict]:
-    """The next `count` days this barber is actually OPEN, starting today.
+async def get_next_open_days(
+    client_id:     str,
+    barber_id:     str,
+    duration_min:  int,
+    count:         int = 7,
+    slot_step_min: int = 30,
+) -> list[dict]:
+    """The next `count` days this barber is OPEN **and still has room on**.
 
-    Salman's requirement, 2026-09-12, from a real drop-off: *"الناس عم توصل عند محل ما لازم يرسل
-    التاريخ وعم بوقفوا لأنه ما عم يعرفوا يكملوا"* — the date was the one step in the WhatsApp
-    flow that asked the customer to TYPE something, while service, barber and time were all
-    tappable lists. People stopped there.
+    Salman's requirement, 2026-09-12, in two steps. First: the date was the only typed step in
+    the WhatsApp flow and real customers stopped there ("الناس عم توصل عند محل ما لازم يرسل
+    التاريخ وعم بوقفوا"). Then, on seeing the first version: *"الأيام العطلة والأيام اللي فيها
+    حجوزات ما لازم تظهر أصلاً عند الزبون"* — a day with nothing free is as useless to offer as a
+    day the shop is shut.
 
-    CLOSED DAYS ARE SKIPPED, NOT SHOWN AS UNAVAILABLE — his own example: if today is Saturday and
-    Monday is the shop's day off, the list reads Saturday, Sunday, Tuesday, ... and the seventh
-    entry lands on next Saturday. So this walks forward until it has `count` open days rather
-    than taking a flat 7-day window.
+    The first version skipped closed days but NOT full days, and the reason I gave was that
+    checking availability costs a query per day. That was a technical excuse for a worse
+    product, and it is not true either: `find_by_barber_on_date` takes an arbitrary start/end,
+    so the whole window is ONE query and every day is then decided in memory. Total cost here
+    is two queries regardless of `count`.
 
-    Reads the same `Barber.workingHours` dict `get_available_slots` and `_check_working_hours`
-    read, with the same UTC treatment, so a day this list offers is a day those two accept. It
-    does NOT check slot availability: a fully-booked open day still appears, and the existing
-    NO_SLOTS_MESSAGE path answers that — it is one query per day otherwise, and the flow already
-    handles an empty slot list gracefully.
+    `duration_min` is required, not optional: "is there room" has no meaning without knowing how
+    much room. A 15-minute beard trim and a 90-minute keratin see different days as full.
 
-    `count` is capped at 10 because a WhatsApp list section holds at most 10 rows; asking for
-    more would silently truncate at the send.
+    Candidate generation, the working-hours gate and the overlap check are the SAME ones
+    `get_available_slots` uses -- `_check_working_hours` and `_has_conflict`, with the same
+    naive-local-labelled-UTC convention. A day this returns is a day that function will return
+    slots for, because both answer the question the same way.
+
+    Capped at 10 because a WhatsApp list section holds 10 rows.
     """
     barber = await barber_repo.find_barber(client_id, barber_id)
     if not barber:
@@ -551,25 +560,69 @@ async def get_next_open_days(client_id: str, barber_id: str, count: int = 7) -> 
         raise ValueError("This barber is not currently accepting reservations.")
 
     working_hours = barber.workingHours or {}
-    closed_days = {str(d).lower() for d in (working_hours.get("closed_days") or [])}
-    has_hours = bool(working_hours.get("open_time") and working_hours.get("close_time"))
-    if not has_hours:
-        # No hours configured at all: every day is unbookable, and offering dates would be a lie.
+    open_time  = working_hours.get("open_time")
+    close_time = working_hours.get("close_time")
+    if not open_time or not close_time:
+        # No hours configured: every day is unbookable, and offering dates would be a lie.
         return []
+    closed_days = {str(d).lower() for d in (working_hours.get("closed_days") or [])}
 
-    out: list[dict] = []
-    day = datetime.now(timezone.utc).date()
-    # Bounded walk: 60 days is far past any plausible weekly closure pattern, and guarantees
-    # termination even if a tenant marks all seven days closed.
+    want = min(count, 10)
+
+    # Pass 1 -- candidate OPEN days. Bounded walk: 60 days is far past any weekly closure
+    # pattern and guarantees termination even if every day is marked closed. More candidates
+    # than `want` are collected because some will turn out to be full.
+    candidates: list[date] = []
+    day = datetime.now().replace(tzinfo=timezone.utc).date()
     for _ in range(60):
-        if len(out) >= min(count, 10):
+        if len(candidates) >= want * 3:
             break
         if day.strftime("%A").lower() not in closed_days:
-            out.append({
-                "date":  day.isoformat(),
-                "label": f"{_AR_WEEKDAYS[day.weekday()]} {day.day} {_AR_MONTHS[day.month - 1]}",
-            })
+            candidates.append(day)
         day += timedelta(days=1)
+    if not candidates:
+        return []
+
+    # Pass 2 -- ONE query for every booking across the whole candidate window.
+    repo = ReservationRepository(prisma_client)
+    existing = await repo.find_by_barber_on_date(
+        client_id, barber_id,
+        datetime.combine(candidates[0],  datetime.min.time(), tzinfo=timezone.utc),
+        datetime.combine(candidates[-1], datetime.max.time(), tzinfo=timezone.utc),
+    )
+
+    # Same "now" convention as get_available_slots: the server's naive local time labelled UTC,
+    # NOT the true UTC instant. Using datetime.now(timezone.utc) here would offer today's
+    # already-past slots to any tenant with a real UTC offset -- the exact bug that function's
+    # own comment records being found live.
+    now = datetime.now().replace(tzinfo=timezone.utc)
+
+    out: list[dict] = []
+    for target in candidates:
+        if len(out) >= want:
+            break
+        day_open  = datetime.combine(target, datetime.strptime(open_time,  "%H:%M").time(),
+                                     tzinfo=timezone.utc)
+        day_close = datetime.combine(target, datetime.strptime(close_time, "%H:%M").time(),
+                                     tzinfo=timezone.utc)
+        candidate = day_open
+        has_room = False
+        while candidate + timedelta(minutes=duration_min) <= day_close:
+            if candidate >= now:
+                try:
+                    _check_working_hours(candidate, working_hours)
+                except ValueError:
+                    candidate += timedelta(minutes=slot_step_min)
+                    continue
+                if not _has_conflict(existing, candidate, duration_min):
+                    has_room = True
+                    break
+            candidate += timedelta(minutes=slot_step_min)
+        if has_room:
+            out.append({
+                "date":  target.isoformat(),
+                "label": f"{_AR_WEEKDAYS[target.weekday()]} {target.day} {_AR_MONTHS[target.month - 1]}",
+            })
     return out
 
 
