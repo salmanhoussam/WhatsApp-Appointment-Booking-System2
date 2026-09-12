@@ -637,6 +637,84 @@ async def get_next_open_days(
     return out
 
 
+async def get_next_open_slots(
+    client_id:     str,
+    barber_id:     str,
+    duration_min:  int,
+    count:         int = 9,
+    day_window:    int = 7,
+    slot_step_min: int = 30,
+) -> list[dict]:
+    """The next `count` bookable START TIMES for this barber, across days.
+
+    Salman's decision, 2026-09-12, and the constraint that forced it is Meta's, not ours: a
+    WhatsApp interactive list holds **10 rows total**, across every section. Measured on all three
+    real tenants, a combined service x barber list is 6 x 2 = 12 -- over the cap before anyone adds
+    a service -- and a single day's slots already hit the same cap on their own. So neither of the
+    two merges that would obviously shorten the flow is available.
+
+    What IS available is this: most customers want the soonest free chair, not a particular
+    Tuesday. Offering 9 real start times spanning whatever days they fall on, plus one row that
+    opens the existing day picker, replaces TWO taps with one for the common case and costs the
+    other case a single extra tap. 9 + 1 uses the cap exactly.
+
+    THIS FUNCTION ADDS NO AVAILABILITY LOGIC, deliberately -- it is arithmetic over two functions
+    that are already the authority:
+
+      * `get_next_open_days()` returns days the barber is open AND has room on (two queries total,
+        regardless of the window).
+      * `get_available_slots()` decides one day's real start times through the proven pipeline --
+        working hours, conflicts, the past-slot filter, all of it.
+
+    A third opinion about whether a time is free is exactly what this codebase's "One Capability,
+    One Service" rule exists to prevent, and it is also how the two would drift. So the cost is
+    honest rather than clever: 2 queries for the days, then one per day actually consumed. The
+    first open day usually yields all 9, so the real cost is typically 3.
+
+    Returns `[{"date", "label", "time", "datetime"}]` -- `date`/`label` from the day, `time`/
+    `datetime` from the slot, so a caller can render "الأحد 13 · 10:00" without re-deriving
+    anything. Empty list means the whole window is full or closed, which the caller must treat as
+    a real answer and not an error.
+
+    Never the authority on bookability. `create_reservation()` is, and its unique index is what
+    actually closes the race -- a slot offered here can be taken in the seconds before the tap,
+    and the existing conflict path already handles that.
+    """
+    days = await get_next_open_days(
+        client_id     = client_id,
+        barber_id     = barber_id,
+        duration_min  = duration_min,
+        count         = day_window,
+        slot_step_min = slot_step_min,
+    )
+
+    out: list[dict] = []
+    for day in days:
+        if len(out) >= count:
+            break
+        try:
+            target = date.fromisoformat(day["date"])
+        except (ValueError, KeyError):
+            continue
+        slots = await get_available_slots(
+            client_id     = client_id,
+            barber_id     = barber_id,
+            target_date   = target,
+            duration_min  = duration_min,
+            slot_step_min = slot_step_min,
+        )
+        for slot in slots:
+            out.append({
+                "date":     day["date"],
+                "label":    day["label"],
+                "time":     slot["time"],
+                "datetime": slot["datetime"],
+            })
+            if len(out) >= count:
+                break
+    return out
+
+
 async def get_available_slots(
     client_id:      str,
     barber_id:      str,

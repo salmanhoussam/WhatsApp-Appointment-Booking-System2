@@ -1110,3 +1110,86 @@ Users (الشرق الأوسط) → Cloudflare → Railway AMSTERDAM 🇳🇱 �
       `reservation_service.py:679`.
 - [ ] **A2-e — إشعار المالك عند تأكيد المدير/رفضه** ⇒ يحتاج **قالباً ثالثاً** (نافذة المالك مغلقة
       عملياً دائماً، فلا إرسال حرّ).
+
+---
+
+# 2026-09-12 — WhatsApp Reservation Backlog (Salman's explicit instruction: record, don't forget)
+
+Appended, not merged into the structure above, per this file's own norm. Every item below was
+MEASURED during the Barber WhatsApp capability review and the Reservation domain alignment study,
+not predicted. Full reasoning: `.claudedocs/plans/reservation-whatsapp-domain-alignment.md` ·
+`.claudedocs/reviews/BARBER_WHATSAPP_CAPABILITY_REVIEW_2026-09-12.md`.
+
+**Shipped and live the same day** (so the list below is only what is STILL open):
+`30a8a6a` outbound messages recorded — the anchor that made A2's تأكيد button work end to end ·
+`cab1d1f` strict customer-name validation · `275dc2a` Phase 1a edge cases + the second CTA button.
+
+## 🔴 P0 — named by Salman, in his order
+
+- [ ] **The public web booking route accepts an unvalidated `customer_name`.**
+      `POST /api/v1/public/reservations` takes it through Pydantic with no content check, so the
+      exact hole closed on the WhatsApp boundary (`cab1d1f`) is still open on the web one. The
+      validator already exists and is one import away: `app.core.customer_name.clean_customer_name`.
+      Deliberately left out of `cab1d1f` to keep that commit to one idea.
+      Evidence: the profanity trap Salman set went in through WhatsApp; the same string typed on
+      the website today would still be stored on `Reservation.customerName` AND `Customer.name`.
+
+- [ ] **~52 conversation-flow sends are still unrecorded.**
+      `whatsapp_reservation_flow.py` and `whatsapp_flow.py` call `wa.send_text()` / `send_list_message()`
+      directly rather than through `whatsapp_notifications._report()`, which is where the new
+      outbound recording lives. So the channel history has both halves only for the 8 proactive
+      senders. Measured after `30a8a6a` went live: `{'IN': 26, 'OUT': 2}`.
+      Consequence is history-only today — no anchor depends on these — but it is why
+      `purpose`/`contextType` read 3/28 rather than a real number.
+      Not a copy of `_report` into the flow: those sends have no `reservation_id` until the
+      booking exists, so this needs its own small design decision about what a flow-step row means.
+
+- [ ] **Web → WhatsApp handoff: nothing resolves an existing reservation from an inbound message.**
+      This is PHASE 1B = D13, which Salman reopened on 2026-09-12 as "Reservation WhatsApp Handoff".
+      Three links were broken; two are now closed:
+      ```
+      1  the message never reached the webhook   ✅ closed by 275dc2a's central-number button
+      2  the tenant could not be resolved         ✅ closed by the same (حجز {slug} opener)
+      3  the reservation is still not resolved    🔴 OPEN — this item
+      ```
+      Binding constraint, Salman's own words: the reservation reference text alone must NOT become
+      a tenant identity or an authorization identity, and must not become a substitute for the
+      handoff architecture. So this is a handoff record (hashed token, single-use, phone bound at
+      consumption), NOT a lookup by `id[:8]`.
+
+## 🟡 P1 — measured, lower blast radius
+
+- [ ] **`_resolve_client_from_text()` matches any token equal to any tenant slug**, against an
+      unscoped `client.find_many()`. Slugs are short (`rk`, `anas`, `smar`). Its sibling
+      `_resolve_client_from_deeplink` is hardened with `startswith("حجز")`; this path is not.
+      Demonstrated live, benignly: `'موعد rk'` resolved tenant `rk` through this path.
+- [ ] **17 reservations carry `customerPhone = 'عبر واتساب'`** (rk 8 · mr-h 6 · barberlab-test 2,
+      +1 cancelled), 15 of them with `customerId = NULL`. **Salman's standing decision: immutable
+      this phase** — that string does not contain the real number, so any fix is a guess. Same for
+      the equivalent old `StoreOrder` rows on `rk`. Sends to them now fail LOUDLY (`275dc2a`)
+      instead of silently. Remediation only if a trustworthy identity source appears.
+- [ ] **`Reservation.source` is NULL on 42 of 46 rows** — blinds any measurement of which channel
+      bookings actually come from.
+- [ ] **No monitoring of template-dropping states** (`PAUSED` / `DISABLED` / `LIMIT_EXCEEDED`).
+      All zero today, and `scripts/inspect_whatsapp_templates.py` now reads them, but nothing
+      checks periodically — so a working merchant alert could stop arriving in silence.
+- [ ] **Meta's template ceiling is unknown** — `message_template_limit` was not returned for our
+      field selection. Harmless at 3 templates; unknown is still unknown.
+- [ ] **`send_staff_setup_link`'s 24-hour window never opens.** The invited staff member has never
+      messaged us, so free-form cannot reach them — the second, still-unfixed cause of the جعفر
+      incident. A `UTILITY` template with a `QUICK_REPLY` (to open the window) plus a `URL` button
+      carrying the setup token is the recommendation; **OUT OF SCOPE this phase by Salman's own
+      instruction** (owner/staff phone flows have their own later plan).
+- [ ] **Barber photos in the WhatsApp flow.** `Barber.image_url` exists and is NULL on all six
+      real barbers. WhatsApp list rows cannot carry images at all, so the shape is: one image
+      message per barber, then interactive buttons. Approved by Salman as a separate later feature.
+
+## 🔵 P2 — recorded, no action implied
+
+- [ ] `send_booking_cancellation` is dead code (zero callers).
+- [ ] `email_service.py:26` defines a second `send_booking_confirmation` — a real import-error trap.
+- [ ] Item Order has a real 8-state machine and 14 live rows but **zero WhatsApp entry points and
+      zero notifications**. PHASE 3, after Reservation.
+- [ ] Meta catalog contents unknown — blocks any judgement on `SPM`/`MPM`/`ORDER_DETAILS`.
+- [ ] Railway warns `railway.json` (Config as Code) is deprecated; existing files keep working
+      until **2026-12-01**.

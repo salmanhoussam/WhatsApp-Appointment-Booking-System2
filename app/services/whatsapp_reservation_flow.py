@@ -62,6 +62,8 @@ State machine (parallel to whatsapp_flow.py's own IDLE->...->CONFIRMING chain):
 """
 
 import logging
+import re
+from typing import Optional
 from datetime import datetime, timezone
 
 from app.core.customer_name import clean_customer_name, reject_reason
@@ -74,6 +76,7 @@ logger = logging.getLogger(__name__)
 
 RES_AWAITING_SERVICE = "RES_AWAITING_SERVICE"
 RES_AWAITING_BARBER  = "RES_AWAITING_BARBER"
+RES_AWAITING_SOONEST = "RES_AWAITING_SOONEST"
 RES_AWAITING_DATE    = "RES_AWAITING_DATE"
 RES_AWAITING_SLOT    = "RES_AWAITING_SLOT"
 RES_AWAITING_NAME    = "RES_AWAITING_NAME"
@@ -85,6 +88,20 @@ STATES = {
 }
 
 NO_SLOTS_MESSAGE = "لا توجد مواعيد متاحة في هذا اليوم لدى هذا الحلاق. جرّب يوماً آخر 📅"
+
+# The 10th row of the "soonest" list. A literal that can never collide with a real value: every
+# other row id in that list is an ISO datetime, and this is not one.
+_PICK_ANOTHER_DATE = "__PICK_ANOTHER_DATE__"
+
+# Words customers put around a service name, stripped before matching so "بدي دقن" and "دقن" are
+# the same request. Kept as a small explicit list rather than a stemmer: these are the actual
+# openers people type, and a stemmer on Lebanese Arabic would be a far bigger claim than this
+# needs to make.
+_REQUEST_NOISE = (
+    "بدي", "بدّي", "ابدي", "أبدي", "بحب", "بحبّ", "حبيت", "لو سمحت", "لو سمحتي", "ممكن",
+    "اريد", "أريد", "عايز", "بليز", "please", "i want", "want", "book", "احجز", "حجز",
+    "موعد", "عندي", "شكرا", "شكراً", "من فضلك", "علا", "على",
+)
 # ^ mirrors the public booking page's own copy, cited verbatim in the Phase C plan (Study 2).
 
 
@@ -166,11 +183,13 @@ async def start(wa, customer_phone: str, session, client) -> None:
         ],
     }]
 
-    header = f"أهلاً بعودتك {returning_name} 👋" if returning_name else f"احجز موعدك في {client.name} 💈"
+    # Salman's wording, 2026-09-12: the flow should sound like a person, not a form. A returning
+    # customer is greeted by name (Phase D) -- that half already read naturally and is unchanged.
+    header = f"أهلاً بعودتك {returning_name} 👋" if returning_name else f"أهلاً فيك في {client.name} 💈"
     await wa.send_list_message(
         to=customer_phone,
         header=header,
-        body="للحجز، اختر الخدمة أولاً:",
+        body="شو بتحب تعمل اليوم؟ اختر من القائمة، أو اكتبلي شو بدك 👇",
         button_text="عرض الخدمات",
         sections=sections,
     )
@@ -190,6 +209,10 @@ async def handle(wa, customer_phone: str, session, msg_type: str, value: str, ti
     elif session.state == RES_AWAITING_BARBER:
         await _step_awaiting_barber(wa, customer_phone, session, client, msg_type, value)
 
+    elif session.state == RES_AWAITING_SOONEST:
+        await _step_awaiting_soonest(wa, customer_phone, session, client, msg_type, value,
+                                     phone_number_id, clear_session_fn)
+
     elif session.state == RES_AWAITING_DATE:
         await _step_awaiting_date(wa, customer_phone, session, client, msg_type, value)
 
@@ -207,15 +230,117 @@ async def handle(wa, customer_phone: str, session, msg_type: str, value: str, ti
 
 # ── State handlers ────────────────────────────────────────────────────────────────────────────
 
-async def _step_awaiting_service(wa, customer_phone, session, client, msg_type, value):
-    if msg_type != "list_reply":
-        await wa.send_text(customer_phone, "الرجاء اختيار خدمة من القائمة أدناه 👆")
-        return
+def _normalise_ar(text: str) -> str:
+    """Fold the spelling differences an Arabic keyboard produces, for MATCHING only.
 
+    A customer typing "حنه" and a service stored as "حنة" mean the same thing, and so do "احمد"
+    and "أحمد". Folding alef/hamza/ta-marbuta/ya and stripping tatweel and diacritics is what
+    makes a substring match usable on real input instead of only on perfectly-typed input. The
+    stored service name is never changed -- this value exists for the comparison and is discarded.
+    """
+    if not text:
+        return ""
+    out = text.strip().lower()
+    for src, dst in (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي"), ("ة", "ه"),
+                     ("ؤ", "و"), ("ئ", "ي"), ("ـ", "")):
+        out = out.replace(src, dst)
+    out = re.sub(r"[\u064B-\u0652]", "", out)       # harakat
+    out = re.sub(r"\s+", " ", out)
+    return out
+
+
+def _match_service_by_text(text: str, services: list[dict]) -> Optional[dict]:
+    """The service a typed message asks for, or None when it is not unambiguous.
+
+    Salman's request, 2026-09-12: a customer who writes "بدي دقن" instead of tapping the list
+    should be understood. The rule that keeps this safe is that AMBIGUITY IS NOT A MATCH -- if the
+    text could be two services, this returns None and the customer is asked to tap, because
+    guessing which haircut someone meant is worse than asking.
+
+    Three passes, strictest first, and none of them is fuzzy in the edit-distance sense. A real
+    fuzzy match would trade a wrong service for a saved tap, and a wrong service is a wrong
+    appointment:
+
+      1. the whole message, noise words stripped, EQUALS a service name
+      2. a service name appears INSIDE the message  ("بدي دقن" -> "دقن")
+      3. every word of a service name appears somewhere in the message, in any order
+         ("شعر ودقن" typed as "دقن وشعر")
+
+    Deliberately NOT matched: a single Arabic letter or a 2-character fragment. "شعر ودقن" and
+    "دقن" both contain "قن", and on `rk` those are two different services at two different prices.
+    """
+    cleaned = _normalise_ar(text)
+    if not cleaned:
+        return None
+    for noise in _REQUEST_NOISE:
+        cleaned = cleaned.replace(_normalise_ar(noise), " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) < 3:
+        return None
+
+    # EACH SERVICE OFFERS SEVERAL NAMES TO MATCH AGAINST, not one -- and this was a real bug the
+    # first version had. `rk` sells "حنة أو صبغة" and "تمشيط أو تسريح": names that are a menu of
+    # two options, not one phrase. A customer types ONE of them ("بدي حنة"), which equals no full
+    # name, is not contained in the typed text the other way round, and fails a
+    # every-word-present test because "صبغة" is nowhere in their message. So the three passes
+    # below now run over the full name AND each alternative.
+    candidates: list[tuple[dict, str]] = []
+    for svc in services:
+        full = _normalise_ar(svc.get("name_ar") or "")
+        for candidate in {full, *re.split(r"(?:\bاو\b|\bor\b|/|،|\|)", full)}:
+            candidate = candidate.strip()
+            if len(candidate) >= 3:
+                candidates.append((svc, candidate))
+
+    def _unique_hit(predicate) -> tuple[bool, Optional[dict]]:
+        """(decided, service). Hits are deduped BY SERVICE, so a service matched through both its
+        full name and one of its alternatives is still one answer, not an ambiguity."""
+        seen: dict[str, dict] = {}
+        for svc, candidate in candidates:
+            if predicate(candidate):
+                seen[svc["id"]] = svc
+        if len(seen) == 1:
+            return True, next(iter(seen.values()))
+        # More than one distinct service at this strictness -- a looser pass would only be MORE
+        # ambiguous, so stop rather than guess which haircut they meant.
+        return (len(seen) > 1), None
+
+    for predicate in (
+        lambda name: name == cleaned,
+        lambda name: name in cleaned,
+        lambda name: all(word in cleaned for word in name.split() if len(word) >= 3),
+    ):
+        decided, svc = _unique_hit(predicate)
+        if svc:
+            return svc
+        if decided:
+            return None
+    return None
+
+
+async def _step_awaiting_service(wa, customer_phone, session, client, msg_type, value):
     services = await catalog_service_service.public_list_services(client.id)
-    service = next((s for s in services if s["id"] == value), None)
-    if not service:
-        await wa.send_text(customer_phone, "❌ الخدمة غير موجودة. حاول مجدداً.")
+
+    if msg_type == "list_reply":
+        service = next((s for s in services if s["id"] == value), None)
+        if not service:
+            await wa.send_text(customer_phone, "❌ الخدمة غير موجودة. حاول مجدداً.")
+            return
+    elif msg_type == "text":
+        # Typed instead of tapped. Understood when unambiguous; otherwise the customer is asked
+        # to tap rather than sent to a service they did not choose.
+        service = _match_service_by_text(value, services)
+        if not service:
+            await wa.send_text(
+                customer_phone,
+                "ما فهمت تماماً 😅 اختار الخدمة من القائمة أدناه 👆",
+            )
+            return
+        logger.info("🔎 Service matched from text %r -> %r at %s",
+                    (value or "")[:40], service.get("name_ar"), client.slug)
+        await wa.send_text(customer_phone, f"تمام، *{service['name_ar']}* ✅")
+    else:
+        await wa.send_text(customer_phone, "الرجاء اختيار خدمة من القائمة أدناه 👆")
         return
 
     session.res_service_id = service["id"]
@@ -236,6 +361,23 @@ async def _step_awaiting_service(wa, customer_phone, session, client, msg_type, 
     filtered = [b for b in barbers if b.id in qualified_ids]
     if filtered:
         barbers = filtered
+
+    # SMART SKIP (Salman, 2026-09-12): one qualified barber is not a choice, it is an answer.
+    #
+    # Keyed on the EFFECTIVE list, deliberately -- not on the number of BarberService links. The
+    # soft filter above means a service with ZERO links shows the whole roster, so a shop with one
+    # link and three barbers must still be asked. Measured: this skips a step on 3 of 6 services at
+    # `rk` and 2 of 6 at `mr-h`, and on none at `barberlab-test`, where both barbers do everything.
+    #
+    # The customer is TOLD who, rather than silently assigned -- "الحلاق: سامي" -- because a chair
+    # they did not pick appearing in the confirmation would read as a bug.
+    if len(barbers) == 1:
+        only = barbers[0]
+        session.res_barber_id = only.id
+        session.res_barber_name = only.name
+        await wa.send_text(customer_phone, f"الحلاق: *{only.name}* 💈")
+        await _offer_soonest_slots(wa, customer_phone, session, client)
+        return
 
     sections = [{
         "title": "اختر الحلاق",
@@ -268,8 +410,117 @@ async def _step_awaiting_barber(wa, customer_phone, session, client, msg_type, v
     session.res_barber_id = barber.id
     session.res_barber_name = barber.name
 
-    await _offer_day_list(wa, customer_phone, session, client)
-    session.state = RES_AWAITING_DATE
+    await _offer_soonest_slots(wa, customer_phone, session, client)
+
+
+async def _offer_soonest_slots(wa, customer_phone, session, client) -> None:
+    """THE DEFAULT: 9 real start times across days, plus one row that opens the day picker.
+
+    Salman's decision, 2026-09-12 -- "الأغلبية تبحث عن أقرب كرسي متاح". Replaces the
+    day-then-time pair with a single tap for that majority, and costs everyone else exactly one
+    extra tap to reach the picker they used to get automatically.
+
+    THE 9 + 1 SHAPE IS META'S ARITHMETIC, NOT A PREFERENCE. An interactive list holds 10 rows
+    across every section, full stop. 9 offers plus 1 escape hatch uses the cap exactly; a 10th
+    offer would leave no way to reach a different date, and 8 would waste a row.
+
+    Row titles are built to FIT, measured not estimated: `title` is capped at 24 characters by
+    Meta and "الأحد 13 · 10:00" is 16, so the label stays readable without truncation mid-word --
+    which is why the month goes in the description instead of the title.
+
+    On an empty result the customer gets the existing NO_SLOTS_MESSAGE and the session returns to
+    IDLE rather than parking in a state with nothing to answer.
+    """
+    try:
+        slots = await reservation_service.get_next_open_slots(
+            client_id    = client.id,
+            barber_id    = session.res_barber_id,
+            duration_min = session.res_duration_min or 30,
+            count        = 9,
+        )
+    except ValueError as exc:
+        await wa.send_text(customer_phone, f"❌ تعذّر جلب المواعيد المتاحة: {exc}")
+        session.state = "IDLE"
+        return
+
+    if not slots:
+        # A genuinely full week is an answer, not an error -- and the day picker would show the
+        # same emptiness one tap later, so offering it here would only waste the customer's time.
+        await wa.send_text(
+            customer_phone,
+            f"لا توجد مواعيد متاحة لدى *{session.res_barber_name}* في الأيام القادمة 📅\n"
+            f"تواصل مع {client.name} مباشرة أو جرّب خدمة أخرى.",
+        )
+        session.state = "IDLE"
+        return
+
+    rows = [
+        {
+            # The id is the slot's ISO datetime -- identical to what RES_AWAITING_SLOT already
+            # sends, so the parsing below and the fallback path stay one behaviour, not two.
+            "id":          slot["datetime"],
+            "title":       f"{_short_day(slot['label'])} · {slot['time']}"[:24],
+            "description": slot["label"][:72],
+        }
+        for slot in slots
+    ]
+    rows.append({
+        "id":          _PICK_ANOTHER_DATE,
+        "title":       "📅 تاريخ آخر",
+        "description": "اختر يوماً بنفسك",
+    })
+
+    await wa.send_list_message(
+        to=customer_phone,
+        header=f"✅ {session.res_service_name} — {session.res_barber_name}",
+        body="هذي أقرب المواعيد المتاحة. اختر اللي يناسبك 👇",
+        button_text="عرض المواعيد",
+        sections=[{"title": "أقرب المواعيد", "rows": rows}],
+    )
+    session.state = RES_AWAITING_SOONEST
+
+
+def _short_day(label: str) -> str:
+    """"الأحد 13 أيلول" -> "الأحد 13". Drops the month so the title fits Meta's 24 characters
+    with the time appended; the full label still goes in the description, so nothing is lost."""
+    parts = (label or "").split()
+    return " ".join(parts[:2]) if len(parts) >= 2 else (label or "")
+
+
+async def _step_awaiting_soonest(wa, customer_phone, session, client, msg_type, value,
+                                 phone_number_id, clear_session_fn):
+    """Either a start time was tapped, or the customer asked for the day picker.
+
+    The escape hatch hands over to `_offer_day_list()` UNCHANGED -- the whole day/slot path stays
+    exactly as it was and is simply reached by a tap now. That is what makes this additive: if the
+    soonest list is ever wrong for a shop, the old flow is still there, whole.
+    """
+    if msg_type != "list_reply":
+        await wa.send_text(customer_phone, "الرجاء اختيار موعد من القائمة 👆")
+        return
+
+    if value == _PICK_ANOTHER_DATE:
+        await _offer_day_list(wa, customer_phone, session, client)
+        session.state = RES_AWAITING_DATE
+        return
+
+    try:
+        slot_dt = datetime.fromisoformat(value)
+    except ValueError:
+        await wa.send_text(customer_phone, "❌ موعد غير صالح. حاول مجدداً.")
+        return
+
+    session.res_slot_datetime = slot_dt
+
+    # Same branch RES_AWAITING_SLOT already takes: a returning customer's name was pre-filled in
+    # start(), so there is nothing left to ask.
+    if session.res_customer_name:
+        await _create_and_report(wa, customer_phone, session, client,
+                                 phone_number_id, clear_session_fn)
+        return
+
+    await wa.send_text(customer_phone, "ما اسمك الكريم؟")
+    session.state = RES_AWAITING_NAME
 
 
 async def _offer_day_list(wa, customer_phone, session, client) -> None:
@@ -531,12 +782,19 @@ async def _create_and_report(wa, customer_phone, session, client,
         # caught the conflict. Back to RES_AWAITING_DATE, service/barber context kept, so the
         # customer can immediately try a different time instead of restarting the whole flow.
         await wa.send_text(customer_phone, f"❌ تعذّر إتمام الحجز: {exc}")
-        session.state = RES_AWAITING_DATE
-        # RE-OFFER THE DAY LIST, don't just say "try another day". Before the list existed this
-        # branch could leave the customer to type a date; now that every other step is a tap,
-        # dropping them back to a bare sentence is a dead end -- the same dead end that made
-        # people abandon the typed date step in the first place.
-        await _offer_day_list(wa, customer_phone, session, client)
+        # RE-OFFER THE SOONEST LIST, not the day list, and not a bare sentence.
+        #
+        # Before any list existed this branch left the customer to type a date, which is the dead
+        # end that made people abandon the flow. The day list fixed that; the soonest list is
+        # strictly better HERE in particular, because it is recomputed from live availability --
+        # so the very slot that was just taken is gone from it, and the customer's next tap cannot
+        # hit the same conflict twice. A day list would have shown them the same day again with no
+        # indication of which time had disappeared.
+        #
+        # `_offer_soonest_slots` sets the state itself (including IDLE when the week is genuinely
+        # full), so it is not set here -- one place decides that, which is why the assignment that
+        # used to be on this line is gone.
+        await _offer_soonest_slots(wa, customer_phone, session, client)
 
     except Exception as exc:
         logger.error("🔥 WhatsApp reservation creation failed: %s", exc, exc_info=True)
