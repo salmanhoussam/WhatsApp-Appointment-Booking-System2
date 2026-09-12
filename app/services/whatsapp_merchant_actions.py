@@ -73,6 +73,7 @@ from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.services import reservation_service
 from app.services.reservation_service import ReservationAccessDenied
 from app.services.security_audit_service import log_security_event
+from app.services.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
 
@@ -155,12 +156,61 @@ def _phone_candidates(sender: str) -> list[str]:
     return out
 
 
-async def _refuse(reason: str, sender: str, detail: dict, client_id: Optional[str] = None) -> None:
-    """A2-c: nothing goes back to the sender; the attempt is recorded.
+# Statuses in the words a merchant reads, not the words the column stores.
+_AR_STATUS = {
+    "pending":   "بانتظار التأكيد",
+    "confirmed": "مؤكّد",
+    "arrived":   "حضر",
+    "cancelled": "ملغى",
+    "no_show":   "لم يحضر",
+}
 
-    Silence is the project's established answer here -- `whatsapp_flow.py`'s suspended-tenant
-    branch does the same, and its comment says telling the sender is a business decision made
-    elsewhere. It also refuses to confirm to an impersonator that the number is watched.
+
+def _already_message(current: str, requested: str, ref: str) -> str:
+    """What to tell a merchant whose tap the transition graph refused.
+
+    Salman, 2026-09-13, after tapping إلغاء and then تأكيد on the same alert: *"عادي يعني أنا
+    ضلّ إقدر إكبس الزر؟ لازم بس يختار option يبطّل فيه يختار."* The domain DID hold -- the second
+    tap was refused and the booking stayed cancelled -- but he was told nothing, so from his side a
+    correct refusal and a broken button look identical.
+
+    THE BUTTONS THEMSELVES CANNOT BE DISABLED, and that is Meta's constraint, not a choice we
+    made: a sent WhatsApp message is immutable, so a template's quick replies stay tappable
+    forever and no API removes or greys them out. What we control is the answer, so the answer has
+    to carry what the buttons cannot.
+    """
+    now = _AR_STATUS.get(current, current)
+    if current == requested:
+        # The tick belongs to a confirmation, not to every repeat tap -- "ملغى أصلاً ✅" reads as
+        # approval of a cancellation, which is not what the sender is being told.
+        mark = " ✅" if requested == "confirmed" else ""
+        return f"هذا الحجز *{now}* أصلاً{mark}\nرقم الحجز: {ref}"
+    if current in ("cancelled", "arrived", "no_show"):
+        return (f"هذا الحجز صار *{now}* — ما بقدر أغيّره من هون.\n"
+                f"رقم الحجز: {ref}\nإذا بدك موعد جديد، الزبون لازم يحجز من جديد.")
+    return f"حالة الحجز حالياً *{now}*، وما بقدر أعملها {_AR_STATUS.get(requested, requested)}."
+
+
+async def _refuse(reason: str, sender: str, detail: dict, client_id: Optional[str] = None,
+                  reply: Optional[str] = None) -> None:
+    """Record a refused tap, and answer the sender ONLY when answering is safe.
+
+    A2-c's silence is the default and stays the default, for the reason it was chosen:
+    `whatsapp_flow.py`'s suspended-tenant branch does the same, and it refuses to confirm to an
+    impersonator that the number is watched.
+
+    But silence was applied to two DIFFERENT situations that deserve different answers, and
+    Salman caught it from the outside on 2026-09-13:
+
+      * the sender is unknown, unauthorised, or out of scope -> silence is a security property.
+        Every refusal above the authority checks is one of these, and none of them passes `reply`.
+      * the sender is a RESOLVED, AUTHORISED merchant whose action the domain simply cannot
+        perform -- a second tap on a settled booking, or attendance on a day that is not today.
+        He is not an attacker; he is a shop owner holding a phone, and telling him nothing means
+        a correct refusal and a broken button are indistinguishable to him.
+
+    So `reply` is opt-in per call site rather than a blanket change: the two post-authorisation
+    refusals pass it, and the seven security refusals keep their silence untouched.
     """
     logger.warning("🚫 Merchant action refused (%s) from %s — %s", reason, sender, detail)
     await log_security_event(
@@ -170,6 +220,13 @@ async def _refuse(reason: str, sender: str, detail: dict, client_id: Optional[st
         detail     = {"reason": reason, "sender_phone": sender, **detail},
         actor      = None,
     )
+    if reply:
+        # Never allowed to turn a refusal into an exception: the tap is already recorded and the
+        # booking is already untouched, so a failed courtesy message must not change either.
+        try:
+            await WhatsAppService().send_text(to=sender, text=reply)
+        except Exception as exc:                                   # pragma: no cover
+            logger.error("🔥 Could not answer a refused merchant tap from %s: %s", sender, exc)
 
 
 async def try_handle(sender_phone: str, msg: dict, msg_type: str,
@@ -347,7 +404,12 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
                 "reserved_local": reserved_local.isoformat(),
                 "today_local":    today_local.isoformat(),
                 "requested":      new_status,
-            }, client_id=client_id)
+            }, client_id=client_id,
+                # Same reasoning as transition_refused: an authorised barber on the wrong day is
+                # not an impersonator, and "nothing happened" is the one answer that teaches him
+                # nothing. The date is included because that IS the explanation.
+                reply=(f"هذا الموعد يوم *{reserved_local.strftime('%Y-%m-%d')}*، وما هو اليوم.\n"
+                       f"علّم الحضور بيوم الموعد نفسه 📅"))
             return True
 
     # ── The act. One existing write path; its transition graph is the real gate. ──
@@ -370,7 +432,9 @@ async def try_handle(sender_phone: str, msg: dict, msg_type: str,
         await _refuse("transition_refused", sender_phone, {
             "reservation_id": reservation.id, "requested": new_status,
             "current":        reservation.status, "error": str(exc),
-        }, client_id=client_id)
+        }, client_id=client_id,
+            reply=_already_message(reservation.status, new_status,
+                                   reservation.id[:8].upper()))
         return True
 
     logger.info("✅ Merchant action: reservation %s %s -> %s by %s %s",
