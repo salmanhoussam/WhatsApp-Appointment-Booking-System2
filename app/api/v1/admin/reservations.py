@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.tenant import require_roles
-from app.core.permissions import require_permission, scope_barber_id
+from app.core.permissions import require_permission, RESERVATION_LEGACY_ROLES, scope_barber_id
 from app.core.services import require_service
 from app.services import reservation_service
 from app.services.reservation_service import ReservationAccessDenied
@@ -36,7 +36,9 @@ VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel"]
 # (explicitly scoped to their own barberId below) -- MANAGER_UNITS deliberately excluded, it was
 # never in this role's stated scope elsewhere (units.py/resources.py), only ever had access here
 # because no gate existed at all.
-RESERVATION_ROLES = ("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF")
+# Was a local tuple; moved to core/permissions.py (2026-09-12) so the WhatsApp channel
+# evaluates the same list rather than a copy of it. Same values, same order.
+RESERVATION_ROLES = RESERVATION_LEGACY_ROLES
 
 
 def _is_staff(user) -> bool:

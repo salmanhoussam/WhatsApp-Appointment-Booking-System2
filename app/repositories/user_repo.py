@@ -103,6 +103,28 @@ async def find_user_by_phone(phone: str):
     return matches[0]
 
 
+async def find_active_user_by_phones(client_id: str, phones: list[str]):
+    """The active User AT THIS TENANT whose phone matches any candidate form, or None.
+
+    A2 (2026-09-12). Deliberately NOT find_user_by_phone() above: that one is the LOGIN path and
+    is cross-tenant by necessity, which is why its own comment says one number really can sit on
+    several accounts (a person owning two shops) and that choosing between them needs the
+    membership model.
+
+    Here the tenant is already known -- it comes from the reservation the button tap answers --
+    so the ambiguity that blocks login simply does not arise. That is the anchor earning its keep.
+
+    `phones` is a list because the caller owns the matching policy; this layer only queries.
+    Active-only: a deactivated account has no authority.
+    """
+    if not phones:
+        return None
+    return await prisma_client.user.find_first(
+        where={"clientId": client_id, "isActive": True, "phone": {"in": phones}},
+        order={"createdAt": "asc"},
+    )
+
+
 async def find_user_by_setup_token(token: str):
     """Find a user by setup token (one-time magic link)."""
     return await prisma_client.user.find_first(

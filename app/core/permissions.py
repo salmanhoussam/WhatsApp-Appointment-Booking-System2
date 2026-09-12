@@ -395,6 +395,32 @@ def resolve_preset(preset: str, addons: Optional[list] = None) -> dict:
 
 # ── Dependency ────────────────────────────────────────────────────────────────
 
+# The legacy role tuple for the reservations area. Defined HERE, beside the authorisation
+# vocabulary, so the WhatsApp channel and admin/reservations.py evaluate the same list instead of
+# each carrying its own copy -- the Duplicate Architecture shape TENANT_OS.md names.
+RESERVATION_LEGACY_ROLES: tuple[str, ...] = (
+    "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF",
+)
+
+
+def is_authorized(user, permission: str, *legacy_roles: str) -> bool:
+    """The authorisation decision itself — no HTTP, no Depends, no request.
+
+    Extracted from require_permission()'s dependency (2026-09-12) so a caller with no request
+    object can reach the SAME decision. A2 needs exactly that: a WhatsApp webhook has no token
+    and no session, but it must not therefore grow a second set of authorisation rules
+    (`.claudedocs/plans/a2-merchant-authorization-from-whatsapp.md` §4).
+
+    The three branches are unchanged and in the same order: SUPER_ADMIN (I3), legacy accounts
+    against the route's own tuple (I1), permission-based accounts against the array (I4/I5).
+    """
+    if _is_super_admin(user):
+        return True
+    if not is_permission_based(user):
+        return _role_of(user) in legacy_roles
+    return has_permission(user, permission)
+
+
 def require_permission(permission: str, *legacy_roles: str):
     """Dependency factory for a MIGRATED route.
 
@@ -414,23 +440,20 @@ def require_permission(permission: str, *legacy_roles: str):
     async def _dependency(request: Request):
         user = await get_current_admin_user(request)
 
-        if _is_super_admin(user):          # I3
+        # One decision, shared with every non-HTTP caller. The branching below is only about
+        # WHICH message to return -- never about whether access is granted.
+        if is_authorized(user, permission, *legacy_roles):
             return user
 
         if not is_permission_based(user):  # I1 -- legacy account, this route's own tuple
-            role = _role_of(user)
-            if role not in legacy_roles:
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Role '{role}' is not authorized. Required: {list(legacy_roles)}",
-                )
-            return user
-
-        if not has_permission(user, permission):   # I4/I5 -- permission-based account
             raise HTTPException(
                 status_code=403,
-                detail=f"Missing permission '{permission}'.",
+                detail=f"Role '{_role_of(user)}' is not authorized. "
+                       f"Required: {list(legacy_roles)}",
             )
-        return user
+        raise HTTPException(                # I4/I5 -- permission-based account
+            status_code=403,
+            detail=f"Missing permission '{permission}'.",
+        )
 
     return _dependency
