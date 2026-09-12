@@ -100,11 +100,33 @@ async def main() -> int:
         print("  approval state, or parameter split — not the path.")
         print("  Accepted is NOT delivered (proven on production 2026-09-11: Meta accepted a")
         print("  message with a wamid and then failed it with 131047). The phone is the evidence.")
+    elif getattr(result, "error_code", None) == 131058:
+        # MEASURED 2026-09-12, and the reason this branch exists: Meta answered
+        # "(#131058) Hello World templates can only be sent from the Public Test Numbers".
+        # The first version of this script called that "the template PATH is broken", which is
+        # FALSE and would have tripped Salman's own gate condition ("if it fails, stop D13") on
+        # a result that says the opposite. A diagnostic that produces a wrong DECISION is worse
+        # than a bug in a feature.
+        print("  INCONCLUSIVE — and not a failure of ours.")
+        print("  131058 means Meta refuses `hello_world` from a real verified business number;")
+        print("  it is allowed only from their Public Test Numbers. So this probe cannot answer")
+        print("  the question from this account, by design.")
+        print("  What it DID prove: credentials work (no 190/401), the request shape is valid")
+        print("  (Meta parsed it and returned a template-specific error), and the path reaches")
+        print("  Meta. What it cannot prove is anything about OUR template.")
+        print("  DO NOT stop D13 on this result. Run instead:")
+        print("      railway run venv/bin/python scripts/inspect_whatsapp_templates.py")
+        print("  which reads the real template list and parameter counts, and sends nothing.")
     else:
         print("  Rejected. The template PATH is broken for this environment, and our own")
         print("  template's parameters were never the question. Read `reason`: credentials_missing")
         print("  is an unset variable, network_error is us, meta_<status> is Meta refusing us.")
-    return 0 if result else 2
+        print("  190/401 is the token; 131058 is NOT this case (see the branch above).")
+    # 131058 exits 0: it is inconclusive, not a failure, and a non-zero exit here would read as
+    # "the channel is broken" to anything scripting this.
+    if result or getattr(result, "error_code", None) == 131058:
+        return 0
+    return 2
 
 
 if __name__ == "__main__":
