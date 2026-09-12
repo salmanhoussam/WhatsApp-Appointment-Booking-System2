@@ -6,7 +6,7 @@ MVP uses:
   - ntfy.sh push notifications to Salman's phone
 
 TODO (WhatsApp Cloud API migration):
-  When WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID env vars are available,
+  When WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID env vars are available,
   replace every wa.me string with an httpx.post to:
     https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages
   See .claudedocs/plans/integration to whatsapp token.md for the full migration guide.
@@ -50,7 +50,7 @@ def _make_wa_link(phone: str, message: str) -> str:
                 "components": [{"type": "body", "parameters": [...]}],
             },
         }
-    Authorization header: f"Bearer {WHATSAPP_API_TOKEN}"
+    Authorization header: f"Bearer {WHATSAPP_ACCESS_TOKEN}"
     """
     return f"https://wa.me/{phone}?text={quote(message)}"
 

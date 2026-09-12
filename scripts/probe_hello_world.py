@@ -47,10 +47,30 @@ async def main() -> int:
     # module scope pulls the whole settings chain before we have reported what is missing.
     from app.services.whatsapp_service import WhatsAppService
 
+    # READ THROUGH `settings`, NOT os.getenv WITH A NAME TYPED HERE.
+    #
+    # The first version of this probe checked "WHATSAPP_TOKEN" and aborted on production saying
+    # it was not set. It was never set anywhere: the name does not exist in this repository. The
+    # app reads WHATSAPP_ACCESS_TOKEN (config.py:81), so the probe was measuring my own typo and
+    # reporting it as a missing production credential — the exact class of false negative a probe
+    # exists to rule out.
+    #
+    # Going through `settings` means the probe and the sender can never disagree about the name
+    # again: if WhatsAppService can find a credential, so can this, because it is the same read.
+    from app.core.config import settings
+
     # PRESENCE ONLY. Never the value — that rule exists because it was broken once.
-    missing = [v for v in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID") if not os.getenv(v)]
-    for v in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_BUSINESS_ACCOUNT_ID"):
-        print(f"  {v:<32}{'set' if os.getenv(v) else 'NOT SET'}")
+    creds = {
+        "WHATSAPP_ACCESS_TOKEN":        settings.WHATSAPP_ACCESS_TOKEN,
+        "WHATSAPP_PHONE_NUMBER_ID":     settings.WHATSAPP_PHONE_NUMBER_ID,
+        "WHATSAPP_BUSINESS_ACCOUNT_ID": settings.WHATSAPP_BUSINESS_ACCOUNT_ID,
+        "WHATSAPP_CENTRAL_NUMBER":      settings.WHATSAPP_CENTRAL_NUMBER,
+    }
+    for name, value in creds.items():
+        print(f"  {name:<32}{'set' if value else 'NOT SET'}")
+
+    # Only the two the send itself needs. WhatsAppService refuses without exactly these.
+    missing = [n for n in ("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID") if not creds[n]]
     if missing:
         print(f"\nABORT: {', '.join(missing)} not in this environment.")
         print("       Run it through `railway run` so production's own values are injected.")
