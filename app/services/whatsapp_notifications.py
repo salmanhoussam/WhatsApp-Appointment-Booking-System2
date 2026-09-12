@@ -369,6 +369,51 @@ async def send_new_reservation_to_merchant(
     """
     try:
         wa = WhatsAppService()
+
+        # ── The approved template first. Two reasons, and both are load-bearing. ──
+        #
+        # 1. IT REACHES A COLD NUMBER. A merchant is not a customer messaging in, so his 24-hour
+        #    window is shut almost always, and free-form outside it is rejected with 131047 -- the
+        #    failure RC1 confirmed on production 2026-09-11. Until this line existed, every
+        #    merchant alert was a free-form send that Meta could accept and then never deliver,
+        #    with only a log line to say so.
+        # 2. IT CARRIES THE BUTTONS. A free-form message cannot. تأكيد/إلغاء exist only on the
+        #    template, so without this the A2-a handler was unreachable code -- shipped and dead.
+        #
+        # NO BUTTON COMPONENTS ARE SENT, deliberately: these buttons were authored in WhatsApp
+        # Manager with no payload field, so a tap returns their visible Arabic text, which
+        # `whatsapp_merchant_actions._CONFIRM_INTENTS` already matches. That is also why
+        # send_template()'s existing "no button components" limitation is not a blocker here.
+        #
+        # PARAMETER ORDER IS THE CONTRACT and is UNVERIFIED against Meta from this machine (no
+        # credentials here, and the Railway CLI is not installed). It is taken from this module's
+        # own long-standing claim that the free-form body "mirrors the template EXACTLY", plus the
+        # approved template's rendered preview. Which is precisely why the fallback below exists.
+        params = [client_name, customer_name, customer_phone,
+                  service_name, barber_name, reserved_at, reservation_ref]
+        result = await wa.send_template(
+            to          = recipient_phone,
+            name        = MERCHANT_ALERT_TEMPLATE,
+            language    = MERCHANT_ALERT_LANGUAGE,
+            body_params = [_or_dash(p) for p in params],
+        )
+        if result:
+            return _report(result, f"New-reservation alert ({recipient_label}, template)",
+                           recipient_phone, reservation_ref)
+
+        # ── Fallback: exactly today's behaviour, so nothing can regress. ──
+        #
+        # A wrong parameter count, a language code that is `ar_LB` rather than `ar`, or a template
+        # still under review all land here. Inside an open window the free-form send still works;
+        # outside one it fails as it already did. Logged as its OWN event rather than folded into
+        # the template attempt -- a silent fallback would hide the exact mismatch this guards
+        # against, and we would never learn the template is misconfigured.
+        logger.warning(
+            "⚠️  Template '%s' send failed for %s (%s) — falling back to free-form. "
+            "reason=%s error_code=%s",
+            MERCHANT_ALERT_TEMPLATE, recipient_phone, recipient_label,
+            getattr(result, "reason", None), getattr(result, "error_code", None),
+        )
         lines = [
             "🔔 *حجز جديد*",
             "",
@@ -380,9 +425,9 @@ async def send_new_reservation_to_merchant(
             f"الموعد: {_or_dash(reserved_at)}",
             f"رقم الحجز: *{_or_dash(reservation_ref)}*",
         ]
-        result = await wa.send_text(to=recipient_phone, text="\n".join(lines))
-        return _report(result, f"New-reservation alert ({recipient_label})", recipient_phone,
-                       reservation_ref)
+        return _report(await wa.send_text(to=recipient_phone, text="\n".join(lines)),
+                       f"New-reservation alert ({recipient_label}, free-form fallback)",
+                       recipient_phone, reservation_ref)
     except Exception as exc:
         logger.error(
             "🔥 Failed to send new-reservation alert to %s (%s): %s",
@@ -411,6 +456,12 @@ async def send_new_reservation_to_merchant(
 # defensive fallback, not as the design.
 #
 # Meta allows at most 3 quick-reply buttons per template. This uses 2.
+
+# The OWNER/ADMIN alert template, approved on Meta 2026-09-11 and carrying the تأكيد/إلغاء
+# buttons that A2-a now handles. Seven positional parameters, in the order this module's own
+# free-form message has always built them.
+MERCHANT_ALERT_TEMPLATE     = "new_reservation_alert"
+MERCHANT_ALERT_LANGUAGE     = "ar"
 
 BARBER_ALERT_TEMPLATE       = "barber_reservation_alert"
 BARBER_ALERT_LANGUAGE       = "ar"
