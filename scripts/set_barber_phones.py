@@ -9,8 +9,25 @@ be refused as `sender_not_staff`. This fills in the three real people's numbers;
 SALMAN'S INSTRUCTION (2026-09-12): the earlier "delete every barber except three" plan is
 **cancelled**. All eight rows stay, alzabt-demo's included. Nothing here deletes or deactivates.
 
-    ⚠️  THE NUMBERS BELOW ARE PLACEHOLDERS. Salman edits them before running.
-        `96100000001` is not a real Lebanese number — it is deliberately obvious.
+THE NUMBERS BELOW ARE REAL, and were taken from `users` (Salman, 2026-09-12) rather than
+retyped — a read-only audit of that table is what they were verified against, and it caught a
+transcription error that would have made the fix silently useless:
+
+    جعفر  96170764479   confirmed: users.phone on jaafar@rk.salmansaas.com
+    حسين  96176985477   confirmed: users.phone on rkbarber@dev.invalid
+    Ali   96171455767   DERIVED. The number given was "961455767" — nine digits, which matched
+                        ZERO user rows. The real stored value is `71455767` on
+                        admin@ali-barber.local at mr-h: a leading 7 had been dropped.
+                        normalize_for_storage("71455767") -> "96171455767".
+
+Two things that audit found, recorded because they are real and neither is fixed here:
+  * `71455767` is stored WITHOUT its country code on a TENANT_ADMIN account — the exact defect
+    class of the جعفر incident, on a live account. Not touched: this script writes `barbers`, and
+    fixing `users.phone` is a separate decision with its own blast radius.
+  * حسين's and Ali's User rows are NOT linked to their Barber rows (`User.barberId` is NULL), so
+    `reservation_service`'s staff recipient lookup (`find_user_by_barber_id`) finds nothing for
+    them. A2-b does not need that link — it resolves by `Barber.phone`, which is what this fills —
+    but the staff alert does.
 
 WHY slug + name AND NOT AN ID. Barber ids are uuids nobody can eyeball; a wrong one writes to the
 wrong person silently. `(slug, name)` is verifiable by reading this file, and the script REFUSES
@@ -42,10 +59,10 @@ from prisma import Prisma                                    # noqa: E402
 
 # (tenant slug, barber name as stored, phone as a human would type it)
 TARGETS: list[tuple[str, str, str]] = [
-    ("rk",   "جعفر", "+96100000001"),   # ← PLACEHOLDER
-    ("rk",   "حسين", "+96100000002"),   # ← PLACEHOLDER
-    ("mr-h", "Ali",  "+96100000003"),   # ← PLACEHOLDER
-]
+    ("rk",   "جعفر", "96170764479"),    # = users.phone on jaafar@rk.salmansaas.com
+    ("rk",   "حسين", "96176985477"),    # = users.phone on rkbarber@dev.invalid
+    ("mr-h", "Ali",  "71455767"),       # = users.phone on admin@ali-barber.local, un-prefixed
+]                                        #   there; normalised to 96171455767 on write
 
 APPLY = "--apply" in sys.argv
 
