@@ -132,7 +132,29 @@ export default function useReservationBooking() {
   const [confirmMethod, setConfirmMethod] = useState(null) // 'whatsapp' | 'local'
   const [whatsappUrl, setWhatsappUrl] = useState(null) // fallback link if the tab open was blocked
 
+  // The CENTRAL bot's own deep link (2026-09-12). Distinct from `config.whatsapp_number`, which
+  // is the shop owner's personal number -- the two are different channels and were never wired
+  // together, which is why a customer's handoff message had never once reached the webhook.
+  // `available: false` means WHATSAPP_CENTRAL_NUMBER is unset in this environment, and the button
+  // is hidden rather than rendered dead.
+  const [botLink, setBotLink] = useState(null)
+
   const mountedRef = useRef(true)
+
+  // Read once per slug. Failure is silent on purpose: a missing bot link must hide one button,
+  // never break the page or the booking form beside it.
+  useEffect(() => {
+    if (!slug) return
+    let alive = true
+    publicApi
+      .get('/reservations/whatsapp-link', { params: { client_slug: slug } })
+      .then((res) => {
+        const data = res?.data?.data
+        if (alive && data?.available && data?.url) setBotLink(data.url)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [slug])
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
@@ -314,6 +336,28 @@ export default function useReservationBooking() {
     }
   }, [canConfirm, config, createReservation, selectedService, selectedBarber, selectedSlot, selectedDate])
 
+  // PRIMARY: book THROUGH the bot, on the central number.
+  //
+  // WHY THIS CREATES NO RESERVATION, which looks like a regression and is the opposite.
+  // `confirmViaWhatsApp` below creates one first and then opens the SHOP's own number -- correct
+  // for that button, because the shop owner reads the message himself and the row must exist
+  // before he does. This button hands the customer to the bot instead, and the bot creates the
+  // booking through the very same `create_reservation()` service. Creating one here too would
+  // produce TWO rows for one intent: the web's, and the one the bot makes when it walks the
+  // customer through service → barber → day → time. The "always create server-side before
+  // opening WhatsApp" rule is about never losing a booking to a message that may not be sent;
+  // here the booking is still made server-side, just by the bot.
+  //
+  // The message is exactly what `build_central_booking_link()` produces -- `حجز {slug}` -- and
+  // that shape is load-bearing twice over: `_resolve_client_from_deeplink()` requires the text to
+  // START with "حجز" before it will override a bound session, and `_resolve_client_from_text()`
+  // matches the slug token to pick the tenant. Neither is guesswork; the link comes from the
+  // backend that owns the format, so the producer and the consumer cannot drift.
+  const bookViaWhatsAppBot = useCallback(() => {
+    if (!botLink) return
+    window.open(botLink, '_blank')
+  }, [botLink])
+
   // Local (secondary) confirm path -- real name/phone, no WhatsApp.
   const confirmLocally = useCallback(async (e) => {
     e?.preventDefault?.()
@@ -348,6 +392,7 @@ export default function useReservationBooking() {
     customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, reservationId, confirmMethod, whatsappUrl,
     canConfirm, confirmViaWhatsApp, confirmLocally,
+    botLink, bookViaWhatsAppBot,
     formatDate,
   }
 }

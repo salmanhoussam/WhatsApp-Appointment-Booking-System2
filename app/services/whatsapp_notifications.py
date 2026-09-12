@@ -29,6 +29,7 @@ import re
 from typing import Optional
 
 from app.core.config import settings
+from app.core.phone import normalize_for_storage
 from app.db.client import prisma_client
 from app.repositories.whatsapp_channel_repo import WhatsAppChannelRepository
 from app.services.whatsapp_service import WhatsAppService
@@ -207,6 +208,48 @@ async def _record_out(
                      recipient_phone, exc, exc_info=True)
 
 
+def _usable_target(phone: Optional[str]) -> Optional[str]:
+    """The recipient we are actually allowed to hand Meta, or None.
+
+    THE DEFECT THIS CLOSES IS LIVE DATA, not a hypothetical. 17 reservations on `rk`, `mr-h` and
+    `barberlab-test` carry `customerPhone = 'عبر واتساب'` -- the literal Arabic string
+    `useReservationBooking.js` writes when a customer takes the website's WhatsApp handoff, because
+    that path was designed for WhatsApp to supply the real identity later and the link that would
+    supply it was never built. So `send_reservation_confirmation()` for one of those bookings posts
+    an Arabic sentence as `to`, Meta rejects it, and `send_text` never raises -- the booking stands
+    and nobody is told the customer was never reachable.
+
+    Reuses `normalize_for_storage` rather than inventing a second phone rule: it already owns the
+    "stored WITH the country code" decision (`.claude/rules/phone-numbers.md`), and a send target
+    is exactly the case that rule was written for. A value it cannot normalise is not a phone
+    number, whatever else it might be.
+
+    This does NOT repair those 17 rows -- Salman's standing decision is that they stay immutable,
+    since 'عبر واتساب' does not contain the real number and any fix would be a guess. It makes the
+    failure LOUD instead of silent, which is the difference between a known gap and a lie.
+    """
+    if not phone:
+        return None
+    return normalize_for_storage(phone)
+
+
+def _refuse_unusable(phone: Optional[str], what: str) -> bool:
+    """True when this send must NOT be attempted. Logs it as loudly as a Meta rejection.
+
+    Logged at ERROR with the same 🔥 marker `_report` uses for a real rejection, on purpose: from
+    the operator's side "Meta refused this" and "we never had a number to try" are the same
+    outcome -- the customer was not told -- and the log must say so with equal volume. The only
+    difference is who fixes it, which is why the message names the value instead of a code.
+    """
+    if _usable_target(phone):
+        return False
+    logger.error(
+        "🔥 %s NOT SENT — %r is not a usable WhatsApp number, so nothing was attempted. "
+        "reason=invalid_target", what, (phone or "")[:40],
+    )
+    return True
+
+
 async def _report(
     result,
     what: str,
@@ -277,6 +320,8 @@ async def send_booking_confirmation(
     Designed to run as a BackgroundTask — never raises, logs errors instead.
     """
     try:
+        if _refuse_unusable(customer_phone, "Booking confirmation"):
+            return False
         wa = WhatsAppService()
         message = (
             f"🎉 *تم تأكيد حجزك بنجاح!*\n\n"
@@ -307,6 +352,8 @@ async def send_booking_cancellation(
     Designed to run as a BackgroundTask — never raises.
     """
     try:
+        if _refuse_unusable(customer_phone, "Booking cancellation"):
+            return False
         wa = WhatsAppService()
         message = (
             f"❌ *تم إلغاء الحجز*\n\n"
@@ -345,6 +392,8 @@ async def send_reservation_confirmation(
     business confirming the appointment, and the first one that reaches a customer regardless of
     which channel (website or WhatsApp) the reservation was created through."""
     try:
+        if _refuse_unusable(customer_phone, "Reservation confirmation"):
+            return False
         wa = WhatsAppService()
         message = (
             f"✅ *تم تأكيد موعدك!*\n\n"
@@ -382,6 +431,8 @@ async def send_reservation_cancellation(
     callers of this function share the same message, since either way the customer's real-world
     next action (rebook if it was a mistake) is identical."""
     try:
+        if _refuse_unusable(customer_phone, "Reservation cancellation"):
+            return False
         wa = WhatsAppService()
         message = (
             f"❌ *تم إلغاء موعدك*\n\n"
@@ -419,6 +470,8 @@ async def send_reservation_reschedule(
     fired for a name/phone/service-only edit, matching edit_reservation()'s own
     schedule_changed distinction."""
     try:
+        if _refuse_unusable(customer_phone, "Reservation reschedule"):
+            return False
         wa = WhatsAppService()
         message = (
             f"🔄 *تم تعديل موعدك*\n\n"
@@ -465,6 +518,8 @@ async def send_staff_setup_link(
     shown "sent", and he was still locked out six days later.
     """
     try:
+        if _refuse_unusable(staff_phone, "Staff setup link"):
+            return False
         wa = WhatsAppService()
         message = (
             f"مرحباً {staff_name} 👋\n\n"
@@ -543,6 +598,8 @@ async def send_new_reservation_to_merchant(
     See .claudedocs/plans/whatsapp-channel-data-model.md §4b.
     """
     try:
+        if _refuse_unusable(recipient_phone, "New-reservation alert"):
+            return False
         wa = WhatsAppService()
 
         # ── The approved template first. Two reasons, and both are load-bearing. ──

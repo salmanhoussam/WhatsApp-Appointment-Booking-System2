@@ -513,6 +513,7 @@ function ConfirmPanel({ booking, accent }) {
   const {
     showLocalForm, toggleLocalForm, customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, canConfirm, confirmViaWhatsApp, confirmLocally, lang,
+    botLink, bookViaWhatsAppBot,
   } = booking
 
   return (
@@ -545,6 +546,37 @@ function ConfirmPanel({ booking, accent }) {
         <MessageCircle size={18} />
         {submitting ? t('confirmingText', lang) : t('confirmViaWhatsAppBtn', lang)}
       </motion.button>
+
+      {/* TWO CHANNELS, TWO BUTTONS -- Salman's decision, 2026-09-12.
+
+          The button above sends the booking the customer just built here to the SHOP's own
+          WhatsApp, where the owner reads it himself. It keeps working exactly as it did; nothing
+          about it changed.
+
+          This one is the platform bot on the CENTRAL number, and it is a genuinely different
+          channel -- the two had never been connected, which is why a handoff message had never
+          once reached our webhook. It deliberately creates no reservation here: the bot walks the
+          customer through the booking and creates it through the same service, so creating one
+          here too would produce two rows for one intent.
+
+          Hidden, not disabled, when the environment has no central number configured -- a dead
+          WhatsApp button is worse than no button. And NOT gated on `canConfirm`: this is an
+          entry point into a conversation, so it does not need a slot picked first. */}
+      {botLink && (
+        <motion.button
+          onClick={bookViaWhatsAppBot}
+          whileTap={{ scale: 0.97 }}
+          style={{
+            padding: '13px 0', background: 'transparent', border: `1px solid ${DT.whatsapp}`,
+            borderRadius: 14, color: DT.whatsapp, fontSize: 14, fontWeight: 600,
+            cursor: 'pointer', fontFamily: FONT,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          <MessageCircle size={16} />
+          {t('bookViaBotBtn', lang)}
+        </motion.button>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
         <div style={{ flex: 1, height: 1, background: DT.borderSoft }} />

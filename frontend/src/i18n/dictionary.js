@@ -58,6 +58,11 @@ export const DICTIONARY = {
   minutesUnit:          { ar: 'دقيقة',                          en: 'min' },
   quickMethod:          { ar: 'طريقة سريعة ومريحة',              en: 'Quick and convenient' },
   confirmViaWhatsAppBtn:{ ar: 'متابعة الحجز عبر واتساب',          en: 'Continue via WhatsApp' },
+  // The second WhatsApp entry point (2026-09-12): the platform bot on the central number, as
+  // opposed to the line above, which messages the shop's own number with an already-built
+  // booking. Worded as an ACTION the bot performs ("book with us") rather than "contact",
+  // because the bot completes the booking itself -- it is not a way to reach a human.
+  bookViaBotBtn:        { ar: 'احجز عبر بوت واتساب',             en: 'Book with our WhatsApp bot' },
   confirmingText:       { ar: 'جارٍ التأكيد...',                 en: 'Confirming...' },
   orSeparator:          { ar: 'أو',                              en: 'or' },
   completeFromSite:     { ar: 'أكمل الحجز من الموقع',            en: 'Complete Booking on Site' },

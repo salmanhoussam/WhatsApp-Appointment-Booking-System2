@@ -443,9 +443,37 @@ async def _dispatch(
         session=existing_session,
     )
     if not client:
+        # A DROPPED MESSAGE IS AN EVENT, NOT A LOG LINE (2026-09-12). This branch discards a real
+        # customer's message entirely: no reply, no session, no row -- the customer sees silence
+        # and we see one WARNING among thousands. It is reached by every inbound message that
+        # carries no tenant hint, which today includes the website's own WhatsApp handoff (its
+        # text starts with "مرحباً", so `_resolve_client_from_deeplink` declines it, and it
+        # contains no slug for `_resolve_client_from_text` to match).
+        #
+        # Recorded through `log_security_event` for the same reason the suspended-tenant branch
+        # below already is: it is queryable, it is counted, and it survives log rotation. Without
+        # it "customers are being dropped" is unmeasurable, and an unmeasurable failure is one
+        # nobody fixes.
+        #
+        # `client_id=None` is correct and is the whole point of the event -- there is no tenant to
+        # attribute it to. The text is truncated and the phone kept, because the phone is what
+        # makes a report actionable.
+        await log_security_event(
+            event_type="whatsapp_unresolved_tenant",
+            client_id=None,
+            endpoint="/api/v1/webhook/whatsapp",
+            detail={
+                "customer_phone": customer_phone,
+                "display_phone":  display_phone,
+                "msg_type":       msg_type,
+                "session_bound":  bool(existing_session and existing_session.client_id),
+                "text_preview":   (value or "")[:80] if msg_type == "text" else None,
+            },
+        )
         logger.warning(
-            "⚠️  No client resolved for display_phone=%s (session bound=%s)",
-            display_phone, bool(existing_session and existing_session.client_id),
+            "⚠️  No client resolved for display_phone=%s (session bound=%s) — message DROPPED, "
+            "customer %s got no reply",
+            display_phone, bool(existing_session and existing_session.client_id), customer_phone,
         )
         return
 
