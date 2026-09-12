@@ -82,10 +82,36 @@ RES_AWAITING_SLOT    = "RES_AWAITING_SLOT"
 RES_AWAITING_NAME    = "RES_AWAITING_NAME"
 RES_CONFIRMING       = "RES_CONFIRMING"
 
+# THE DELEGATION REGISTER. `whatsapp_flow._dispatch` routes a message here only when the
+# session's state is in this set (`whatsapp_flow.py:563`), so a state missing from it is a state
+# whose handler is never called -- the message simply lands nowhere.
+#
+# That is not hypothetical: RES_AWAITING_SOONEST shipped on 2026-09-12 with its constant declared,
+# its `handle()` branch written and its handler implemented, but NOT listed here. A real customer
+# tapped a real slot, the log showed `state=RES_AWAITING_SOONEST type=list_reply
+# value=2026-09-13T12:00:00+00:00`, and nothing happened. Every piece existed except the one line
+# that connects them -- the same shape as the outbound anchor bug found hours earlier, where the
+# send side and the read side were each correct and never wired together.
+#
+# The assertion below is why it cannot happen a third time. It runs at import, so the app refuses
+# to start rather than going quiet on one branch, and `from app.main import app` -- already part of
+# every pre-flight here -- catches it before a push instead of a customer catching it after one.
 STATES = {
-    RES_AWAITING_SERVICE, RES_AWAITING_BARBER, RES_AWAITING_DATE,
-    RES_AWAITING_SLOT, RES_AWAITING_NAME, RES_CONFIRMING,
+    RES_AWAITING_SERVICE, RES_AWAITING_BARBER, RES_AWAITING_SOONEST,
+    RES_AWAITING_DATE, RES_AWAITING_SLOT, RES_AWAITING_NAME, RES_CONFIRMING,
 }
+
+_DECLARED_STATES = {
+    name: value for name, value in list(globals().items())
+    if name.startswith("RES_") and isinstance(value, str)
+}
+_UNREGISTERED = {n for n, v in _DECLARED_STATES.items() if v not in STATES}
+if _UNREGISTERED:                                          # pragma: no cover - import-time guard
+    raise RuntimeError(
+        f"whatsapp_reservation_flow: {sorted(_UNREGISTERED)} declared as state(s) but missing "
+        f"from STATES, so whatsapp_flow would never delegate to their handler. Add them to "
+        f"STATES and to handle()."
+    )
 
 NO_SLOTS_MESSAGE = "لا توجد مواعيد متاحة في هذا اليوم لدى هذا الحلاق. جرّب يوماً آخر 📅"
 
