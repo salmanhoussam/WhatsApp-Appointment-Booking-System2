@@ -70,13 +70,35 @@ about it.
 
 ## Persona & Prompt Drift
 
-`.claude/agent/*.md` and `.claude/rules/*.md` files are prompts, not ordinary project files —
-editing one changes agent behavior directly. Real research on prompt governance (see
+`.claude/agent/*.md`, `.claude/rules/*.md` and `app/prompts/**` files are prompts, not ordinary
+project files — editing one changes agent behavior directly. Real research on prompt governance (see
 `.claudedocs/architecture/AGENT_DRIFT_AND_OBSERVABILITY_VISION.md`) converges on one practice
 regardless of team size: a change to one of these files needs a stated reason on the record at
 the moment of the edit — not just "what changed" but "why." In practice: any commit touching
-`.claude/agent/*.md` or `.claude/rules/*.md` states its Intent in the commit body — already this
-project's habit, made explicit here for these two paths specifically. No separate changelog file,
+`.claude/agent/*.md`, `.claude/rules/*.md` or `app/prompts/**` states its Intent in the commit
+body — already this project's habit, made explicit here for these three paths specifically. No separate changelog file,
 no approval workflow, no version-pinning — those belong to Observability/canary-rollout tooling
 this project doesn't run yet; at this project's current scale (one owner, git as the review
 trail) the commit message already is that record.
+
+**`app/prompts/**` added 2026-09-13 (Salman's explicit instruction), and it was added because the
+drift this rule describes had already happened.** Lia — a Platform Service that writes real tenant
+data from an owner's WhatsApp message — kept her entire behaviour in a 25-line Python string inside
+`app/services/lia_owner_entry.py`. Her behaviour then changed FOUR times in a single day: the
+prompt itself, the split between "unavailable" and "misunderstood", making price and duration
+mandatory, and the refusal wording. **Every one of those arrived as a code edit, not as a
+behaviour change**, which is precisely the invisibility this rule exists to prevent — and the
+rule could not catch them, because it is path-scoped and that path was not listed.
+
+The mechanism is the file's LOCATION, not its format. A prompt living under `app/prompts/**` is
+reviewable as prose in a diff, editable by the product owner without touching Python, and now
+carries the same "state your reason" obligation as every other prompt in this repository. Its
+runtime loader (`_load_prompt()`) refuses to start the app if the file is missing or malformed,
+so the separation cannot silently degrade into a stale copy.
+
+One narrow consequence worth stating: a prompt file may contain documentation ALONGSIDE the text
+actually sent to a model. Lia's does — a header explaining the rule above, plus the structural
+rules the code enforces — and the payload is delimited by sentinels precisely so the two cannot be
+confused. The first version delimited it with a markdown heading, and that heading also appeared
+inside the file's own explanatory prose, so the whole file was sent as the prompt. A delimiter in a
+prompt file must be a token that cannot occur in human text.
