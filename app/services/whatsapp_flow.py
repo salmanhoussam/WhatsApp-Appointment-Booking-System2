@@ -75,6 +75,7 @@ from app.repositories.whatsapp_session_repo import WhatsAppSessionRepository
 from app.core.tenant import is_status_blocked
 from app.services.security_audit_service import log_security_event
 from app.services import whatsapp_merchant_actions
+from app.services import lia_owner_entry
 from app.services import whatsapp_reservation_flow
 from app.core.db_resilience import with_db_resilience
 
@@ -121,6 +122,12 @@ class ConversationSession:
     res_barber_name: Optional[str] = None
     res_slot_datetime: Optional[datetime] = None
     res_customer_name: Optional[str] = None
+    # Lia's own working area (2026-09-13). A free-form dict rather than a column per field
+    # because an owner data-entry draft is transient by design -- it lives for 10 minutes and is
+    # consumed or discarded, and adding a typed column per draft field would make every future
+    # intent a schema change. Serialised into the SAME `whatsapp_sessions.stateData` the booking
+    # flow uses: one session store, not a second one.
+    lia: dict = field(default_factory=dict)
     # Internal bookkeeping only -- never persisted (not part of _to_state_data below). Set by
     # _clear_session() so _dispatch()'s own end-of-request save doesn't resurrect a row that was
     # just deleted (e.g. after a booking/reservation completes or the customer cancels).
@@ -148,6 +155,7 @@ def _session_to_state_data(session: ConversationSession) -> dict:
         "res_barber_name":    session.res_barber_name,
         "res_slot_datetime":  session.res_slot_datetime.isoformat() if session.res_slot_datetime else None,
         "res_customer_name":  session.res_customer_name,
+        "lia":                session.lia or {},
     }
 
 
@@ -173,6 +181,7 @@ def _session_from_row(row) -> ConversationSession:
         res_slot_datetime=(
             datetime.fromisoformat(data["res_slot_datetime"]) if data.get("res_slot_datetime") else None
         ),
+        lia=data.get("lia") or {},
         res_customer_name=data.get("res_customer_name"),
     )
 
@@ -531,6 +540,26 @@ async def _dispatch(
         "📩 [%s/%s] state=%s type=%s value=%s",
         customer_phone, client.slug, session.state, msg_type, value,
     )
+
+    # ── Lia: owner data entry (2026-09-13, Phase 1) ──
+    #
+    # Placed AHEAD of the customer state router, and after the session exists because a draft
+    # lives on the session. `try_handle` returns False for anything that is not an owner
+    # data-entry message, so an ordinary customer -- or an owner booking for someone -- falls
+    # through untouched; it returns True on every branch it owns, INCLUDING refusals, so a
+    # half-handled owner message can never land in the customer machine where
+    # "ضيف خدمة كيراتين" would be stored as an answer to "ما اسمك الكريم؟".
+    #
+    # Distinct from whatsapp_merchant_actions, which runs BEFORE tenant resolution because a
+    # button tap carries its own tenant via the reservation. Lia has no reservation, so it needs
+    # the resolved session and takes its tenant from the sender's phone instead.
+    if await lia_owner_entry.try_handle(wa, customer_phone, session, msg_type, value, title):
+        # Saved here rather than falling through to the shared save below, because that one sits
+        # after the state router and this branch returns before it. Same helper, same
+        # conversation link -- the draft has to survive to the NEXT message or the confirmation
+        # button has nothing to confirm.
+        await _save_session(phone_number_id, customer_phone, session, conversation_id)
+        return
 
     # Route by state
     if session.state == IDLE:

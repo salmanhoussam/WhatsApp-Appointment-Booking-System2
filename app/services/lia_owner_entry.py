@@ -1,0 +1,661 @@
+"""
+Lia — owner data entry from WhatsApp. Phase 1: TEXT -> create_service.
+
+Salman's decision, 2026-09-13. Architecture and every rejected alternative:
+`.claudedocs/plans/lia-owner-data-entry.md`.
+
+    owner text -> AI extraction -> draft -> missing-field questions -> preview
+               -> owner taps ✅ -> is_authorized -> existing service layer -> DB
+
+WHAT THIS MODULE IS NOT, and the whole design rests on it: it is NOT a second implementation of
+service creation. It ends at `catalog_service_service.admin_create_service()` -- the same function
+`POST /api/v1/admin/catalog-services` calls -- so the dashboard and Lia write through one path.
+The AI is an interface layer, never a database layer.
+
+INTERNAL CALL, NOT HTTP (Salman's decision). An HTTP call to our own API would need a token
+minted for a phone number, which is a second authentication surface for no gain. So the route's
+three gates are replicated EXPLICITLY here instead of inherited from FastAPI's dependency
+injection, and that replication is the risky part, named rather than glossed:
+
+    route gate                          what this module does
+    ─────────────────────────────────────────────────────────────────────────────
+    get_current_tenant                  resolve the tenant from the SENDER's phone
+    require_service("reservations")      _tenant_has_reservations()
+    require_permission("services.write") is_authorized(user, "services.write", ...)
+
+Anything the route gains later must be added here too. That is the standing cost of the internal
+call, and `whatsapp_merchant_actions` already pays it for reservations -- this follows its shape
+deliberately rather than inventing a second one.
+
+TENANT RESOLUTION IS THE PART THAT MUST NOT BE CLEVER. The central WhatsApp number is shared by
+every tenant, so `phone_number_id` identifies the CHANNEL and never the tenant (the keystone
+recorded in `project_whatsapp_channel_state`). For a merchant action the tenant comes from the
+reservation being acted on; Lia has no reservation, so it comes from the sender's phone -- and
+ONLY when that phone resolves to exactly ONE tenant. Two matches is a question, never a guess:
+writing a service into the wrong shop is not recoverable by the owner who did not ask for it.
+"""
+
+import json
+import logging
+import re
+from datetime import datetime, timezone
+from typing import Optional
+
+from app.core.config import settings
+from app.core.permissions import is_authorized
+from app.core.phone import normalize_for_storage
+from app.db.client import prisma_client
+from app.repositories import catalog_service_repo, user_repo
+from app.services import catalog_service_service
+from app.services.security_audit_service import log_security_event
+from app.services.whatsapp_service import WhatsAppService
+
+logger = logging.getLogger(__name__)
+
+_ENDPOINT = "/api/v1/webhook/whatsapp"
+
+# Session state keys. Lia's draft lives in the SAME `whatsapp_sessions.stateData` the booking flow
+# uses -- one session store, not a second one. The 30-minute session TTL is the outer bound; the
+# 10-minute window below is Lia's own, deliberately shorter (see the plan's §10).
+DRAFT_KEY = "lia_draft"
+DRAFT_WINDOW_MIN = 10
+
+# States, registered the same way the reservation flow registers its own.
+LIA_AWAITING_FIELD   = "LIA_AWAITING_FIELD"
+LIA_AWAITING_CONFIRM = "LIA_AWAITING_CONFIRM"
+
+STATES = {LIA_AWAITING_FIELD, LIA_AWAITING_CONFIRM}
+
+# Every LIA_* state must be in STATES, checked at IMPORT. Same guard the reservation flow gained
+# on 2026-09-12 after a declared state with a written handler shipped unregistered and a real
+# customer's tap landed nowhere. The app refuses to start rather than going quiet on one branch,
+# and `from app.main import app` -- already in every pre-flight here -- catches it before a push.
+_DECLARED = {n: v for n, v in list(globals().items())
+             if n.startswith("LIA_") and isinstance(v, str)}
+_UNREGISTERED = {n for n, v in _DECLARED.items() if v not in STATES}
+if _UNREGISTERED:                                          # pragma: no cover - import-time guard
+    raise RuntimeError(
+        f"lia_owner_entry: {sorted(_UNREGISTERED)} declared as state(s) but missing from STATES, "
+        f"so try_handle would never see them and the message would land nowhere."
+    )
+
+CONFIRM_ID = "__LIA_CONFIRM__"
+CANCEL_ID  = "__LIA_CANCEL__"
+
+# What makes a message a DATA-ENTRY attempt at all. Checked before spending a model call, and
+# deliberately narrow: an owner also books, asks and chats on this number, and every non-matching
+# message must fall through to the normal flow untouched. "ضيف" alone is not enough -- "ضيفني"
+# is a person talking -- so the object word has to be there too.
+_ENTRY_VERBS = ("ضيف", "ضيّف", "اضف", "أضف", "زيد", "سجل", "سجّل", "add", "create")
+_ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
+
+
+def _looks_like_service_entry(text: str) -> bool:
+    """A cheap, explicit gate before any model call.
+
+    NOT an intent classifier -- the model does that. This only decides whether asking the model is
+    justified, which keeps an owner's ordinary message (a booking, a question, a thank-you) from
+    costing a call and, more importantly, from being interpreted at all.
+    """
+    low = " ".join((text or "").split()).lower()
+    if len(low) < 6:
+        return False
+    return (any(v in low for v in _ENTRY_VERBS)
+            and any(o in low for o in _ENTRY_OBJECTS))
+
+
+# ── Actor + tenant ────────────────────────────────────────────────────────────
+
+def _phone_candidates(sender: str) -> list[str]:
+    """Every stored form the sender's number could legitimately have.
+
+    Same helper shape as `whatsapp_merchant_actions._phone_candidates`, and same reasoning:
+    Meta delivers the country code, rows written before the phone rule may not have it, and
+    widening a READ is safe where widening a write is not.
+    """
+    normalized = normalize_for_storage(sender)
+    out: list[str] = []
+    for value in (normalized, sender, (normalized or "")[3:] if normalized else None):
+        if value and value not in out:
+            out.append(value)
+    return out
+
+
+async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """(client_id, actor, actor_id) for a sender allowed to enter data, else (None, None, None).
+
+    Two paths, highest authority first -- the same precedence `whatsapp_merchant_actions` uses,
+    because one person is often both a shop's published number and a User row:
+
+      1. the number the SHOP publishes  -> `Client.whatsapp_number|phone`, tenant-wide
+      2. a User account                 -> judged by `is_authorized`, the SAME predicate the
+                                           dashboard's own `require_permission` uses
+
+    AMBIGUITY IS REFUSED, NOT RESOLVED. If one phone is the published number of two tenants, this
+    returns nothing and the caller asks. Silently picking the first would write a service into
+    someone else's shop.
+    """
+    candidates = _phone_candidates(sender_phone)
+
+    clients = await prisma_client.client.find_many()
+    def _digits(v): return "".join(ch for ch in (v or "") if ch.isdigit())
+    wanted = {_digits(c) for c in candidates if _digits(c)}
+    shop_matches = [
+        c for c in clients
+        if _digits(getattr(c, "whatsapp_number", None)) in wanted
+        or _digits(getattr(c, "phone", None)) in wanted
+    ]
+    if len(shop_matches) == 1:
+        return shop_matches[0].id, "owner", shop_matches[0].id
+    if len(shop_matches) > 1:
+        logger.warning("🚫 Lia: phone %s is the published number of %d tenants — refusing",
+                       sender_phone, len(shop_matches))
+        return None, None, None
+
+    # Path 2: a real User row. `find_user_by_phone` is the cross-tenant lookup the login path
+    # already uses, so "which account is this number" has one answer in the codebase.
+    for candidate in candidates:
+        user = await user_repo.find_user_by_phone(candidate)
+        if not user or not getattr(user, "isActive", True):
+            continue
+        # THE SAME AUTHORISATION DECISION AS THE ROUTE, reached from a phone instead of a JWT.
+        # `services.write` is exactly what POST /admin/catalog-services requires, with the same
+        # legacy roles -- not a Lia-specific permission, which would be a second rulebook.
+        if not is_authorized(user, "services.write", "SUPER_ADMIN", "TENANT_ADMIN"):
+            logger.warning("🚫 Lia: user %s is not authorised for services.write", user.id)
+            return None, None, None
+        return user.clientId, "admin", user.id
+
+    return None, None, None
+
+
+async def _tenant_has_reservations(client_id: str) -> bool:
+    """The route's own `require_service("reservations")` gate, replicated.
+
+    Not cosmetic: a tenant without the Reservations surface has no services list to show, so
+    creating a service there produces a row nothing reads.
+    """
+    row = await prisma_client.clientservice.find_first(where={
+        "clientId": client_id, "serviceKey": "reservations", "isActive": True})
+    return row is not None
+
+
+# ── Category resolution — the backend's job, never the model's ────────────────
+
+async def _resolve_service_category(client_id: str) -> tuple[Optional[str], list]:
+    """(category_id, active_categories). None means "ask", never "create one".
+
+    `CatalogServiceCreate.category_id` is REQUIRED, so this cannot be deferred to a later phase.
+    Resolved by where the tenant's services actually live rather than by name: measured on both
+    real barber tenants, every service sits in one category ('الخدمات') while a second
+    ('منتجات العناية') sits empty -- so "the category that already holds services" is a fact,
+    where a name match would be a guess about Arabic labels.
+
+    Creating a category silently is refused on purpose. A category is a customer-visible grouping;
+    inventing one from a chat message is exactly the "we don't want empty tables" failure in
+    reverse -- a table filled with structure nobody asked for.
+    """
+    cats = await prisma_client.catalogcategory.find_many(
+        where={"clientId": client_id, "isActive": True})
+    if not cats:
+        return None, []
+    with_services = []
+    for cat in cats:
+        count = await prisma_client.catalogservice.count(where={"categoryId": cat.id})
+        if count:
+            with_services.append(cat)
+    if len(with_services) == 1:
+        return with_services[0].id, cats
+    if len(cats) == 1:
+        return cats[0].id, cats
+    return None, cats
+
+
+# ── Extraction ────────────────────────────────────────────────────────────────
+
+_SYSTEM_PROMPT = """أنت مساعد لاستخراج بيانات خدمة من رسالة صاحب محل حلاقة.
+أعد JSON فقط، بلا أي نصّ أو شرح أو markdown.
+
+الشكل:
+{"intent":"create_service","confidence":"high|medium|low",
+ "data":{"name_ar":"...","price":25,"duration_min":60,"currency":"USD","name_en":null,"description_ar":null},
+ "unresolved":[]}
+
+قواعد صارمة:
+- intent دائماً "create_service".
+- name_ar: اسم الخدمة بالعربية كما قاله، بلا كلمات الطلب مثل "ضيف" أو "بدي".
+- price: رقم فقط. إذا لم يذكر سعراً، اتركه خارج data وأضف "price" إلى unresolved.
+- duration_min: بالدقائق. "ساعة"=60، "نص ساعة"=30، "ساعة ونص"=90. إذا لم يذكر مدة،
+  اتركه خارج data وأضف "duration_min" إلى unresolved.
+- currency: "USD" للدولار، "LBP" لليرة. الافتراضي "USD".
+- 🔴 لا تخترع سعراً ولا مدة ولا اسماً. ما لم يُذكر صراحةً يذهب إلى unresolved.
+- 🔴 لا تُضف أي حقل غير المذكورة أعلاه. ولا تُصدر أي معرّف (id).
+- confidence: "low" إذا كان اسم الخدمة نفسه غير واضح.
+"""
+
+
+# Returned when the MODEL could not be reached at all -- a missing key, a dead key, a network
+# failure. Distinct from None, which means "the model answered and the answer was unusable".
+# Collapsing the two would tell an owner he was unclear when the truth is that our AI is down.
+_UNAVAILABLE = object()
+
+
+async def _extract(text: str) -> Optional["object"]:
+    """Ask the model for a draft. Returns a validated LiaExtraction, or None.
+
+    Same shape as `onboarding.py`'s `_extract_with_claude`, including the fence stripping -- the
+    model wraps JSON in ```json often enough that handling it is not defensive, it is the observed
+    behaviour. Anything that fails validation returns None: a malformed extraction must become a
+    clarifying question, never a partially-trusted draft.
+    """
+    from app.schemas.lia_drafts import LiaExtraction
+
+    api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+    if not api_key:
+        logger.error("🔥 Lia: ANTHROPIC_API_KEY is not configured — extraction unavailable")
+        return _UNAVAILABLE
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        resp = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": text}],
+        )
+        raw = resp.content[0].text.strip()
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return LiaExtraction.model_validate_json(raw)
+    except Exception as exc:
+        # An authentication or transport failure is NOT "the owner was unclear", and telling him
+        # "ما فهمت" for a dead API key would send him rephrasing a message that was perfectly
+        # clear. Confirmed worth separating: on 2026-09-13 the key was invalid in BOTH the local
+        # env and whatever `railway run` injects (401), and the deployed service answers
+        # "AI not configured" outright -- so this is the branch that would actually have run.
+        import anthropic as _a
+        if isinstance(exc, (_a.AuthenticationError, _a.PermissionDeniedError,
+                            _a.APIConnectionError, _a.RateLimitError)):
+            logger.error("🔥 Lia: extraction UNAVAILABLE (%s) — not an owner error",
+                         type(exc).__name__)
+            return _UNAVAILABLE
+        logger.error("🔥 Lia extraction failed: %s", exc, exc_info=True)
+        return None
+
+
+# ── Draft state ───────────────────────────────────────────────────────────────
+
+def _load_draft(session) -> Optional[dict]:
+    """The active draft, or None when there is none or it has aged out.
+
+    The window is Lia's own and shorter than the session's: a confirmation prompt the owner
+    answers half an hour later is not a confirmation, it is a stale tap on whatever the screen
+    still showed.
+    """
+    data = getattr(session, "state_data", None) or {}
+    draft = data.get(DRAFT_KEY) if isinstance(data, dict) else None
+    if not isinstance(draft, dict):
+        return None
+    started = draft.get("started_at")
+    if started:
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(started)).total_seconds()
+            if age > DRAFT_WINDOW_MIN * 60:
+                return None
+        except (ValueError, TypeError):
+            return None
+    return draft
+
+
+def _save_draft(session, draft: Optional[dict]) -> None:
+    data = getattr(session, "state_data", None)
+    if not isinstance(data, dict):
+        data = {}
+    if draft is None:
+        data.pop(DRAFT_KEY, None)
+    else:
+        data[DRAFT_KEY] = draft
+    session.state_data = data
+
+
+_FIELD_QUESTIONS = {
+    "price":        "قدّيش سعرها؟ (بالدولار)",
+    "duration_min": "وقدّيش بتاخد وقت؟ (بالدقائق، أو قول «ساعة»)",
+    "name_ar":      "شو اسم الخدمة؟",
+}
+
+_DURATION_WORDS = {
+    "ساعة": 60, "ساعه": 60, "ساعة ونص": 90, "ساعه ونص": 90, "نص ساعة": 30, "نص ساعه": 30,
+    "ربع ساعة": 15, "ساعتين": 120,
+}
+
+
+def _parse_field_answer(field: str, text: str):
+    """One typed answer to one asked field. None means "still not understood".
+
+    Numbers only for price, because an owner answering a price question types a price. Durations
+    additionally accept the words people actually say -- "ساعة" is far more common than "60".
+    """
+    value = " ".join((text or "").split())
+    if field == "name_ar":
+        return value or None
+    if field == "duration_min":
+        for word, minutes in _DURATION_WORDS.items():
+            if word in value:
+                return minutes
+    digits = re.findall(r"\d+(?:[.,]\d+)?", value.replace(",", "."))
+    if not digits:
+        return None
+    number = float(digits[0])
+    return int(number) if field == "duration_min" else number
+
+
+# ── Preview + write ───────────────────────────────────────────────────────────
+
+def _preview_text(draft_data: dict, category_name: str) -> str:
+    """What the owner reads BEFORE anything is written.
+
+    This message is the primary safety mechanism of the whole slice, not a courtesy. Every value
+    the model produced is quoted back, so a hallucinated price is visible as a number the owner
+    did not say -- the plan's §15 marks "hallucinated price" as the one failure that BLOCKS Phase 1
+    for exactly this reason. Nothing is summarised or rounded here.
+    """
+    lines = [
+        "هيك فهمت 👇",
+        "",
+        f"*الخدمة:*  {draft_data.get('name_ar')}",
+        f"*السعر:*   {draft_data.get('price')} {draft_data.get('currency', 'USD')}",
+        f"*المدة:*   {draft_data.get('duration_min')} دقيقة",
+        f"*الفئة:*   {category_name}",
+    ]
+    if draft_data.get("name_en"):
+        lines.append(f"*بالإنجليزي:* {draft_data['name_en']}")
+    if draft_data.get("description_ar"):
+        lines.append(f"*الوصف:*   {draft_data['description_ar']}")
+    return "\n".join(lines)
+
+
+async def _send_preview(wa, phone: str, draft: dict) -> None:
+    await wa.send_text(phone, _preview_text(draft["data"], draft.get("category_name", "—")))
+    await wa.send_interactive_buttons(
+        to=phone,
+        text="أضيفها هلق؟",
+        buttons=[
+            {"type": "reply", "reply": {"id": CONFIRM_ID, "title": "✅ ضيفها"}},
+            {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
+        ],
+    )
+
+
+async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
+    """Validate one last time, then write through the EXISTING service layer.
+
+    RE-VALIDATED HERE even though the draft was validated when it was completed, and the reason is
+    not paranoia: between then and now the owner answered questions that mutated `data`, so the
+    object being written is not the object that was checked. Pydantic is cheap; a bad row is not.
+
+    RE-AUTHORISED HERE for the same reason -- minutes passed, and an account can be deactivated or
+    have its permissions changed inside a 10-minute window. The check that matters is the one at
+    the moment of the write.
+
+    THE DRAFT IS CONSUMED BEFORE THE WRITE, so two taps on the same button cannot create two
+    services. `wamid` idempotency already stops a Meta retry from reaching here twice, but a human
+    double-tap produces two DIFFERENT wamids and would otherwise pass both.
+    """
+    from app.schemas.lia_drafts import LiaServiceDraft
+
+    client_id = draft.get("client_id")
+    actor, actor_id = draft.get("actor"), draft.get("actor_id")
+
+    # Consume first. A failure after this point means the owner re-sends, which is recoverable;
+    # a double write is not.
+    clear_draft()
+
+    try:
+        validated = LiaServiceDraft.model_validate(draft["data"])
+    except Exception as exc:
+        logger.error("🔥 Lia: draft failed final validation: %s", exc)
+        await wa.send_text(phone, "صار خلل بالبيانات 😅 ابعتلي الخدمة من جديد.")
+        return
+
+    ok, reason = await _still_authorised(phone, client_id)
+    if not ok:
+        await log_security_event(
+            event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": reason, "sender_phone": phone}, actor=actor_id,
+        )
+        logger.warning("🚫 Lia: write refused at commit time (%s) from %s", reason, phone)
+        return
+
+    category_id, _ = await _resolve_service_category(client_id)
+    if not category_id:
+        await wa.send_text(phone, "ما لقيت فئة للخدمات بالمحل. أضفها من اللوحة أول مرّة.")
+        return
+
+    try:
+        # THE ONE WRITE PATH. Identical function to POST /api/v1/admin/catalog-services --
+        # not a copy of its body, the function itself.
+        created = await catalog_service_service.admin_create_service(
+            client_id      = client_id,
+            category_id    = category_id,
+            name_ar        = validated.name_ar,
+            name_en        = validated.name_en,
+            description_ar = validated.description_ar,
+            description_en = None,
+            image_url      = None,
+            price          = validated.price,
+            currency       = validated.currency,
+            duration_min   = validated.duration_min,
+            is_featured    = False,
+            sort_order     = 0,
+        )
+    except Exception as exc:
+        logger.error("🔥 Lia: service creation failed: %s", exc, exc_info=True)
+        await wa.send_text(phone, "تعذّر إضافة الخدمة. جرّب من جديد أو من اللوحة.")
+        return
+
+    await log_security_event(
+        event_type=f"lia_{actor}_create_service", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"service_id": created.get("id"), "name_ar": validated.name_ar,
+                "price": validated.price, "duration_min": validated.duration_min,
+                "sender_phone": phone, "source": "whatsapp_text"},
+        actor=actor_id,
+    )
+    logger.info("✅ Lia: service %s created for %s by %s %s",
+                created.get("id"), client_id, actor, actor_id)
+    await wa.send_text(
+        phone,
+        f"✅ تمّت إضافة *{validated.name_ar}*\n"
+        f"{validated.price} {validated.currency} · {validated.duration_min} دقيقة\n\n"
+        f"صارت ظاهرة للزبائن بالحجز هلق.",
+    )
+
+
+async def _still_authorised(phone: str, client_id: Optional[str]) -> tuple[bool, str]:
+    """Re-run the resolution at write time and require the SAME tenant."""
+    if not client_id:
+        return False, "no_client"
+    resolved, _actor, _actor_id = await _resolve_owner(phone)
+    if resolved is None:
+        return False, "not_authorised_now"
+    if resolved != client_id:
+        return False, "tenant_changed"
+    if not await _tenant_has_reservations(client_id):
+        return False, "service_inactive"
+    return True, "ok"
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
+                     title: str) -> bool:
+    """Handle an owner data-entry message. True means "dealt with, stop processing".
+
+    Returning True on every branch it owns -- including refusals -- matters for the same reason it
+    does in `whatsapp_merchant_actions`: a half-handled owner message must never fall through into
+    the CUSTOMER booking state machine, where "ضيف خدمة كيراتين" would be read as an answer to
+    "ما اسمك الكريم؟" and stored as a customer's name.
+    """
+    draft = _load_draft(session)
+
+    # ── 0. A Lia state with no live draft: the window expired. ──
+    #
+    # THIS GUARD IS THE ONE THE RESERVATION FLOW LEARNED THE HARD WAY (2026-09-12): a session
+    # parked in a state no branch answers is a message that lands nowhere and a customer who gets
+    # silence. `session.state` outlives the draft by design -- the draft has a 10-minute window
+    # while the session row has 30 -- so this is not an edge case, it is the NORMAL end of an
+    # abandoned draft. Without it, an owner who walks away for 15 minutes and comes back finds a
+    # dead conversation: Lia would decline the message (no draft) and the state router has no
+    # LIA_* branch, so nothing would answer at all.
+    if not draft and session.state in STATES:
+        session.state = "IDLE"
+        _save_draft(session, None)
+        logger.info("⏲  Lia: draft window expired for %s — state reset to IDLE", sender_phone)
+        await wa.send_text(
+            sender_phone,
+            "مرّ وقت طويل على الطلب فألغيته 🙂 ابعتلي الخدمة من جديد إذا بدك.",
+        )
+        return True
+
+    # ── 1. A pending confirmation. Checked first: a tap answers the draft, nothing else. ──
+    if draft and session.state == LIA_AWAITING_CONFIRM:
+        if msg_type in ("button_reply", "list_reply"):
+            if value == CONFIRM_ID:
+                await _commit(wa, sender_phone, session, draft,
+                              lambda: (_save_draft(session, None),
+                                       setattr(session, "state", "IDLE")))
+                return True
+            if value == CANCEL_ID:
+                _save_draft(session, None)
+                session.state = "IDLE"
+                await log_security_event(
+                    event_type="lia_draft_cancelled", client_id=draft.get("client_id"),
+                    endpoint=_ENDPOINT, detail={"sender_phone": sender_phone},
+                    actor=draft.get("actor_id"),
+                )
+                await wa.send_text(sender_phone, "تمام، ألغيت الطلب 👌")
+                return True
+        await wa.send_text(sender_phone, "اضغط ✅ ضيفها أو ❌ إلغاء 👆")
+        return True
+
+    # ── 2. An answer to one asked field. ──
+    if draft and session.state == LIA_AWAITING_FIELD and msg_type == "text":
+        field = draft.get("asking")
+        parsed = _parse_field_answer(field, value)
+        if parsed is None:
+            await wa.send_text(sender_phone, _FIELD_QUESTIONS.get(field, "ما فهمت، جرّب مرّة تانية."))
+            return True
+        draft["data"][field] = parsed
+        draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != field]
+        await _advance(wa, sender_phone, session, draft)
+        return True
+
+    # ── 3. A new data-entry request. The cheap gate runs BEFORE the model. ──
+    if msg_type != "text" or not _looks_like_service_entry(value):
+        return False
+
+    client_id, actor, actor_id = await _resolve_owner(sender_phone)
+    if client_id is None:
+        # SILENT, and for the reason A2-c established: an unresolved or unauthorised sender must
+        # not learn that this number accepts owner commands. The attempt is recorded instead.
+        await log_security_event(
+            event_type="lia_entry_refused", client_id=None, endpoint=_ENDPOINT,
+            detail={"sender_phone": sender_phone, "text_preview": (value or "")[:80]},
+        )
+        logger.warning("🚫 Lia: data-entry attempt from unresolved/unauthorised %s", sender_phone)
+        return True
+
+    if not await _tenant_has_reservations(client_id):
+        await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
+        return True
+
+    extraction = await _extract(value)
+    if extraction is _UNAVAILABLE:
+        # Our fault, said as our fault. And the dashboard still works, so the owner is not stuck.
+        logger.error("🔥 Lia: unavailable for %s at %s — owner told, not blamed",
+                     sender_phone, client_id)
+        await wa.send_text(
+            sender_phone,
+            "المساعد مش متوفّر هلق 🔧 ضيف الخدمة من اللوحة، وأنا رح كون جاهز بعدين.",
+        )
+        return True
+    if extraction is None or extraction.confidence == "low":
+        await wa.send_text(
+            sender_phone,
+            "ما فهمت تماماً 😅 اكتبها هيك مثلاً:\n«ضيف خدمة كيراتين، 25 دولار، ساعة»",
+        )
+        return True
+
+    category_id, cats = await _resolve_service_category(client_id)
+    if not category_id:
+        names = " · ".join(c.nameAr for c in cats) if cats else "—"
+        await wa.send_text(
+            sender_phone,
+            f"عندك أكتر من فئة ({names}). أضف الخدمة من اللوحة هالمرّة، أو خبّرني بأي فئة.",
+        )
+        return True
+    category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
+
+    draft = {
+        "intent":        extraction.intent,
+        "data":          dict(extraction.data or {}),
+        "unresolved":    list(extraction.unresolved or []),
+        "client_id":     client_id,
+        "actor":         actor,
+        "actor_id":      actor_id,
+        "category_id":   category_id,
+        "category_name": category_name,
+        "started_at":    datetime.now(timezone.utc).isoformat(),
+        "asking":        None,
+    }
+    await log_security_event(
+        event_type="lia_draft_opened", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"intent": extraction.intent, "confidence": extraction.confidence,
+                "unresolved": draft["unresolved"], "sender_phone": sender_phone},
+        actor=actor_id,
+    )
+    await _advance(wa, sender_phone, session, draft)
+    return True
+
+
+async def _advance(wa, phone: str, session, draft: dict) -> None:
+    """Ask for the next missing field, or show the preview once nothing is missing.
+
+    REQUIRED MEANS REQUIRED, and this is where that is enforced rather than in the prompt. The
+    model is asked not to invent a price; this makes the absence of one a QUESTION regardless of
+    what the model did. `price` and `duration_min` are optional on the API's own schema -- see
+    `app/schemas/lia_drafts.py` for why Lia refuses to inherit those defaults.
+    """
+    from app.schemas.lia_drafts import LiaServiceDraft
+
+    for field in ("name_ar", "price", "duration_min"):
+        if draft["data"].get(field) in (None, "", []):
+            draft["asking"] = field
+            _save_draft(session, draft)
+            session.state = LIA_AWAITING_FIELD
+            await wa.send_text(phone, _FIELD_QUESTIONS[field])
+            return
+
+    try:
+        LiaServiceDraft.model_validate(draft["data"])
+    except Exception as exc:
+        # A value present but invalid (a negative price, a 37-minute duration) is re-asked rather
+        # than silently corrected -- correcting it would put a number in the row the owner never
+        # said.
+        bad = None
+        for err in getattr(exc, "errors", lambda: [])():
+            loc = err.get("loc") or ()
+            if loc and loc[0] in _FIELD_QUESTIONS:
+                bad = loc[0]
+                break
+        field = bad or "price"
+        draft["data"].pop(field, None)
+        draft["asking"] = field
+        _save_draft(session, draft)
+        session.state = LIA_AWAITING_FIELD
+        await wa.send_text(phone, "هالقيمة ما زبطت. " + _FIELD_QUESTIONS[field])
+        return
+
+    draft["asking"] = None
+    _save_draft(session, draft)
+    session.state = LIA_AWAITING_CONFIRM
+    await _send_preview(wa, phone, draft)
