@@ -584,7 +584,7 @@ async def _dispatch(
 
     # Route by state
     if session.state == IDLE:
-        await _step_idle(wa, customer_phone, session, client)
+        await _step_idle(wa, customer_phone, session, client, msg_type, value)
 
     elif session.state == AWAITING_PROPERTY:
         await _step_awaiting_property(wa, customer_phone, session, msg_type, value, title)
@@ -627,7 +627,7 @@ async def _dispatch(
 
 # ── State handlers ─────────────────────────────────────────────────────────────
 
-async def _step_idle(wa, customer_phone, session, client):
+async def _step_idle(wa, customer_phone, session, client, msg_type=None, value=None):
     """Greet the user. Routes into the Reservation Engine's own "احجز موعد" branch (Phase C,
     2026-08-24) when this tenant has the "reservations" service active -- otherwise unchanged,
     falls through to the pre-existing Booking/Property flow below. No real tenant today has both
@@ -635,7 +635,10 @@ async def _step_idle(wa, customer_phone, session, client):
     this is a hard either/or rather than a menu -- documented as a deliberate v1 scope limit in
     the Phase C evidence, not a decision hidden here."""
     if await whatsapp_reservation_flow.is_reservations_active(client.id):
-        await whatsapp_reservation_flow.start(wa, customer_phone, session, client)
+        # The opening text goes through: the reservation flow matches it against the service
+        # list, and falls back to its own greeting when it is ambiguous.
+        await whatsapp_reservation_flow.start(wa, customer_phone, session, client,
+                                              msg_type, value)
         return
 
     properties = await prisma_client.property.find_many(

@@ -155,7 +155,8 @@ def _parse_date_text(text: str):
 
 # ── Entry point (called from whatsapp_flow._step_idle) ─────────────────────────────────────────
 
-async def start(wa, customer_phone: str, session, client) -> None:
+async def start(wa, customer_phone: str, session, client,
+                msg_type: str | None = None, value: str | None = None) -> None:
     """Greet the user into the reservation flow and show the service list.
 
     Phase D (Customer Experience, 2026-08-24) -- returning-customer greeting: if this phone
@@ -196,6 +197,32 @@ async def start(wa, customer_phone: str, session, client) -> None:
         )
         session.state = "IDLE"
         return
+
+    # THE OPENING MESSAGE IS READ, NOT DISCARDED (2026-09-13). It used to be: `_step_idle` called
+    # this function without the text at all, so a customer who opened with "بدي دقن" was shown the
+    # greeting and the full list, and had to say it a second time by tapping. Measured live on
+    # 2026-09-13 19:34 -- Salman's own "بدى أعمل كرياتين لشعرى" never reached the matcher, because
+    # it was the first message of the conversation.
+    #
+    # AMBIGUITY FALLS THROUGH TO THE GREETING, never to a refusal (Salman's decision, same day).
+    # "ما فهمت تماماً 😅" is a fine answer to someone who has already been shown a list and typed
+    # something odd; as the FIRST thing a new customer ever hears from the shop it is a cold
+    # reception to nothing. So there is no `else` here -- an unmatched opening simply continues
+    # into the normal greeting below, which is also the only branch that has a list to offer.
+    if msg_type == "text" and value:
+        opening = _match_service_by_text(value, services)
+        if opening:
+            logger.info("🔎 Service matched from the OPENING message %r -> %r at %s",
+                        (value or "")[:40], opening.get("name_ar"), client.slug)
+            hello = (f"أهلاً بعودتك {returning_name} 👋" if returning_name
+                     else f"أهلاً فيك في {client.name} 💈")
+            # The match is QUOTED BACK before anything moves (Salman, 2026-09-13): a silent jump
+            # to barber selection hides a misreading, and the customer has no way to see what we
+            # thought they said.
+            await wa.send_text(customer_phone, f"{hello}\nتمام، *{opening['name_ar']}* ✅")
+            session.state = RES_AWAITING_SERVICE
+            await _accept_service(wa, customer_phone, session, client, opening)
+            return
 
     sections = [{
         "title": "اختر الخدمة",
@@ -445,6 +472,17 @@ async def _step_awaiting_service(wa, customer_phone, session, client, msg_type, 
         await wa.send_text(customer_phone, "الرجاء اختيار خدمة من القائمة أدناه 👆")
         return
 
+    await _accept_service(wa, customer_phone, session, client, service)
+
+
+async def _accept_service(wa, customer_phone, session, client, service: dict) -> None:
+    """Everything that happens once a service is settled, however it was settled.
+
+    Extracted unchanged from `_step_awaiting_service` (2026-09-13) so the opening message of a
+    conversation can reach it too. Three callers now arrive here -- a list tap, a typed message
+    mid-flow, and a typed FIRST message -- and they must behave identically from this point on;
+    a second copy of the barber filter and the smart skip is exactly how they would drift apart.
+    """
     session.res_service_id = service["id"]
     session.res_service_name = service["name_ar"] or "الخدمة"
     session.res_duration_min = service["duration_min"] or 30

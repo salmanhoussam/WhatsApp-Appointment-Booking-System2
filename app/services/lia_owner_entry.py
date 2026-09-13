@@ -47,7 +47,7 @@ from app.core.permissions import is_authorized
 from app.core.phone import normalize_for_storage
 from app.db.client import prisma_client
 from app.repositories import catalog_service_repo, user_repo
-from app.services import catalog_service_service
+from app.services import catalog_service_service, whatsapp_reservation_flow
 from app.services.security_audit_service import log_security_event
 from app.services.whatsapp_service import WhatsAppService
 
@@ -103,6 +103,48 @@ def _looks_like_service_entry(text: str) -> bool:
         return False
     return (any(v in low for v in _ENTRY_VERBS)
             and any(o in low for o in _ENTRY_OBJECTS))
+
+
+# Greetings an owner actually opens with. A SECOND cheap gate, and it has to stay as cheap as
+# the first one: `_resolve_owner` is a DB read, and every new conversation on this number starts
+# with a greeting -- a customer's included. So this must almost never fire on anything else.
+#
+# Strict by construction: the whole message, folded and stripped of punctuation, must BE one of
+# these. Not "starts with", not "contains" -- "مرحبا بدي احجز دقن" is a customer opening a
+# booking, and it belongs to the reservation flow's own first-message matching, not to Lia.
+_GREETINGS = frozenset({
+    "مرحبا", "مرحبتين", "اهلا", "اهلين", "هلا", "هلو", "هاي", "يا هلا",
+    "السلام عليكم", "سلام", "صباح الخير", "صباحو", "مسا الخير", "مساء الخير",
+    "كيفك", "شلونك", "hi", "hello", "hey", "salam", "marhaba", "hala", "kifak",
+})
+
+# The escape hatch. An owner is very often also a barber and sometimes a customer -- measured:
+# Salman's own number is TENANT_ADMIN at `barberlab-test` AND a Customer row there, and حسين owns
+# `rk` while holding a Barber row. Without this button, routing an owner's greeting to Lia would
+# take away his only way into the customer flow, on the one tenant we test on.
+BOOK_ID = "__LIA_BOOK__"
+
+_AR_FOLD = (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي"), ("ة", "ه"), ("ـ", ""))
+
+
+def _fold_greeting(text: str) -> str:
+    """Lowercase, drop punctuation and emoji, fold the alef/ya/ta-marbuta spellings.
+
+    Its own small copy rather than importing the reservation flow's `_normalise_ar`: that one is
+    private to a different module and tuned for service names, and this project's own convention
+    is to keep a four-line helper local instead of reaching across a module boundary for it.
+    """
+    low = (text or "").strip().lower()
+    for src_ch, dst in _AR_FOLD:
+        low = low.replace(src_ch, dst)
+    low = re.sub(r"[\u064B-\u0652]", "", low)
+    low = re.sub(r"[^\w\s]", " ", low, flags=re.UNICODE)
+    return " ".join(low.split())
+
+
+def _looks_like_greeting(text: str) -> bool:
+    folded = _fold_greeting(text)
+    return bool(folded) and len(folded) <= 20 and folded in _GREETINGS
 
 
 # ── Actor + tenant ────────────────────────────────────────────────────────────
@@ -223,6 +265,11 @@ _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "lia.md"
 # sentinel in this shape cannot appear in prose, which makes that mistake unrepeatable.
 _PROMPT_START = "<!--LIA_PROMPT_START-->"
 _PROMPT_END   = "<!--LIA_PROMPT_END-->"
+# The owner's welcome message. A SECOND, separate block -- never merged into the prompt above,
+# because it is not sent to a model at all: it is sent verbatim to a person. Keeping them apart
+# is what lets the prompt stay provably byte-identical to what it was while the welcome changes.
+_WELCOME_START = "<!--LIA_WELCOME_START-->"
+_WELCOME_END   = "<!--LIA_WELCOME_END-->"
 
 
 def _load_prompt() -> str:
@@ -247,27 +294,39 @@ def _load_prompt() -> str:
     message goes unanswered. Same shape as the two STATES registration guards added on 09-12 and
     09-13, for the same reason: a silent dead branch is worse than a loud refusal to start.
     """
+    return _load_block(_PROMPT_START, _PROMPT_END, "prompt") + "\n"
+
+
+def _load_block(start: str, end: str, label: str, min_len: int = 100) -> str:
+    """One delimited block of `app/prompts/lia.md`, or a refusal to start.
+
+    Two blocks live in that file and they are NOT interchangeable: the prompt goes to a model,
+    the welcome goes to a person. Both are Lia's behaviour and both are under the drift rule, so
+    both load through here and both fail the same loud way.
+    """
     if not _PROMPT_PATH.exists():
         raise RuntimeError(
             f"Lia prompt file missing: {_PROMPT_PATH}. Lia cannot run without it; see "
             f".claudedocs/architecture/capabilities/lia.md"
         )
     raw = _PROMPT_PATH.read_text(encoding="utf-8")
-    if _PROMPT_START not in raw or _PROMPT_END not in raw:
+    if start not in raw or end not in raw:
         raise RuntimeError(
-            f"Lia prompt file {_PROMPT_PATH} is missing its {_PROMPT_START}/{_PROMPT_END} "
-            f"sentinels -- refusing to send the whole file, whose header is documentation "
-            f"rather than instructions."
+            f"Lia prompt file {_PROMPT_PATH} is missing its {start}/{end} sentinels -- refusing "
+            f"to send the whole file, whose header is documentation rather than instructions."
         )
-    prompt = raw.split(_PROMPT_START, 1)[1].split(_PROMPT_END, 1)[0].strip()
-    if len(prompt) < 100:
+    block = raw.split(start, 1)[1].split(end, 1)[0].strip()
+    if len(block) < min_len:
         raise RuntimeError(
-            f"Lia prompt from {_PROMPT_PATH} is only {len(prompt)} chars -- that is not a prompt."
+            f"Lia {label} from {_PROMPT_PATH} is only {len(block)} chars -- that is not a {label}."
         )
-    return prompt + "\n"
+    return block
 
 
 _SYSTEM_PROMPT = _load_prompt()
+# The welcome is loaded at import for the same reason the prompt is: a missing block is caught in
+# pre-flight, not by an owner whose "مرحبا" goes unanswered.
+_WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
 
 
 # Returned when the MODEL could not be reached at all -- a missing key, a dead key, a network
@@ -583,6 +642,48 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         )
         return session
 
+    # ── 0.5 The escape hatch. Checked BEFORE the draft branches, deliberately. ──
+    #
+    # An owner who taps "احجز موعد" has said he wants out of Lia. Making him first finish a draft
+    # he has already abandoned would be the tool arguing with the person. A live draft is dropped
+    # here, and he is TOLD it was -- silently discarding work he can still see on screen is the
+    # one thing this branch must not do.
+    if msg_type in ("button_reply", "list_reply") and value == BOOK_ID:
+        client_id, actor, actor_id = await _resolve_owner(sender_phone)
+        if client_id is None:
+            # The id is ours, the sender is not. Same silence as every other unresolved case:
+            # a stranger must not learn what this number accepts.
+            await log_security_event(
+                event_type="lia_entry_refused", client_id=None, endpoint=_ENDPOINT,
+                detail={"sender_phone": sender_phone, "reason": "book_escape_unresolved"},
+            )
+            return _SENTINEL
+        if not await _tenant_has_reservations(client_id):
+            await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
+            return _SENTINEL
+
+        client = await prisma_client.client.find_unique(where={"id": client_id})
+        if client is None:
+            logger.error("🔥 Lia: escape hatch resolved client_id=%s that no longer exists",
+                         client_id)
+            return _SENTINEL
+
+        session = await ensure_session()
+        if _load_draft(session):
+            _save_draft(session, None)
+            await wa.send_text(sender_phone, "تمام، تركت المسودة 👌")
+        # BINDING THE TENANT HERE IS THE POINT. Lia resolved it from the sender's phone; the
+        # channel resolver could not have -- an owner with no bound session and no slug in his
+        # message is exactly the case that made Lia's first production message vanish. Writing it
+        # onto the session now means every following message in this booking resolves normally.
+        session.client_id = client.id
+        session.client_slug = client.slug
+        session.state = "IDLE"
+        logger.info("🚪 Lia: %s (%s) took the escape hatch into the customer flow at %s",
+                    sender_phone, actor, client.slug)
+        await whatsapp_reservation_flow.start(wa, sender_phone, session, client)
+        return session
+
     # ── 1. A pending confirmation. Checked first: a tap answers the draft, nothing else. ──
     if draft and session is not None and session.state == LIA_AWAITING_CONFIRM:
         if msg_type in ("button_reply", "list_reply"):
@@ -615,6 +716,28 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != field]
         await _advance(wa, sender_phone, session, draft)
         return session
+
+    # ── 2.5 An owner's opening greeting -> Lia's own welcome, with the way out. ──
+    #
+    # Only from IDLE (or no session at all). An owner mid-booking who types "مرحبا" is answered by
+    # the state he is actually in -- hijacking it here would lose his place in his own
+    # appointment, and he is a customer at that moment whatever his role says.
+    if (msg_type == "text" and _looks_like_greeting(value)
+            and (session is None or session.state == "IDLE")):
+        client_id, actor, actor_id = await _resolve_owner(sender_phone)
+        if client_id is None:
+            # A CUSTOMER said hello. Not ours -- fall through, and note that the only cost paid
+            # for a non-owner greeting is this one indexed read.
+            return None
+        logger.info("👋 Lia: welcome sent to %s (%s)", sender_phone, actor)
+        await wa.send_interactive_buttons(
+            sender_phone,
+            _WELCOME,
+            [{"type": "reply", "reply": {"id": BOOK_ID, "title": "احجز موعد 💈"}}],
+        )
+        # _SENTINEL, not a session: the welcome creates no draft and needs no state. The tap that
+        # follows re-resolves the owner from his phone, so nothing has to be remembered.
+        return _SENTINEL
 
     # ── 3. A new data-entry request. The cheap gate runs BEFORE the model. ──
     if msg_type != "text" or not _looks_like_service_entry(value):
