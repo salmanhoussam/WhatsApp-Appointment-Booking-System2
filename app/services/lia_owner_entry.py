@@ -39,6 +39,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from app.core.config import settings
@@ -213,25 +214,60 @@ async def _resolve_service_category(client_id: str) -> tuple[Optional[str], list
 
 # ── Extraction ────────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """أنت مساعد لاستخراج بيانات خدمة من رسالة صاحب محل حلاقة.
-أعد JSON فقط، بلا أي نصّ أو شرح أو markdown.
+# ── The prompt lives in a file, not here (2026-09-13, Salman's decision) ──
 
-الشكل:
-{"intent":"create_service","confidence":"high|medium|low",
- "data":{"name_ar":"...","price":25,"duration_min":60,"currency":"USD","name_en":null,"description_ar":null},
- "unresolved":[]}
+_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "lia.md"
+# Sentinels, not a markdown heading. The first version split on `## SYSTEM PROMPT` and that
+# heading also appeared INSIDE the file's own explanatory comment, in a sentence describing it --
+# so the split landed on the wrong occurrence and the entire file was sent as the prompt. A
+# sentinel in this shape cannot appear in prose, which makes that mistake unrepeatable.
+_PROMPT_START = "<!--LIA_PROMPT_START-->"
+_PROMPT_END   = "<!--LIA_PROMPT_END-->"
 
-قواعد صارمة:
-- intent دائماً "create_service".
-- name_ar: اسم الخدمة بالعربية كما قاله، بلا كلمات الطلب مثل "ضيف" أو "بدي".
-- price: رقم فقط. إذا لم يذكر سعراً، اتركه خارج data وأضف "price" إلى unresolved.
-- duration_min: بالدقائق. "ساعة"=60، "نص ساعة"=30، "ساعة ونص"=90. إذا لم يذكر مدة،
-  اتركه خارج data وأضف "duration_min" إلى unresolved.
-- currency: "USD" للدولار، "LBP" لليرة. الافتراضي "USD".
-- 🔴 لا تخترع سعراً ولا مدة ولا اسماً. ما لم يُذكر صراحةً يذهب إلى unresolved.
-- 🔴 لا تُضف أي حقل غير المذكورة أعلاه. ولا تُصدر أي معرّف (id).
-- confidence: "low" إذا كان اسم الخدمة نفسه غير واضح.
-"""
+
+def _load_prompt() -> str:
+    """Lia's system prompt, read from `app/prompts/lia.md`.
+
+    WHY IT IS NOT A STRING IN THIS FILE ANY MORE. It was, and Lia's behaviour changed four times
+    in one day -- the prompt itself, the unavailable/misunderstood split, making price and duration
+    mandatory, the refusal wording -- and every one of those looked like a code edit rather than a
+    behaviour change. `repository-hygiene.md`'s "Persona & Prompt Drift" rule exists for exactly
+    that risk and is path-scoped, so a prompt buried in a service module sat outside it. The rule
+    now covers `app/prompts/**`, which means a change to Lia's behaviour has to state its reason
+    in the commit -- the protection is the file's LOCATION, not its format.
+
+    ONLY THE TEXT BETWEEN THE TWO SENTINELS IS SENT. Everything outside them -- the governing
+    rules, the reason the file exists -- is documentation for whoever opens it, and costs no
+    tokens. That split is what lets the identity and the payload live in one reviewable place
+    without the identity leaking into every API call.
+
+    FAILS AT IMPORT, NOT AT RUNTIME. A missing or malformed prompt file means Lia cannot function,
+    and the honest moment to say so is startup -- `from app.main import app` is already part of
+    every pre-flight here, so the failure is caught before a push instead of by an owner whose
+    message goes unanswered. Same shape as the two STATES registration guards added on 09-12 and
+    09-13, for the same reason: a silent dead branch is worse than a loud refusal to start.
+    """
+    if not _PROMPT_PATH.exists():
+        raise RuntimeError(
+            f"Lia prompt file missing: {_PROMPT_PATH}. Lia cannot run without it; see "
+            f".claudedocs/architecture/capabilities/lia.md"
+        )
+    raw = _PROMPT_PATH.read_text(encoding="utf-8")
+    if _PROMPT_START not in raw or _PROMPT_END not in raw:
+        raise RuntimeError(
+            f"Lia prompt file {_PROMPT_PATH} is missing its {_PROMPT_START}/{_PROMPT_END} "
+            f"sentinels -- refusing to send the whole file, whose header is documentation "
+            f"rather than instructions."
+        )
+    prompt = raw.split(_PROMPT_START, 1)[1].split(_PROMPT_END, 1)[0].strip()
+    if len(prompt) < 100:
+        raise RuntimeError(
+            f"Lia prompt from {_PROMPT_PATH} is only {len(prompt)} chars -- that is not a prompt."
+        )
+    return prompt + "\n"
+
+
+_SYSTEM_PROMPT = _load_prompt()
 
 
 # Returned when the MODEL could not be reached at all -- a missing key, a dead key, a network
