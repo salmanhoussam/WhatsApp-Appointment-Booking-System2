@@ -275,6 +275,49 @@ def _normalise_ar(text: str) -> str:
     return out
 
 
+# Clitics that stay glued to a word in real Arabic typing while STILL naming the thing: the
+# conjunction (و/ف) and the definite article (ال), plus their combinations. Longest first, one
+# strip only.
+#
+# PREPOSITIONS ARE DELIBERATELY ABSENT -- ل، لل، ب، ك -- and that omission is the fix. "لشعري"
+# and "للشعر" are not a customer naming the service "شعر"; they are a customer describing
+# something else that involves hair. On `rk`, plain substring matching turned "البروتين للشعر"
+# into a booked haircut, and turned "بدى أعمل كرياتين لشعرى" into a false ambiguity between
+# كرياتين and شعر. A glued conjunction or article still names the service; a glued preposition
+# does not.
+_CLITIC_PREFIXES = ("وال", "فال", "بال", "ال", "و", "ف")
+
+
+def _canon_tokens(text: str) -> set[str]:
+    """Whole words, punctuation dropped, one leading clitic removed when it is safe to remove.
+
+    This is what makes containment mean "on a word boundary" instead of "anywhere in the
+    string". Both sides of every comparison go through it, which is also what finally makes
+    word-order-independent matching work: "شعر ودقن" and "دقن وشعر" both canonicalise to
+    {شعر, دقن}, whereas the previous every-word-present test compared the literal "ودقن"
+    against a message that only ever contained "دقن".
+
+    A clitic is stripped ONLY when at least 3 characters remain. That guard is not cosmetic:
+    "وجه" would otherwise become "جه", inventing a token the customer never typed. Real words
+    that merely begin with a clitic letter keep their full form.
+    """
+    out: set[str] = set()
+    for tok in re.findall(r"[^\W_]+", text, flags=re.UNICODE):
+        if len(tok) < 2:
+            # A standalone single letter is the same conjunction again, just typed with a space
+            # ("شعر و دقن"). It can never BE a service name -- every candidate is >= 3 characters
+            # -- so dropping it cannot make pass 3 match anything new: removing words from the
+            # haystack only ever makes a subset test harder. It affects pass 2 alone, where it
+            # lets the spaced spelling equal the glued one.
+            continue
+        for pre in _CLITIC_PREFIXES:
+            if tok.startswith(pre) and len(tok) - len(pre) >= 3:
+                tok = tok[len(pre):]
+                break
+        out.add(tok)
+    return out
+
+
 def _match_service_by_text(text: str, services: list[dict]) -> Optional[dict]:
     """The service a typed message asks for, or None when it is not unambiguous.
 
@@ -288,12 +331,24 @@ def _match_service_by_text(text: str, services: list[dict]) -> Optional[dict]:
     appointment:
 
       1. the whole message, noise words stripped, EQUALS a service name
-      2. a service name appears INSIDE the message  ("بدي دقن" -> "دقن")
-      3. every word of a service name appears somewhere in the message, in any order
-         ("شعر ودقن" typed as "دقن وشعر")
+      2. the message's words ARE the name's words, in any order ("شعر ودقن" typed as "دقن وشعر")
+      3. the name's words all APPEAR among the message's words ("بدي دقن" -> "دقن")
 
-    Deliberately NOT matched: a single Arabic letter or a 2-character fragment. "شعر ودقن" and
-    "دقن" both contain "قن", and on `rk` those are two different services at two different prices.
+    EVERY COMPARISON IS ON WHOLE WORDS -- see `_canon_tokens`. Passes 2 and 3 used to compare raw
+    substrings, which was wrong in both directions and wrong in production:
+
+        "البروتين للشعر" on `rk`      -> booked "شعر", because "للشعر" contains it
+        "بدى أعمل كرياتين لشعرى"      -> refused as ambiguous between كرياتين and شعر,
+                                          for the same reason
+        "دقن وشعر"                    -> refused, because the literal "ودقن" is nowhere in it
+
+    A wrong match is worse than a question, and a question the customer did not deserve is worse
+    than an answer. Word boundaries fix all three at once without loosening anything: the passes
+    are still exact, just on words rather than characters.
+
+    Both Arabic and English names are matched (`name_ar` and `name_en`), because a customer who
+    types "keratin" means كرياتين. Franco-Arabic ("sha3r", "da8n") is deliberately NOT handled
+    here -- that needs its own transliteration decision, not a quiet widening of this matcher.
     """
     cleaned = _normalise_ar(text)
     if not cleaned:
@@ -310,20 +365,28 @@ def _match_service_by_text(text: str, services: list[dict]) -> Optional[dict]:
     # name, is not contained in the typed text the other way round, and fails a
     # every-word-present test because "صبغة" is nowhere in their message. So the three passes
     # below now run over the full name AND each alternative.
-    candidates: list[tuple[dict, str]] = []
+    # A SERVICE ALSO HAS AN ENGLISH NAME, and until now the matcher never looked at it, so a
+    # customer typing "keratin" reached nothing while "كرياتين" worked. `name_en` is already on
+    # every dict `public_list_services` returns (catalog_service_service._fmt) -- no schema
+    # change, no new query, no translation table. A service whose name_en is NULL simply
+    # contributes no English candidate; nothing is invented for it.
+    candidates: list[tuple[dict, str, bool]] = []
     for svc in services:
-        full = _normalise_ar(svc.get("name_ar") or "")
-        for candidate in {full, *re.split(r"(?:\bاو\b|\bor\b|/|،|\|)", full)}:
-            candidate = candidate.strip()
-            if len(candidate) >= 3:
-                candidates.append((svc, candidate))
+        for source, is_en in ((svc.get("name_ar"), False), (svc.get("name_en"), True)):
+            full = _normalise_ar(source or "")
+            if not full:
+                continue
+            for candidate in {full, *re.split(r"(?:\bاو\b|\bor\b|/|،|\|)", full)}:
+                candidate = candidate.strip()
+                if len(candidate) >= 3:
+                    candidates.append((svc, candidate, is_en))
 
     def _unique_hit(predicate) -> tuple[bool, Optional[dict]]:
         """(decided, service). Hits are deduped BY SERVICE, so a service matched through both its
         full name and one of its alternatives is still one answer, not an ambiguity."""
         seen: dict[str, dict] = {}
-        for svc, candidate in candidates:
-            if predicate(candidate):
+        for svc, candidate, is_en in candidates:
+            if predicate(candidate, is_en):
                 seen[svc["id"]] = svc
         if len(seen) == 1:
             return True, next(iter(seen.values()))
@@ -331,10 +394,23 @@ def _match_service_by_text(text: str, services: list[dict]) -> Optional[dict]:
         # ambiguous, so stop rather than guess which haircut they meant.
         return (len(seen) > 1), None
 
+    # Strictest first, and every pass compares WHOLE WORDS. Equality and token-set equality both
+    # run before any containment, so a message that IS a service name is answered by that service
+    # even when a shorter service name is also one of its words ("دقن وشعر" is the service
+    # "شعر ودقن", not an ambiguity between "شعر" and "دقن").
+    #
+    # THE ENGLISH NAMES TAKE PART IN PASSES 1 AND 2 ONLY, and that asymmetry is deliberate. They
+    # are single generic category words -- `rk` sells "Hair" and "Haircut", barberlab sells
+    # "Haircut" and "Haircut & Beard" -- so "the name's words all appear" is not evidence the
+    # customer named THAT service. Measured: "hair and beard" on `rk` resolved to "شعر" under a
+    # subset pass, booking hair alone for someone who asked for both. Arabic keeps all three
+    # passes because its morphology needs them: filler verbs and glued prepositions sit around
+    # the name and the noise list cannot know every one of them.
+    typed = _canon_tokens(cleaned)
     for predicate in (
-        lambda name: name == cleaned,
-        lambda name: name in cleaned,
-        lambda name: all(word in cleaned for word in name.split() if len(word) >= 3),
+        lambda name, en: name == cleaned,                          # 1. the message IS the name
+        lambda name, en: _canon_tokens(name) == typed,             # 2. same words, any order
+        lambda name, en: not en and _canon_tokens(name) <= typed,  # 3. name's words all present
     ):
         decided, svc = _unique_hit(predicate)
         if svc:
