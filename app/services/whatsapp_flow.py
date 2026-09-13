@@ -446,6 +446,47 @@ async def _dispatch(
 
     existing_session = await _peek_session(phone_number_id, customer_phone)
 
+    # ── Lia: owner data entry (2026-09-13) ──
+    #
+    # MOVED AHEAD OF _resolve_client() ON 2026-09-13, AFTER IT FAILED IN PRODUCTION. Its first
+    # real message was dropped before Lia ever ran:
+    #
+    #   ⚠️  No client resolved for display_phone=96179022398 (session bound=False)
+    #       — message DROPPED, customer 96178727986 got no reply
+    #
+    # An owner writing "أضيف خدمة البروتين..." does not start with the deep-link keyword, carries
+    # no slug, and -- 5 hours after his last booking -- has no bound session either. So
+    # `_resolve_client` answers None and the message is discarded. Lia was placed after it in the
+    # belief that it "needs the resolved session", and its own docstring carried the contradiction:
+    # Lia takes its tenant FROM THE SENDER'S PHONE, so it never needed the channel's tenant at
+    # all. It needs the SESSION (for the draft) -- which `_peek_session` above already gives.
+    #
+    # This is the same placement `whatsapp_merchant_actions` documents two blocks above, for the
+    # same reason: anything whose tenant comes from WHO SENT IT cannot depend on a resolver that
+    # answers from the shared channel.
+    #
+    # `_ensure_session` is passed rather than a session object so the "no phantom session" rule
+    # `_peek_session` exists to protect still holds: a session is created only once Lia has
+    # resolved a real authorised owner and actually has a draft to keep.
+    async def _ensure_session():
+        return existing_session or await _get_session(phone_number_id, customer_phone)
+
+    lia_session = await lia_owner_entry.try_handle(
+        wa, customer_phone, existing_session, msg_type, value, title, _ensure_session,
+    )
+    if lia_session is not None:
+        # Three outcomes, and the middle one is why this is not a bool:
+        #   a session      -> Lia acted and has a draft to keep
+        #   _SENTINEL      -> Lia handled it (a silent refusal) and must leave NO session behind
+        #   None           -> not an owner-entry message; fall through to the customer flow
+        #
+        # No conversation id is passed: tenant resolution has not run yet, so there is none --
+        # recording owner-entry messages in `whatsapp_messages` is a named follow-up, not
+        # something to improvise here.
+        if lia_session is not lia_owner_entry._SENTINEL:
+            await _save_session(phone_number_id, customer_phone, lia_session)
+        return
+
     client = await _resolve_client(
         display_phone,
         message_text=value if msg_type == "text" else "",
@@ -540,26 +581,6 @@ async def _dispatch(
         "📩 [%s/%s] state=%s type=%s value=%s",
         customer_phone, client.slug, session.state, msg_type, value,
     )
-
-    # ── Lia: owner data entry (2026-09-13, Phase 1) ──
-    #
-    # Placed AHEAD of the customer state router, and after the session exists because a draft
-    # lives on the session. `try_handle` returns False for anything that is not an owner
-    # data-entry message, so an ordinary customer -- or an owner booking for someone -- falls
-    # through untouched; it returns True on every branch it owns, INCLUDING refusals, so a
-    # half-handled owner message can never land in the customer machine where
-    # "ضيف خدمة كيراتين" would be stored as an answer to "ما اسمك الكريم؟".
-    #
-    # Distinct from whatsapp_merchant_actions, which runs BEFORE tenant resolution because a
-    # button tap carries its own tenant via the reservation. Lia has no reservation, so it needs
-    # the resolved session and takes its tenant from the sender's phone instead.
-    if await lia_owner_entry.try_handle(wa, customer_phone, session, msg_type, value, title):
-        # Saved here rather than falling through to the shared save below, because that one sits
-        # after the state router and this branch returns before it. Same helper, same
-        # conversation link -- the draft has to survive to the NEXT message or the confirmation
-        # button has nothing to confirm.
-        await _save_session(phone_number_id, customer_phone, session, conversation_id)
-        return
 
     # Route by state
     if session.state == IDLE:

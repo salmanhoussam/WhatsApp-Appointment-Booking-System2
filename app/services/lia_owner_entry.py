@@ -239,6 +239,10 @@ _SYSTEM_PROMPT = """أنت مساعد لاستخراج بيانات خدمة م�
 # Collapsing the two would tell an owner he was unclear when the truth is that our AI is down.
 _UNAVAILABLE = object()
 
+# "handled, but there is no session to persist" -- distinct from None ("not mine, fall through")
+# and from a session object ("persist this").
+_SENTINEL = object()
+
 
 async def _extract(text: str) -> Optional["object"]:
     """Ask the model for a draft. Returns a validated LiaExtraction, or None.
@@ -487,15 +491,26 @@ async def _still_authorised(phone: str, client_id: Optional[str]) -> tuple[bool,
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
-                     title: str) -> bool:
-    """Handle an owner data-entry message. True means "dealt with, stop processing".
+                     title: str, ensure_session) -> Optional[object]:
+    """Handle an owner data-entry message. Returns the SESSION to persist, or None to fall through.
 
-    Returning True on every branch it owns -- including refusals -- matters for the same reason it
-    does in `whatsapp_merchant_actions`: a half-handled owner message must never fall through into
-    the CUSTOMER booking state machine, where "ضيف خدمة كيراتين" would be read as an answer to
-    "ما اسمك الكريم؟" and stored as a customer's name.
+    RUNS BEFORE TENANT RESOLUTION (`whatsapp_flow`, right after `_peek_session`), because Lia's
+    tenant comes from WHO SENT the message and never from the shared channel. Placing it after
+    `_resolve_client` is what made its very first production message vanish: an owner's
+    "أضيف خدمة البروتين..." has no deep-link keyword and no slug, so the resolver answered None and
+    the message was dropped before this function was reached.
+
+    Returning a session -- not True -- on every branch it owns, including refusals, for the same
+    reason `whatsapp_merchant_actions` returns True on refusals: a half-handled owner message must
+    never fall through into the CUSTOMER booking machine, where "ضيف خدمة كيراتين" would be read as
+    an answer to "ما اسمك الكريم؟" and stored as a customer's name. `None` means "not mine".
+
+    `session` may be None (a first-contact owner, or one whose session expired). `ensure_session`
+    creates one, and is called ONLY once this module has resolved a real authorised owner -- which
+    preserves the rule `_peek_session` exists for: an unresolvable message must not leave a phantom
+    session behind.
     """
-    draft = _load_draft(session)
+    draft = _load_draft(session) if session is not None else None
 
     # ── 0. A Lia state with no live draft: the window expired. ──
     #
@@ -506,7 +521,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # abandoned draft. Without it, an owner who walks away for 15 minutes and comes back finds a
     # dead conversation: Lia would decline the message (no draft) and the state router has no
     # LIA_* branch, so nothing would answer at all.
-    if not draft and session.state in STATES:
+    if session is not None and not draft and session.state in STATES:
         session.state = "IDLE"
         _save_draft(session, None)
         logger.info("⏲  Lia: draft window expired for %s — state reset to IDLE", sender_phone)
@@ -514,16 +529,16 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             sender_phone,
             "مرّ وقت طويل على الطلب فألغيته 🙂 ابعتلي الخدمة من جديد إذا بدك.",
         )
-        return True
+        return session
 
     # ── 1. A pending confirmation. Checked first: a tap answers the draft, nothing else. ──
-    if draft and session.state == LIA_AWAITING_CONFIRM:
+    if draft and session is not None and session.state == LIA_AWAITING_CONFIRM:
         if msg_type in ("button_reply", "list_reply"):
             if value == CONFIRM_ID:
                 await _commit(wa, sender_phone, session, draft,
                               lambda: (_save_draft(session, None),
                                        setattr(session, "state", "IDLE")))
-                return True
+                return session
             if value == CANCEL_ID:
                 _save_draft(session, None)
                 session.state = "IDLE"
@@ -533,25 +548,28 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                     actor=draft.get("actor_id"),
                 )
                 await wa.send_text(sender_phone, "تمام، ألغيت الطلب 👌")
-                return True
+                return session
         await wa.send_text(sender_phone, "اضغط ✅ ضيفها أو ❌ إلغاء 👆")
-        return True
+        return session
 
     # ── 2. An answer to one asked field. ──
-    if draft and session.state == LIA_AWAITING_FIELD and msg_type == "text":
+    if draft and session is not None and session.state == LIA_AWAITING_FIELD and msg_type == "text":
         field = draft.get("asking")
         parsed = _parse_field_answer(field, value)
         if parsed is None:
             await wa.send_text(sender_phone, _FIELD_QUESTIONS.get(field, "ما فهمت، جرّب مرّة تانية."))
-            return True
+            return session
         draft["data"][field] = parsed
         draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != field]
         await _advance(wa, sender_phone, session, draft)
-        return True
+        return session
 
     # ── 3. A new data-entry request. The cheap gate runs BEFORE the model. ──
     if msg_type != "text" or not _looks_like_service_entry(value):
-        return False
+        # NOT MINE. None is the only value that lets the message continue to tenant resolution
+        # and the customer flow -- `False` would read as "handled" to the caller's
+        # `is not None` check and silently swallow every ordinary message on this number.
+        return None
 
     client_id, actor, actor_id = await _resolve_owner(sender_phone)
     if client_id is None:
@@ -562,11 +580,18 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             detail={"sender_phone": sender_phone, "text_preview": (value or "")[:80]},
         )
         logger.warning("🚫 Lia: data-entry attempt from unresolved/unauthorised %s", sender_phone)
-        return True
+        # Deliberately NOT `ensure_session()`: an unauthorised sender must leave no session
+        # behind, which is the same rule `_peek_session` protects. `_SENTINEL` says "handled,
+        # nothing to persist" -- returning None here would let the message fall through into the
+        # customer flow, and returning a session would create one for a stranger.
+        return _SENTINEL
+
+    # From here on a draft will exist, so a session is needed -- and only from here on.
+    session = await ensure_session()
 
     if not await _tenant_has_reservations(client_id):
         await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
-        return True
+        return session
 
     extraction = await _extract(value)
     if extraction is _UNAVAILABLE:
@@ -577,13 +602,13 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             sender_phone,
             "المساعد مش متوفّر هلق 🔧 ضيف الخدمة من اللوحة، وأنا رح كون جاهز بعدين.",
         )
-        return True
+        return session
     if extraction is None or extraction.confidence == "low":
         await wa.send_text(
             sender_phone,
             "ما فهمت تماماً 😅 اكتبها هيك مثلاً:\n«ضيف خدمة كيراتين، 25 دولار، ساعة»",
         )
-        return True
+        return session
 
     category_id, cats = await _resolve_service_category(client_id)
     if not category_id:
@@ -592,7 +617,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             sender_phone,
             f"عندك أكتر من فئة ({names}). أضف الخدمة من اللوحة هالمرّة، أو خبّرني بأي فئة.",
         )
-        return True
+        return session
     category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
 
     draft = {
@@ -614,7 +639,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         actor=actor_id,
     )
     await _advance(wa, sender_phone, session, draft)
-    return True
+    return session
 
 
 async def _advance(wa, phone: str, session, draft: dict) -> None:
