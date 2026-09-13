@@ -291,11 +291,22 @@ async def _extract(text: str) -> Optional["object"]:
 def _load_draft(session) -> Optional[dict]:
     """The active draft, or None when there is none or it has aged out.
 
+    READS `session.lia`, WHICH IS THE FIELD THAT ACTUALLY EXISTS. The first version read and
+    wrote `session.state_data` -- an attribute `ConversationSession` does not declare. Python
+    happily created it on assignment, `_session_to_state_data()` serialised `session.lia` (empty),
+    and the draft died the instant the message finished. Salman tapped ✅ seconds after the
+    preview and was told "مرّ وقت طويل على الطلب فألغيته".
+
+    The test suite did not catch it because the stub session I wrote for it DEFINED a
+    `state_data` property -- the stub was more capable than the real object, so it proved the
+    wrong thing. The suite now builds a real `ConversationSession`, which is the only way a
+    field-name mismatch cannot hide again.
+
     The window is Lia's own and shorter than the session's: a confirmation prompt the owner
     answers half an hour later is not a confirmation, it is a stale tap on whatever the screen
     still showed.
     """
-    data = getattr(session, "state_data", None) or {}
+    data = getattr(session, "lia", None) or {}
     draft = data.get(DRAFT_KEY) if isinstance(data, dict) else None
     if not isinstance(draft, dict):
         return None
@@ -311,14 +322,19 @@ def _load_draft(session) -> Optional[dict]:
 
 
 def _save_draft(session, draft: Optional[dict]) -> None:
-    data = getattr(session, "state_data", None)
+    """Write the draft into `session.lia` -- the declared field, which is what gets persisted.
+
+    See `_load_draft` for why this is not `state_data`: that name existed nowhere and silently
+    dropped every draft.
+    """
+    data = getattr(session, "lia", None)
     if not isinstance(data, dict):
         data = {}
     if draft is None:
         data.pop(DRAFT_KEY, None)
     else:
         data[DRAFT_KEY] = draft
-    session.state_data = data
+    session.lia = data
 
 
 _FIELD_QUESTIONS = {
