@@ -270,6 +270,18 @@ _PROMPT_END   = "<!--LIA_PROMPT_END-->"
 # is what lets the prompt stay provably byte-identical to what it was while the welcome changes.
 _WELCOME_START = "<!--LIA_WELCOME_START-->"
 _WELCOME_END   = "<!--LIA_WELCOME_END-->"
+# The edit prompt: a second model-facing block, kept separate from the first because it takes a
+# DRAFT PLUS AN INSTRUCTION and returns only the changed fields, not a whole draft.
+_EDIT_START = "<!--LIA_EDIT_PROMPT_START-->"
+_EDIT_END   = "<!--LIA_EDIT_PROMPT_END-->"
+# Owner-facing wording that this round changes. NOT the whole file's messages -- see the block's
+# own header in app/prompts/lia.md for why moving the rest pre-emptively is refused.
+_REPLIES_START = "<!--LIA_REPLIES_START-->"
+_REPLIES_END   = "<!--LIA_REPLIES_END-->"
+_REPLY_KEY = re.compile(r"^\[\[([a-z_]+)\]\]$", re.M)
+# Every key the code actually sends. Checked at IMPORT: a missing one must fail pre-flight, not
+# reach an owner as a KeyError or an empty message.
+_REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailable")
 
 
 def _load_prompt() -> str:
@@ -323,10 +335,40 @@ def _load_block(start: str, end: str, label: str, min_len: int = 100) -> str:
     return block
 
 
+def _load_replies() -> dict:
+    """The `[[key]]`-delimited owner-facing messages, and a refusal to start without them.
+
+    A dict rather than four constants so the import-time guard can assert the whole set at once:
+    an owner must never receive an empty message because a key was renamed in the file and not in
+    the code.
+    """
+    block = _load_block(_REPLIES_START, _REPLIES_END, "replies", min_len=60)
+    keys = list(_REPLY_KEY.finditer(block))
+    if not keys:
+        raise RuntimeError(
+            f"Lia replies block in {_PROMPT_PATH} has no [[key]] markers -- refusing to start."
+        )
+    out: dict[str, str] = {}
+    for i, m in enumerate(keys):
+        end = keys[i + 1].start() if i + 1 < len(keys) else len(block)
+        text = block[m.end():end].strip()
+        if text:
+            out[m.group(1)] = text
+    missing = [k for k in _REQUIRED_REPLIES if k not in out]
+    if missing:
+        raise RuntimeError(
+            f"Lia replies in {_PROMPT_PATH} are missing required key(s): {missing}. "
+            f"Every message the code sends must exist in the file."
+        )
+    return out
+
+
 _SYSTEM_PROMPT = _load_prompt()
 # The welcome is loaded at import for the same reason the prompt is: a missing block is caught in
 # pre-flight, not by an owner whose "مرحبا" goes unanswered.
 _WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
+_EDIT_PROMPT = _load_block(_EDIT_START, _EDIT_END, "edit prompt")
+_REPLIES = _load_replies()
 
 
 # Returned when the MODEL could not be reached at all -- a missing key, a dead key, a network
@@ -380,6 +422,55 @@ async def _extract(text: str) -> Optional["object"]:
         logger.error("🔥 Lia extraction failed: %s", exc, exc_info=True)
         return None
 
+
+
+async def _extract_edit(draft_data: dict, instruction: str) -> Optional["object"]:
+    """Read one edit instruction against a live draft. Returns a LiaEditPatch, None, or the
+    _UNAVAILABLE sentinel.
+
+    Same three-outcome contract as `_extract`, and for the same measured reason: a dead API key is
+    not "the owner was unclear", and answering "ما فهمت" to a perfectly clear instruction would
+    send him rephrasing something that was never the problem.
+
+    THE MODEL IS GIVEN THE DRAFT, AND ASKED FOR THE DELTA. Not for a new draft -- see the edit
+    prompt's own header in `app/prompts/lia.md`. The draft is passed as JSON rather than as the
+    rendered preview, because the preview is prose for a human (bold markers, an Arabic category
+    name) and re-parsing prose to get field names back would be inventing a second, weaker
+    contract beside the one Pydantic already enforces.
+    """
+    from app.schemas.lia_drafts import LiaEditPatch
+
+    api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+    if not api_key:
+        logger.error("🔥 Lia: ANTHROPIC_API_KEY is not configured — edit unavailable")
+        return _UNAVAILABLE
+    # Only the editable fields are shown. `category_id`, ids and anything else the draft carries
+    # internally stay out of the model's sight entirely -- it cannot change what it cannot see.
+    visible = {k: draft_data.get(k) for k in
+               ("name_ar", "price", "duration_min", "currency", "name_en", "description_ar")
+               if draft_data.get(k) is not None}
+    payload = ("المسوّدة الحالية:\n" + json.dumps(visible, ensure_ascii=False)
+               + "\n\nتعليمة المالك:\n" + (instruction or "").strip())
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        resp = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system=_EDIT_PROMPT,
+            messages=[{"role": "user", "content": payload}],
+        )
+        raw = resp.content[0].text.strip()
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return LiaEditPatch.model_validate_json(raw)
+    except Exception as exc:
+        import anthropic as _a
+        if isinstance(exc, (_a.AuthenticationError, _a.PermissionDeniedError,
+                            _a.APIConnectionError, _a.RateLimitError)):
+            logger.error("🔥 Lia: edit UNAVAILABLE (%s) — not an owner error", type(exc).__name__)
+            return _UNAVAILABLE
+        logger.error("🔥 Lia edit failed: %s", exc, exc_info=True)
+        return None
 
 # ── Draft state ───────────────────────────────────────────────────────────────
 
@@ -700,9 +791,59 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                     endpoint=_ENDPOINT, detail={"sender_phone": sender_phone},
                     actor=draft.get("actor_id"),
                 )
-                await wa.send_text(sender_phone, "تمام، ألغيت الطلب 👌")
+                # A REAL CANCEL, and the wording now says what comes next. It used to end at
+                # "تمام، ألغيت الطلب 👌" while the expiry message two blocks up told him how to
+                # start again -- two logics for one moment. The text lives in
+                # app/prompts/lia.md, under the drift rule, not in this line.
+                await wa.send_text(sender_phone, _REPLIES["cancel"])
                 return session
-        await wa.send_text(sender_phone, "اضغط ✅ ضيفها أو ❌ إلغاء 👆")
+
+        # ── A TYPED MESSAGE HERE IS AN EDIT, not a failure to press a button. ──
+        #
+        # Measured 2026-09-13 17:43: Salman asked twice, in plain words, to change the service
+        # name while the preview was on his screen, and was told "اضغط ✅ ضيفها أو ❌ إلغاء" both
+        # times. He confirmed a name he did not want and fixed it from the dashboard afterwards.
+        # Cancel was the only way to reject a preview, so cancel was being used as "edit" -- which
+        # is why it hurt, and why these two were one defect rather than two.
+        #
+        # RE-PREVIEW IS MANDATORY. Every accepted change goes back through `_advance`, which
+        # re-validates the WHOLE draft and shows it again, and the state returns to
+        # LIA_AWAITING_CONFIRM. There is no path here that writes, and none that applies a change
+        # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
+        if msg_type == "text" and (value or "").strip():
+            patch = await _extract_edit(draft.get("data") or {}, value)
+            if patch is _UNAVAILABLE:
+                # Ours, not his -- and the draft is untouched, so the two working actions are
+                # offered instead of sending him to the dashboard.
+                await wa.send_text(sender_phone, _REPLIES["edit_unavailable"])
+                return session
+            changes = patch.changes.applied() if patch is not None else {}
+            if patch is None or patch.confidence == "low" or not changes:
+                logger.info("🤷 Lia: edit not understood for %s — asking, draft kept intact",
+                            sender_phone)
+                await wa.send_text(sender_phone, _REPLIES["edit_unclear"])
+                return session
+
+            # MERGED ON A COPY. A patch that passes its own validation can still be refused by
+            # `LiaServiceDraft` once merged, and the owner must not lose a good draft to a bad
+            # instruction -- so nothing is written back until the merge validates.
+            from app.schemas.lia_drafts import LiaServiceDraft
+            merged = dict(draft.get("data") or {})
+            merged.update(changes)
+            try:
+                LiaServiceDraft.model_validate(merged)
+            except Exception as exc:
+                logger.info("🚫 Lia: edit %s rejected by the draft contract (%s) — old draft kept",
+                            list(changes), type(exc).__name__)
+                await wa.send_text(sender_phone, _REPLIES["edit_unclear"])
+                return session
+
+            draft["data"] = merged
+            logger.info("✏️  Lia: draft edited for %s — fields=%s", sender_phone, list(changes))
+            await _advance(wa, sender_phone, session, draft)
+            return session
+
+        await wa.send_text(sender_phone, _REPLIES["confirm_nudge"])
         return session
 
     # ── 2. An answer to one asked field. ──

@@ -109,3 +109,98 @@ class LiaExtraction(BaseModel):
     # LiaServiceDraft later.
     data:       dict = Field(default_factory=dict)
     unresolved: list[str] = Field(default_factory=list)
+
+
+class LiaDraftChanges(BaseModel):
+    """ROLE: the PARTIAL set of fields this one instruction asked to change. Never a draft.
+
+    Read the name as "the changes", not as "the draft's changeable fields" -- it carries only what
+    moved, and an absent field means the owner did not mention it. `applied()` is the only way
+    values leave here, and it drops every unset field, so a one-field instruction yields a
+    one-key dict. Nothing in this class can produce a complete draft.
+
+    The fields an edit instruction actually asked to change -- and ONLY those.
+
+    EVERY FIELD IS OPTIONAL, and that is the whole safety property. A model asked to return the
+    full draft after "غيّر الاسم لبروتين" will happily re-emit a price and a duration too, and
+    nothing downstream can tell a re-emitted 30 from a freshly invented one. A partial patch makes
+    "the owner did not mention the price" structurally representable: the field is simply absent.
+
+    THE BOUNDS ARE REPEATED FROM `LiaServiceDraft` RATHER THAN INHERITED, deliberately. That model
+    requires `price` and `duration_min` because a complete draft must carry both; this one cannot
+    require anything because it carries only what changed. Inheriting either way would mean
+    weakening the requirement there or imposing it here -- so the real product rules (price > 0,
+    duration 5..480 on a 5-minute grid, USD/LBP only) are restated. The authority is still
+    `LiaServiceDraft`: a patch is validated, merged, and then the WHOLE draft is validated again
+    through the existing `_advance`.
+
+    An EMPTY patch is a valid shape and means "nothing was understood". Deciding what to do about
+    that is the caller's job, not the schema's -- so it becomes a question rather than a silent
+    no-op.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    name_ar:        Optional[str] = Field(default=None, min_length=2, max_length=200)
+    price:          Optional[float] = Field(default=None, gt=0, le=100_000)
+    duration_min:   Optional[int] = Field(default=None, ge=5, le=480)
+    currency:       Optional[str] = None
+    name_en:        Optional[str] = Field(default=None, max_length=200)
+    description_ar: Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("name_ar", "name_en", "description_ar")
+    @classmethod
+    def _collapse(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        cleaned = " ".join(v.split())
+        return cleaned or None
+
+    @field_validator("currency")
+    @classmethod
+    def _known_currency(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        up = v.strip().upper()
+        if up not in _CURRENCIES:
+            raise ValueError(f"currency must be one of {sorted(_CURRENCIES)}")
+        return up
+
+    @field_validator("duration_min")
+    @classmethod
+    def _five_minute_grid(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v % 5:
+            raise ValueError("duration_min must be a multiple of 5")
+        return v
+
+    def applied(self) -> dict:
+        """Only the fields that were actually set, ready to merge onto a draft."""
+        return {k: v for k, v in self.model_dump().items() if v is not None}
+
+
+class LiaEditPatch(BaseModel):
+    """ROLE: the ENVELOPE the model returns for one edit -- intent, confidence, and the changes.
+
+    The partial data itself lives in `changes` (a `LiaDraftChanges`); this class adds the three
+    things the code needs around it: which operation was meant, how sure the model was, and what
+    it could not read. It is not itself the patch payload.
+
+    One edit instruction against a draft that is already on the owner's screen.
+
+    `edit_draft` IS NOT IN `LiaIntent`, and that separation is deliberate rather than an omission.
+    `LiaIntent` is what a MESSAGE can ask the platform to do; this is an operation inside a draft
+    that already exists -- it creates nothing, writes nothing, and is unreachable without a live
+    draft. Folding it into `LiaIntent` would let a first message claim `edit_draft` with no draft
+    to edit.
+
+    `confidence` and `unresolved` carry the same load they carry in `LiaExtraction`: they are how
+    "I could not tell what he wanted changed" arrives as a fact instead of as a plausible guess.
+    "خليها أحسن" is not an edit, and it must become a question.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    intent:     Literal["edit_draft"]
+    confidence: Literal["high", "medium", "low"]
+    changes:    LiaDraftChanges = Field(default_factory=LiaDraftChanges)
+    unresolved: list[str] = Field(default_factory=list)
