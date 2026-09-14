@@ -719,11 +719,32 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
 
     # ── 2.5 An owner's opening greeting -> Lia's own welcome, with the way out. ──
     #
-    # Only from IDLE (or no session at all). An owner mid-booking who types "مرحبا" is answered by
-    # the state he is actually in -- hijacking it here would lose his place in his own
-    # appointment, and he is a customer at that moment whatever his role says.
-    if (msg_type == "text" and _looks_like_greeting(value)
-            and (session is None or session.state == "IDLE")):
+    # ONLY WHEN HE HAS COMMITTED TO NOTHING. An owner mid-booking who types "مرحبا" is answered by
+    # the state he is actually in -- hijacking it would lose his place in his own appointment, and
+    # at that moment he is a customer whatever his role says.
+    #
+    # THE TEST IS WHAT HE PICKED, NOT WHAT THE STATE IS CALLED -- and the first version got that
+    # wrong. It required `state == "IDLE"`, which locked the welcome out for anyone who had merely
+    # been SHOWN the service list. Measured on 2026-09-14: Salman typed the slug to switch tenant,
+    # which opened the flow and parked him at RES_AWAITING_SERVICE with `res_service_id=None`, and
+    # "مرحبا" was then answered by "ما فهمت تماماً" instead of by Lia.
+    #
+    # And it could not be waited out, which is what made it a defect rather than a delay:
+    # `whatsapp_session_repo.upsert()` refreshes `expiresAt` on EVERY save, so each attempt pushed
+    # the 30-minute window another 30 minutes away. The owner's real path -- tap "احجز موعد",
+    # browse, decide not to book, then ask to add a service -- was a dead end.
+    #
+    # Standing at the list having chosen nothing is not being mid-booking. A chosen service (and
+    # so anything past it: a barber, a slot) is. The property/booking flow's own states are
+    # deliberately NOT in here: they are a different engine, and an owner inside one is mid-task
+    # there for reasons this module knows nothing about.
+    uncommitted = (
+        session is None
+        or session.state == "IDLE"
+        or (session.state == whatsapp_reservation_flow.RES_AWAITING_SERVICE
+            and not session.res_service_id)
+    )
+    if msg_type == "text" and _looks_like_greeting(value) and uncommitted:
         client_id, actor, actor_id = await _resolve_owner(sender_phone)
         if client_id is None:
             # A CUSTOMER said hello. Not ours -- fall through, and note that the only cost paid

@@ -223,15 +223,32 @@ async def main():
     check("a CUSTOMER's «مرحبا» falls through untouched", out is None and not rec.sent,
           f"out={out!r} sent={rec.sent}")
 
-    rec, sess = Recorder(), _real_session(res.RES_AWAITING_SLOT)
-    lia._resolve_owner = lambda p: _done(("client-1", "owner", "user-1"))
-    try:
-        out = await lia.try_handle(rec, "96178727986", sess, "text", "مرحبا", "مرحبا",
-                                   lambda: _done(sess))
-    finally:
-        lia._resolve_owner = orig_resolve
-    check("an owner MID-BOOKING is not hijacked by the welcome",
-          out is None and not rec.sent, f"out={out!r} sent={rec.sent}")
+    # WHAT HE PICKED, NOT WHAT THE STATE IS CALLED. The real case is the third row: on
+    # 2026-09-14 Salman typed the slug to switch tenant, which parked him at
+    # RES_AWAITING_SERVICE with no service chosen -- and the first version of this guard, keyed
+    # on state == "IDLE", answered his "مرحبا" with "ما فهمت تماماً".
+    for state, service_id, want_welcome, note in (
+        ("IDLE",                    None,      True,  "idle"),
+        (res.RES_AWAITING_SERVICE,  None,      True,  "shown the list, chose nothing"),
+        (res.RES_AWAITING_SERVICE,  "svc-2",   False, "service chosen"),
+        (res.RES_AWAITING_BARBER,   "svc-2",   False, "picking a barber"),
+        (res.RES_AWAITING_SOONEST,  "svc-2",   False, "picking a slot"),
+        (res.RES_AWAITING_SLOT,     "svc-2",   False, "picking a time"),
+        ("AWAITING_UNIT",           None,      False, "inside the property flow"),
+    ):
+        rec, sess = Recorder(), _real_session(state)
+        sess.res_service_id = service_id
+        lia._resolve_owner = lambda p: _done(("client-1", "owner", "user-1"))
+        try:
+            out = await lia.try_handle(rec, "96178727986", sess, "text", "مرحبا", "مرحبا",
+                                       lambda: _done(sess))
+        finally:
+            lia._resolve_owner = orig_resolve
+        got_welcome = any(x[0] == "buttons" for x in rec.sent)
+        check(f"owner «مرحبا» @ {state} ({note}) -> welcome={want_welcome}",
+              got_welcome is want_welcome and (out is lia._SENTINEL if want_welcome
+                                               else out is None),
+              f"welcome={got_welcome} out={'SENTINEL' if out is lia._SENTINEL else out!r}")
 
     print("\n── G. the escape hatch binds the tenant and opens the customer flow ──")
     rec, sess = Recorder(), _real_session()
