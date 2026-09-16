@@ -254,6 +254,151 @@ reads — curated by review, never generated.
 
 ---
 
+## Activation Key, Operation Contract, and the Migration Debt
+
+Added 2026-09-16 with Lia Foundation (F0.1–F0.9). The decisions behind every line here are in
+`.claudedocs/plans/lia-expansion-master-plan.md`'s decision record (D0, I-1…I-7, D3-a/b/c,
+a-1…a-4, D9, R1–R6); this section states what is now true of the capability, not why.
+
+### ① Lia access — her own key, at last
+
+`serviceKey = "lia"`, accepted by `POST /api/v1/admin/client-services/activate` and listed in
+`platform_services`. Until this, Lia was gated on `serviceKey = "reservations"` — a key that is
+not hers — so "does this tenant have Lia" had no answer and she could not be switched off without
+switching off Reservations.
+
+```
+_tenant_has_lia(client_id)   →  client_services{ serviceKey ∈ ("lia","reservations"), isActive }
+```
+
+**🔴 THE `OR reservations` HALF IS A MIGRATION DEBT, with a stated payoff condition.**
+
+Pinning Lia straight onto her own key would switch her off for every live tenant until the
+activation rows exist — a real outage window for a sold capability, and one that depends on
+whether code or rows land first. The tolerant form removes that ordering dependence entirely.
+
+| | |
+|---|---|
+| **Population** | `rk` · `barberlab-test` · `mr-h`. `alzabt-demo` is **excluded permanently** (decision D0) — and `status` does not distinguish it, so any compliance query must exclude it **by slug** or it silently returns |
+| **Measured 2026-09-16** | `N₁ = 3` in population · `N₂ = 0` carrying a `lia` row · `N₃ = 0` |
+| **Payoff condition** | every in-population tenant carries an active `lia` row, **and** a fixture/test proves the two keys are independent — a `lia`-only tenant passes ① and is refused at ② by name, and a `reservations`-only tenant is refused once the `OR` is gone |
+| **NOT the condition** | a live tenant running on `lia` alone. Such a tenant passes ① and then fails every registered operation, because no operation's `service_key` is `lia`. It would greet and refuse everything — that is a broken tenant, not evidence (decision R6) |
+| **Blocked on** | `F4-B`: the four provisioning maps do not contain `lia`, so a newly seeded tenant is born non-compliant **after** compliance is declared. Re-measure at the moment of removal, not before |
+
+### ② Operation capability, and the two checks that must never merge
+
+```
+①  access to Lia        serviceKey ∈ ("lia","reservations")     _tenant_has_lia
+②  the OPERATION's own  OP.service_key                          _authorise_operation
+③  the customer flow's  "reservations"                          _tenant_has_reservations  ← the
+                                                                   escape hatch, a THIRD gate
+```
+
+Merging ① and ② re-pins Lia to `reservations` through the other door. Merging ② and ③ hands an
+owner into a booking flow on a tenant with no Reservations surface. All three are checked
+separately, and `scripts/test_lia_foundation.py` asserts the separation against the parsed source,
+not against its prose.
+
+### The operation contract
+
+`app/services/lia_operations.py` — `OperationDefinition(permission, legacy_roles, service_key,
+write_fn)`. The operation supplies the question; the human actor supplies the answer; **Lia holds
+no permission of her own** (invariant I-7, and the reason no `lia.write` string exists anywhere).
+
+| operation | permission | legacy_roles | service_key | mirrors |
+|---|---|---|---|---|
+| `create_service` | `services.write` | 2 roles | `reservations` | `admin/catalog_services.py:81` |
+| `create_reservation` | `reservations.write` | 4 roles | `reservations` | `admin/reservations.py:220` |
+| `create_catalog_item` | `catalog.write` | 4 roles incl. `MANAGER_UNITS` | `catalog` | `admin/catalog.py:142` |
+
+`legacy_roles` is the fourth field and not a convenience: invariant I1 judges an account with
+`permissions IS NULL` against **that route's own tuple**, the four real tuples differ, and all
+three live tenant owners are legacy accounts. Carrying only the permission would have silently
+changed what every real owner may do.
+
+**`create_barber` and `create_product` are absent, not disabled** (decision a-2): they have no
+service-layer write function, so reusing their repositories from here would bypass `clientId`,
+`moduleKey` and `normalize_for_storage` — the last of which is the جعفر defect. They enter the
+registry when a shared service-layer write path is extracted.
+
+### Authorisation, in the decided order
+
+```
+C   identity   Resolver Lia — tenant + ONE active actor, ambiguity refused by count (I-3, Lia-scoped)
+①   access     _tenant_has_lia                     ← and this alone gates the welcome (R1)
+[   the operation becomes known   ]
+A   capability client_services{ OP.service_key }
+B   permission is_authorized(actor, OP.permission, *OP.legacy_roles)
+    → re-run C · ① · A · B before the write, with the SAME OperationDefinition
+```
+
+Named refusals: `identity_unresolved` · `identity_ambiguous` · `tenant_changed` ·
+`lia_access_inactive` · `capability_inactive` · `missing_permission`. A `C` failure is **silent**
+plus an audit record — an unresolved sender must not learn what this number accepts; `①`, `A` and
+`B` are told plainly, without naming the permission.
+
+**`user_repo.find_user_by_phone` is deliberately untouched.** It is the login path, it is
+cross-tenant by necessity, and it resolves ambiguity by signing in the oldest account — changing
+it would stop a person who owns two shops from logging in at all. I-3's scope is Lia's own
+resolution (decision R4).
+
+### Behaviour change on record
+
+The welcome is now gated on ① . Before, it went out on identity alone, so an owner whose tenant
+had no Lia access was greeted by an assistant that would refuse his first instruction. He now
+falls through to the customer flow, and **no new wording was invented** to say it. Zero effect on
+the three live tenants, all of which pass ① today.
+
+### The provisioning invariant (a3-PR)
+
+> A tenant Lia operates on must have an active `User` reachable from its published shop number.
+
+### ✅ G3 decided, 2026-09-16 — `G3-a + G3-d`
+
+**`G3-a` — Foundation closes WITHOUT a hard provisioning block, and the reason is measured:**
+
+```
+the invariant fails CLOSED           a violation yields a refusal, never a wrong actor and never
+                                     a write.  ⇒ the security gain of PREVENTION is zero;
+                                     the invariant is an availability precondition, not a guard
+a blanket block fires ONLY on demo   registration_service already satisfies it (never fires),
+                                     demo_service structurally cannot (always fires)
+                                     ⇒ 100% false-positive rate on the only path it would trip
+a block scoped to the `lia` key      `lia` is in ZERO provisioning maps today, so it would never
+                                     fire on anything — costless AND useless until F4-B adds it
+```
+
+⇒ **the hard-block half is DEFERRED to `F4-B`, not cancelled.** When `lia` enters the provisioning
+maps, a block scoped to that key becomes both meaningful and harmless, and is decided then.
+
+**`G3-d` — what was actually broken, and is now fixed.** The analysis found a gap that a
+provisioning block would NOT have closed: an unresolved identity at the welcome returned `None`
+with **no audit record at all**. So a legitimate owner on a violating tenant got silence, and *we*
+got nothing either — the same shape as the جعفر incident, a failure invisible on both sides.
+
+The fix is a distinction, not a message:
+
+```
+identity_unresolved     nobody we know wrote in — a customer said hello.  NOT audited: it is the
+                        overwhelming majority, and recording it would drown the log.
+owner_number_unlinked   a tenant's OWN published number wrote in and no active account carries it.
+                        Rare, always a misconfiguration, always audited.
+identity_ambiguous      resolves to two accounts.  Audited.
+```
+
+`lia_owner_greeting_unresolved` is recorded for the latter two. **The sender is still told nothing**
+— that silence is deliberate (A2-c) and unchanged — and **no new wording was invented**.
+
+### The invariant's two halves today
+
+Runtime half: `identity_unresolved` / `owner_number_unlinked`, enforced and now audited.
+Provisioning half:
+`scripts/audit_lia_owner_actor_invariant.py` (read-only; 3/3 in-population tenants pass as of
+2026-09-16). **A hard block was NOT inserted into the shared provisioning paths** — measured,
+`registration_service` already satisfies the invariant and `demo_service` structurally cannot
+(placeholder `demo-<slug>` phone, no user phone), so a raise would break demo creation for tenants
+D0 excludes anyway. That reduction is deliberate and is recorded as an open item, not closed.
+
 ## Open Findings
 
 | # | Finding | Severity |
