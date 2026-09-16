@@ -108,7 +108,7 @@ async def main():
           f"{len(lia._SYSTEM_PROMPT)} chars sha256={hashlib.sha256(lia._SYSTEM_PROMPT.encode()).hexdigest()[:16]}")
     check("welcome still loads", len(lia._WELCOME) > 40, f"{len(lia._WELCOME)} chars")
     check("edit prompt loads", len(lia._EDIT_PROMPT) > 100, f"{len(lia._EDIT_PROMPT)} chars")
-    check("all four replies load", all(k in lia._REPLIES for k in lia._REQUIRED_REPLIES),
+    check("every required reply loads", all(k in lia._REPLIES for k in lia._REQUIRED_REPLIES),
           str(sorted(lia._REPLIES)))
 
     print("\n── 2. the guards fire on a damaged file ──")

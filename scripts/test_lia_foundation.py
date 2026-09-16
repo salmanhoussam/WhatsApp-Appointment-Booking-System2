@@ -192,15 +192,33 @@ async def main():
     OP_SERVICE = ops.get("create_service")
     OP_RESERVE = ops.get("create_reservation")
     OP_ITEM = ops.get("create_catalog_item")
+    OP_PRODUCT = ops.get("create_product")
 
     # ── the registry itself ──────────────────────────────────────────────────
     print("── 0. the operation registry (D3-a / a-1 / a-2) ──")
-    check("exactly three operations registered",
-          ops.names() == ("create_catalog_item", "create_reservation", "create_service"),
+    # FOUR since S3 (2026-09-17), and this assertion changed for a measured reason rather than to
+    # accommodate new code. `a-2` kept `create_product` out on the stated ground that the store
+    # product path had NO service-layer write function. That ground turned out to be false:
+    # `catalog_service.admin_create_item` is one, `admin/store.py` calls it, and
+    # `scripts/test_lia_product_s1.py` runs the real function against a faked repository to prove
+    # the row is a correct product. So a-2's list is now `create_barber` ALONE -- the operation
+    # that genuinely still writes through a repository with its constraints in the route.
+    check("exactly four operations registered",
+          ops.names() == ("create_catalog_item", "create_product", "create_reservation",
+                          "create_service"),
           str(ops.names()))
     check("create_barber is ABSENT, not registered-and-disabled (a-2)",
           ops.get("create_barber") is None and "create_barber" not in ops.names())
-    check("create_product is ABSENT too", ops.get("create_product") is None)
+    check("create_product's gate is `store`, NOT `catalog` — a different key, inactive on all "
+          "three live tenants",
+          OP_PRODUCT.service_key == "store" and OP_ITEM.service_key == "catalog")
+    check("   and its legacy tuple mirrors admin/store.py, which admits no MANAGER_UNITS",
+          OP_PRODUCT.legacy_roles == ("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")
+          and "MANAGER_UNITS" in OP_ITEM.legacy_roles,
+          str(OP_PRODUCT.legacy_roles))
+    check("   two definitions over ONE write function — the table writes, the route authorises",
+          OP_PRODUCT.write_fn() is OP_ITEM.write_fn()
+          and OP_PRODUCT.permission != OP_ITEM.permission)
     check("an unknown name returns None, never a default (no fallback operation)",
           ops.get("anything_else") is None)
     for op, key, nroles in ((OP_SERVICE, "reservations", 2), (OP_RESERVE, "reservations", 4),
@@ -471,8 +489,17 @@ async def main():
         r()
     check("the re-check takes an OperationDefinition, so it cannot fall back to a fixed key",
           "async def _still_authorised(phone: str, client_id: Optional[str], op=None)" in lia_src)
-    check("   and _commit passes create_service's own definition into it",
-          'op = lia_operations.get("create_service")' in lia_src)
+    # S3 (2026-09-17): `_commit` no longer names an operation at all -- it reads the one the
+    # DRAFT carries. That is the point of the slice, so the assertion moves from "the literal
+    # create_service is passed" to "the definition comes from the draft and has no fallback".
+    # The stronger property is asserted by the two checks below rather than weakened away.
+    commit_src = code_of_function("app/services/lia_owner_entry.py", "_commit")
+    check("   and _commit takes the definition from the DRAFT's operation, not a literal",
+          "op_name = _draft_operation(draft)" in commit_src
+          and "lia_operations.get(op_name)" in commit_src
+          and 'lia_operations.get("create_service")' not in commit_src)
+    check("   an unregistered operation on a draft REFUSES the write (no fallback definition)",
+          "if op is None:" in commit_src and "unknown_operation" in commit_src)
 
     # ── AC-6 · independence, all four combinations ───────────────────────────
     print("\n── AC-6. capability/permission independence — four combinations ──")
