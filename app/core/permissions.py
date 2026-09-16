@@ -402,6 +402,25 @@ RESERVATION_LEGACY_ROLES: tuple[str, ...] = (
     "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "STAFF",
 )
 
+# The same treatment for the two other areas an operation-authorised channel needs (Lia
+# Foundation, 2026-09-16, decision D3-a). Each tuple below is a VERBATIM MIRROR of the tuple that
+# route already passes to require_permission() -- copied, never re-derived, because invariant I1
+# evaluates a legacy account (permissions IS NULL) against the route's OWN list and the real lists
+# differ per area. Getting one wrong silently changes what a legacy account may do, and all three
+# live tenant owners are legacy accounts (measured 2026-09-16: rk, barberlab-test and mr-h all
+# carry permissions IS NULL), so this is the normal path, not an edge case.
+#
+# The routes are deliberately NOT changed to import these -- that would be a refactor with no
+# behavioural gain. Instead `scripts/test_lia_foundation.py` parses the route files and asserts
+# these tuples still match, so a future edit to either side cannot drift silently.
+#
+#   SERVICES_LEGACY_ROLES -> app/api/v1/admin/catalog_services.py:81 (POST /)
+#   CATALOG_LEGACY_ROLES  -> app/api/v1/admin/catalog.py:45 (CATALOG_ROLES, used by _WRITE)
+SERVICES_LEGACY_ROLES: tuple[str, ...] = ("SUPER_ADMIN", "TENANT_ADMIN")
+CATALOG_LEGACY_ROLES: tuple[str, ...] = (
+    "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS",
+)
+
 
 def is_authorized(user, permission: str, *legacy_roles: str) -> bool:
     """The authorisation decision itself — no HTTP, no Depends, no request.
