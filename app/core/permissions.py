@@ -416,9 +416,19 @@ RESERVATION_LEGACY_ROLES: tuple[str, ...] = (
 #
 #   SERVICES_LEGACY_ROLES -> app/api/v1/admin/catalog_services.py:81 (POST /)
 #   CATALOG_LEGACY_ROLES  -> app/api/v1/admin/catalog.py:45 (CATALOG_ROLES, used by _WRITE)
+#   STORE_LEGACY_ROLES    -> app/api/v1/admin/store.py:176 (POST /products)
 SERVICES_LEGACY_ROLES: tuple[str, ...] = ("SUPER_ADMIN", "TENANT_ADMIN")
 CATALOG_LEGACY_ROLES: tuple[str, ...] = (
     "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS", "MANAGER_UNITS",
+)
+# The product area (S3, 2026-09-17). NOT the same list as CATALOG_LEGACY_ROLES, and that
+# difference is the whole reason this is a fourth tuple rather than a reuse: `admin/store.py`
+# admits MANAGER_RESERVATIONS but NOT MANAGER_UNITS, while `admin/catalog.py` admits both. A
+# legacy MANAGER_UNITS account may write a catalog item through the catalog surface and may NOT
+# write a product through the store surface -- so borrowing the catalog tuple here would silently
+# widen what a legacy account can do from WhatsApp.
+STORE_LEGACY_ROLES: tuple[str, ...] = (
+    "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS",
 )
 
 
