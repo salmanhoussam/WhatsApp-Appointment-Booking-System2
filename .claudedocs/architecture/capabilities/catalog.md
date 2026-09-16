@@ -129,6 +129,44 @@ collapsed a tenant's real plural capability set into one derived value has been 
 resolution.md` and fully executed (5 phases + a Search Verification gate). Full ledger:
 `.claudedocs/maturity/catalog.md`.
 
+## Two unrelated things are both called "catalog" (2026-09-16)
+
+Recorded after decision **Q2** of the catalog-model investigation
+(`.claudedocs/work/catalog-model-investigation/2026-09-16/summary.md`). No structural change was
+made and none is needed — this is a NAMING collision, and writing it down is the whole fix.
+
+```
+CatalogCategory.moduleKey = "catalog"     a PARTITION inside the shared catalog tables
+client_services.serviceKey = "catalog"    a CAPABILITY KEY gating admin/catalog.py
+```
+
+**They are not related, and they do not have to agree.** Measured 2026-09-16:
+
+| | |
+|---|---|
+| All 36 `CatalogService` rows | sit in `moduleKey="catalog"` categories |
+| Yet their real gate | is `require_service("reservations")` (`admin/catalog_services.py:66`) |
+| And `serviceKey="catalog"` | is **inactive on all three live tenants** (`rk`, `barberlab-test`, `mr-h`) |
+| While services work there | correctly — because they never pass through that gate |
+
+So a reader who assumes `moduleKey` names the gating capability concludes the data is
+mis-classified. It is not. `moduleKey` answers **"which vertical's partition does this row belong
+to"**, and it answers it consistently — `admin/store.py` passes `module_key="store"` on **eight**
+call sites (create, read, update, delete, for both category and item), and `admin/restaurant.py`
+does the same with `"restaurant"`. Items line up with their capability (`store`→`store`,
+`restaurant`→`restaurant`); services deliberately use the generic `catalog` partition while being
+gated by `reservations`.
+
+**An earlier note in this project's own working reports said `moduleKey` "lies about its most
+important table". That was stated more strongly than the evidence supports, and is corrected
+here:** the column does its job without a single exception. What is true is narrower — one VALUE,
+`"catalog"`, names two unrelated concepts.
+
+**Consequence for anything new:** derive a capability gate from the ROUTE that owns the surface,
+never from a category's `moduleKey`. Lia's product operation follows this — it is gated on `store`
+because `admin/store.py` is, and it writes into a `moduleKey="store"` category because that is the
+partition products live in. Two separate facts that happen to agree, not one fact used twice.
+
 ## Open Findings
 
 **Duplicate Architecture** — `app/api/v1/admin/store.py` and `app/api/v1/admin/restaurant.py`

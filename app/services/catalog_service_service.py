@@ -1,9 +1,23 @@
 """
-CatalogService Service — business logic for the CatalogService model (something a customer books
-a Reservation for, distinct from CatalogItem). Phase 3.7C (2026-08-08). Named
-catalog_service_service.py, not service_service.py -- that file already exists for the unrelated
-`Service` (smar property add-on) model. No Prisma imports. All DB access via
-app/repositories/catalog_service_repo.py.
+CatalogService Service — business logic for the CatalogService model: WHAT A SHOP SELLS ITS OWN
+CUSTOMERS and a customer books a Reservation for (a haircut, a beard trim), distinct from
+CatalogItem, which is merchandise. Phase 3.7C (2026-08-08).
+
+NOT the platform's own products. Three different things in this repository answer to the word
+"service", and conflating them is a real and recurring source of confusion:
+
+    platform_services / client_services / require_service()   what SalmanSaaS sells a TENANT
+    CatalogService (this file)                                what a TENANT sells its CUSTOMERS
+    app/services/*.py                                         the code layer
+
+THE DOUBLED NAME IS HISTORICAL, and its original reason is gone. It read "not service_service.py
+-- that file already exists for the unrelated `Service` (smar property add-on) model". That file
+and that model were both deleted on 2026-09-07 in 2d464d7 ("drop the legacy services table"), when
+`services` was retired and `catalog_services` inherited its 28 rows. Corrected 2026-09-16 rather
+than left standing: a docstring explaining itself by a file nobody can find is what made this
+module look wrong to read.
+
+No Prisma imports. All DB access via app/repositories/catalog_service_repo.py.
 """
 
 from typing import Optional
