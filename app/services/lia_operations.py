@@ -50,6 +50,7 @@ from app.core.permissions import (
     CATALOG_LEGACY_ROLES,
     RESERVATION_LEGACY_ROLES,
     SERVICES_LEGACY_ROLES,
+    STORE_LEGACY_ROLES,
 )
 
 
@@ -86,20 +87,46 @@ def _write_create_catalog_item():
     return catalog_service.admin_create_item
 
 
+def _write_create_product():
+    """THE SAME FUNCTION as `_write_create_catalog_item`, and that is not a duplication.
+
+    `admin_create_item` writes one `CatalogItem`. Which SURFACE asked for it decides the gate and
+    the permission, and the two surfaces are genuinely different:
+
+        admin/catalog.py:142   require_service("catalog")  catalog.write  + MANAGER_UNITS
+        admin/store.py:175-176 require_service("store")    store.write    no MANAGER_UNITS
+
+    Measured 2026-09-16: `catalog` is INACTIVE on all three live tenants while `store` is active
+    on rk and barberlab-test -- so reusing `create_catalog_item`'s definition for a product would
+    refuse every real owner with a 403 on a capability nobody has. Hence two definitions over one
+    write function: the table decides what is written, the route decides who may ask.
+    """
+    from app.services import catalog_service
+    return catalog_service.admin_create_item
+
+
 # ── The registry ─────────────────────────────────────────────────────────────
 #
 # Decision a-1: exactly the operations that have a real service-layer write function TODAY.
-# `create_barber` and `create_product` are deliberately ABSENT, not present-and-disabled
-# (decision a-2): `barber_repo.create_barber` and the store product path write through
-# repositories, with the tenant id, the phone normalisation and the module key enforced in the
-# route. Reusing them from here would re-create the جعفر defect (a phone stored without its
-# country code) and bypass `clientId`/`moduleKey`. They enter this registry when a shared
-# service-layer write path is extracted, and not before.
+# `create_barber` is deliberately ABSENT, not present-and-disabled (decision a-2):
+# `barber_repo.create_barber` writes through a repository, with the tenant id, the phone
+# normalisation and the working hours enforced in the route. Reusing it from here would re-create
+# the جعفر defect (a phone stored without its country code) and bypass `clientId`. It enters this
+# registry when a shared service-layer write path is extracted, and not before.
+#
+# `create_product` WAS in that same sentence until 2026-09-17, on the belief that the store
+# product path had no service-layer function either. That belief was wrong, and it was corrected
+# by measurement rather than by re-reading: `catalog_service.admin_create_item` IS a service-layer
+# function, `admin/store.py` calls it, and `scripts/test_lia_product_s1.py` runs the REAL function
+# against a faked repository to prove the row it writes is a correct product (clientId carried,
+# store partition, isActive set by the service, no duration field). So the operation qualifies
+# under a-1 on the same terms as the others -- no exception was made for it.
 #
 # NOTE ON REACHABILITY: registering an operation does not make Lia able to perform it. The model
-# can only ever produce a name that `LiaIntent` admits, and today that is `create_service` alone.
-# The registry is the authorization specification; the intents that reach it arrive per operation,
-# each with its own phase.
+# can only ever produce a name that `LiaIntent` admits, and a family the cheap entry gate can
+# recognise. `create_reservation` and `create_catalog_item` are registered and NOT reachable for
+# exactly that reason. The registry is the authorization specification; the intents that reach it
+# arrive per operation, each with its own phase.
 _REGISTRY: dict[str, OperationDefinition] = {
     "create_service": OperationDefinition(
         name          = "create_service",
@@ -124,6 +151,18 @@ _REGISTRY: dict[str, OperationDefinition] = {
         service_key   = "catalog",
         write_fn      = _write_create_catalog_item,
         mirrors_route = "app/api/v1/admin/catalog.py:142",
+    ),
+    # S3, 2026-09-17. Every value below is read off `admin/store.py`, not chosen: the permission
+    # and the legacy tuple from :176, the capability key from :175. See `_write_create_product`
+    # for why this is a separate definition from `create_catalog_item` although the write
+    # function is the same object.
+    "create_product": OperationDefinition(
+        name          = "create_product",
+        permission    = "store.write",
+        legacy_roles  = STORE_LEGACY_ROLES,
+        service_key   = "store",
+        write_fn      = _write_create_product,
+        mirrors_route = "app/api/v1/admin/store.py:175-176",
     ),
 }
 

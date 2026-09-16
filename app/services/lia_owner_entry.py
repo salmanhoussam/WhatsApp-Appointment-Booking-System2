@@ -48,7 +48,7 @@ from app.core.phone import normalize_for_storage
 from app.db.client import prisma_client
 from app.repositories import catalog_service_repo, user_repo
 from app.services import lia_operations
-from app.services import catalog_service_service, whatsapp_reservation_flow
+from app.services import catalog_service, catalog_service_service, whatsapp_reservation_flow
 from app.services.security_audit_service import log_security_event
 from app.services.whatsapp_service import WhatsAppService
 
@@ -92,18 +92,52 @@ _ENTRY_VERBS = ("ضيف", "ضيّف", "اضف", "أضف", "زيد", "سجل", "�
 _ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
 
 
-def _looks_like_service_entry(text: str) -> bool:
-    """A cheap, explicit gate before any model call.
+# What a message may be about, and the operation each family maps to. S3, 2026-09-17.
+#
+# THIS REPLACED `_looks_like_service_entry`, which was deleted rather than kept beside it. Keeping
+# both would have left a second copy of the same verb/noun logic with no caller in `app/` --
+# alive only because a test named it, which is how a duplicate survives long enough to drift from
+# the one that runs. `_entry_family(t) == "create_service"` is exactly what that predicate
+# answered, and `scripts/test_lia_product_s3.py` asserts that equivalence on the real messages.
+#
+# THE GATE NOW CHOOSES WHICH QUESTION TO ASK THE MODEL, and that is a real widening of its job --
+# it used to answer "is a model call justified", it now also answers "justified for which
+# operation". The reason it must be here rather than in the model's answer is decision D9's own
+# order: the operation has to be KNOWN before A and B run, and A and B run before any model call.
+# An operation named by the model would be named after it was already authorised.
+#
+# It is still not a classifier. It matches a REQUIRED GENERIC NOUN -- "خدمة" or "منتج"/"بضاعة" --
+# and nothing else. It does not know that شامبو is a product and حلاقة is a service, and it must
+# not learn: a dictionary of Arabic product names is a list that is wrong the day a shop stocks
+# something new. The cost is that an owner says the noun ("ضيف منتج شامبو بـ12 دولار"), which is
+# exactly the shape the live service path already requires of him ("ضيف خدمة...").
+_PRODUCT_OBJECTS = ("منتج", "منتوج", "بضاعة", "بضاعه", "سلعة", "سلعه", "صنف",
+                    "product", "item")
 
-    NOT an intent classifier -- the model does that. This only decides whether asking the model is
-    justified, which keeps an owner's ordinary message (a booking, a question, a thank-you) from
-    costing a call and, more importantly, from being interpreted at all.
+# Returned when a message names BOTH families. Not a family, and deliberately not a silent
+# preference for the live one: guessing "service" here could authorise `services.write` for a
+# message that meant a product, which is the one thing the operation-aware model exists to stop.
+_AMBIGUOUS = "__ambiguous__"
+
+
+def _entry_family(text: str) -> Optional[str]:
+    """The OPERATION this message asks for, `_AMBIGUOUS`, or None for "not mine".
+
+    Returns an operation name straight out of `lia_operations`, not a private label, so there is
+    no second vocabulary to keep in step with the registry.
     """
     low = " ".join((text or "").split()).lower()
-    if len(low) < 6:
-        return False
-    return (any(v in low for v in _ENTRY_VERBS)
-            and any(o in low for o in _ENTRY_OBJECTS))
+    if len(low) < 6 or not any(v in low for v in _ENTRY_VERBS):
+        return None
+    service = any(o in low for o in _ENTRY_OBJECTS)
+    product = any(o in low for o in _PRODUCT_OBJECTS)
+    if service and product:
+        return _AMBIGUOUS
+    if service:
+        return "create_service"
+    if product:
+        return "create_product"
+    return None
 
 
 # Greetings an owner actually opens with. A SECOND cheap gate, and it has to stay as cheap as
@@ -360,6 +394,47 @@ async def _resolve_service_category(client_id: str) -> tuple[Optional[str], list
     return None, cats
 
 
+async def _resolve_store_category(client_id: str) -> tuple[Optional[str], list]:
+    """(category_id, store_categories). None means "ask", never "create one". S3, 2026-09-17.
+
+    RESOLVED BY PARTITION, NOT BY CONTENT -- and that asymmetry with `_resolve_service_category`
+    above is the single most important line in this function.
+
+    That one finds the category that already HOLDS services, because a name match would be a guess
+    about Arabic labels. Doing the same for products would be actively wrong, and there is a
+    measured row proving it: mr-h's «تمشيط أو تسريح» was a `CatalogItem` sitting inside the
+    SERVICES category (`scripts/fix_mrh_service_modelled_as_item.py`, applied 2026-09-16). A
+    content-based resolver asked "which category holds items?" would have answered with the
+    services category on that tenant, and a product would have been written onto the booking
+    surface.
+
+    `moduleKey` is the partition discriminator, verified to work without exception --
+    `admin/store.py` passes `module_key="store"` on eight call sites. So the question here is
+    "which category belongs to the STORE?", which is a structural fact rather than an inference.
+
+    Nothing is created when the answer is empty. A category is a customer-visible grouping; a
+    shop that sells nothing yet has not decided how its shelf is organised, and a chat message is
+    not where that gets decided.
+    """
+    cats = await prisma_client.catalogcategory.find_many(
+        where={"clientId": client_id, "isActive": True, "moduleKey": "store"})
+    if not cats:
+        return None, []
+    if len(cats) == 1:
+        return cats[0].id, cats
+    # More than one shelf: prefer the one that already holds products, on the same reasoning the
+    # service resolver uses -- where the tenant's products already live is a fact.
+    with_items = []
+    for cat in cats:
+        count = await prisma_client.catalogitem.count(
+            where={"categoryId": cat.id, "isActive": True})
+        if count:
+            with_items.append(cat)
+    if len(with_items) == 1:
+        return with_items[0].id, cats
+    return None, cats
+
+
 # ── Extraction ────────────────────────────────────────────────────────────────
 
 # ── The prompt lives in a file, not here (2026-09-13, Salman's decision) ──
@@ -371,6 +446,13 @@ _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "lia.md"
 # sentinel in this shape cannot appear in prose, which makes that mistake unrepeatable.
 _PROMPT_START = "<!--LIA_PROMPT_START-->"
 _PROMPT_END   = "<!--LIA_PROMPT_END-->"
+# The product prompt: a THIRD model-facing block (S3, 2026-09-17). Separate from the service
+# prompt above, not an extension of it, for two reasons stated in full in the file's own header:
+# the service prompt is pinned byte-identical by two test suites and must stay at zero change,
+# and one block per intent is what makes the operation the model names identical to the operation
+# already authorised -- see `LiaProductExtraction.intent`.
+_PRODUCT_PROMPT_START = "<!--LIA_PRODUCT_PROMPT_START-->"
+_PRODUCT_PROMPT_END   = "<!--LIA_PRODUCT_PROMPT_END-->"
 # The owner's welcome message. A SECOND, separate block -- never merged into the prompt above,
 # because it is not sent to a model at all: it is sent verbatim to a person. Keeping them apart
 # is what lets the prompt stay provably byte-identical to what it was while the welcome changes.
@@ -387,7 +469,12 @@ _REPLIES_END   = "<!--LIA_REPLIES_END-->"
 _REPLY_KEY = re.compile(r"^\[\[([a-z_]+)\]\]$", re.M)
 # Every key the code actually sends. Checked at IMPORT: a missing one must fail pre-flight, not
 # reach an owner as a KeyError or an empty message.
-_REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailable")
+_REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailable",
+                     # S3, 2026-09-17 -- the five owner-facing texts the product path needs.
+                     # Listed here so a missing one fails the app's startup rather than reaching
+                     # an owner as an empty WhatsApp message.
+                     "store_inactive", "product_no_category", "product_created_note",
+                     "product_unclear", "entry_ambiguous")
 
 
 def _load_prompt() -> str:
@@ -470,6 +557,9 @@ def _load_replies() -> dict:
 
 
 _SYSTEM_PROMPT = _load_prompt()
+# Loaded at import for the same reason as the others: a missing or malformed block must fail
+# pre-flight, where it is visible, not one owner's message, where it is not.
+_PRODUCT_PROMPT = _load_block(_PRODUCT_PROMPT_START, _PRODUCT_PROMPT_END, "product prompt")
 # The welcome is loaded at import for the same reason the prompt is: a missing block is caught in
 # pre-flight, not by an owner whose "مرحبا" goes unanswered.
 _WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
@@ -488,7 +578,7 @@ _SENTINEL = object()
 
 
 async def _extract(text: str) -> Optional["object"]:
-    """Ask the model for a draft. Returns a validated LiaExtraction, or None.
+    """Ask the model for a SERVICE draft. Returns a validated LiaExtraction, or None.
 
     Same shape as `onboarding.py`'s `_extract_with_claude`, including the fence stripping -- the
     model wraps JSON in ```json often enough that handling it is not defensive, it is the observed
@@ -497,6 +587,30 @@ async def _extract(text: str) -> Optional["object"]:
     """
     from app.schemas.lia_drafts import LiaExtraction
 
+    return await _ask_model(_SYSTEM_PROMPT, text, LiaExtraction)
+
+
+async def _extract_product(text: str) -> Optional["object"]:
+    """Ask the model for a PRODUCT draft. Returns a validated LiaProductExtraction, or None.
+
+    A different prompt and a different contract, but the SAME transport, the same fence stripping
+    and the same three-way outcome (`_UNAVAILABLE` / None / a validated object) -- which is why
+    the body is shared rather than copied. A second copy of the failure classification below is
+    exactly how "unavailable" and "misunderstood" would drift apart again, and that distinction
+    was paid for once already (2026-09-13, a dead API key answered with "ما فهمت").
+    """
+    from app.schemas.lia_drafts import LiaProductExtraction
+
+    return await _ask_model(_PRODUCT_PROMPT, text, LiaProductExtraction)
+
+
+async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["object"]:
+    """One model call, one contract. `_UNAVAILABLE` for our fault, None for an unusable answer.
+
+    `model_cls` is a Pydantic class with `extra="forbid"` and a one-value `intent` Literal, so the
+    caller's already-authorised operation and the model's claimed one cannot disagree: a product
+    prompt answering `create_service` fails validation and becomes a question.
+    """
     api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
     if not api_key:
         logger.error("🔥 Lia: ANTHROPIC_API_KEY is not configured — extraction unavailable")
@@ -507,12 +621,12 @@ async def _extract(text: str) -> Optional["object"]:
         resp = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=512,
-            system=_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": text}],
         )
         raw = resp.content[0].text.strip()
         raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        return LiaExtraction.model_validate_json(raw)
+        return model_cls.model_validate_json(raw)
     except Exception as exc:
         # An authentication or transport failure is NOT "the owner was unclear", and telling him
         # "ما فهمت" for a dead API key would send him rephrasing a message that was perfectly
@@ -635,6 +749,48 @@ _FIELD_QUESTIONS = {
     "name_ar":      "شو اسم الخدمة؟",
 }
 
+# The product's own questions. A separate dict rather than a widened one, so the service
+# questions above stay byte-identical -- and because the wording genuinely differs: «سعرها» is a
+# service, «سعره» is a product, and there is no duration question at all.
+_PRODUCT_FIELD_QUESTIONS = {
+    "price":   "قدّيش سعره؟ (بالدولار)",
+    "name_ar": "شو اسم المنتج؟",
+}
+
+
+def _op_spec(op_name: str):
+    """(required_fields, field_questions, draft_class) for one operation. S3, 2026-09-17.
+
+    THE ONE PLACE THE SHAPE OF A DRAFT IS DECIDED, so `_advance`, `_preview_text` and `_commit`
+    read it instead of each carrying its own idea of what a complete draft looks like. Before
+    this, all three were frozen to the service shape -- `_advance` looped over a literal
+    ("name_ar", "price", "duration_min") and `_commit` named `LiaServiceDraft` outright -- and a
+    second operation would have had to be threaded through each of them separately.
+
+    REQUIRED MEANS REQUIRED, and it is enforced here rather than in the prompt: the model is
+    asked not to invent a price, and this makes the absence of one a QUESTION regardless of what
+    the model actually did.
+    """
+    from app.schemas.lia_drafts import LiaProductDraft, LiaServiceDraft
+
+    if op_name == "create_product":
+        return ("name_ar", "price"), _PRODUCT_FIELD_QUESTIONS, LiaProductDraft
+    # `create_service` and, deliberately, anything unknown: a draft whose operation cannot be
+    # read is treated as the one operation that has always existed. This is not a default
+    # OPERATION -- authorisation never falls back, `lia_operations.get` returns None for an
+    # unknown name and the caller refuses. It is only how a draft written by the PREVIOUS deploy,
+    # which carries `intent` and no `operation` key, still completes instead of dying mid-flow.
+    return ("name_ar", "price", "duration_min"), _FIELD_QUESTIONS, LiaServiceDraft
+
+
+def _draft_operation(draft: dict) -> str:
+    """Which operation this draft is for, tolerant of a draft written before S3.
+
+    A draft that was mid-flight when this code deployed has `intent` and no `operation`. Reading
+    both, in that order, is what stops the deploy itself from cancelling every open preview.
+    """
+    return draft.get("operation") or draft.get("intent") or "create_service"
+
 _DURATION_WORDS = {
     "ساعة": 60, "ساعه": 60, "ساعة ونص": 90, "ساعه ونص": 90, "نص ساعة": 30, "نص ساعه": 30,
     "ربع ساعة": 15, "ساعتين": 120,
@@ -663,22 +819,30 @@ def _parse_field_answer(field: str, text: str):
 
 # ── Preview + write ───────────────────────────────────────────────────────────
 
-def _preview_text(draft_data: dict, category_name: str) -> str:
+def _preview_text(draft_data: dict, category_name: str,
+                  op_name: str = "create_service") -> str:
     """What the owner reads BEFORE anything is written.
 
     This message is the primary safety mechanism of the whole slice, not a courtesy. Every value
     the model produced is quoted back, so a hallucinated price is visible as a number the owner
     did not say -- the plan's §15 marks "hallucinated price" as the one failure that BLOCKS Phase 1
     for exactly this reason. Nothing is summarised or rounded here.
+
+    THE PRODUCT PREVIEW OMITS THE DURATION LINE, and that omission is itself the safety property:
+    printing "*المدة:* None دقيقة" would show the owner a field his product does not have and
+    teach him that Lia does not know what she is writing. `op_name` defaults to the service so an
+    S2-era draft previews exactly as it did.
     """
+    label = "المنتج" if op_name == "create_product" else "الخدمة"
     lines = [
         "هيك فهمت 👇",
         "",
-        f"*الخدمة:*  {draft_data.get('name_ar')}",
+        f"*{label}:*  {draft_data.get('name_ar')}",
         f"*السعر:*   {draft_data.get('price')} {draft_data.get('currency', 'USD')}",
-        f"*المدة:*   {draft_data.get('duration_min')} دقيقة",
-        f"*الفئة:*   {category_name}",
     ]
+    if op_name != "create_product":
+        lines.append(f"*المدة:*   {draft_data.get('duration_min')} دقيقة")
+    lines.append(f"*الفئة:*   {category_name}")
     if draft_data.get("name_en"):
         lines.append(f"*بالإنجليزي:* {draft_data['name_en']}")
     if draft_data.get("description_ar"):
@@ -687,7 +851,8 @@ def _preview_text(draft_data: dict, category_name: str) -> str:
 
 
 async def _send_preview(wa, phone: str, draft: dict) -> None:
-    await wa.send_text(phone, _preview_text(draft["data"], draft.get("category_name", "—")))
+    await wa.send_text(phone, _preview_text(draft["data"], draft.get("category_name", "—"),
+                                            _draft_operation(draft)))
     await wa.send_interactive_buttons(
         to=phone,
         text="أضيفها هلق؟",
@@ -713,37 +878,77 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
     services. `wamid` idempotency already stops a Meta retry from reaching here twice, but a human
     double-tap produces two DIFFERENT wamids and would otherwise pass both.
     """
-    from app.schemas.lia_drafts import LiaServiceDraft
-
     client_id = draft.get("client_id")
     actor, actor_id = draft.get("actor"), draft.get("actor_id")
+    op_name = _draft_operation(draft)
+    _, _, draft_cls = _op_spec(op_name)
 
     # Consume first. A failure after this point means the owner re-sends, which is recoverable;
     # a double write is not.
     clear_draft()
 
+    # The SAME definition the pre-model checks used -- looked up by the operation the DRAFT
+    # carries, not by a name written into this function. `get` returns None for an unknown name
+    # and there is no fallback: a draft naming an operation this registry does not know is
+    # refused, because the alternative is writing under a permission nobody checked.
+    op = lia_operations.get(op_name)
+    if op is None:
+        await log_security_event(
+            event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": "unknown_operation", "operation": op_name,
+                    "sender_phone": phone}, actor=actor_id,
+        )
+        logger.error("🔥 Lia: draft named unknown operation %r — write refused", op_name)
+        return
+
     try:
-        validated = LiaServiceDraft.model_validate(draft["data"])
+        validated = draft_cls.model_validate(draft["data"])
     except Exception as exc:
         logger.error("🔥 Lia: draft failed final validation: %s", exc)
         await wa.send_text(phone, "صار خلل بالبيانات 😅 ابعتلي الخدمة من جديد.")
         return
 
-    # The SAME definition the pre-model checks used -- not a second lookup of a different shape.
-    op = lia_operations.get("create_service")
     ok, reason = await _still_authorised(phone, client_id, op)
     if not ok:
         await log_security_event(
             event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
-            detail={"reason": reason, "sender_phone": phone}, actor=actor_id,
+            detail={"reason": reason, "operation": op.name, "sender_phone": phone},
+            actor=actor_id,
         )
         logger.warning("🚫 Lia: write refused at commit time (%s) from %s", reason, phone)
         return
 
+    if op.name == "create_product":
+        created = await _write_product(wa, phone, client_id, validated)
+    else:
+        created = await _write_service(wa, phone, client_id, validated)
+    if created is None:
+        return                                     # the branch already told the owner why
+
+    await log_security_event(
+        event_type=f"lia_{actor}_{op.name}", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"row_id": created.get("id"), "name_ar": validated.name_ar,
+                "price": validated.price,
+                "duration_min": getattr(validated, "duration_min", None),
+                "operation": op.name, "permission": op.permission,
+                "service_key": op.service_key,
+                "sender_phone": phone, "source": "whatsapp_text"},
+        actor=actor_id,
+    )
+    logger.info("✅ Lia: %s %s created for %s by %s %s",
+                op.name, created.get("id"), client_id, actor, actor_id)
+
+
+async def _write_service(wa, phone: str, client_id: str, validated) -> Optional[dict]:
+    """The service write, unchanged in substance -- only moved out of `_commit`.
+
+    Returns None once the owner has been told what went wrong, so the caller does not have to
+    distinguish "failed" from "failed and already explained".
+    """
     category_id, _ = await _resolve_service_category(client_id)
     if not category_id:
         await wa.send_text(phone, "ما لقيت فئة للخدمات بالمحل. أضفها من اللوحة أول مرّة.")
-        return
+        return None
 
     try:
         # THE ONE WRITE PATH. Identical function to POST /api/v1/admin/catalog-services --
@@ -765,23 +970,74 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
     except Exception as exc:
         logger.error("🔥 Lia: service creation failed: %s", exc, exc_info=True)
         await wa.send_text(phone, "تعذّر إضافة الخدمة. جرّب من جديد أو من اللوحة.")
-        return
+        return None
 
-    await log_security_event(
-        event_type=f"lia_{actor}_create_service", client_id=client_id, endpoint=_ENDPOINT,
-        detail={"service_id": created.get("id"), "name_ar": validated.name_ar,
-                "price": validated.price, "duration_min": validated.duration_min,
-                "sender_phone": phone, "source": "whatsapp_text"},
-        actor=actor_id,
-    )
-    logger.info("✅ Lia: service %s created for %s by %s %s",
-                created.get("id"), client_id, actor, actor_id)
     await wa.send_text(
         phone,
         f"✅ تمّت إضافة *{validated.name_ar}*\n"
         f"{validated.price} {validated.currency} · {validated.duration_min} دقيقة\n\n"
         f"صارت ظاهرة للزبائن بالحجز هلق.",
     )
+    return created
+
+
+async def _write_product(wa, phone: str, client_id: str, validated) -> Optional[dict]:
+    """The product write. S3, 2026-09-17.
+
+    `catalog_service.admin_create_item` is the SAME function `POST /api/v1/admin/store/products`
+    calls -- the function itself, not a copy of its body, which is the rule
+    `rules/backend/architecture.md` §9 states and the reason no new write path was built for this
+    operation. `scripts/test_lia_product_s1.py` runs this exact function against a faked
+    repository and asserts the row it produces: clientId carried, the store partition, isActive
+    set by the service, and NO duration field.
+
+    FOUR ARGUMENTS ARE DELIBERATELY NOT PASSED FROM THE DRAFT -- `image_url`, `metadata`,
+    `is_featured`, `sort_order`. Each of them is a real column the route lets a dashboard set, and
+    none of them is something a chat message may decide. `image_url=None` is why the product shows
+    a generic icon, which the owner is TOLD in the success message rather than left to discover.
+    """
+    category_id, cats = await _resolve_store_category(client_id)
+    if not category_id:
+        if len(cats) > 1:
+            names = " · ".join(c.nameAr for c in cats)
+            # More than one shelf and none of them obviously the right one: the owner names it,
+            # Lia does not pick. Same shape as the service branch's own ambiguity message.
+            await wa.send_text(
+                phone,
+                f"عندك أكتر من قسم بضاعة ({names}). ضيفه من اللوحة هالمرّة، أو خبّرني بأي قسم.",
+            )
+        else:
+            await wa.send_text(phone, _REPLIES["product_no_category"])
+        return None
+
+    try:
+        created = await catalog_service.admin_create_item(
+            client_id      = client_id,
+            category_id    = category_id,
+            name_ar        = validated.name_ar,
+            name_en        = validated.name_en,
+            description_ar = validated.description_ar,
+            description_en = None,
+            image_url      = None,
+            price          = validated.price,
+            currency       = validated.currency,
+            is_featured    = False,
+            sort_order     = 0,
+            metadata       = None,
+        )
+    except Exception as exc:
+        logger.error("🔥 Lia: product creation failed: %s", exc, exc_info=True)
+        await wa.send_text(phone, "تعذّر إضافة المنتج. جرّب من جديد أو من اللوحة.")
+        return None
+
+    await wa.send_text(
+        phone,
+        f"✅ تمّت إضافة *{validated.name_ar}*\n"
+        f"{validated.price} {validated.currency}\n\n"
+        f"صارت ظاهرة بالمتجر هلق.\n"
+        f"{_REPLIES['product_created_note']}",
+    )
+    return created
 
 
 async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tuple[bool, str]:
@@ -953,13 +1209,19 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 return session
 
             # MERGED ON A COPY. A patch that passes its own validation can still be refused by
-            # `LiaServiceDraft` once merged, and the owner must not lose a good draft to a bad
-            # instruction -- so nothing is written back until the merge validates.
-            from app.schemas.lia_drafts import LiaServiceDraft
+            # the draft's own contract once merged, and the owner must not lose a good draft to a
+            # bad instruction -- so nothing is written back until the merge validates.
+            #
+            # VALIDATED AGAINST THE DRAFT'S OWN CLASS, not `LiaServiceDraft` outright: the edit
+            # prompt speaks the service vocabulary, so "خلّي المدة ساعة" on a PRODUCT draft
+            # produces a `duration_min` that `LiaProductDraft` simply does not have. It is dropped
+            # at validation and never reaches the write, which is the correct outcome -- a product
+            # has no duration column to put it in.
+            _, _, merge_cls = _op_spec(_draft_operation(draft))
             merged = dict(draft.get("data") or {})
             merged.update(changes)
             try:
-                LiaServiceDraft.model_validate(merged)
+                merge_cls.model_validate(merged)
             except Exception as exc:
                 logger.info("🚫 Lia: edit %s rejected by the draft contract (%s) — old draft kept",
                             list(changes), type(exc).__name__)
@@ -979,7 +1241,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         field = draft.get("asking")
         parsed = _parse_field_answer(field, value)
         if parsed is None:
-            await wa.send_text(sender_phone, _FIELD_QUESTIONS.get(field, "ما فهمت، جرّب مرّة تانية."))
+            # Re-asked in the DRAFT's own wording: a product must not be asked "شو اسم الخدمة؟".
+            _, questions, _ = _op_spec(_draft_operation(draft))
+            await wa.send_text(sender_phone, questions.get(field, "ما فهمت، جرّب مرّة تانية."))
             return session
         draft["data"][field] = parsed
         draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != field]
@@ -1056,7 +1320,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         return _SENTINEL
 
     # ── 3. A new data-entry request. The cheap gate runs BEFORE the model. ──
-    if msg_type != "text" or not _looks_like_service_entry(value):
+    family = _entry_family(value) if msg_type == "text" else None
+    if family is None:
         # NOT MINE. None is the only value that lets the message continue to tenant resolution
         # and the customer flow -- `False` would read as "handled" to the caller's
         # `is not None` check and silently swallow every ordinary message on this number.
@@ -1096,18 +1361,40 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
         return session
 
-    # [operation] -- the one intent the model may produce today. The registry is the single place
-    # that says what this operation requires; nothing below re-states it.
-    op = lia_operations.get("create_service")
+    # ── AMBIGUITY IS A QUESTION, and it is asked HERE -- after C and ①, before A and B. ──
+    #
+    # A message naming both families has no operation, so there is no `service_key` to check and
+    # no permission to evaluate: A and B literally cannot run yet. Asking at this point leaks
+    # nothing an owner who already passed ① does not know, and the alternative -- picking the
+    # live operation because it is the live one -- would authorise `services.write` for a message
+    # that may have meant a product.
+    if family is _AMBIGUOUS:
+        logger.info("🤔 Lia: entry names both families for %s — asking", sender_phone)
+        await wa.send_text(sender_phone, _REPLIES["entry_ambiguous"])
+        return session
+
+    # [operation] -- named by the cheap gate, which is the only place it CAN be named: D9 requires
+    # the operation to be known before A and B, and A and B run before the model is called. The
+    # registry is the single place that says what this operation requires; nothing below re-states
+    # it. `get` has no default -- an unregistered family would refuse rather than fall back.
+    op = lia_operations.get(family)
+    if op is None:
+        logger.error("🔥 Lia: entry gate produced unregistered family %r", family)
+        return _SENTINEL
 
     # A AND B, from that definition.
     allowed, why = await _authorise_operation(client_id, user, op)
     if not allowed:
         if why == "capability_inactive":
-            # Same sentence as ①, and accurate for this operation: its `service_key` IS
-            # `reservations`. An operation gated on a different key will need its own wording, and
-            # that wording is a prompt change, not a code change.
-            await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
+            # THE SENTENCE NOW FOLLOWS THE OPERATION'S OWN KEY, which it did not before: this
+            # branch said "خدمة الحجوزات مش مفعّلة" for every operation, and that is true for
+            # `create_service` (its `service_key` IS `reservations`) and FALSE for
+            # `create_product`, whose key is `store`. Both texts live in app/prompts/lia.md.
+            await wa.send_text(
+                sender_phone,
+                _REPLIES["store_inactive"] if op.service_key == "store"
+                else "خدمة الحجوزات مش مفعّلة على هالمحل.",
+            )
         else:
             # B fell. SILENT + audited, byte-identical to how an unauthorised account was treated
             # before this change -- it was refused inside `_resolve_owner` and returned silently.
@@ -1123,7 +1410,12 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                            op.name, sender_phone, client_id, why)
         return session
 
-    extraction = await _extract(value)
+    # The PROMPT follows the operation, and so does the contract that validates the answer. A
+    # product prompt whose answer claims `create_service` fails `LiaProductExtraction` and lands
+    # in the "did not understand" branch -- the operation authorised above and the operation the
+    # model names cannot come apart.
+    is_product = op.name == "create_product"
+    extraction = await (_extract_product(value) if is_product else _extract(value))
     if extraction is _UNAVAILABLE:
         # Our fault, said as our fault. And the dashboard still works, so the owner is not stuck.
         logger.error("🔥 Lia: unavailable for %s at %s — owner told, not blamed",
@@ -1136,23 +1428,55 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     if extraction is None or extraction.confidence == "low":
         await wa.send_text(
             sender_phone,
+            _REPLIES["product_unclear"] if is_product else
             "ما فهمت تماماً 😅 اكتبها هيك مثلاً:\n«ضيف خدمة كيراتين، 25 دولار، ساعة»",
         )
         return session
 
-    category_id, cats = await _resolve_service_category(client_id)
-    if not category_id:
-        names = " · ".join(c.nameAr for c in cats) if cats else "—"
-        await wa.send_text(
-            sender_phone,
-            f"عندك أكتر من فئة ({names}). أضف الخدمة من اللوحة هالمرّة، أو خبّرني بأي فئة.",
-        )
-        return session
+    if is_product:
+        category_id, cats = await _resolve_store_category(client_id)
+        if not category_id:
+            if len(cats) > 1:
+                names = " · ".join(c.nameAr for c in cats)
+                await wa.send_text(
+                    sender_phone,
+                    f"عندك أكتر من قسم بضاعة ({names}). ضيفه من اللوحة هالمرّة، "
+                    f"أو خبّرني بأي قسم.",
+                )
+            else:
+                await wa.send_text(sender_phone, _REPLIES["product_no_category"])
+            return session
+    else:
+        category_id, cats = await _resolve_service_category(client_id)
+        if not category_id:
+            names = " · ".join(c.nameAr for c in cats) if cats else "—"
+            await wa.send_text(
+                sender_phone,
+                f"عندك أكتر من فئة ({names}). أضف الخدمة من اللوحة هالمرّة، أو خبّرني بأي فئة.",
+            )
+            return session
     category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
 
+    # FILTERED TO THE FIELDS THE DRAFT'S OWN CLASS OWNS, and that is not tidiness -- it closes a
+    # real livelock. `data` is a free dict on both extraction contracts (`extra="forbid"` guards
+    # the top-level keys, not what is inside `data`), so a product model could still put
+    # `duration_min` in there. `_advance` would then fail validation on a field that has no
+    # question, fall back to re-asking `price`, and re-fail forever. Nothing unknown enters the
+    # draft, so that cannot happen.
+    _, _, draft_cls = _op_spec(op.name)
+    known = set(draft_cls.model_fields)
+    dropped = [k for k in (extraction.data or {}) if k not in known]
+    if dropped:
+        logger.info("🧹 Lia: dropped %s from a %s extraction — not fields of %s",
+                    dropped, op.name, draft_cls.__name__)
+
     draft = {
+        # `operation` is the authoritative key from S3 on. `intent` is kept beside it, carrying
+        # the same value, because a draft written by the previous deploy has only `intent` and
+        # `_draft_operation` reads both -- so a deploy mid-conversation costs nobody his draft.
+        "operation":     op.name,
         "intent":        extraction.intent,
-        "data":          dict(extraction.data or {}),
+        "data":          {k: v for k, v in (extraction.data or {}).items() if k in known},
         "unresolved":    list(extraction.unresolved or []),
         "client_id":     client_id,
         "actor":         actor,
@@ -1164,7 +1488,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     }
     await log_security_event(
         event_type="lia_draft_opened", client_id=client_id, endpoint=_ENDPOINT,
-        detail={"intent": extraction.intent, "confidence": extraction.confidence,
+        detail={"intent": extraction.intent, "operation": op.name,
+                "confidence": extraction.confidence,
                 "unresolved": draft["unresolved"], "sender_phone": sender_phone},
         actor=actor_id,
     )
@@ -1179,19 +1504,22 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     model is asked not to invent a price; this makes the absence of one a QUESTION regardless of
     what the model did. `price` and `duration_min` are optional on the API's own schema -- see
     `app/schemas/lia_drafts.py` for why Lia refuses to inherit those defaults.
-    """
-    from app.schemas.lia_drafts import LiaServiceDraft
 
-    for field in ("name_ar", "price", "duration_min"):
+    WHICH fields are required now comes from the draft's operation (`_op_spec`) instead of being
+    written into this loop, so a product is never asked how long it takes.
+    """
+    required, questions, draft_cls = _op_spec(_draft_operation(draft))
+
+    for field in required:
         if draft["data"].get(field) in (None, "", []):
             draft["asking"] = field
             _save_draft(session, draft)
             session.state = LIA_AWAITING_FIELD
-            await wa.send_text(phone, _FIELD_QUESTIONS[field])
+            await wa.send_text(phone, questions[field])
             return
 
     try:
-        LiaServiceDraft.model_validate(draft["data"])
+        draft_cls.model_validate(draft["data"])
     except Exception as exc:
         # A value present but invalid (a negative price, a 37-minute duration) is re-asked rather
         # than silently corrected -- correcting it would put a number in the row the owner never
@@ -1199,7 +1527,7 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
         bad = None
         for err in getattr(exc, "errors", lambda: [])():
             loc = err.get("loc") or ()
-            if loc and loc[0] in _FIELD_QUESTIONS:
+            if loc and loc[0] in questions:
                 bad = loc[0]
                 break
         field = bad or "price"
@@ -1207,7 +1535,7 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
         draft["asking"] = field
         _save_draft(session, draft)
         session.state = LIA_AWAITING_FIELD
-        await wa.send_text(phone, "هالقيمة ما زبطت. " + _FIELD_QUESTIONS[field])
+        await wa.send_text(phone, "هالقيمة ما زبطت. " + questions[field])
         return
 
     draft["asking"] = None

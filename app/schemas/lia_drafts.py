@@ -33,10 +33,19 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-# The intents Phase 1 can actually execute. A model returning anything else is refused rather
+# What a MESSAGE may ask the platform to do. A model returning anything else is refused rather
 # than best-guessed -- "عدّل" and "شيل" are real requests with real contracts, and the plan's
 # §12 keeps them out of the first slice on purpose (a delete has no undo here).
-LiaIntent = Literal["create_service"]
+#
+# `create_product` added 2026-09-17 (S3). This symbol is the VOCABULARY -- the set of operation
+# names a draft may carry and `lia_operations` may be asked for. It is deliberately NOT the type
+# of any single extraction's `intent`: each extraction class pins its own one-value Literal
+# instead (see `LiaExtraction` and `LiaProductExtraction`), because the two use DIFFERENT prompts
+# with different required fields. Typing both against this union would let the service prompt
+# return `create_product` carrying a `duration_min`, and let the product prompt claim a service --
+# a mismatch between the operation AUTHORISED before the model call and the one the model names.
+# Pinning per class makes that mismatch structurally impossible rather than guarded against.
+LiaIntent = Literal["create_service", "create_product"]
 
 # Currencies the shops actually price in. Anything else is a question, not a conversion -- Lia
 # does no FX, ever.
@@ -102,11 +111,79 @@ class LiaExtraction(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    intent:     LiaIntent
+    # ONE value, not `LiaIntent`. See that symbol's own note: this class is fed by the SERVICE
+    # prompt, so the only intent it may carry is the service one.
+    intent:     Literal["create_service"]
     confidence: Literal["high", "medium", "low"]
     # Partial on purpose: the model fills what the owner actually said. Validation of the full
     # draft happens only once the gaps are filled, which is why this is a loose dict here and a
     # LiaServiceDraft later.
+    data:       dict = Field(default_factory=dict)
+    unresolved: list[str] = Field(default_factory=list)
+
+
+class LiaProductDraft(BaseModel):
+    """One proposed PRODUCT, as extracted and BEFORE any write. S3, 2026-09-17.
+
+    THE DIFFERENCE FROM `LiaServiceDraft` IS ONE ABSENCE, and it is the entire point: there is no
+    `duration_min`. A product is not booked, it is sold -- `CatalogItem` has no duration column
+    and no foreign key from `Reservation`, which is exactly what the 2026-09-16 catalog
+    investigation measured. `scripts/test_lia_product_s1.py` asserts that the real write path
+    writes no duration field, so this schema and that write agree by construction rather than by
+    convention.
+
+    Bounds are the service draft's, deliberately identical where the meaning is identical:
+
+    - `name_ar` 2..200   matches `CatalogItemCreate`'s own column.
+    - `price` > 0        a zero or negative price is a mis-extraction, never an intention. An
+                         owner who really gives something away sets that in the dashboard.
+
+    NO `metadata`, NO `is_featured`, NO `sort_order`, NO `image_url`: every one of those exists on
+    the write path and NONE of them may come from a chat message. The service layer's own defaults
+    own them, which is the rule S1 verified (`isActive` is set by the SERVICE, not by the caller).
+    """
+
+    name_ar:        str = Field(min_length=2, max_length=200)
+    price:          float = Field(gt=0, le=100_000)
+    currency:       str = "USD"
+    name_en:        Optional[str] = Field(default=None, max_length=200)
+    description_ar: Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("name_ar", "name_en", "description_ar")
+    @classmethod
+    def _collapse(cls, v: Optional[str]) -> Optional[str]:
+        """Whitespace only. A product's own name is not ours to rewrite beyond that."""
+        if v is None:
+            return None
+        cleaned = " ".join(v.split())
+        return cleaned or None
+
+    @field_validator("currency")
+    @classmethod
+    def _known_currency(cls, v: str) -> str:
+        up = (v or "USD").strip().upper()
+        if up not in _CURRENCIES:
+            raise ValueError(f"currency must be one of {sorted(_CURRENCIES)}")
+        return up
+
+
+class LiaProductExtraction(BaseModel):
+    """What the PRODUCT prompt is allowed to return. S3, 2026-09-17.
+
+    A second class rather than a widened `LiaExtraction`, for the reason `LiaIntent` records: the
+    operation is authorised BEFORE the model is called, so the model must not be able to name a
+    different one. Pinning `intent` to a single value makes the two agree structurally -- the same
+    device `LiaEditPatch` already uses with `edit_draft`.
+
+    `extra="forbid"` so a model that invents a field is refused rather than silently trimmed --
+    and here that matters more than for a service: the invented field an owner would never see is
+    exactly the kind that reaches a column.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    intent:     Literal["create_product"]
+    confidence: Literal["high", "medium", "low"]
     data:       dict = Field(default_factory=dict)
     unresolved: list[str] = Field(default_factory=list)
 
