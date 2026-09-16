@@ -218,8 +218,11 @@ async def main():
     lia.catalog_service_service.admin_create_service = _fake_create
     auth_calls = []
 
-    def _fake_auth(phone, cid):
-        auth_calls.append((phone, cid))
+    def _fake_auth(phone, cid, op=None):
+        # `op` added 2026-09-16 (Lia Foundation F0.7): the write-time re-check now takes the SAME
+        # OperationDefinition the pre-model checks used, instead of re-checking a hardcoded key.
+        # Recorded, not ignored -- the assertion below proves the real operation reached it.
+        auth_calls.append((phone, cid, getattr(op, "name", None)))
         return _done((True, "ok"))
 
     lia._still_authorised = _fake_auth
@@ -236,6 +239,8 @@ async def main():
     check("admin_create_service was the write path", bool(wrote), str(list(wrote))[:70])
     check("   _commit re-checked authorisation at write time",
           len(auth_calls) == 1 and auth_calls[0][0] == "96178727986", str(auth_calls))
+    check("   and re-checked it against the SAME OperationDefinition",
+          len(auth_calls) == 1 and auth_calls[0][2] == "create_service", str(auth_calls))
     check("   it received the EDITED price", wrote.get("price") == 25.0, str(wrote.get("price")))
     check("   and the untouched name/duration",
           wrote.get("name_ar") == "البروتين للشعر" and wrote.get("duration_min") == 45)

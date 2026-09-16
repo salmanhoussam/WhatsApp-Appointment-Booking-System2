@@ -61,6 +61,12 @@ ACTIVATABLE_KEYS: frozenset[str] = frozenset({
     "reservations",
     "gallery",
     "delivery_zones",
+    # 'lia' (Lia Foundation F0.2, 2026-09-16) -- Lia's OWN access key, so she can be switched off
+    # for a tenant without touching Reservations. Until then she borrowed serviceKey
+    # "reservations", which made "does this tenant have Lia" unanswerable. Activating it is a
+    # separate, explicitly-approved production write (F0.4) -- adding the key here only makes the
+    # activation endpoint accept it.
+    "lia",
 })
 
 

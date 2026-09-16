@@ -47,6 +47,7 @@ from app.core.permissions import is_authorized
 from app.core.phone import normalize_for_storage
 from app.db.client import prisma_client
 from app.repositories import catalog_service_repo, user_repo
+from app.services import lia_operations
 from app.services import catalog_service_service, whatsapp_reservation_flow
 from app.services.security_audit_service import log_security_event
 from app.services.whatsapp_service import WhatsAppService
@@ -164,22 +165,58 @@ def _phone_candidates(sender: str) -> list[str]:
     return out
 
 
-async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
-    """(client_id, actor, actor_id) for a sender allowed to enter data, else (None, None, None).
+# ── C · Actor resolution — decisions D3-2 and D3-c (2026-09-16) ───────────────
+#
+# Named refusal reasons. A caller must be able to say WHICH condition fell, because "returns None"
+# for three different failures is what made the three conditions indistinguishable in the first
+# place. These are codes, never text shown to anyone.
+_R_OK         = "ok"
+_R_UNRESOLVED = "identity_unresolved"
+_R_AMBIGUOUS  = "identity_ambiguous"
+# The a3-PR violation, told apart from an ordinary stranger (G3-d, 2026-09-16). Both end in a
+# refusal, but they are opposite situations and only one is a misconfiguration:
+#
+#   identity_unresolved   nobody we know sent this. A customer said hello. Expected, constant,
+#                         and the overwhelming majority -- auditing it would drown the log.
+#   owner_number_unlinked a tenant's OWN published number wrote in, and that tenant has no active
+#                         account carrying it. A real shop, a real owner, and Lia is silent at him.
+#                         Rare, always wrong, and worth a record.
+#
+# Collapsing the two is what made the failure invisible: the owner gets silence by design, so
+# without this distinction nothing anywhere said his shop was misconfigured.
+_R_UNLINKED   = "owner_number_unlinked"
 
-    Two paths, highest authority first -- the same precedence `whatsapp_merchant_actions` uses,
-    because one person is often both a shop's published number and a User row:
 
-      1. the number the SHOP publishes  -> `Client.whatsapp_number|phone`, tenant-wide
-      2. a User account                 -> judged by `is_authorized`, the SAME predicate the
-                                           dashboard's own `require_permission` uses
+async def _resolve_actor(
+    sender_phone: str,
+) -> tuple[Optional[str], Optional[str], Optional[str], object, str]:
+    """(client_id, actor_tier, actor_id, user_row, reason) — the ONE identity answer.
 
-    AMBIGUITY IS REFUSED, NOT RESOLVED. If one phone is the published number of two tenants, this
-    returns nothing and the caller asks. Silently picking the first would write a service into
-    someone else's shop.
+    Decision **D3-2**: the published shop number answers "WHICH TENANT", and it does NOT answer
+    "who". Before this, path A returned `(client_id, "owner", client_id)` with no `User` row and no
+    `is_authorized` call at all -- so tenant identity doubled as authorization, and invariant
+    **I-4** was violated on the one path every real shop number takes. Measured 2026-09-16: all six
+    published numbers of the three live tenants took that path.
+
+    Decision **D3-c**: this resolver owns BOTH paths and shares its policy with nothing.
+
+      path A  shop number -> tenant -> active User INSIDE that tenant
+      path B  no shop match -> active User, searched across tenants (an admin or staff account
+              texting from a number that is not any shop's published number)
+
+    In both: `isActive` is an explicit condition, there is NO oldest-wins, and ambiguity is
+    REFUSED BY COUNT -- including inside one tenant, not only across tenants (invariant **I-3**,
+    scoped to Lia's own resolution; `user_repo.find_user_by_phone`, the login path, is deliberately
+    left exactly as it is, oldest-wins and all, because changing it would stop a person who owns
+    two shops from logging in).
+
+    The tier is DERIVED, never stored twice: holding the shop's published number is `owner`,
+    anything else resolved through a User row is `admin`. Same two values this module already
+    audited under, so `lia_{actor}_create_service` keeps its existing shape.
     """
     candidates = _phone_candidates(sender_phone)
 
+    # Path A -- which tenant publishes this number.
     clients = await prisma_client.client.find_many()
     def _digits(v): return "".join(ch for ch in (v or "") if ch.isdigit())
     wanted = {_digits(c) for c in candidates if _digits(c)}
@@ -188,39 +225,108 @@ async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str
         if _digits(getattr(c, "whatsapp_number", None)) in wanted
         or _digits(getattr(c, "phone", None)) in wanted
     ]
-    if len(shop_matches) == 1:
-        return shop_matches[0].id, "owner", shop_matches[0].id
     if len(shop_matches) > 1:
+        # Two tenants publishing one number. Picking either would write into someone else's shop.
+        # `Client.phone` is @unique so this can only arrive through `whatsapp_number`, which
+        # carries no constraint -- hence a real check rather than a trusted invariant.
         logger.warning("🚫 Lia: phone %s is the published number of %d tenants — refusing",
                        sender_phone, len(shop_matches))
-        return None, None, None
+        return None, None, None, None, _R_AMBIGUOUS
 
-    # Path 2: a real User row. `find_user_by_phone` is the cross-tenant lookup the login path
-    # already uses, so "which account is this number" has one answer in the codebase.
-    for candidate in candidates:
-        user = await user_repo.find_user_by_phone(candidate)
-        if not user or not getattr(user, "isActive", True):
-            continue
-        # THE SAME AUTHORISATION DECISION AS THE ROUTE, reached from a phone instead of a JWT.
-        # `services.write` is exactly what POST /admin/catalog-services requires, with the same
-        # legacy roles -- not a Lia-specific permission, which would be a second rulebook.
-        if not is_authorized(user, "services.write", "SUPER_ADMIN", "TENANT_ADMIN"):
-            logger.warning("🚫 Lia: user %s is not authorised for services.write", user.id)
-            return None, None, None
-        return user.clientId, "admin", user.id
+    scoped_client_id = shop_matches[0].id if len(shop_matches) == 1 else None
+    tier = "owner" if scoped_client_id else "admin"
 
-    return None, None, None
+    users = await user_repo.lia_find_active_users_by_phones(scoped_client_id, candidates)
+    if not users:
+        # The split described at `_R_UNLINKED`: a shop matched means this is that shop's own
+        # number, so "no actor" is a misconfiguration of a known tenant, not an unknown sender.
+        if scoped_client_id:
+            logger.warning(
+                "🔗 Lia: tenant %s published number %s resolves to NO active account — "
+                "a3-PR invariant violated, Lia cannot act for this shop",
+                scoped_client_id, sender_phone,
+            )
+            return None, None, None, None, _R_UNLINKED
+        return None, None, None, None, _R_UNRESOLVED
+    if len(users) > 1:
+        logger.warning(
+            "🚫 Lia: phone %s matches %d active accounts (%s) — refusing, not choosing",
+            sender_phone, len(users),
+            ", ".join(sorted({getattr(getattr(u, "client", None), "slug", "?") for u in users})),
+        )
+        return None, None, None, None, _R_AMBIGUOUS
+
+    user = users[0]
+    # Path A already fixed the tenant, so this is a restatement, not a new source of truth. Path B
+    # takes the tenant FROM the account -- `User.clientId` is a real FK, which is why widening the
+    # search there is safe.
+    return user.clientId, tier, user.id, user, _R_OK
+
+
+async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """The three-value form, for the branches that need identity without an operation.
+
+    Kept as its own seam deliberately: the welcome and the escape hatch ask only "whose shop is
+    this", never "may he do X" -- there is no operation at that point to ask about.
+    """
+    client_id, tier, actor_id, _user, _reason = await _resolve_actor(sender_phone)
+    return client_id, tier, actor_id
+
+
+# ── ① Lia access, and ② operation capability — two checks, never one ─────────
+
+async def _tenant_has_lia(client_id: str) -> bool:
+    """① — may this tenant reach Lia AT ALL. F0.3, the deliberately tolerant gate.
+
+    `lia OR reservations`, and the `OR` is a MIGRATION BRIDGE with a stated payoff condition, not
+    the final architecture. Pinning Lia straight onto her own key would switch her off for every
+    live tenant until the activation rows exist, which is a real outage window for a sold
+    capability; the tolerant form removes any dependence on whether code or rows land first.
+
+    THE DEBT: the `reservations` half is removed once every live tenant carries a `lia` row --
+    proven by fixture/test that the two keys are independent, never by waiting for a tenant to
+    look right (decision R6). Recorded with its payoff condition in
+    `.claudedocs/architecture/capabilities/lia.md`.
+
+    This is NOT an operation's capability. An operation's capability is `OP.service_key` and is
+    checked separately, per operation, in `_authorise_operation`. Collapsing the two would re-pin
+    Lia to `reservations` through the other door -- the exact coupling F1 exists to break.
+    """
+    row = await prisma_client.clientservice.find_first(where={
+        "clientId": client_id, "serviceKey": {"in": ["lia", "reservations"]}, "isActive": True})
+    return row is not None
 
 
 async def _tenant_has_reservations(client_id: str) -> bool:
-    """The route's own `require_service("reservations")` gate, replicated.
+    """The customer Reservation flow's own gate — `require_service("reservations")`, replicated.
 
-    Not cosmetic: a tenant without the Reservations surface has no services list to show, so
-    creating a service there produces a row nothing reads.
+    KEPT, and kept SEPARATE (decision R2). This is neither ① nor ②: it is the capability of the
+    flow the escape hatch hands the owner OVER TO. Replacing it with `_tenant_has_lia` would hand
+    an owner into a booking flow on a tenant that has no Reservations surface -- a tenant with only
+    `lia` active would pass the tolerant gate and land in a flow with nothing to show.
     """
     row = await prisma_client.clientservice.find_first(where={
         "clientId": client_id, "serviceKey": "reservations", "isActive": True})
     return row is not None
+
+
+async def _authorise_operation(client_id: str, user, op) -> tuple[bool, str]:
+    """② + B for ONE operation — `A AND B`, evaluated from the operation's own definition.
+
+    The operation supplies the question (which permission, which legacy roles, which capability);
+    the human actor supplies the answer. Lia holds no permission of her own -- invariant **I-7**.
+
+    Order is A then B on purpose: a capability the tenant has not bought is a fact about the shop
+    and is cheap to read, while a permission is a fact about the person. Both are returned by name
+    so the caller says which one fell rather than "refused".
+    """
+    row = await prisma_client.clientservice.find_first(where={
+        "clientId": client_id, "serviceKey": op.service_key, "isActive": True})
+    if row is None:
+        return False, "capability_inactive"
+    if not is_authorized(user, op.permission, *op.legacy_roles):
+        return False, "missing_permission"
+    return True, _R_OK
 
 
 # ── Category resolution — the backend's job, never the model's ────────────────
@@ -623,7 +729,9 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
         await wa.send_text(phone, "صار خلل بالبيانات 😅 ابعتلي الخدمة من جديد.")
         return
 
-    ok, reason = await _still_authorised(phone, client_id)
+    # The SAME definition the pre-model checks used -- not a second lookup of a different shape.
+    op = lia_operations.get("create_service")
+    ok, reason = await _still_authorised(phone, client_id, op)
     if not ok:
         await log_security_event(
             event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
@@ -676,18 +784,34 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
     )
 
 
-async def _still_authorised(phone: str, client_id: Optional[str]) -> tuple[bool, str]:
-    """Re-run the resolution at write time and require the SAME tenant."""
+async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tuple[bool, str]:
+    """Re-run C, ① , A and B at WRITE time — with the SAME `OperationDefinition`.
+
+    Decision **D9**: the re-check is not a weaker version of the first check, it is the identical
+    question asked again from the identical definition. Before this it re-checked a HARDCODED
+    `reservations` key regardless of which operation was being written, so a second operation would
+    have been re-validated against a capability that does not gate it.
+
+    `op=None` keeps the signature usable by a caller that has no operation in hand; it then checks
+    identity, the same tenant, and ① only. Every real write passes its operation.
+    """
     if not client_id:
         return False, "no_client"
-    resolved, _actor, _actor_id = await _resolve_owner(phone)
+    resolved, _tier, _actor_id, user, reason = await _resolve_actor(phone)
     if resolved is None:
-        return False, "not_authorised_now"
+        # C fell. `identity_ambiguous` is kept distinct from `identity_unresolved` on purpose: one
+        # is "we do not know you", the other is "we know you twice", and they need different fixes.
+        # `identity_unresolved` keeps its historical name here so existing audit queries on
+        # `not_authorised_now` still match; every other reason passes through as itself, including
+        # `owner_number_unlinked`, which a reader must be able to tell from "we don't know you".
+        return False, ("not_authorised_now" if reason == _R_UNRESOLVED else reason)
     if resolved != client_id:
         return False, "tenant_changed"
-    if not await _tenant_has_reservations(client_id):
-        return False, "service_inactive"
-    return True, "ok"
+    if not await _tenant_has_lia(client_id):
+        return False, "lia_access_inactive"
+    if op is None:
+        return True, _R_OK
+    return await _authorise_operation(client_id, user, op)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -749,6 +873,10 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 detail={"sender_phone": sender_phone, "reason": "book_escape_unresolved"},
             )
             return _SENTINEL
+        # `reservations`, NOT `_tenant_has_lia` (decision R2). This gate belongs to the flow the
+        # owner is being handed OVER TO, not to Lia: a tenant carrying only `lia` would pass the
+        # tolerant access gate and land in a booking flow with no services to show. Third gate,
+        # deliberately -- neither ① nor ②.
         if not await _tenant_has_reservations(client_id):
             await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
             return _SENTINEL
@@ -886,10 +1014,36 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             and not session.res_service_id)
     )
     if msg_type == "text" and _looks_like_greeting(value) and uncommitted:
-        client_id, actor, actor_id = await _resolve_owner(sender_phone)
+        client_id, actor, actor_id, _user, c_reason = await _resolve_actor(sender_phone)
         if client_id is None:
-            # A CUSTOMER said hello. Not ours -- fall through, and note that the only cost paid
-            # for a non-owner greeting is this one indexed read.
+            # G3-d, 2026-09-16 (Salman's decision): the SENDER still gets silence -- that part is
+            # deliberate and unchanged. What changes is that WE now have a record when the silence
+            # is our fault.
+            #
+            # A customer greeting stays free: it takes the indexed read and nothing else, because
+            # `identity_unresolved` is not audited. Only a tenant's own published number arriving
+            # with no account behind it, or resolving to two, is written down -- the two cases that
+            # mean a real shop is being met with silence by misconfiguration.
+            if c_reason in (_R_UNLINKED, _R_AMBIGUOUS):
+                await log_security_event(
+                    event_type="lia_owner_greeting_unresolved", client_id=None,
+                    endpoint=_ENDPOINT,
+                    detail={"sender_phone": sender_phone, "reason": c_reason},
+                )
+            return None
+        # ① AND ONLY ① (decision R1). At a greeting there is no operation yet, so there is no
+        # `OP.service_key` to check -- asking for one here would force either an invented default
+        # operation or the merge of ① with ②, and both are forbidden. So the question is exactly
+        # "may this tenant reach Lia", and nothing narrower.
+        #
+        # BEHAVIOUR CHANGE, deliberate: before this, the welcome went out on identity alone, so an
+        # owner whose tenant has no Lia access was greeted by an assistant that would refuse his
+        # first instruction. A greeting that cannot be honoured is a promise not kept. He now falls
+        # through to the customer flow -- the same treatment any other sender gets on that tenant,
+        # and no new wording is invented to say it.
+        if not await _tenant_has_lia(client_id):
+            logger.info("🚪 Lia: welcome suppressed for %s — tenant %s has no Lia access",
+                        sender_phone, client_id)
             return None
         logger.info("👋 Lia: welcome sent to %s (%s)", sender_phone, actor)
         await wa.send_interactive_buttons(
@@ -908,15 +1062,22 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # `is not None` check and silently swallow every ordinary message on this number.
         return None
 
-    client_id, actor, actor_id = await _resolve_owner(sender_phone)
+    # ── D9, in its decided order: C -> ① -> [operation] -> A -> B ──
+    #
+    # Every one of these precedes the model call. That was already true for the single hardcoded
+    # check; what changes is that the question now comes from the operation instead of being
+    # frozen into this function.
+    client_id, actor, actor_id, user, c_reason = await _resolve_actor(sender_phone)
     if client_id is None:
-        # SILENT, and for the reason A2-c established: an unresolved or unauthorised sender must
-        # not learn that this number accepts owner commands. The attempt is recorded instead.
+        # C fell -- SILENT, for the reason A2-c established: an unresolved or ambiguous sender must
+        # not learn that this number accepts owner commands. The attempt is recorded instead, now
+        # with WHICH condition fell rather than an undifferentiated refusal.
         await log_security_event(
             event_type="lia_entry_refused", client_id=None, endpoint=_ENDPOINT,
-            detail={"sender_phone": sender_phone, "text_preview": (value or "")[:80]},
+            detail={"sender_phone": sender_phone, "text_preview": (value or "")[:80],
+                    "reason": c_reason},
         )
-        logger.warning("🚫 Lia: data-entry attempt from unresolved/unauthorised %s", sender_phone)
+        logger.warning("🚫 Lia: data-entry refused (%s) from %s", c_reason, sender_phone)
         # Deliberately NOT `ensure_session()`: an unauthorised sender must leave no session
         # behind, which is the same rule `_peek_session` protects. `_SENTINEL` says "handled,
         # nothing to persist" -- returning None here would let the message fall through into the
@@ -926,8 +1087,40 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # From here on a draft will exist, so a session is needed -- and only from here on.
     session = await ensure_session()
 
-    if not await _tenant_has_reservations(client_id):
+    # ① -- may this tenant reach Lia at all.
+    if not await _tenant_has_lia(client_id):
+        # The existing wording, unchanged: ① is `lia OR reservations`, so failing it means
+        # `reservations` is inactive too, which is exactly what this sentence says. No new text is
+        # invented here -- a new refusal wording belongs in `app/prompts/lia.md` with a stated
+        # Intent, not in Python.
         await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
+        return session
+
+    # [operation] -- the one intent the model may produce today. The registry is the single place
+    # that says what this operation requires; nothing below re-states it.
+    op = lia_operations.get("create_service")
+
+    # A AND B, from that definition.
+    allowed, why = await _authorise_operation(client_id, user, op)
+    if not allowed:
+        if why == "capability_inactive":
+            # Same sentence as ①, and accurate for this operation: its `service_key` IS
+            # `reservations`. An operation gated on a different key will need its own wording, and
+            # that wording is a prompt change, not a code change.
+            await wa.send_text(sender_phone, "خدمة الحجوزات مش مفعّلة على هالمحل.")
+        else:
+            # B fell. SILENT + audited, byte-identical to how an unauthorised account was treated
+            # before this change -- it was refused inside `_resolve_owner` and returned silently.
+            # Telling a resolved-but-unentitled sender which permission he lacks would describe the
+            # authorization model to someone who does not hold it.
+            await log_security_event(
+                event_type="lia_entry_refused", client_id=client_id, endpoint=_ENDPOINT,
+                detail={"sender_phone": sender_phone, "reason": why,
+                        "operation": op.name, "permission": op.permission},
+                actor=actor_id,
+            )
+            logger.warning("🚫 Lia: %s refused for %s on %s (%s)",
+                           op.name, sender_phone, client_id, why)
         return session
 
     extraction = await _extract(value)

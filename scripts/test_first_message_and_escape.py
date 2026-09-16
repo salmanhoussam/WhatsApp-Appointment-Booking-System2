@@ -198,14 +198,20 @@ async def main():
     check("welcome points at the escape hatch", "الزرّ" in w or "الزر" in w)
 
     print("\n── F. the owner welcome and the escape hatch ──")
+    # UPDATED 2026-09-16 (Lia Foundation F0.7 / decision R1, approved): the welcome is now gated
+    # on ① Lia access as well as identity. `_tenant_has_lia` is stubbed True for every case that
+    # expects a welcome, so these cases keep testing the greeting gate rather than the new
+    # capability gate -- the capability gate has its own cases in `test_lia_foundation.py`.
+    orig_lia_access = lia._tenant_has_lia
+    lia._tenant_has_lia = lambda cid: _done(True)
     rec = Recorder()
-    orig_resolve = lia._resolve_owner
-    lia._resolve_owner = lambda p: _done(("client-1", "owner", "user-1"))
+    orig_resolve = lia._resolve_actor      # ONE seam: _resolve_owner delegates to it
+    lia._resolve_actor = lambda p: _done(("client-1", "owner", "user-1", object(), "ok"))
     try:
         out = await lia.try_handle(rec, "96178727986", None, "text", "مرحبا", "مرحبا",
                                    lambda: _done(_real_session()))
     finally:
-        lia._resolve_owner = orig_resolve
+        lia._resolve_actor = orig_resolve
     btns = [s for s in rec.sent if s[0] == "buttons"]
     check("an owner's «مرحبا» gets Lia's welcome", len(btns) == 1, str(rec.sent)[:120])
     check("   carrying exactly one button, «احجز موعد 💈»",
@@ -214,12 +220,12 @@ async def main():
     check("   and no session is left behind", out is lia._SENTINEL, repr(out))
 
     rec = Recorder()
-    lia._resolve_owner = lambda p: _done((None, None, None))
+    lia._resolve_actor = lambda p: _done((None, None, None, None, "identity_unresolved"))
     try:
         out = await lia.try_handle(rec, "96170000001", None, "text", "مرحبا", "مرحبا",
                                    lambda: _done(_real_session()))
     finally:
-        lia._resolve_owner = orig_resolve
+        lia._resolve_actor = orig_resolve
     check("a CUSTOMER's «مرحبا» falls through untouched", out is None and not rec.sent,
           f"out={out!r} sent={rec.sent}")
 
@@ -238,17 +244,32 @@ async def main():
     ):
         rec, sess = Recorder(), _real_session(state)
         sess.res_service_id = service_id
-        lia._resolve_owner = lambda p: _done(("client-1", "owner", "user-1"))
+        lia._resolve_actor = lambda p: _done(("client-1", "owner", "user-1", object(), "ok"))
         try:
             out = await lia.try_handle(rec, "96178727986", sess, "text", "مرحبا", "مرحبا",
                                        lambda: _done(sess))
         finally:
-            lia._resolve_owner = orig_resolve
+            lia._resolve_actor = orig_resolve
         got_welcome = any(x[0] == "buttons" for x in rec.sent)
         check(f"owner «مرحبا» @ {state} ({note}) -> welcome={want_welcome}",
               got_welcome is want_welcome and (out is lia._SENTINEL if want_welcome
                                                else out is None),
               f"welcome={got_welcome} out={'SENTINEL' if out is lia._SENTINEL else out!r}")
+
+    # ① suppresses the welcome rather than sending a promise that cannot be kept (R1). No new
+    # wording: the message simply falls through to the customer flow, as it does for any sender
+    # this tenant does not know Lia for.
+    rec = Recorder()
+    lia._resolve_actor = lambda p: _done(("client-1", "owner", "user-1", object(), "ok"))
+    lia._tenant_has_lia = lambda cid: _done(False)
+    try:
+        out = await lia.try_handle(rec, "96178727986", None, "text", "مرحبا", "مرحبا",
+                                   lambda: _done(_real_session()))
+    finally:
+        lia._resolve_actor = orig_resolve
+        lia._tenant_has_lia = orig_lia_access
+    check("owner «مرحبا» with NO Lia access -> no welcome, falls through",
+          out is None and not rec.sent, f"out={out!r} sent={rec.sent}")
 
     print("\n── G. the escape hatch binds the tenant and opens the customer flow ──")
     rec, sess = Recorder(), _real_session()
@@ -259,7 +280,7 @@ async def main():
         session.state = res.RES_AWAITING_SERVICE
 
     orig_start, orig_has = res.start, lia._tenant_has_reservations
-    lia._resolve_owner = lambda p: _done(("client-1", "owner", "user-1"))
+    lia._resolve_actor = lambda p: _done(("client-1", "owner", "user-1", object(), "ok"))
     lia._tenant_has_reservations = lambda cid: _done(True)
     lia.whatsapp_reservation_flow.start = _fake_start
 
@@ -273,7 +294,7 @@ async def main():
         out = await lia.try_handle(rec, "96178727986", sess, "button_reply", lia.BOOK_ID,
                                    "احجز موعد 💈", lambda: _done(sess))
     finally:
-        lia._resolve_owner = orig_resolve
+        lia._resolve_actor = orig_resolve
         lia._tenant_has_reservations = orig_has
         lia.whatsapp_reservation_flow.start = orig_start
         lia.prisma_client = orig_prisma

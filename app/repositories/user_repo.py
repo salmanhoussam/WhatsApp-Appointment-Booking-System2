@@ -7,6 +7,7 @@ import logging
 import re
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.db.client import prisma_client
 
@@ -276,3 +277,38 @@ async def reactivate_user(user_id: str, client_id: str) -> int:
         where={"id": user_id, "clientId": client_id},
         data={"isActive": True},
     )
+
+
+async def lia_find_active_users_by_phones(client_id: Optional[str], phones: list[str]) -> list:
+    """EVERY active User matching any candidate phone form — a LIST, never a pick.
+
+    Added for Lia Foundation F0.5 (2026-09-16, decision D3-c). Deliberately a THIRD function
+    rather than a reuse of either neighbour above, and the reason is the whole point of the
+    decision:
+
+      * `find_user_by_phone` is the LOGIN path. It is cross-tenant by necessity and resolves
+        ambiguity by signing in the oldest account. Salman's decision keeps it untouched — changing
+        it would stop a person who owns two shops from logging in at all, and choosing between
+        their shops needs the membership model, not a rule invented here.
+      * `find_active_user_by_phones` is `find_first` + `order createdAt asc`, i.e. the same
+        oldest-wins, narrowed to one tenant. Correct for `whatsapp_merchant_actions`, whose tenant
+        comes from the reservation a button tap answers. Reusing it HERE would quietly turn
+        "the oldest account wins" into an AUTHORIZATION rule, which the decision forbids by name.
+
+    So this returns every match and decides nothing. The caller counts: exactly one is an actor,
+    more than one is refused (invariant I-3 — ambiguity is refused, never resolved), and none is
+    an unresolved identity. `isActive` is an explicit condition here, not an afterthought: a
+    deactivated account has no authority, and an older deactivated row must never mask a newer
+    active one.
+
+    client_id=None widens the search across tenants (Lia's path B — an admin or a staff account
+    texting from a number that is not any shop's published number, so no tenant is known yet).
+    A real client_id narrows it to that tenant (path A — the shop number already answered "which
+    tenant", so the ambiguity that blocks login does not arise).
+    """
+    if not phones:
+        return []
+    where: dict = {"isActive": True, "phone": {"in": phones}}
+    if client_id:
+        where["clientId"] = client_id
+    return await prisma_client.user.find_many(where=where, include={"client": True})

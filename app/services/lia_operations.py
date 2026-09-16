@@ -1,0 +1,161 @@
+"""
+Lia — the Operation Registry.
+
+Lia Foundation F0.6, 2026-09-16. Implements decision **D3-a**:
+
+    OperationDefinition = ( permission , legacy_roles , service_key , write_fn )
+
+WHY THIS FILE EXISTS
+--------------------
+Until now Lia asked ONE authorization question, hardcoded inside `_resolve_owner`:
+
+    is_authorized(user, "services.write", "SUPER_ADMIN", "TENANT_ADMIN")
+
+With one operation that was indistinguishable from the right thing. With two it becomes wrong in
+both directions, and both directions were measured on real production accounts (2026-09-16):
+
+  * `barberlab-test`'s MANAGER_RESERVATIONS account holds `reservations.write` and nothing else.
+    It is refused by Lia today even for creating a reservation, which it is entitled to do.
+  * An account holding `services.write` would have been accepted for an operation it does not
+    hold, the moment the scope widened past create_service.
+
+So the OPERATION supplies the question and the human actor supplies the answer. Lia holds no
+permission of her own — invariant **I-7**, and the reason there is deliberately no "lia.write"
+anywhere in this codebase.
+
+WHY FOUR FIELDS AND NOT THREE
+-----------------------------
+The plan originally proposed `(permission, service_key, write_fn)`. `legacy_roles` was added after
+measuring `app/core/permissions.py`'s invariant **I1**: an account with `permissions IS NULL` is
+judged against THAT ROUTE'S OWN role tuple, not against the permission string. The real tuples
+differ per area (services 2 roles, reservations 4, catalog 4 including MANAGER_UNITS), and all
+three live tenant owners are legacy accounts. Carrying only the permission would have silently
+changed what every real owner may do.
+
+WHAT IS DELIBERATELY NOT IN A DEFINITION
+----------------------------------------
+No message text, no Arabic wording, no Meta identifiers, no `wamid`, no buttons, no tenant id, no
+actor id, and nothing the model produces except the operation NAME. The channel owns how a
+refusal is phrased; this registry owns what is being asked.
+
+`service_key` here is the OPERATION's capability (`reservations` / `catalog` / `store`). It is NOT
+Lia's own access key. Those are two separate checks and collapsing them would re-pin Lia to
+`reservations` through the other door — see `lia_owner_entry._tenant_has_lia`.
+"""
+
+from dataclasses import dataclass
+from typing import Callable, Optional
+
+from app.core.permissions import (
+    CATALOG_LEGACY_ROLES,
+    RESERVATION_LEGACY_ROLES,
+    SERVICES_LEGACY_ROLES,
+)
+
+
+@dataclass(frozen=True)
+class OperationDefinition:
+    """One authorisable operation. Frozen: a definition is read, never adjusted at runtime."""
+
+    name: str
+    permission: str
+    legacy_roles: tuple[str, ...]
+    service_key: str
+    # The SERVICE-layer function that performs the write. Never a repository: a repository call
+    # would be a second write path for a capability that already has one, which
+    # `rules/backend/architecture.md` §9 forbids. An operation with no service-layer function is
+    # not registered at all (decision a-2) rather than registered as unavailable.
+    write_fn: Callable
+    # Which route this definition mirrors, so the drift test can find it and a reader can check it.
+    mirrors_route: str
+
+
+def _write_create_service():
+    """Imported lazily — `catalog_service_service` pulls the Prisma client at import time."""
+    from app.services import catalog_service_service
+    return catalog_service_service.admin_create_service
+
+
+def _write_create_reservation():
+    from app.services import reservation_service
+    return reservation_service.create_reservation
+
+
+def _write_create_catalog_item():
+    from app.services import catalog_service
+    return catalog_service.admin_create_item
+
+
+# ── The registry ─────────────────────────────────────────────────────────────
+#
+# Decision a-1: exactly the operations that have a real service-layer write function TODAY.
+# `create_barber` and `create_product` are deliberately ABSENT, not present-and-disabled
+# (decision a-2): `barber_repo.create_barber` and the store product path write through
+# repositories, with the tenant id, the phone normalisation and the module key enforced in the
+# route. Reusing them from here would re-create the جعفر defect (a phone stored without its
+# country code) and bypass `clientId`/`moduleKey`. They enter this registry when a shared
+# service-layer write path is extracted, and not before.
+#
+# NOTE ON REACHABILITY: registering an operation does not make Lia able to perform it. The model
+# can only ever produce a name that `LiaIntent` admits, and today that is `create_service` alone.
+# The registry is the authorization specification; the intents that reach it arrive per operation,
+# each with its own phase.
+_REGISTRY: dict[str, OperationDefinition] = {
+    "create_service": OperationDefinition(
+        name          = "create_service",
+        permission    = "services.write",
+        legacy_roles  = SERVICES_LEGACY_ROLES,
+        service_key   = "reservations",
+        write_fn      = _write_create_service,
+        mirrors_route = "app/api/v1/admin/catalog_services.py:81",
+    ),
+    "create_reservation": OperationDefinition(
+        name          = "create_reservation",
+        permission    = "reservations.write",
+        legacy_roles  = RESERVATION_LEGACY_ROLES,
+        service_key   = "reservations",
+        write_fn      = _write_create_reservation,
+        mirrors_route = "app/api/v1/admin/reservations.py:220",
+    ),
+    "create_catalog_item": OperationDefinition(
+        name          = "create_catalog_item",
+        permission    = "catalog.write",
+        legacy_roles  = CATALOG_LEGACY_ROLES,
+        service_key   = "catalog",
+        write_fn      = _write_create_catalog_item,
+        mirrors_route = "app/api/v1/admin/catalog.py:142",
+    ),
+}
+
+# Every registered operation must carry all four fields, checked at IMPORT rather than at the
+# moment an owner sends a message. Same guard shape the reservation flow and the prompt loader
+# already use: a malformed definition fails the app's startup, where it is visible, instead of
+# failing one person's WhatsApp message, where it is not.
+for _name, _op in _REGISTRY.items():
+    if _name != _op.name:
+        raise RuntimeError(f"Lia operation registry: key {_name!r} != name {_op.name!r}")
+    if not _op.permission or "." not in _op.permission:
+        raise RuntimeError(f"Lia operation {_name!r}: permission must be 'area.verb'")
+    if not _op.legacy_roles:
+        raise RuntimeError(
+            f"Lia operation {_name!r}: legacy_roles is required -- invariant I1 judges a legacy "
+            f"account against the route's own tuple, so an empty tuple would deny every owner"
+        )
+    if not _op.service_key:
+        raise RuntimeError(f"Lia operation {_name!r}: service_key is required")
+    if not callable(_op.write_fn):
+        raise RuntimeError(f"Lia operation {_name!r}: write_fn must be callable")
+
+
+def get(operation: str) -> Optional[OperationDefinition]:
+    """The definition, or None for a name this registry does not know.
+
+    None means "ask", never "assume a default". There is no fallback operation: a default would be
+    exactly the hardcoded permission this registry exists to remove.
+    """
+    return _REGISTRY.get(operation)
+
+
+def names() -> tuple[str, ...]:
+    """Registered operation names, sorted — for tests and for the capability document."""
+    return tuple(sorted(_REGISTRY))
