@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | **Owns which data?** | 🔴 **None.** Lia owns no table and creates none. |
-| **Writes through** | `catalog_service_service.admin_create_service()` — the same function `POST /api/v1/admin/catalog-services` calls. The function itself, not a copy of its body. |
+| **Writes through** | `catalog_service_service.admin_create_service()` — the same function `POST /api/v1/admin/catalog-services` calls — and, since 2026-09-17, `catalog_service.admin_create_item()`, the same function `POST /api/v1/admin/store/products` calls. The functions themselves, not copies of their bodies. **Two operations, zero new write paths.** |
 | **Owned by** | The Reservations domain. Lia is an INTERFACE onto `catalog` (see `capabilities/catalog.md`). |
 | **Prompt** | `app/prompts/lia.md` — governed by `repository-hygiene.md`'s Persona & Prompt Drift rule. |
 | **Contracts** | `app/schemas/lia_drafts.py` — `LiaExtraction`, `LiaServiceDraft`. |
@@ -77,11 +77,13 @@ question. Lia does not add to the empty-column pile.
 | Operation | Phase | State |
 |---|---|---|
 | `create_service` from text | **1** | ✅ **Live** |
-| Edit the draft before saving | **1.1** | 🟡 Backlog **P1** — Salman's decision, after governance lands |
+| Edit the draft before saving | **1.1** | ✅ **Live** — shipped 2026-09-13 |
+| `create_product` from text | **S3** | ✅ **Built 2026-09-17** — 99 checks, awaiting live verification (S5) |
+| `create_product_batch` (up to 10) | **S4** | 🔵 Next — B1/B3/B4 in `plans/lia-product-entry.md` |
 | `create_service` from image + caption | 2 | 🔵 Planned |
 | `create_service` from voice | 3 | 🔵 Planned — needs a second provider (Anthropic has no STT) |
 | Read / analyse (the Analyst role) | **2** | 🔵 **Vision — §Maturity & Future** |
-| update / delete · barber · product | later | 🔵 Not started |
+| update / delete · barber · category | later | 🔵 Not started |
 
 **One operation per conversation turn.** `create`, `update` and `delete` are three contracts with
 three validation rules, and a mistaken `delete` has no undo — `CatalogService` carries `isActive`,
@@ -97,7 +99,7 @@ which is a different thing from a soft delete.
 |---|---|---|
 | The in-flight draft | `whatsapp_sessions.stateData` → key `lia` | A Prisma table. 10-minute window, inside the session's own 30. |
 | The created service | `catalog_services` | Written by the existing service layer. |
-| The audit trail | `SecurityAuditLog` | `lia_draft_opened` · `lia_{actor}_create_service` · `lia_draft_cancelled` · `lia_entry_refused` · `lia_write_refused`. |
+| The audit trail | `SecurityAuditLog` | `lia_draft_opened` · `lia_{actor}_{operation}` (so `lia_owner_create_service` is unchanged and `lia_owner_create_product` is new) · `lia_draft_cancelled` · `lia_entry_refused` · `lia_write_refused`. Every write event carries `operation`, `permission` and `service_key`, so the audit row says which authorisation was actually evaluated rather than leaving it to be inferred. |
 
 ---
 
@@ -310,16 +312,33 @@ no permission of her own** (invariant I-7, and the reason no `lia.write` string 
 | `create_service` | `services.write` | 2 roles | `reservations` | `admin/catalog_services.py:81` |
 | `create_reservation` | `reservations.write` | 4 roles | `reservations` | `admin/reservations.py:220` |
 | `create_catalog_item` | `catalog.write` | 4 roles incl. `MANAGER_UNITS` | `catalog` | `admin/catalog.py:142` |
+| `create_product` | `store.write` | 3 roles, **no** `MANAGER_UNITS` | **`store`** | `admin/store.py:175-176` |
 
 `legacy_roles` is the fourth field and not a convenience: invariant I1 judges an account with
 `permissions IS NULL` against **that route's own tuple**, the four real tuples differ, and all
 three live tenant owners are legacy accounts. Carrying only the permission would have silently
 changed what every real owner may do.
 
-**`create_barber` and `create_product` are absent, not disabled** (decision a-2): they have no
-service-layer write function, so reusing their repositories from here would bypass `clientId`,
-`moduleKey` and `normalize_for_storage` — the last of which is the جعفر defect. They enter the
-registry when a shared service-layer write path is extracted.
+**`create_barber` is absent, not disabled** (decision a-2): it has no service-layer write
+function, so reusing `barber_repo.create_barber` from here would bypass `clientId` and
+`normalize_for_storage` — the latter being the جعفر defect. It enters the registry when a shared
+service-layer write path is extracted.
+
+**`create_product` was in that same sentence until 2026-09-17, and the sentence was wrong.** a-2
+excluded it on the stated ground that the store product path had no service-layer function. It
+has one: `catalog_service.admin_create_item`, which is what `admin/store.py` itself calls.
+`scripts/test_lia_product_s1.py` runs that real function against a faked repository and asserts
+the row is a correct product — `clientId` carried, the store partition, `isActive` set by the
+service, and no duration field. So the operation qualifies under a-1 on the same terms as the
+others; no exception was made for it, and a-2's exclusion list is now `create_barber` alone.
+
+**Two definitions over one write function, deliberately.** `create_product` and
+`create_catalog_item` both call `admin_create_item`, and they must stay separate because the
+SURFACE decides the gate: `catalog` is inactive on all three live tenants while `store` is active
+on rk and barberlab-test, and `admin/store.py` admits no `MANAGER_UNITS` where
+`admin/catalog.py` does. Reusing one definition for the other would either refuse every real
+owner or widen what a legacy `MANAGER_UNITS` account may do from WhatsApp. **The table decides
+what is written; the route decides who may ask.**
 
 ### Authorisation, in the decided order
 
