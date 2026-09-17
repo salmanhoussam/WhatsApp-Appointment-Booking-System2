@@ -177,10 +177,20 @@ async def _drain():
         await asyncio.gather(*pending, return_exceptions=True)
 
 
-async def book(reserved_at, working_hours=WORKING_HOURS, existing=None, phone="96170123456"):
+async def book(reserved_at, working_hours=WORKING_HOURS, existing=None, phone="96170123456",
+               allow_past=True, notify_merchant=True):
+    """`allow_past` defaults to True here because this suite IS the historical measurement.
+
+    Added 2026-09-17 with T3-b. Before it, the past was reachable because no guard existed —
+    which is precisely the accident the new parameter removes. So every call in this file now
+    ASKS for the past explicitly, which is the contract Salman decided: the past is opened by an
+    operation saying so, never inherited from the absence of a check.
+    """
     prisma, sends, restore = install(working_hours, existing)
     try:
         result = await rs.create_reservation(
+            allow_past      = allow_past,
+            notify_merchant = notify_merchant,
             client_id      = CLIENT,
             module_key     = "barber",
             customer_name  = "أحمد",
@@ -251,8 +261,11 @@ async def main():
     print("\n── T1-d. 🔴 the merchant notification FIRES — unconditionally, today ──")
     check("a merchant alert was raised for an appointment that already happened",
           len(sends.calls) == 1, f"{len(sends.calls)} call(s)")
-    check("   there is no parameter to suppress it",
-          "notify_merchant" not in rs.create_reservation.__code__.co_varnames)
+    # TRANSITION, flipped by T3-b (2026-09-17). Until then this read "there is no parameter to
+    # suppress it", and its being true was the whole argument for R-3. It is now false BY
+    # DECISION, and the assertion states the change rather than being quietly deleted.
+    check("   T3-b added the parameter that suppresses it (was: none existed)",
+          "notify_merchant" in rs.create_reservation.__code__.co_varnames)
     check("   ⇒ R-3's parameter is NECESSARY, not decorative", len(sends.calls) == 1)
 
     print("\n── T1-e. 🔴 working hours ARE enforced against the past ──")
