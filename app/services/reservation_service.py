@@ -351,6 +351,27 @@ async def create_reservation(
     metadata:       dict | None,
     customer_email: str | None = None,
     source:         str | None = None,
+    *,
+    # T3-b (2026-09-17, Salman's decision). KEYWORD-ONLY on purpose: every existing call site
+    # passes keywords already, and this makes it impossible for a future positional argument to
+    # land on one of these by accident.
+    #
+    # `allow_past=False` IS A DELIBERATE TIGHTENING OF THIS CONTRACT, and saying so plainly is
+    # part of the decision rather than a footnote to it. Until today this function accepted a past
+    # datetime — measured, not assumed (scripts/test_reservation_contract_baseline.py pins that
+    # behaviour as it stood). The refusal lived in the three CALLERS: admin/reservations.py and
+    # public/reservations.py compare against now(), and the WhatsApp flow is protected
+    # structurally because it only ever offers slots built by get_next_open_days. So no caller's
+    # behaviour changes here — but the SERVICE's does, and that is the point: recording the past
+    # must be something an operation ASKS FOR, never something it inherits from the absence of a
+    # guard. The claim is "the defaults preserve the three callers", not "the defaults preserve
+    # the service".
+    #
+    # `notify_merchant=True` is the opposite kind of default: a true preservation. The merchant
+    # alert fires unconditionally today, verified by running this real function with a recorder on
+    # the send boundary, so True reproduces exactly what every caller already gets.
+    allow_past:      bool = False,
+    notify_merchant: bool = True,
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -360,6 +381,24 @@ async def create_reservation(
     repo = ReservationRepository(prisma_client)
 
     # -- Validate ------------------------------------------------------------------------------
+    # The past guard, first, before any row is read: a refusal should not cost a database round
+    # trip, and it belongs to Validate rather than to Working Hours (a past date is not a
+    # scheduling conflict, it is a different kind of request entirely).
+    #
+    # THE COMPARISON IS THE ROUTES' OWN, CHARACTER FOR CHARACTER, and that is deliberate.
+    # `datetime.now()` with no argument is the server's local wall clock (TZ=Asia/Beirut on the
+    # container), and `.replace(tzinfo=timezone.utc)` LABELS it without converting — which is the
+    # same representation `reservedAt` is stored in throughout this system. Writing a "more
+    # correct" comparison here with a real UTC instant would put this guard three hours away from
+    # the two in the routes, and two guards that everyone assumes agree are worse than one.
+    #
+    # The duplication with the routes is intentional, not an oversight: the route answers the user
+    # with a 400 and a sentence, this raises ValueError as a second line of defence for any caller
+    # that is not a route. Same shape as decision a3-PR — provisioning prevents the state and the
+    # runtime detects it anyway.
+    if not allow_past and reserved_at < datetime.now().replace(tzinfo=timezone.utc):
+        raise ValueError("Cannot reserve a past time slot.")
+
     # (Duration default resolution — a Validate-adjacent concern: what this reservation's
     # duration is, absent an explicit override.)
     effective_duration = duration_min or MODULE_DEFAULTS.get(module_key, {}).get("duration_min", 60)
@@ -520,7 +559,14 @@ async def create_reservation(
     # on status/reschedule changes and goes to the CUSTOMER. Nothing reached the merchant at all
     # before this: the customer got a confirmation only once someone confirmed the booking in the
     # dashboard, and the shop found out by opening the dashboard in the first place.
-    await _notify_merchant_new_reservation(reservation)
+    #
+    # T3-b: `notify_merchant` gates THIS call and nothing else. `_notify_reservation_event` is
+    # deliberately untouched — it fires on a status or reschedule change, goes to the CUSTOMER,
+    # and has nothing to do with whether a creation was worth announcing. The case this exists
+    # for is recording an appointment that already happened: telling a shop owner "a new booking
+    # arrived!" about yesterday afternoon is not a notification, it is a false statement.
+    if notify_merchant:
+        await _notify_merchant_new_reservation(reservation)
 
     return _fmt(reservation)
 
