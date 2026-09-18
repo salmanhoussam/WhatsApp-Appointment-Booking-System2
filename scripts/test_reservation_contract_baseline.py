@@ -203,10 +203,15 @@ async def main():
     import subprocess
     dirty = [ln[3:] for ln in subprocess.run(["git", "status", "--porcelain", "app/"],
                                              capture_output=True, text=True).stdout.splitlines()]
-    check("the only modified file under app/ is reservation_service.py",
-          dirty in ([], ["app/services/reservation_service.py"]), str(dirty))
-    check("   no route was changed — the duplicated guard is deliberate, not a migration",
-          not any(d.startswith("app/api/") for d in dirty))
+    # NARROWED IN S7. This read "the only modified file under app/ is reservation_service.py",
+    # which was true of T3-b's diff and is a SNAPSHOT, not an invariant — the next slice touching
+    # any other file fails it while changing nothing about reservations. The durable property is
+    # the one below: the reservation contract moved without a single route moving with it.
+    check("no route was changed — the duplicated guard is deliberate, not a migration",
+          not any(d.startswith("app/api/") for d in dirty), str(dirty))
+    check("   and reservation_service.py is the only reservation file touched",
+          not any(d.startswith("app/services/reservation") and
+                  d != "app/services/reservation_service.py" for d in dirty), str(dirty))
 
     print("\n" + ("ALL GREEN" if ok else "FAILURES ABOVE"))
     return 0 if ok else 1
