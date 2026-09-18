@@ -65,8 +65,21 @@ DRAFT_WINDOW_MIN = 10
 # States, registered the same way the reservation flow registers its own.
 LIA_AWAITING_FIELD   = "LIA_AWAITING_FIELD"
 LIA_AWAITING_CONFIRM = "LIA_AWAITING_CONFIRM"
+# S7. A name that already exists: the draft is complete and held, and the owner picks what to do
+# with it. Belongs in STATES because it HAS a draft, so the expiry guard's wording fits it.
+LIA_AWAITING_DUP     = "LIA_AWAITING_DUP"
+# S7. The family question, asked before any draft exists.
+LIA_AWAITING_FAMILY  = "LIA_AWAITING_FAMILY"
 
-STATES = {LIA_AWAITING_FIELD, LIA_AWAITING_CONFIRM}
+# Every state `try_handle` routes. The import guard below holds it to "declared means routed".
+STATES = {LIA_AWAITING_FIELD, LIA_AWAITING_CONFIRM, LIA_AWAITING_DUP, LIA_AWAITING_FAMILY}
+
+# The subset whose liveness IS a draft — and the distinction matters, because S7 nearly got it
+# wrong. `LIA_AWAITING_FAMILY` is routed like the others, so it belongs in STATES, but it has no
+# draft: what keeps it alive is a pending record. The expiry guard below reads THIS set, so a
+# family answer is not eaten by a "your draft expired" branch it was never part of, and does not
+# receive a message about a draft that never existed.
+_DRAFT_STATES = {LIA_AWAITING_FIELD, LIA_AWAITING_CONFIRM, LIA_AWAITING_DUP}
 
 # Every LIA_* state must be in STATES, checked at IMPORT. Same guard the reservation flow gained
 # on 2026-09-12 after a declared state with a written handler shipped unregistered and a real
@@ -83,12 +96,45 @@ if _UNREGISTERED:                                          # pragma: no cover - 
 
 CONFIRM_ID = "__LIA_CONFIRM__"
 CANCEL_ID  = "__LIA_CANCEL__"
+# S7: the two answers to "this name already exists". `CANCEL_ID` is reused for the third, because
+# cancelling means the same thing here as anywhere else and a second cancel id would be a second
+# way to say one thing.
+DUP_EDIT_ID = "__LIA_DUP_EDIT__"
+DUP_NEW_ID  = "__LIA_DUP_NEW__"
 
 # What makes a message a DATA-ENTRY attempt at all. Checked before spending a model call, and
 # deliberately narrow: an owner also books, asks and chats on this number, and every non-matching
 # message must fall through to the normal flow untouched. "ضيف" alone is not enough -- "ضيفني"
 # is a person talking -- so the object word has to be there too.
-_ENTRY_VERBS = ("ضيف", "ضيّف", "اضف", "أضف", "زيد", "سجل", "سجّل", "add", "create")
+# SPLIT IN S7 (2026-09-17), and the split is what lets the gate widen without promising what is
+# not built. `ضيف` adds a THING to the catalogue; `سجل` records an EVENT -- which is the verb an
+# owner reaches for when he means a reservation. Only the ADD verbs get the wider, noun-optional
+# treatment below; widening `سجل` too would answer "سجل إنه أحمد إجا مبارح" with
+# "خدمة أو بضاعة؟", offering a third thing that does not exist yet. It widens in T4, when that
+# question becomes three-way.
+_ADD_VERBS = ("ضيف", "ضيّف", "اضف", "أضف", "زيد", "add", "create")
+_RECORD_VERBS = ("سجل", "سجّل")
+# FRANCO ARABIC, S7 (2026-09-18, Salman's decision 3). The owner writes Latin letters with digits
+# standing in for letters -- 3=ع, 7=ح, 2=ء, 5=خ -- and that is INPUT UNDERSTANDING only: nothing
+# Lia sends back is ever Franco.
+#
+# 🔴 WHY THESE ARE A SEPARATE TUPLE INSTEAD OF MORE ENTRIES ABOVE. The Arabic lists are matched
+# by SUBSTRING, which is safe for Arabic script but not for three or four Latin letters: `dif` is
+# inside `ndif`/`ndife` (نضيف, "clean"), a word a person really might type. A false verb match
+# would walk an owner writing AS A CUSTOMER into the owner-entry path -- and an owner is very
+# often also a customer, which is the one case the plan requires proving. So every Franco token
+# is matched on a WORD BOUNDARY. The Arabic path keeps its existing semantics untouched.
+_FRANCO_ADD_VERBS     = ("dif", "dayef", "dayif", "dayyef", "zid", "2dif", "dif2")
+_FRANCO_SERVICE_WORDS = ("khedme", "khidme", "khedmi", "khedma", "serves")
+_FRANCO_PRODUCT_WORDS = ("mantoj", "mantouj", "menteg", "mantouj", "bde3a", "bda3a", "sel3a",
+                         "senf")
+
+
+def _has_franco(low: str, words: tuple) -> bool:
+    """Whole-word match for a Latin-script token -- see `_FRANCO_ADD_VERBS` for why not substring."""
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", low) for w in words)
+# The union stays under the original name: "is there a Lia verb here at all" is still one question.
+_ENTRY_VERBS = _ADD_VERBS + _RECORD_VERBS
 _ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
 
 
@@ -114,30 +160,66 @@ _ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
 _PRODUCT_OBJECTS = ("منتج", "منتوج", "بضاعة", "بضاعه", "سلعة", "سلعه", "صنف",
                     "product", "item")
 
-# Returned when a message names BOTH families. Not a family, and deliberately not a silent
-# preference for the live one: guessing "service" here could authorise `services.write` for a
-# message that meant a product, which is the one thing the operation-aware model exists to stop.
+# Returned when the family cannot be decided from the words alone. Not a family, and deliberately
+# not a silent preference for the live one: guessing "service" here could authorise
+# `services.write` for a message that meant a product, which is the one thing the operation-aware
+# model exists to stop. It is now reached by TWO routes -- both nouns present, or neither.
 _AMBIGUOUS = "__ambiguous__"
+# An add verb and nothing to add. Mine, but empty -- and the owner gets a sentence, not silence.
+_INCOMPLETE = "__incomplete__"
 
 
 def _entry_family(text: str) -> Optional[str]:
-    """The OPERATION this message asks for, `_AMBIGUOUS`, or None for "not mine".
+    """The OPERATION this message asks for, `_AMBIGUOUS`, `_INCOMPLETE`, or None for "not mine".
 
     Returns an operation name straight out of `lia_operations`, not a private label, so there is
     no second vocabulary to keep in step with the registry.
+
+    🔴 WIDENED IN S7, BECAUSE THE NARROW VERSION FAILED IN A REAL TEST. It used to require a
+    generic noun -- `خدمة` or `منتج` -- and refuse everything else, on the argument that the
+    alternative was a dictionary of Arabic product names that would be wrong the first day a shop
+    stocked something new. That argument still holds. What it missed is that there was a third
+    option, and the cost of missing it was measured on 2026-09-17: Salman wrote
+    «ضيف ماكينة حلاقة 20 دولار» and got TOTAL SILENCE, four times, because `ماكينة` is in neither
+    list. An owner writes the way he speaks.
+
+    The third option is to widen the gate and let the AMBIGUITY BRANCH carry the load: an add verb
+    plus something to add is enough to enter, and a message whose family we cannot read becomes a
+    QUESTION instead of nothing. No dictionary is introduced, and D9's order is untouched -- the
+    question is asked before any operation is known, and authorisation runs after he answers. The
+    question costs no model call either, so the wider gate is free.
     """
     low = " ".join((text or "").split()).lower()
-    if len(low) < 6 or not any(v in low for v in _ENTRY_VERBS):
+    if len(low) < 6:
         return None
-    service = any(o in low for o in _ENTRY_OBJECTS)
-    product = any(o in low for o in _PRODUCT_OBJECTS)
+    # A VERB IS STILL REQUIRED FOR EVERY PATH, and this line is load-bearing. The first S7 draft
+    # checked the nouns before the verb, and the existing suite caught it immediately: «بدي خدمة
+    # حلاقة» -- a CUSTOMER asking for a haircut -- contains `خدمة` and would have entered the
+    # owner-entry path. No customer message carries `ضيف`/`سجل`; that is the whole reason the
+    # gate is built on the verb.
+    if not (any(v in low for v in _ENTRY_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
+        return None
+    service = any(o in low for o in _ENTRY_OBJECTS) or _has_franco(low, _FRANCO_SERVICE_WORDS)
+    product = any(o in low for o in _PRODUCT_OBJECTS) or _has_franco(low, _FRANCO_PRODUCT_WORDS)
     if service and product:
         return _AMBIGUOUS
     if service:
         return "create_service"
     if product:
         return "create_product"
-    return None
+    # No generic noun. Only an ADD verb may proceed without one -- see `_ADD_VERBS`.
+    if not (any(v in low for v in _ADD_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
+        return None
+    # Is there anything to add? A price-like number, or at least two words beyond the verb. This
+    # is a CHEAPNESS test, not a classifier: it keeps a bare "ضيف" from costing a database read
+    # while letting a real request through to the question.
+    rest = low
+    for v in _ADD_VERBS + _FRANCO_ADD_VERBS:
+        rest = rest.replace(v, " ", 1) if v in rest else rest
+    words = rest.split()
+    if re.search(r"\d", low) or len(words) >= 2:
+        return _AMBIGUOUS
+    return _INCOMPLETE
 
 
 # Greetings an owner actually opens with. A SECOND cheap gate, and it has to stay as cheap as
@@ -162,12 +244,19 @@ BOOK_ID = "__LIA_BOOK__"
 _AR_FOLD = (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي"), ("ة", "ه"), ("ـ", ""))
 
 
-def _fold_greeting(text: str) -> str:
+def _fold_ar(text: str) -> str:
     """Lowercase, drop punctuation and emoji, fold the alef/ya/ta-marbuta spellings.
 
     Its own small copy rather than importing the reservation flow's `_normalise_ar`: that one is
     private to a different module and tuned for service names, and this project's own convention
     is to keep a four-line helper local instead of reaching across a module boundary for it.
+
+    RENAMED FROM `_fold_greeting` IN S7. It was never about greetings -- it is general Arabic
+    folding, and S7 needs the same folding to compare PRODUCT NAMES. Salman named the reason
+    directly: Arabic typed fast on WhatsApp spells the same word several ways, so «ماكينة حلاقة»
+    and «ماكينه حلاقه» must not become two products. The old name is kept as an alias below so
+    nothing that reads it breaks, and a name that describes one of two callers is exactly the
+    drift this file has corrected elsewhere.
     """
     low = (text or "").strip().lower()
     for src_ch, dst in _AR_FOLD:
@@ -175,6 +264,10 @@ def _fold_greeting(text: str) -> str:
     low = re.sub(r"[\u064B-\u0652]", "", low)
     low = re.sub(r"[^\w\s]", " ", low, flags=re.UNICODE)
     return " ".join(low.split())
+
+
+# The original name, kept so existing readers and callers are undisturbed.
+_fold_greeting = _fold_ar
 
 
 def _looks_like_greeting(text: str) -> bool:
@@ -394,6 +487,38 @@ async def _resolve_service_category(client_id: str) -> tuple[Optional[str], list
     return None, cats
 
 
+async def _find_existing_product(client_id: str, name_ar: str) -> Optional[dict]:
+    """The tenant's existing product with this name, or None. S7, 2026-09-17. READ ONLY.
+
+    🔴 THIS EXISTS BECAUSE A REAL TEST PRODUCED A REAL DUPLICATE. On 2026-09-17 Salman added
+    «مشط خشب» twice and got two products in his shop. Decision B4 already said an existing name
+    must become a QUESTION -- never a silent second row -- but B4 was scoped to the batch slice
+    (S4), so the single-product path shipped without it. That scoping was the mistake; the
+    decision was right all along.
+
+    MEASURED: there is no duplicate check anywhere in this repository -- not in
+    `admin_create_item`, not in the repository, not on the route. So the dashboard carries the
+    same gap. Only Lia is guarded here, because only Lia makes it one sentence away; the
+    dashboard's own gap is recorded as a finding rather than fixed from inside a chat handler.
+
+    COMPARED ON FOLDED ARABIC, at Salman's instruction: typed fast on WhatsApp the same word
+    arrives spelled several ways, so «ماكينه حلاقه» must find «ماكينة حلاقة». `_fold_ar` is the
+    folding this module already uses for greetings, now serving its second caller.
+
+    SEARCHED TENANT-WIDE, not inside the resolved category. A product may already sit on a
+    different shelf, and answering "you have it, in «أدوات الحلاقة»" is the guidance Salman asked
+    for -- naming the shelf turns a refusal into help. One service-layer read
+    (`admin_list_items`), no new path.
+    """
+    wanted = _fold_ar(name_ar)
+    if not wanted:
+        return None
+    for item in await catalog_service.admin_list_items(client_id):
+        if item.get("is_active") and _fold_ar(item.get("name_ar") or "") == wanted:
+            return item
+    return None
+
+
 async def _resolve_store_category(client_id: str) -> tuple[Optional[str], list]:
     """(category_id, store_categories). None means "ask", never "create one". S3, 2026-09-17.
 
@@ -474,7 +599,15 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # Listed here so a missing one fails the app's startup rather than reaching
                      # an owner as an empty WhatsApp message.
                      "store_inactive", "product_no_category", "product_created_note",
-                     "product_unclear", "entry_ambiguous")
+                     "product_unclear", "entry_ambiguous",
+                     # S7, 2026-09-17 -- every one of these exists because a real live test
+                     # produced silence, a duplicate, or a dead end.
+                     "entry_incomplete", "dup_found", "dup_ask_price", "dup_updated",
+                     "dup_cancelled",
+                     # S7, 2026-09-18. `dup_nudge` replaces a text that named an absent button;
+                     # `dup_price_only` closes the loop the widened question would otherwise
+                     # create. Both texts are pending Salman's approval before any deposit.
+                     "dup_nudge", "dup_price_only")
 
 
 def _load_prompt() -> str:
@@ -743,6 +876,72 @@ def _save_draft(session, draft: Optional[dict]) -> None:
     session.lia = data
 
 
+_PENDING_KEY = "family"
+
+
+def _load_pending(session) -> Optional[dict]:
+    """The unanswered family question, or None when there is none or it aged out. S7.
+
+    Stored beside the draft in `session.lia`, under its own key, because it is NOT a draft: there
+    is no extracted data yet, nothing has been validated, and no operation is known. Folding it
+    into the draft would give `_load_draft` two meanings and make "is there a draft" ambiguous at
+    every call site.
+
+    Same 10-minute window as a draft, for the same reason: an answer half an hour later is not an
+    answer, it is a stale tap on whatever the screen still showed.
+    """
+    data = getattr(session, "lia", None) or {}
+    pend = data.get(_PENDING_KEY) if isinstance(data, dict) else None
+    if not isinstance(pend, dict):
+        return None
+    started = pend.get("started_at")
+    if started:
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(started)).total_seconds()
+            if age > DRAFT_WINDOW_MIN * 60:
+                return None
+        except (ValueError, TypeError):
+            return None
+    return pend
+
+
+def _save_pending(session, pending: Optional[dict]) -> None:
+    data = getattr(session, "lia", None)
+    if not isinstance(data, dict):
+        data = {}
+    if pending is None:
+        data.pop(_PENDING_KEY, None)
+    else:
+        data[_PENDING_KEY] = pending
+    session.lia = data
+
+
+# The words an owner actually answers "خدمة أو بضاعة؟" with. Folded before matching, so
+# «بضاعه» finds «بضاعة» -- the same spelling tolerance the duplicate check needs.
+_FAMILY_ANSWERS = {
+    "create_service": ("خدمه", "خدمة", "سيرفس", "service", "khedme", "khidme", "khedma"),
+    "create_product": ("بضاعه", "بضاعة", "منتج", "منتوج", "سلعه", "صنف", "product", "item",
+                       "bde3a", "bda3a", "mantoj", "mantouj", "menteg"),
+}
+
+
+def _parse_family_answer(text: str) -> Optional[str]:
+    """Which family he named, or None for anything else — including a change of subject.
+
+    None is what makes the state INTERRUPTIBLE, at Salman's instruction: an owner who answers
+    "انسى الموضوع، احجزلي موعد" must not be held at the question. The caller drops the pending
+    record and lets the message be handled from scratch, so it reaches the booking flow instead
+    of being argued with.
+    """
+    folded = _fold_ar(text)
+    if not folded:
+        return None
+    for family, words in _FAMILY_ANSWERS.items():
+        if any(w in folded for w in words):
+            return family
+    return None
+
+
 _FIELD_QUESTIONS = {
     "price":        "قدّيش سعرها؟ (بالدولار)",
     "duration_min": "وقدّيش بتاخد وقت؟ (بالدقائق، أو قول «ساعة»)",
@@ -939,6 +1138,79 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
                 op.name, created.get("id"), client_id, actor, actor_id)
 
 
+async def _update_existing_price(wa, phone: str, session, draft: dict, dup: dict,
+                                 new_price: float) -> None:
+    """Change an existing product's price. S7, 2026-09-17.
+
+    THE OTHER HALF OF THE DUPLICATE ANSWER. Telling an owner "you already have this" and stopping
+    there sends him to the dashboard, which is the one thing Lia exists to spare him. So the
+    answer carries an action.
+
+    A FULL WRITE, AUTHORISED LIKE ANY OTHER. `_still_authorised` re-runs C, ①, A and B against
+    `update_product`'s own definition -- the same gate and permission as creating a product,
+    read off the PATCH route -- and the draft is consumed before the call so a double tap cannot
+    apply the change twice.
+
+    ONLY THE PRICE IS SENT. `admin_update_item` drops every `None` from its patch, so the name,
+    the category, the image and the flags are untouched. An "edit the price" that quietly rewrote
+    a field the owner never mentioned would be worse than no edit at all.
+    """
+    client_id = draft.get("client_id")
+    actor, actor_id = draft.get("actor"), draft.get("actor_id")
+    item_id, old_price = dup.get("id"), dup.get("price")
+    currency = dup.get("currency") or "USD"
+
+    _save_draft(session, None)
+    session.state = "IDLE"
+
+    op = lia_operations.get("update_product")
+    ok, reason = await _still_authorised(phone, client_id, op)
+    if not ok:
+        await log_security_event(
+            event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": reason, "operation": "update_product", "sender_phone": phone},
+            actor=actor_id,
+        )
+        logger.warning("🚫 Lia: price update refused (%s) from %s", reason, phone)
+        return
+
+    try:
+        await catalog_service.admin_update_item(
+            client_id      = client_id,
+            item_id        = item_id,
+            name_ar        = None,
+            name_en        = None,
+            description_ar = None,
+            description_en = None,
+            image_url      = None,
+            price          = new_price,
+            currency       = None,
+            is_featured    = None,
+            is_active      = None,
+            sort_order     = None,
+            metadata       = None,
+        )
+    except Exception as exc:
+        logger.error("🔥 Lia: price update failed: %s", exc, exc_info=True)
+        await wa.send_text(phone, "تعذّر تعديل السعر. جرّب من جديد أو من اللوحة.")
+        return
+
+    await log_security_event(
+        event_type=f"lia_{actor}_update_product", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"row_id": item_id, "name_ar": draft["data"].get("name_ar"),
+                "price": new_price, "old_price": old_price,
+                "operation": "update_product", "permission": op.permission,
+                "service_key": op.service_key,
+                "sender_phone": phone, "source": "whatsapp_text"},
+        actor=actor_id,
+    )
+    logger.info("✏️  Lia: product %s repriced %s -> %s for %s", item_id, old_price, new_price,
+                client_id)
+    await wa.send_text(phone, _REPLIES["dup_updated"].format(
+        name=draft["data"].get("name_ar"), price=new_price, currency=currency,
+        old_price=old_price))
+
+
 async def _write_service(wa, phone: str, client_id: str, validated) -> Optional[dict]:
     """The service write, unchanged in substance -- only moved out of `_commit`.
 
@@ -1103,7 +1375,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # abandoned draft. Without it, an owner who walks away for 15 minutes and comes back finds a
     # dead conversation: Lia would decline the message (no draft) and the state router has no
     # LIA_* branch, so nothing would answer at all.
-    if session is not None and not draft and session.state in STATES:
+    if session is not None and not draft and session.state in _DRAFT_STATES:
         session.state = "IDLE"
         _save_draft(session, None)
         logger.info("⏲  Lia: draft window expired for %s — state reset to IDLE", sender_phone)
@@ -1112,6 +1384,17 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             "مرّ وقت طويل على الطلب فألغيته 🙂 ابعتلي الخدمة من جديد إذا بدك.",
         )
         return session
+
+    # ── 0.1 The same guard for the family question, which has no draft. ──
+    #
+    # S7. `LIA_AWAITING_FAMILY` is deliberately outside STATES, so the block above cannot rescue
+    # it -- and a state no branch answers is the dead conversation that guard exists to prevent.
+    # It gets its own, SILENT reset: nothing was promised and nothing was lost, so announcing an
+    # expiry would be noise about a question the owner has already forgotten. Returning None lets
+    # the message be handled from scratch, which is also what makes the state interruptible.
+    if session is not None and session.state == LIA_AWAITING_FAMILY and not _load_pending(session):
+        session.state = "IDLE"
+        logger.info("⏲  Lia: family question expired for %s — state reset", sender_phone)
 
     # ── 0.5 The escape hatch. Checked BEFORE the draft branches, deliberately. ──
     #
@@ -1157,6 +1440,62 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         logger.info("🚪 Lia: %s (%s) took the escape hatch into the customer flow at %s",
                     sender_phone, actor, client.slug)
         await whatsapp_reservation_flow.start(wa, sender_phone, session, client)
+        return session
+
+    # ── 0.9 S7: the name already exists, and the owner is choosing. ──
+    #
+    # Before the confirmation branch, because this state has its own three answers and a draft
+    # that must NOT be written until one of them is given. Nothing here writes except the
+    # explicit "edit the existing one" path, which is its own registered operation.
+    if draft and session is not None and session.state == LIA_AWAITING_DUP:
+        dup = draft.get("dup") or {}
+        if msg_type in ("button_reply", "list_reply"):
+            if value == DUP_NEW_ID:
+                # He meant a second, genuinely separate product with the same name. `dup_ack`
+                # stops `_advance` asking again on the way back through.
+                draft["dup_ack"] = True
+                draft.pop("dup", None)
+                logger.info("➕ Lia: %s keeps a second product named %r",
+                            sender_phone, draft["data"].get("name_ar"))
+                await _advance(wa, sender_phone, session, draft)
+                return session
+            if value == DUP_EDIT_ID:
+                draft["asking"] = "dup_price"
+                _save_draft(session, draft)
+                session.state = LIA_AWAITING_DUP
+                await wa.send_text(sender_phone, _REPLIES["dup_ask_price"])
+                return session
+            if value == CANCEL_ID:
+                _save_draft(session, None)
+                session.state = "IDLE"
+                await log_security_event(
+                    event_type="lia_draft_cancelled", client_id=draft.get("client_id"),
+                    endpoint=_ENDPOINT, detail={"sender_phone": sender_phone, "reason": "duplicate"},
+                    actor=draft.get("actor_id"),
+                )
+                await wa.send_text(sender_phone, _REPLIES["dup_cancelled"])
+                return session
+
+        # A typed number after "عدّل الموجود" is the new price. Anything else re-asks.
+        if msg_type == "text" and draft.get("asking") == "dup_price":
+            new_price = _parse_field_answer("price", value)
+            if new_price is None:
+                # NOT `dup_ask_price` again, and this is the whole reason `dup_price_only`
+                # exists. That question names three fields -- price, name, section -- because
+                # Salman kept it open for a later, independent widening. Only PRICE is built in
+                # S7, so an owner who answers «الاسم» (a perfectly sensible answer to the
+                # question he was asked) would be re-asked the identical question forever. This
+                # branch is the one that must not loop.
+                await wa.send_text(sender_phone, _REPLIES["dup_price_only"])
+                return session
+            await _update_existing_price(wa, sender_phone, session, draft, dup, new_price)
+            return session
+
+        # 🔴 WAS `confirm_nudge`, WHICH WAS A REAL DEFECT. That text says «اضغط ✅ ضيفها أو
+        # ❌ إلغاء» -- and in THIS state the buttons on his screen are عدّل الموجود / صنف جديد /
+        # إلغاء. It pointed at a button that was not there. Found by reading the texts against
+        # the state that shows them, not by a test.
+        await wa.send_text(sender_phone, _REPLIES["dup_nudge"])
         return session
 
     # ── 1. A pending confirmation. Checked first: a tap answers the draft, nothing else. ──
@@ -1320,7 +1659,31 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         return _SENTINEL
 
     # ── 3. A new data-entry request. The cheap gate runs BEFORE the model. ──
-    family = _entry_family(value) if msg_type == "text" else None
+    #
+    # S7: this entry is reached two ways now -- a fresh message, or the ANSWER to the family
+    # question. The answer carries no product details of its own ("بضاعة" is not a request), so
+    # the text that gets extracted is the ORIGINAL message the owner wrote. Forgetting that is
+    # exactly what made the question a dead end when it first shipped: it was asked, answered,
+    # and the answer landed nowhere.
+    pending = _load_pending(session) if session is not None else None
+    entry_text = value
+    if pending and msg_type == "text" and session is not None \
+            and session.state == LIA_AWAITING_FAMILY:
+        family = _parse_family_answer(value)
+        if family is None:
+            # INTERRUPTIBLE, at Salman's instruction. "انسى الموضوع، احجزلي موعد" must not be
+            # held at a question. Drop the pending record and let the message be handled from
+            # scratch -- returning None is what carries it on to the booking flow.
+            _save_pending(session, None)
+            session.state = "IDLE"
+            logger.info("↩️  Lia: family question dropped for %s — he changed the subject",
+                        sender_phone)
+            return None
+        entry_text = pending.get("text") or value
+        _save_pending(session, None)
+        logger.info("🧭 Lia: family answered %s for %s", family, sender_phone)
+    else:
+        family = _entry_family(value) if msg_type == "text" else None
     if family is None:
         # NOT MINE. None is the only value that lets the message continue to tenant resolution
         # and the customer flow -- `False` would read as "handled" to the caller's
@@ -1369,8 +1732,27 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # live operation because it is the live one -- would authorise `services.write` for a message
     # that may have meant a product.
     if family is _AMBIGUOUS:
-        logger.info("🤔 Lia: entry names both families for %s — asking", sender_phone)
+        # S7: the question is now REMEMBERED. Before this it was asked and the answer had nowhere
+        # to land, so the owner answered, got silence, and retyped his original message -- twice,
+        # in the 2026-09-17 test. The pending record holds his original text for exactly as long
+        # as a draft would.
+        _save_pending(session, {"text": value,
+                                "started_at": datetime.now(timezone.utc).isoformat()})
+        session.state = LIA_AWAITING_FAMILY
+        logger.info("🤔 Lia: family unclear for %s — asking, and remembering the request",
+                    sender_phone)
         await wa.send_text(sender_phone, _REPLIES["entry_ambiguous"])
+        return session
+
+    # ── S7: an add verb with nothing to add. Mine, but empty — and answered, never ignored. ──
+    #
+    # Asked AFTER C and ① for the same reason every other reply is: a stranger must learn nothing
+    # about what this number accepts. `F-2` in the live test was this exact shape -- four
+    # messages, four silences, and an owner who could not tell whether the bot was broken or
+    # deaf.
+    if family is _INCOMPLETE:
+        logger.info("🫱 Lia: entry had a verb and no payload from %s — guiding", sender_phone)
+        await wa.send_text(sender_phone, _REPLIES["entry_incomplete"])
         return session
 
     # [operation] -- named by the cheap gate, which is the only place it CAN be named: D9 requires
@@ -1415,7 +1797,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # in the "did not understand" branch -- the operation authorised above and the operation the
     # model names cannot come apart.
     is_product = op.name == "create_product"
-    extraction = await (_extract_product(value) if is_product else _extract(value))
+    extraction = await (_extract_product(entry_text) if is_product else _extract(entry_text))
     if extraction is _UNAVAILABLE:
         # Our fault, said as our fault. And the dashboard still works, so the owner is not stuck.
         logger.error("🔥 Lia: unavailable for %s at %s — owner told, not blamed",
@@ -1539,6 +1921,38 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
         return
 
     draft["asking"] = None
+
+    # ── S7: an existing name becomes a QUESTION, and this is the one right place to ask it. ──
+    #
+    # HERE, not at entry and not at commit. At entry the name may still be missing (it can arrive
+    # in `unresolved` and be asked for), so there would be nothing to compare. At commit the draft
+    # has already been consumed by design, so offering "edit the existing one" would mean writing
+    # a draft back after consuming it -- and the consume-before-write rule is what stops a double
+    # tap creating two rows. At this point every required field is filled and the draft is still
+    # held, which is exactly what the question needs.
+    if _draft_operation(draft) == "create_product" and not draft.get("dup_ack"):
+        existing = await _find_existing_product(draft["client_id"], draft["data"]["name_ar"])
+        if existing:
+            draft["dup"] = {"id": existing["id"], "price": existing.get("price"),
+                            "currency": existing.get("currency") or "USD",
+                            "category": existing.get("category_name") or "—"}
+            _save_draft(session, draft)
+            session.state = LIA_AWAITING_DUP
+            await wa.send_text(phone, _REPLIES["dup_found"].format(
+                name=draft["data"]["name_ar"], price=existing.get("price"),
+                currency=existing.get("currency") or "USD",
+                category=existing.get("category_name") or "—"))
+            await wa.send_interactive_buttons(
+                to=phone,
+                text="شو بدك تعمل؟",
+                buttons=[
+                    {"type": "reply", "reply": {"id": DUP_EDIT_ID, "title": "✏️ عدّل الموجود"}},
+                    {"type": "reply", "reply": {"id": DUP_NEW_ID,  "title": "➕ صنف جديد"}},
+                    {"type": "reply", "reply": {"id": CANCEL_ID,   "title": "❌ إلغاء"}},
+                ],
+            )
+            return
+
     _save_draft(session, draft)
     session.state = LIA_AWAITING_CONFIRM
     await _send_preview(wa, phone, draft)

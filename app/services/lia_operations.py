@@ -105,6 +105,19 @@ def _write_create_product():
     return catalog_service.admin_create_item
 
 
+def _write_update_product():
+    """S7 (2026-09-17). Mirrors `admin/store.py`'s PATCH /products, same gate as the POST.
+
+    `admin_update_item` drops every `None` from its patch, so a price-only edit is one call that
+    leaves every other column alone -- no read-modify-write, and no risk of blanking a field the
+    owner never mentioned. It also re-validates a target category against the tenant, which is
+    what will let the later "move it to another shelf" flow reuse this definition rather than
+    grow a third one.
+    """
+    from app.services import catalog_service
+    return catalog_service.admin_update_item
+
+
 # ── The registry ─────────────────────────────────────────────────────────────
 #
 # Decision a-1: exactly the operations that have a real service-layer write function TODAY.
@@ -163,6 +176,19 @@ _REGISTRY: dict[str, OperationDefinition] = {
         service_key   = "store",
         write_fn      = _write_create_product,
         mirrors_route = "app/api/v1/admin/store.py:175-176",
+    ),
+    # S7, 2026-09-17. Registered because the live test exposed a dead end: once Lia says "this
+    # already exists", refusing and stopping sends the owner back to the dashboard -- the one
+    # thing she exists to avoid. Editing is the other half of the duplicate answer, not a
+    # separate feature. Same gate and same permission as `create_product`, read off the PATCH
+    # route, so no new authorisation question is introduced.
+    "update_product": OperationDefinition(
+        name          = "update_product",
+        permission    = "store.write",
+        legacy_roles  = STORE_LEGACY_ROLES,
+        service_key   = "store",
+        write_fn      = _write_update_product,
+        mirrors_route = "app/api/v1/admin/store.py:220-221",
     ),
 }
 

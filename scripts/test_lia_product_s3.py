@@ -152,6 +152,14 @@ def _product_session(data=None, state=None, operation="create_product"):
 
 
 async def main():
+    # S7: `_advance` now asks whether this product name already exists, through
+    # `catalog_service.admin_list_items`. Every `_advance` case below means "a shop with no
+    # matching product", so the read is stubbed empty here and overridden where a duplicate is
+    # the point. Leaving it unstubbed reaches the REAL prisma client -- which is how this suite
+    # started crashing instead of failing.
+    _orig_list_items = catalog_service.admin_list_items
+    catalog_service.admin_list_items = lambda *a, **kw: _done([])
+
     OP_PRODUCT = ops.get("create_product")
     OP_ITEM = ops.get("create_catalog_item")
     OP_SERVICE = ops.get("create_service")
@@ -186,10 +194,17 @@ async def main():
         ("add product shampoo 12", "create_product"),
         ("ضيف صنف جديد مشط بـ3 دولار", "create_product"),
         ("ضيف خدمة وبضاعة", lia._AMBIGUOUS),
-        ("ضيف شامبو كيراتين بـ12 دولار", None),      # no generic noun -> not mine
+        # 🔴 TRANSITION, S7 (2026-09-17). This returned None — TOTAL SILENCE — until the live
+        # test made the cost visible: Salman wrote «ضيف ماكينة حلاقة 20 دولار» four times and
+        # got nothing back, because the noun was in neither list. It is now a QUESTION. The
+        # dictionary of product names is still refused; what changed is that the gate hands an
+        # unreadable family to the ambiguity branch instead of dropping the message.
+        ("ضيف شامبو كيراتين بـ12 دولار", lia._AMBIGUOUS),
         ("مرحبا", None),
-        ("بدي احجز دقن بكرا", None),                  # a customer, untouched
+        ("بدي احجز دقن بكرا", None),                  # a customer, untouched — still silent
+        ("سجل إنه أحمد إجا مبارح", None),             # a RECORD verb stays narrow until T4
         ("ضيف", None),                                # too short
+        ("ضيف واحد", lia._INCOMPLETE),                # mine, but empty -> guided, not ignored
     ]
     for text, want in cases:
         got = lia._entry_family(text)
@@ -209,7 +224,10 @@ async def main():
     i_lia = th.index("_tenant_has_lia(client_id)", i_family)
     i_op = th.index("lia_operations.get(family)")
     i_auth = th.index("_authorise_operation(client_id, user, op)")
-    i_model = th.index("_extract_product(value)")
+    # S7 renamed the argument: the extraction reads `entry_text`, which is the ORIGINAL request
+    # when the message being handled is an answer to the family question. Asserting on the old
+    # spelling made this suite CRASH rather than fail — see the harness note in the session log.
+    i_model = th.index("_extract_product(entry_text)")
     check("the gate runs before the tenant is even read (no model, no DB for a stranger)",
           i_family < i_actor)
     check("C before ①", i_actor < i_lia)

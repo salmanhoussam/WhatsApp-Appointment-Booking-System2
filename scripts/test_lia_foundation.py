@@ -203,10 +203,17 @@ async def main():
     # `scripts/test_lia_product_s1.py` runs the real function against a faked repository to prove
     # the row is a correct product. So a-2's list is now `create_barber` ALONE -- the operation
     # that genuinely still writes through a repository with its constraints in the route.
-    check("exactly four operations registered",
+    # FIVE since S7 (2026-09-17). `update_product` joined because the live test exposed a dead
+    # end: once Lia says "this already exists", refusing and stopping sends the owner back to the
+    # dashboard. Same gate and permission as create_product, read off store.py's PATCH route.
+    check("exactly five operations registered (was four before S7)",
           ops.names() == ("create_catalog_item", "create_product", "create_reservation",
-                          "create_service"),
+                          "create_service", "update_product"),
           str(ops.names()))
+    check("   update_product shares create_product's gate and permission exactly",
+          ops.get("update_product").service_key == OP_PRODUCT.service_key
+          and ops.get("update_product").permission == OP_PRODUCT.permission
+          and ops.get("update_product").legacy_roles == OP_PRODUCT.legacy_roles)
     check("create_barber is ABSENT, not registered-and-disabled (a-2)",
           ops.get("create_barber") is None and "create_barber" not in ops.names())
     check("create_product's gate is `store`, NOT `catalog` — a different key, inactive on all "
