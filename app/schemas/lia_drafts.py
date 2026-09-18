@@ -294,9 +294,16 @@ class LiaEditPatch(BaseModel):
 # never invents a number that could belong to a real person.
 #
 # 🔴 WHY THIS EXACT SHAPE, MEASURED RATHER THAN CHOSEN:
-#   * `Reservation.customerId` is `String @db.Uuid` with NO `?` -- not nullable. Recording a
-#     reservation without SOME customer row is impossible without a migration, so a placeholder
-#     is the only available option, not a preference.
+#   * 🔴 CORRECTION (2026-09-18, found while writing the live-evidence reader). This comment
+#     first said `Reservation.customerId` is NOT nullable. THAT WAS WRONG: the non-nullable
+#     `customerId String @db.Uuid` I read is on `Booking` (schema.prisma:352), a different model.
+#     `Reservation.customerId` is `String?` (schema.prisma:~62) and the schema's own comment says
+#     pre-migration rows correctly carry null.
+#     What is still true, and is the REAL reason a placeholder is used: `create_reservation`
+#     takes `customer_phone: str` as a REQUIRED parameter and always runs a find-or-create from
+#     it. So a null customer link is possible in the DATABASE but not through the shared service
+#     as written -- reaching it would need a guarded branch in a write path used by the website,
+#     the dashboard and the customer WhatsApp flow. That is a separate decision, not a detail.
 #   * `create_reservation` runs `normalize_for_storage(phone) or phone` before a find-or-create.
 #     Measured: `normalize_for_storage("walkin-123")` returns **"961123"** -- a plausible Lebanese
 #     number. Any placeholder containing digits can therefore be rewritten into something that
