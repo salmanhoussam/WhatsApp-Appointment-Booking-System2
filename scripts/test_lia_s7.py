@@ -295,6 +295,13 @@ async def main():
         check("«ماكينه حلاقه» finds «ماكينة حلاقة» — folded, not compared raw",
               len(env.created) == 0 and out.state == lia.LIA_AWAITING_DUP)
         check("   and names the shelf it is really on", "أدوات الحلاقة" in wa.joined())
+        # F-C1 (Gate ①, 2026-09-18). The owner typed «ماكينه حلاقه»; the row on his shelf is
+        # «ماكينة حلاقة». The message exists to tell him WHAT WAS FOUND, so it must quote the
+        # stored row, not his own spelling echoed back. Found on real production data, where
+        # «مشط خشب » came back quoted with his trailing space.
+        check("   🔴 it quotes the STORED name, not what he typed",
+              "«ماكينة حلاقة»" in wa.joined() and "«ماكينه حلاقه»" not in wa.joined(),
+              wa.joined())
 
     print("\n── D1c. a genuinely new name is untouched by any of this ──")
     async with Env(extraction=Extract("بلسم للشعر", 9.0)) as env:
@@ -428,7 +435,9 @@ async def main():
     # ── A3 · the texts themselves ────────────────────────────────────────────
     print("\n── A3. the approved wording, asserted as wording ──")
     _S7_TEXTS = ("entry_incomplete", "dup_found", "dup_ask_price", "dup_price_only",
-                 "dup_updated", "dup_cancelled", "dup_nudge")
+                 "dup_updated", "dup_cancelled", "dup_nudge",
+                 # moved out of the service module unchanged on 2026-09-18 (F-C2)
+                 "dup_choose")
     import unicodedata
     def _has_emoji(t):
         return any(unicodedata.category(c) == "So" or ord(c) > 0x1F000 for c in t)
@@ -464,6 +473,55 @@ async def main():
           all(k in lia._REQUIRED_REPLIES for k in _S7_TEXTS))
     check("`confirm_nudge` is no longer sent from the duplicate state",
           "dup_nudge" in open(lia.__file__, encoding="utf-8").read())
+
+    # ── F-C2 · owner-facing text does not live in the service module ──
+    #
+    # Asserted on the PARSED SOURCE, not on a grep: a comment explaining the move would match a
+    # grep and pass a test that proves nothing. This project has paid for that three times.
+    import ast as _ast, re as _re2
+    _src = open(lia.__file__, encoding="utf-8").read()
+    _tree = _ast.parse(_src)
+    _AR = _re2.compile(r"[\u0600-\u06FF]")
+    _sent_literals = []
+    for _n in _ast.walk(_tree):
+        if (isinstance(_n, _ast.Call) and isinstance(_n.func, _ast.Attribute)
+                and _n.func.attr.startswith("send_")):
+            for _a in list(_n.args) + [_k.value for _k in _n.keywords]:
+                for _sub in _ast.walk(_a):
+                    if (isinstance(_sub, _ast.Constant) and isinstance(_sub.value, str)
+                            and _AR.search(_sub.value)):
+                        _sent_literals.append((_n.lineno, _sub.value))
+    check("«شو بدك تعمل؟» is no longer a literal in the service module",
+          not any(v.strip() == "شو بدك تعمل؟" for _, v in _sent_literals))
+    check("   and it is the prompt file's text, unchanged — a MOVE, not a rewrite",
+          lia._REPLIES["dup_choose"].strip() == "شو بدك تعمل؟",
+          repr(lia._REPLIES["dup_choose"]))
+    # MY FIRST VERSION OF THIS CHECK WAS WRONG, and the suite caught it. It asserted that NO
+    # Arabic literal may appear in the duplicate branch — which fails on the three BUTTON TITLES
+    # («✏️ عدّل الموجود» …), and Salman decided explicitly that button titles stay as they are.
+    # The real property is narrower and is the one F-C2 was about: the message BODY of every
+    # `send_interactive_buttons` comes from the prompt file, never from a literal.
+    _literal_bodies = []
+    for _n in _ast.walk(_tree):
+        if (isinstance(_n, _ast.Call) and isinstance(_n.func, _ast.Attribute)
+                and _n.func.attr == "send_interactive_buttons"):
+            for _k in _n.keywords:
+                if _k.arg == "text" and isinstance(_k.value, _ast.Constant):
+                    _literal_bodies.append((_n.lineno, _k.value.value))
+    # AND THE SECOND VERSION WAS ALSO TOO BROAD — caught again, by the same suite. One literal
+    # body survives: «أضيفها هلق؟», the PREVIEW's, written in S3 and untouched by this round.
+    # The prompt file's own rule is «كل رسالة تُنقَل حين يلمسها تغيير حقيقي، لا قبله», so moving
+    # it here would be exactly the pre-emptive migration that rule refuses. This is therefore a
+    # BASELINE with its remaining member named, not an invariant: the duplicate branch's body is
+    # gone from the source, and a NEW literal body would show up here immediately.
+    check("   the only literal interactive body left is S3's preview, named",
+          [v for _, v in _literal_bodies] == ["أضيفها هلق؟"], str(_literal_bodies))
+    # BASELINE, not an invariant — and the difference matters. 31 Arabic literals are still sent
+    # directly from this module, and that is the prompt file's own documented rule, not drift:
+    # «كل رسالة تُنقَل حين يلمسها تغيير حقيقي، لا قبله». Pinning the number makes the next one
+    # VISIBLE instead of silent; a round that legitimately moves one lowers it and edits this line.
+    check("the un-migrated owner-facing literals are pinned at 31 (was 32 before F-C2)",
+          len(_sent_literals) == 31, str(len(_sent_literals)))
     check("a RECORD verb still stays out until T4 — no promise of reservations",
           lia._entry_family("سجل إنه أحمد إجا مبارح") is None)
     check("a CUSTOMER asking for a service is still not owner entry",

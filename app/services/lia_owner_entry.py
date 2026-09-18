@@ -607,7 +607,9 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # S7, 2026-09-18. `dup_nudge` replaces a text that named an absent button;
                      # `dup_price_only` closes the loop the widened question would otherwise
                      # create. Both texts are pending Salman's approval before any deposit.
-                     "dup_nudge", "dup_price_only")
+                     "dup_nudge", "dup_price_only",
+                     # Moved out of the service module on 2026-09-18, unchanged (F-C2).
+                     "dup_choose")
 
 
 def _load_prompt() -> str:
@@ -1938,13 +1940,24 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
                             "category": existing.get("category_name") or "—"}
             _save_draft(session, draft)
             session.state = LIA_AWAITING_DUP
+            # F-C1 (Gate ①, 2026-09-18). WAS `draft["data"]["name_ar"]` -- what the OWNER typed,
+            # as the model extracted it. The real read on production showed «مشط خشب » quoted
+            # back with his trailing space, and «ماكينه حلاقه» would be quoted in HIS spelling
+            # while the row on his shelf is spelled «ماكينة حلاقة». This message exists to tell
+            # him what the system FOUND, so the stored row's own name is the only correct
+            # reference. The fold that matched them is deliberately not shown to him.
             await wa.send_text(phone, _REPLIES["dup_found"].format(
-                name=draft["data"]["name_ar"], price=existing.get("price"),
+                name=existing.get("name_ar") or draft["data"]["name_ar"],
+                price=existing.get("price"),
                 currency=existing.get("currency") or "USD",
                 category=existing.get("category_name") or "—"))
             await wa.send_interactive_buttons(
                 to=phone,
-                text="شو بدك تعمل؟",
+                # F-C2 (Gate ①, 2026-09-18). This was an Arabic owner-facing string living in a
+                # service module -- a SECOND WhatsApp message, invisible to the text review
+                # because it was not a key. Moved verbatim: "انقل ولا تُحسِّن". Re-wording it is
+                # a separate decision, and it now has to pass the same gate as every other text.
+                text=_REPLIES["dup_choose"],
                 buttons=[
                     {"type": "reply", "reply": {"id": DUP_EDIT_ID, "title": "✏️ عدّل الموجود"}},
                     {"type": "reply", "reply": {"id": DUP_NEW_ID,  "title": "➕ صنف جديد"}},
