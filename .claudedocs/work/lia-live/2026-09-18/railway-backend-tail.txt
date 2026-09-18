@@ -1,0 +1,56 @@
+Starting Container
+[2026-09-18 18:19:22 +0300] [3] [INFO] Booting worker with pid: 3
+[2026-09-18 18:19:22 +0300] [4] [INFO] Booting worker with pid: 4
+[2026-09-18 18:19:22 +0300] [2] [INFO] Starting gunicorn 23.0.0
+[2026-09-18 18:19:22 +0300] [2] [INFO] Listening at: http://0.0.0.0:8080 (2)
+[2026-09-18 18:19:22 +0300] [2] [INFO] Using worker: uvicorn.workers.UvicornWorker
+[2026-09-18 18:19:27 +0300] [4] [INFO] Started server process [4]
+[2026-09-18 18:19:27 +0300] [4] [INFO] Waiting for application startup.
+[2026-09-18 18:19:27 +0300] [3] [INFO] Started server process [3]
+[2026-09-18 18:19:27 +0300] [3] [INFO] Waiting for application startup.
+INFO app.db.client: ✅ Successfully connected to the database (Prisma).
+[2026-09-18 18:19:27 +0300] [4] [INFO] Application startup complete.
+INFO app.db.client: ✅ Successfully connected to the database (Prisma).
+[2026-09-18 18:19:27 +0300] [3] [INFO] Application startup complete.
+INFO app.api.v1.admin.auth: 🔐 User login attempt: 'rkbarber@dev.invalid'
+INFO app.api.v1.admin.auth: ✅ User login success: rkbarber@dev.invalid (role=TENANT_ADMIN)
+INFO app.core.tenant: 🔑 Tenant from JWT: rk
+INFO app.core.tenant: ✅ Tenant verified and cached: rk
+INFO app.core.tenant: ✅ Tenant verified and cached: rk
+INFO app.core.tenant: 🔑 Tenant from JWT: rk
+INFO app.core.tenant: 🔑 Tenant from JWT: rk
+INFO app.core.tenant: 🔑 Tenant from JWT: rk
+INFO app.api.v1.admin.auth: 🔐 User login attempt: 'barberlab-test@demo.salmansaas.com'
+INFO app.api.v1.admin.auth: ✅ User login success: barberlab-test@demo.salmansaas.com (role=TENANT_ADMIN)
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: 🔗 Tenant from query param: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.api.v1.admin.auth: 🔐 User login attempt: 'barberlab-test@demo.salmansaas.com'
+INFO app.api.v1.admin.auth: ✅ User login success: barberlab-test@demo.salmansaas.com (role=TENANT_ADMIN)
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: ✅ Tenant verified and cached: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+INFO app.core.tenant: 🔑 Tenant from JWT: barberlab-test
+WARNING app.services.whatsapp_flow: ⚠️  No client resolved for display_phone=96179022398 (session bound=False) — message DROPPED, customer 21650492679 got no reply
+warning: Config as Code (railway.json / railway.toml) is deprecated. Prefer Infrastructure as Code (.railway/railway.ts). Run `railway config migrate` or see https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code
+  → Migrate: `railway config migrate` — https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code
+  Existing files keep working until 2026-12-01.
