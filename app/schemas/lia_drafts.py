@@ -29,6 +29,7 @@ WHAT IS DELIBERATELY NOT HERE:
     silently. Named as out of scope in the plan rather than left to a model's judgement.
 """
 
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -45,7 +46,9 @@ from pydantic import BaseModel, Field, field_validator
 # return `create_product` carrying a `duration_min`, and let the product prompt claim a service --
 # a mismatch between the operation AUTHORISED before the model call and the one the model names.
 # Pinning per class makes that mismatch structurally impossible rather than guarded against.
-LiaIntent = Literal["create_service", "create_product"]
+# `create_reservation` added 2026-09-18 (T4). Same rule as above: it is vocabulary, never the
+# type of one extraction's `intent` -- the reservation prompt pins its own single value.
+LiaIntent = Literal["create_service", "create_product", "create_reservation"]
 
 # Currencies the shops actually price in. Anything else is a question, not a conversion -- Lia
 # does no FX, ever.
@@ -280,4 +283,85 @@ class LiaEditPatch(BaseModel):
     intent:     Literal["edit_draft"]
     confidence: Literal["high", "medium", "low"]
     changes:    LiaDraftChanges = Field(default_factory=LiaDraftChanges)
+    unresolved: list[str] = Field(default_factory=list)
+
+
+# ── Reservations (T4, 2026-09-18) ─────────────────────────────────────────────
+
+# The answer an owner gives when the customer has no number. Salman's decision, 2026-09-18: a
+# walk-in ("زبون طيار") is the barber's bread and butter, and refusing to record one because a
+# phone is missing would make the owner hate the tool. R-1 still holds in full -- Lia ASKS, and
+# never invents a number that could belong to a real person.
+#
+# 🔴 WHY THIS EXACT SHAPE, MEASURED RATHER THAN CHOSEN:
+#   * `Reservation.customerId` is `String @db.Uuid` with NO `?` -- not nullable. Recording a
+#     reservation without SOME customer row is impossible without a migration, so a placeholder
+#     is the only available option, not a preference.
+#   * `create_reservation` runs `normalize_for_storage(phone) or phone` before a find-or-create.
+#     Measured: `normalize_for_storage("walkin-123")` returns **"961123"** -- a plausible Lebanese
+#     number. Any placeholder containing digits can therefore be rewritten into something that
+#     could collide with a real customer. `WALK_IN` normalises to None and is stored verbatim.
+#   * It is deliberately not a number at all, so it can never be dialled, matched against an
+#     inbound sender, or mistaken for data.
+WALK_IN_PHONE = "WALK_IN"
+
+
+class LiaReservationDraft(BaseModel):
+    """One proposed RESERVATION, as extracted and BEFORE any write. T4, 2026-09-18.
+
+    IT CARRIES NAMES, NOT IDS, and that is the same rule the product path already follows for its
+    category: the model never emits a database id. `service_name` and `barber_name` are resolved
+    against the CURRENT tenant's real rows by the backend, and an unresolvable name becomes a
+    question rather than a guess.
+
+    `reserved_at` IS A NAIVE LOCAL WALL CLOCK, deliberately, and this is the single most
+    dangerous field in the file. The platform stores local wall-clock time wearing a UTC label --
+    proved by construction on 2026-09-17, not assumed: `_check_working_hours` reads the RAW
+    `%H:%M` against the shop's local hours and 52 of 52 production rows fall inside 09:00-21:00,
+    which is impossible for a true UTC instant in a UTC+3 shop. So the rule is **DO NOT CONVERT**.
+    An aware datetime from the model has its tzinfo DROPPED rather than converted -- «الساعة ٤»
+    means four o'clock on the shop's wall, and turning it into an instant would move every
+    appointment by the tenant's real offset.
+
+    NO `is_past` FIELD. Whether this already happened is derived by comparing `reserved_at` with
+    the clock, in ONE place in the code. Letting the model declare it would create a second place
+    for «مبارح» and «بكرا» to disagree.
+    """
+
+    customer_name:  str = Field(min_length=2, max_length=120)
+    # Required, and `WALK_IN_PHONE` is the one non-number it accepts. Optional would let a silent
+    # omission through; requiring it makes "he has no number" an explicit thing the owner SAID.
+    customer_phone: str = Field(min_length=3, max_length=32)
+    reserved_at:    datetime
+    service_name:   str = Field(min_length=2, max_length=200)
+    barber_name:    Optional[str] = Field(default=None, max_length=120)
+    notes:          Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("customer_name", "service_name", "barber_name", "notes")
+    @classmethod
+    def _collapse(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        cleaned = " ".join(v.split())
+        return cleaned or None
+
+    @field_validator("reserved_at")
+    @classmethod
+    def _wall_clock(cls, v: datetime) -> datetime:
+        """Drop any offset WITHOUT converting — see the class docstring."""
+        return v.replace(tzinfo=None) if v.tzinfo is not None else v
+
+
+class LiaReservationExtraction(BaseModel):
+    """What the RESERVATION prompt is allowed to return. T4, 2026-09-18.
+
+    A fourth class rather than a widened one, for the reason `LiaIntent` records: the operation is
+    authorised BEFORE the model is called, so the model must not be able to name a different one.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    intent:     Literal["create_reservation"]
+    confidence: Literal["high", "medium", "low"]
+    data:       dict = Field(default_factory=dict)
     unresolved: list[str] = Field(default_factory=list)

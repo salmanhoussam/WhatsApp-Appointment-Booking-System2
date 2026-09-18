@@ -125,6 +125,10 @@ _RECORD_VERBS = ("سجل", "سجّل")
 # often also a customer, which is the one case the plan requires proving. So every Franco token
 # is matched on a WORD BOUNDARY. The Arabic path keeps its existing semantics untouched.
 _FRANCO_ADD_VERBS     = ("dif", "dayef", "dayif", "dayyef", "zid", "2dif", "dif2")
+# T4: the RECORD verb in Franco. Kept in its own tuple for the same reason the Arabic ones are
+# split -- `سجل` opens a reservation and `ضيف` does not, and that distinction must survive the
+# transliteration rather than be flattened by it.
+_FRANCO_RECORD_VERBS  = ("sajel", "sajjel", "sajil", "sajell", "sejjel", "record")
 _FRANCO_SERVICE_WORDS = ("khedme", "khidme", "khedmi", "khedma", "serves")
 _FRANCO_PRODUCT_WORDS = ("mantoj", "mantouj", "menteg", "mantouj", "bde3a", "bda3a", "sel3a",
                          "senf")
@@ -164,6 +168,14 @@ _PRODUCT_OBJECTS = ("منتج", "منتوج", "بضاعة", "بضاعه", "سل�
 # not a silent preference for the live one: guessing "service" here could authorise
 # `services.write` for a message that meant a product, which is the one thing the operation-aware
 # model exists to stop. It is now reached by TWO routes -- both nouns present, or neither.
+# T4 (2026-09-18). The third family. `موعد` is the noun; `سجل` is its verb, and the verb alone is
+# enough -- «سجّللي إنو أحمد إجا مبارح» names no noun at all, which is exactly how an owner speaks
+# about something that already happened. That is why `_RECORD_VERBS` was kept narrow until today:
+# widening it earlier would have answered a reservation with "خدمة أو بضاعة؟", promising a third
+# thing that did not exist. It exists now.
+_RESERVATION_OBJECTS = ("موعد", "مواعيد", "حجز", "حجوزات", "appointment", "booking", "reservation")
+_FRANCO_RESERVATION_WORDS = ("maw3ad", "maw3ed", "mawaid", "hajz", "7ajz", "7ajez")
+
 _AMBIGUOUS = "__ambiguous__"
 # An add verb and nothing to add. Mine, but empty -- and the owner gets a sentence, not silence.
 _INCOMPLETE = "__incomplete__"
@@ -197,24 +209,34 @@ def _entry_family(text: str) -> Optional[str]:
     # حلاقة» -- a CUSTOMER asking for a haircut -- contains `خدمة` and would have entered the
     # owner-entry path. No customer message carries `ضيف`/`سجل`; that is the whole reason the
     # gate is built on the verb.
-    if not (any(v in low for v in _ENTRY_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
+    if not (any(v in low for v in _ENTRY_VERBS)
+            or _has_franco(low, _FRANCO_ADD_VERBS)
+            or _has_franco(low, _FRANCO_RECORD_VERBS)):
         return None
     service = any(o in low for o in _ENTRY_OBJECTS) or _has_franco(low, _FRANCO_SERVICE_WORDS)
     product = any(o in low for o in _PRODUCT_OBJECTS) or _has_franco(low, _FRANCO_PRODUCT_WORDS)
-    if service and product:
+    booking = (any(o in low for o in _RESERVATION_OBJECTS)
+               or _has_franco(low, _FRANCO_RESERVATION_WORDS))
+    # A NOUN NAMES THE FAMILY, and more than one noun is a question rather than a precedence rule.
+    # Guessing here could authorise `services.write` for a message that meant a reservation.
+    named = [f for f, hit in (("create_service", service), ("create_product", product),
+                              ("create_reservation", booking)) if hit]
+    if len(named) > 1:
         return _AMBIGUOUS
-    if service:
-        return "create_service"
-    if product:
-        return "create_product"
-    # No generic noun. Only an ADD verb may proceed without one -- see `_ADD_VERBS`.
+    if named:
+        return named[0]
+    # No noun at all. A RECORD verb is now enough on its own -- «سجّللي إنو أحمد إجا مبارح الساعة
+    # ٤» is a reservation and names nothing. An ADD verb still is not: «ضيف أحمد الساعة ٤» could
+    # be any of the three, so it goes to the question.
+    if any(v in low for v in _RECORD_VERBS) or _has_franco(low, _FRANCO_RECORD_VERBS):
+        return "create_reservation"
     if not (any(v in low for v in _ADD_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
         return None
     # Is there anything to add? A price-like number, or at least two words beyond the verb. This
     # is a CHEAPNESS test, not a classifier: it keeps a bare "ضيف" from costing a database read
     # while letting a real request through to the question.
     rest = low
-    for v in _ADD_VERBS + _FRANCO_ADD_VERBS:
+    for v in _ADD_VERBS + _FRANCO_ADD_VERBS + _FRANCO_RECORD_VERBS:
         rest = rest.replace(v, " ", 1) if v in rest else rest
     words = rest.split()
     if re.search(r"\d", low) or len(words) >= 2:
@@ -585,6 +607,10 @@ _WELCOME_START = "<!--LIA_WELCOME_START-->"
 _WELCOME_END   = "<!--LIA_WELCOME_END-->"
 # The edit prompt: a second model-facing block, kept separate from the first because it takes a
 # DRAFT PLUS AN INSTRUCTION and returns only the changed fields, not a whole draft.
+# T4: the reservation block, a FOURTH model-facing block. Separate for the same reason the
+# product one is: a different question, different required fields, and its own pinned intent.
+_RESERVATION_START = "<!--LIA_RESERVATION_PROMPT_START-->"
+_RESERVATION_END   = "<!--LIA_RESERVATION_PROMPT_END-->"
 _EDIT_START = "<!--LIA_EDIT_PROMPT_START-->"
 _EDIT_END   = "<!--LIA_EDIT_PROMPT_END-->"
 # Owner-facing wording that this round changes. NOT the whole file's messages -- see the block's
@@ -609,7 +635,17 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # create. Both texts are pending Salman's approval before any deposit.
                      "dup_nudge", "dup_price_only",
                      # Moved out of the service module on 2026-09-18, unchanged (F-C2).
-                     "dup_choose")
+                     "dup_choose",
+                     # T4, 2026-09-18 -- the reservation path. Every one of these is required at
+                     # import, so a missing key fails `from app.main import app` rather than
+                     # reaching an owner as an empty WhatsApp message.
+                     "reservation_ask_customer", "reservation_ask_phone", "reservation_ask_when",
+                     "reservation_ask_service", "reservation_ask_barber",
+                     "reservation_service_unknown", "reservation_barber_unknown",
+                     "reservation_no_barbers", "reservation_no_services",
+                     "reservation_preview", "reservation_preview_past", "reservation_confirm",
+                     "reservation_created", "reservation_conflict", "reservation_unclear",
+                     "reservations_inactive", "walkin_label")
 
 
 def _load_prompt() -> str:
@@ -699,6 +735,7 @@ _PRODUCT_PROMPT = _load_block(_PRODUCT_PROMPT_START, _PRODUCT_PROMPT_END, "produ
 # pre-flight, not by an owner whose "مرحبا" goes unanswered.
 _WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
 _EDIT_PROMPT = _load_block(_EDIT_START, _EDIT_END, "edit prompt")
+_RESERVATION_PROMPT = _load_block(_RESERVATION_START, _RESERVATION_END, "reservation prompt")
 _REPLIES = _load_replies()
 
 
@@ -737,6 +774,76 @@ async def _extract_product(text: str) -> Optional["object"]:
     from app.schemas.lia_drafts import LiaProductExtraction
 
     return await _ask_model(_PRODUCT_PROMPT, text, LiaProductExtraction)
+
+
+async def _extract_reservation(text: str) -> Optional["object"]:
+    """One owner message -> a reservation candidate. T4, 2026-09-18.
+
+    THE PROMPT IS GIVEN THE CURRENT TIME, and it has to be: «مبارح» and «بكرا» are meaningless
+    without it, and a model left to guess today's date will silently file an appointment in the
+    wrong week. The time handed over is `datetime.now()` -- the container runs TZ=Asia/Beirut, so
+    the server's wall clock IS the shop's wall clock, which is the same representation every
+    reservation in this system is stored in. Deliberately NOT `utcnow()`: that would be three
+    hours off the only clock that matters here.
+    """
+    from app.schemas.lia_drafts import LiaReservationExtraction
+    from app.services.whatsapp_notifications import fmt_reserved_at
+    now = datetime.now()
+    prompt = _RESERVATION_PROMPT.format(now=f"{now:%Y-%m-%d %H:%M} ({fmt_reserved_at(now)})")
+    return await _ask_model(prompt, text, LiaReservationExtraction)
+
+
+async def _list_barbers(client_id: str) -> list:
+    """Active barbers, through the SAME repository the customer flow reads.
+
+    `whatsapp_reservation_flow:494` calls exactly this with `active_only=True`; Lia asking a
+    different question would let her offer a barber the booking flow would refuse.
+    """
+    from app.repositories import barber_repo
+    try:
+        return await barber_repo.list_barbers(client_id, active_only=True) or []
+    except Exception as exc:                                   # pragma: no cover - read failure
+        logger.error("🔥 Lia: could not list barbers for %s: %s", client_id, exc)
+        return []
+
+
+async def _list_services(client_id: str) -> list:
+    """Active `CatalogService` rows — the BOOK side, never `CatalogItem`.
+
+    The two must not be confused: a product is bought and has no duration; a service is booked and
+    carries `durationMin`, which is the number this reservation's length comes from.
+    """
+    from app.repositories import catalog_service_repo
+    try:
+        return await catalog_service_repo.list_catalog_services(client_id) or []
+    except Exception as exc:                                   # pragma: no cover - read failure
+        logger.error("🔥 Lia: could not list services for %s: %s", client_id, exc)
+        return []
+
+
+def _match_by_name(rows: list, spoken: str, attr: str = "nameAr"):
+    """The row whose `nameAr` the owner meant, or None. Folded, never fuzzy.
+
+    Exact-on-folded first, then containment in either direction, so «قص» finds «قص شعر» and
+    «قص شعر» finds «قص». `_fold_ar` is the same normaliser the duplicate check uses -- an owner
+    typing «حلاقه دقن» must reach «حلاقة دقن». Nothing scores or ranks: a name that matches two
+    rows is treated as no match at all, because guessing between two real services would put the
+    wrong one on a real appointment.
+    """
+    wanted = _fold_ar(spoken or "")
+    if not wanted:
+        return None
+    # THE COLUMN IS NOT THE SAME ON BOTH SIDES, measured not assumed: `CatalogService.nameAr`
+    # and `Barber.name`. Passing it in beats a helper that silently reads the wrong attribute and
+    # matches nothing -- which would present as "Lia never finds my barber", not as an error.
+    folded = [(r, _fold_ar(getattr(r, attr, "") or "")) for r in rows]
+    exact = [r for r, f in folded if f == wanted]
+    if len(exact) == 1:
+        return exact[0]
+    if exact:
+        return None
+    partial = [r for r, f in folded if f and (wanted in f or f in wanted)]
+    return partial[0] if len(partial) == 1 else None
 
 
 async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["object"]:
@@ -924,6 +1031,7 @@ _FAMILY_ANSWERS = {
     "create_service": ("خدمه", "خدمة", "سيرفس", "service", "khedme", "khidme", "khedma"),
     "create_product": ("بضاعه", "بضاعة", "منتج", "منتوج", "سلعه", "صنف", "product", "item",
                        "bde3a", "bda3a", "mantoj", "mantouj", "menteg"),
+    "create_reservation": ("موعد", "حجز", "appointment", "booking", "maw3ad", "7ajz"),
 }
 
 
@@ -937,6 +1045,14 @@ def _parse_family_answer(text: str) -> Optional[str]:
     """
     folded = _fold_ar(text)
     if not folded:
+        return None
+    # 🔴 SHORT ANSWERS ONLY — and this bound was NOT here until T4 made it necessary. The existing
+    # suite caught it the moment `موعد` joined the answer words: «انسى الموضوع واحجزلي موعد» is an
+    # owner ABANDONING the question to go and book, and substring matching read it as "he said
+    # reservation". That is precisely the interruptibility Salman required, broken by widening the
+    # vocabulary. A real answer to "خدمة، بضاعة، ولا موعد؟" is one or two words; a sentence is a
+    # change of subject and must fall through to be handled from scratch.
+    if len(folded.split()) > 3:
         return None
     for family, words in _FAMILY_ANSWERS.items():
         if any(w in folded for w in words):
@@ -958,6 +1074,20 @@ _PRODUCT_FIELD_QUESTIONS = {
     "name_ar": "شو اسم المنتج؟",
 }
 
+# T4. READ FROM THE PROMPT FILE, not written here -- these are owner-facing text, and F-C2 was
+# exactly the cost of keeping such a string in a service module.
+_RESERVATION_FIELD_QUESTIONS = {
+    "customer_name":  _REPLIES["reservation_ask_customer"],
+    "customer_phone": _REPLIES["reservation_ask_phone"],
+    "reserved_at":    _REPLIES["reservation_ask_when"],
+    "service_name":   _REPLIES["reservation_ask_service"],
+    "barber_name":    _REPLIES["reservation_ask_barber"],
+}
+
+# What the owner says when the customer has no number (R-1's escape, Salman 2026-09-18).
+_WALKIN_WORDS = ("طيار", "عابر", "ما عندي رقمه", "ما عندي رقم", "بدون رقم", "بلا رقم",
+                 "ما بعرف رقمه", "walk in", "walkin", "tayyar", "tayar")
+
 
 def _op_spec(op_name: str):
     """(required_fields, field_questions, draft_class) for one operation. S3, 2026-09-17.
@@ -972,8 +1102,16 @@ def _op_spec(op_name: str):
     asked not to invent a price, and this makes the absence of one a QUESTION regardless of what
     the model actually did.
     """
-    from app.schemas.lia_drafts import LiaProductDraft, LiaServiceDraft
+    from app.schemas.lia_drafts import (LiaProductDraft, LiaReservationDraft, LiaServiceDraft)
 
+    if op_name == "create_reservation":
+        # `barber_name` is REQUIRED BY THE FLOW while staying Optional on the draft class, and the
+        # difference is deliberate: R-6 says an unnamed barber is a QUESTION, never an automatic
+        # choice (every live tenant has two barbers, so "there is only one" would help nobody).
+        # The class stays tolerant so a draft that reaches validation without it fails on the
+        # flow's terms rather than on Pydantic's.
+        return (("customer_name", "customer_phone", "reserved_at", "service_name", "barber_name"),
+                _RESERVATION_FIELD_QUESTIONS, LiaReservationDraft)
     if op_name == "create_product":
         return ("name_ar", "price"), _PRODUCT_FIELD_QUESTIONS, LiaProductDraft
     # `create_service` and, deliberately, anything unknown: a draft whose operation cannot be
@@ -1005,8 +1143,17 @@ def _parse_field_answer(field: str, text: str):
     additionally accept the words people actually say -- "ساعة" is far more common than "60".
     """
     value = " ".join((text or "").split())
-    if field == "name_ar":
+    if field in ("name_ar", "customer_name", "service_name", "barber_name"):
         return value or None
+    if field == "customer_phone":
+        # R-1 in full: Lia ASKS, and never invents. What she accepts is the owner SAYING there is
+        # no number -- which is a fact he stated, not a number she made up.
+        from app.schemas.lia_drafts import WALK_IN_PHONE
+        folded = _fold_ar(value)
+        if any(_fold_ar(w) in folded for w in _WALKIN_WORDS):
+            return WALK_IN_PHONE
+        from app.core.phone import normalize_for_storage
+        return normalize_for_storage(value) or None
     if field == "duration_min":
         for word, minutes in _DURATION_WORDS.items():
             if word in value:
@@ -1016,6 +1163,70 @@ def _parse_field_answer(field: str, text: str):
         return None
     number = float(digits[0])
     return int(number) if field == "duration_min" else number
+
+
+async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> bool:
+    """Turn the two NAMES the model returned into the two real ids the write needs. T4.
+
+    🔴 THE IDS TRAVEL IN `metadata`, NOT AS PARAMETERS, and that is measured rather than designed:
+    `create_reservation` has no `barber_id` or `service_id` argument at all. `_resolve_barber` reads
+    `metadata["barber_id"]` and `_resolve_catalog_service` reads `metadata["service_id"]`
+    (reservation_service.py:318, :337), which is exactly how the customer flow already writes them
+    (whatsapp_reservation_flow.py:892). Lia follows that literally instead of inventing a shape.
+
+    A name that matches nothing becomes the SAME question again, with the real list attached --
+    never a guess, and never a silent drop. Returns False when the owner still owes an answer.
+    """
+    client_id = draft["client_id"]
+
+    services = await _list_services(client_id)
+    if not services:
+        await wa.send_text(phone, _REPLIES["reservation_no_services"])
+        return False
+    svc = _match_by_name(services, draft["data"].get("service_name"), attr="nameAr")
+    if svc is None:
+        names = " · ".join((getattr(r, "nameAr", "") or "") for r in services)
+        draft["data"].pop("service_name", None)
+        draft["asking"] = "service_name"
+        _save_draft(session, draft)
+        session.state = LIA_AWAITING_FIELD
+        await wa.send_text(phone, _REPLIES["reservation_service_unknown"].format(names=names))
+        return False
+
+    barbers = await _list_barbers(client_id)
+    if not barbers:
+        await wa.send_text(phone, _REPLIES["reservation_no_barbers"])
+        return False
+    brb = _match_by_name(barbers, draft["data"].get("barber_name"), attr="name")
+    if brb is None:
+        names = " · ".join((getattr(r, "name", "") or "") for r in barbers)
+        draft["data"].pop("barber_name", None)
+        draft["asking"] = "barber_name"
+        _save_draft(session, draft)
+        session.state = LIA_AWAITING_FIELD
+        await wa.send_text(phone, _REPLIES["reservation_barber_unknown"].format(names=names))
+        return False
+
+    # The ROW's own spelling replaces what he typed, for the same reason F-C1 exists: the preview
+    # must show what will be written, not what was heard.
+    draft["service_id"]   = svc.id
+    draft["barber_id"]    = brb.id
+    draft["duration_min"] = getattr(svc, "durationMin", None) or 30
+    draft["data"]["service_name"] = getattr(svc, "nameAr", "") or draft["data"]["service_name"]
+    draft["data"]["barber_name"]  = getattr(brb, "name", "") or draft["data"]["barber_name"]
+    return True
+
+
+def _is_past(reserved_at: datetime) -> bool:
+    """ONE place decides this, and it never converts. T4.
+
+    The stored representation is a local wall clock wearing a UTC label — proved by construction
+    2026-09-17 — so the comparison is built the same way the three routes build theirs, character
+    for character. A "more correct" comparison using a real UTC instant would sit three hours away
+    from every other guard in this system.
+    """
+    when = reserved_at if reserved_at.tzinfo is None else reserved_at.replace(tzinfo=None)
+    return when < datetime.now()
 
 
 # ── Preview + write ───────────────────────────────────────────────────────────
@@ -1051,7 +1262,46 @@ def _preview_text(draft_data: dict, category_name: str,
     return "\n".join(lines)
 
 
+def _reservation_preview_text(draft: dict) -> str:
+    """What the owner reads BEFORE a reservation is written. T4.
+
+    The same safety property as the service/product preview: every value is quoted back, so a
+    mis-read date is visible as a date he did not say. The time is rendered by the platform's ONE
+    formatter (`fmt_reserved_at`), which prints the value exactly as stored — using a second
+    formatter here would let the preview and the merchant alert disagree about the same row.
+    """
+    from app.schemas.lia_drafts import WALK_IN_PHONE
+    from app.services.whatsapp_notifications import fmt_reserved_at
+    data = draft["data"]
+    phone_shown = (_REPLIES["walkin_label"] if data.get("customer_phone") == WALK_IN_PHONE
+                   else data.get("customer_phone"))
+    when = data.get("reserved_at")
+    if isinstance(when, str):
+        try:
+            when = datetime.fromisoformat(when)
+        except ValueError:
+            pass
+    text = _REPLIES["reservation_preview"].format(
+        customer=data.get("customer_name"), phone=phone_shown,
+        when=fmt_reserved_at(when) if isinstance(when, datetime) else when,
+        service=data.get("service_name"), barber=data.get("barber_name"))
+    if isinstance(when, datetime) and _is_past(when):
+        text += "\n" + _REPLIES["reservation_preview_past"]
+    return text
+
+
 async def _send_preview(wa, phone: str, draft: dict) -> None:
+    if _draft_operation(draft) == "create_reservation":
+        await wa.send_text(phone, _reservation_preview_text(draft))
+        await wa.send_interactive_buttons(
+            to=phone,
+            text=_REPLIES["reservation_confirm"],
+            buttons=[
+                {"type": "reply", "reply": {"id": CONFIRM_ID, "title": "✅ سجّله"}},
+                {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
+            ],
+        )
+        return
     await wa.send_text(phone, _preview_text(draft["data"], draft.get("category_name", "—"),
                                             _draft_operation(draft)))
     await wa.send_interactive_buttons(
@@ -1119,18 +1369,34 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
         logger.warning("🚫 Lia: write refused at commit time (%s) from %s", reason, phone)
         return
 
-    if op.name == "create_product":
+    if op.name == "create_reservation":
+        created = await _write_reservation(wa, phone, client_id, validated, draft)
+    elif op.name == "create_product":
         created = await _write_product(wa, phone, client_id, validated)
     else:
         created = await _write_service(wa, phone, client_id, validated)
     if created is None:
         return                                     # the branch already told the owner why
 
+    if op.name == "create_reservation":
+        from app.services.whatsapp_notifications import fmt_reserved_at
+        await wa.send_text(phone, _REPLIES["reservation_created"].format(
+            customer=validated.customer_name,
+            when=fmt_reserved_at(validated.reserved_at),
+            barber=validated.barber_name or "—"))
+
     await log_security_event(
         event_type=f"lia_{actor}_{op.name}", client_id=client_id, endpoint=_ENDPOINT,
-        detail={"row_id": created.get("id"), "name_ar": validated.name_ar,
-                "price": validated.price,
+        # `getattr` on every field: a reservation draft has no `name_ar` and no `price`, and an
+        # audit line that raises is an audit line that never gets written.
+        detail={"row_id": created.get("id"),
+                "name_ar": getattr(validated, "name_ar", None),
+                "price": getattr(validated, "price", None),
                 "duration_min": getattr(validated, "duration_min", None),
+                "reserved_at": (validated.reserved_at.isoformat()
+                                if getattr(validated, "reserved_at", None) else None),
+                "historical": (_is_past(validated.reserved_at)
+                               if getattr(validated, "reserved_at", None) else None),
                 "operation": op.name, "permission": op.permission,
                 "service_key": op.service_key,
                 "sender_phone": phone, "source": "whatsapp_text"},
@@ -1312,6 +1578,58 @@ async def _write_product(wa, phone: str, client_id: str, validated) -> Optional[
         f"{_REPLIES['product_created_note']}",
     )
     return created
+
+
+async def _write_reservation(wa, phone: str, client_id: str, validated, draft: dict):
+    """Write ONE reservation through the existing service. T4, 2026-09-18.
+
+    THE THREE KEYWORDS ARE THE WHOLE DECISION, and each one is a ratified rule rather than a
+    convenience:
+
+        allow_past            R-4 — recording the past must be ASKED FOR, never inherited.
+        notify_merchant       R-3 — «حجز جديد» about yesterday is a lie to the merchant.
+        enforce_working_hours R-2/T3-c — a walk-in the barber really served on his day off is a
+                              fact; the schedule configured today does not get a vote on it.
+
+    All three are True/default-preserving for a FUTURE appointment, so Lia's future path behaves
+    exactly like the dashboard's own Quick Create.
+
+    `module_key="barber"` mirrors `whatsapp_reservation_flow.py:886` literally, and is what all 52
+    production reservations carry.
+    """
+    from app.services import reservation_service
+    past = _is_past(validated.reserved_at)
+    when = validated.reserved_at.replace(tzinfo=timezone.utc)
+    try:
+        return await reservation_service.create_reservation(
+            client_id      = client_id,
+            module_key     = "barber",
+            customer_name  = validated.customer_name,
+            customer_phone = validated.customer_phone,
+            reserved_at    = when,
+            duration_min   = draft.get("duration_min"),
+            notes          = validated.notes,
+            metadata       = {"barber_id": draft.get("barber_id"),
+                              "service_id": draft.get("service_id")},
+            source         = "lia",
+            allow_past            = past,
+            notify_merchant       = not past,
+            enforce_working_hours = not past,
+        )
+    except ValueError as exc:
+        # The service says why in a sentence meant for a developer. The owner gets the one case he
+        # can act on -- a clash -- and anything else is logged rather than pasted at him.
+        if "already booked" in str(exc):
+            await wa.send_text(phone, _REPLIES["reservation_conflict"].format(
+                barber=validated.barber_name or "الحلاق"))
+        else:
+            logger.error("🔥 Lia: reservation refused for %s: %s", client_id, exc)
+            await wa.send_text(phone, _REPLIES["reservation_unclear"])
+        return None
+    except Exception as exc:                                   # pragma: no cover - write failure
+        logger.error("🔥 Lia: reservation write failed for %s: %s", client_id, exc)
+        await wa.send_text(phone, _REPLIES["reservation_unclear"])
+        return None
 
 
 async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tuple[bool, str]:
@@ -1580,7 +1898,28 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # ── 2. An answer to one asked field. ──
     if draft and session is not None and session.state == LIA_AWAITING_FIELD and msg_type == "text":
         field = draft.get("asking")
-        parsed = _parse_field_answer(field, value)
+        # 🔴 «مبارح الساعة ٤» IS NOT PARSEABLE BY A REGEX, and pretending otherwise is how a
+        # wrong date reaches a real appointment. The reservation prompt already turns relative
+        # Arabic time into an ISO datetime and already knows what "now" is, so the answer goes
+        # back through the SAME extractor rather than through a second, weaker parser written
+        # here. Everything else stays on the cheap synchronous path.
+        if field == "reserved_at":
+            again = await _extract_reservation(value)
+            parsed = None
+            if again is not None and again is not _UNAVAILABLE:
+                raw = (again.data or {}).get("reserved_at")
+                if raw:
+                    try:
+                        # PARSED TO PROVE IT IS A DATE, STORED AS A STRING. The draft is persisted
+                        # as JSONB (`_session_to_state_data` -> json.dumps), and a `datetime`
+                        # object in `data` would raise there — one branch later, in a different
+                        # function, with the owner's answer already lost. The draft class parses
+                        # the ISO string back at validation time.
+                        parsed = datetime.fromisoformat(str(raw)).isoformat()
+                    except ValueError:
+                        parsed = None
+        else:
+            parsed = _parse_field_answer(field, value)
         if parsed is None:
             # Re-asked in the DRAFT's own wording: a product must not be asked "شو اسم الخدمة؟".
             _, questions, _ = _op_spec(_draft_operation(draft))
@@ -1777,7 +2116,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             await wa.send_text(
                 sender_phone,
                 _REPLIES["store_inactive"] if op.service_key == "store"
-                else "خدمة الحجوزات مش مفعّلة على هالمحل.",
+                # Moved out of this module on 2026-09-18 (T4 touches this branch, so the rule
+                # «كل رسالة تُنقَل حين يلمسها تغيير حقيقي» applies): same sentence, now a key.
+                else _REPLIES["reservations_inactive"],
             )
         else:
             # B fell. SILENT + audited, byte-identical to how an unauthorised account was treated
@@ -1798,8 +2139,13 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # product prompt whose answer claims `create_service` fails `LiaProductExtraction` and lands
     # in the "did not understand" branch -- the operation authorised above and the operation the
     # model names cannot come apart.
-    is_product = op.name == "create_product"
-    extraction = await (_extract_product(entry_text) if is_product else _extract(entry_text))
+    is_product     = op.name == "create_product"
+    is_reservation = op.name == "create_reservation"
+    extraction = await (
+        _extract_reservation(entry_text) if is_reservation else
+        _extract_product(entry_text) if is_product else
+        _extract(entry_text)
+    )
     if extraction is _UNAVAILABLE:
         # Our fault, said as our fault. And the dashboard still works, so the owner is not stuck.
         logger.error("🔥 Lia: unavailable for %s at %s — owner told, not blamed",
@@ -1812,12 +2158,19 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     if extraction is None or extraction.confidence == "low":
         await wa.send_text(
             sender_phone,
+            _REPLIES["reservation_unclear"] if is_reservation else
             _REPLIES["product_unclear"] if is_product else
             "ما فهمت تماماً 😅 اكتبها هيك مثلاً:\n«ضيف خدمة كيراتين، 25 دولار، ساعة»",
         )
         return session
 
-    if is_product:
+    # A RESERVATION HAS NO CATEGORY. The service and the product both live on a shelf; an
+    # appointment does not, and its two real references (barber, service) are resolved AFTER the
+    # owner has answered the questions, in `_advance` -- because at this point the names he owes
+    # may still be missing entirely.
+    if is_reservation:
+        category_id, cats, category_name = None, [], "—"
+    elif is_product:
         category_id, cats = await _resolve_store_category(client_id)
         if not category_id:
             if len(cats) > 1:
@@ -1830,6 +2183,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             else:
                 await wa.send_text(sender_phone, _REPLIES["product_no_category"])
             return session
+        category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
     else:
         category_id, cats = await _resolve_service_category(client_id)
         if not category_id:
@@ -1839,7 +2193,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 f"عندك أكتر من فئة ({names}). أضف الخدمة من اللوحة هالمرّة، أو خبّرني بأي فئة.",
             )
             return session
-    category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
+        category_name = next((c.nameAr for c in cats if c.id == category_id), "—")
 
     # FILTERED TO THE FIELDS THE DRAFT'S OWN CLASS OWNS, and that is not tidiness -- it closes a
     # real livelock. `data` is a free dict on both extraction contracts (`extra="forbid"` guards
@@ -1932,6 +2286,13 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     # a draft back after consuming it -- and the consume-before-write rule is what stops a double
     # tap creating two rows. At this point every required field is filled and the draft is still
     # held, which is exactly what the question needs.
+    # T4: names -> ids, and a name that matches nothing is asked again with the real list. Placed
+    # exactly where the duplicate question is, and for the same reason: every required field is
+    # filled and the draft is still held, so a refusal here costs nothing and writes nothing.
+    if _draft_operation(draft) == "create_reservation":
+        if not await _resolve_reservation_rows(wa, phone, session, draft):
+            return
+
     if _draft_operation(draft) == "create_product" and not draft.get("dup_ack"):
         existing = await _find_existing_product(draft["client_id"], draft["data"]["name_ar"])
         if existing:

@@ -520,10 +520,16 @@ async def main():
     # directly from this module, and that is the prompt file's own documented rule, not drift:
     # «كل رسالة تُنقَل حين يلمسها تغيير حقيقي، لا قبله». Pinning the number makes the next one
     # VISIBLE instead of silent; a round that legitimately moves one lowers it and edits this line.
-    check("the un-migrated owner-facing literals are pinned at 31 (was 32 before F-C2)",
-          len(_sent_literals) == 31, str(len(_sent_literals)))
-    check("a RECORD verb still stays out until T4 — no promise of reservations",
-          lia._entry_family("سجل إنه أحمد إجا مبارح") is None)
+    # 32 (pre-F-C2) -> 31 (F-C2 moved «شو بدك تعمل؟» out) -> 33 today. T4 added the reservation
+    # preview's two BUTTON TITLES («✅ سجّله» / «❌ إلغاء»), which stay literals by Salman's own
+    # decision that button titles are a separate question, and moved `reservations_inactive` OUT
+    # (-1) while the same sentence remains twice more in branches T4 did not touch (+... net +2).
+    # The number is a baseline that makes the next one visible, never a rule.
+    check("the un-migrated owner-facing literals are pinned at 33 (was 31 before T4)",
+          len(_sent_literals) == 33, str(len(_sent_literals)))
+    # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
+    check("a RECORD verb now opens a reservation — T4 is built, so the promise is real",
+          lia._entry_family("سجل إنه أحمد إجا مبارح") == "create_reservation")
     check("a CUSTOMER asking for a service is still not owner entry",
           lia._entry_family("بدي خدمة حلاقة") is None
           and lia._entry_family("بدي منتج شامبو") is None)

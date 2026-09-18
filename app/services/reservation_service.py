@@ -372,6 +372,17 @@ async def create_reservation(
     # the send boundary, so True reproduces exactly what every caller already gets.
     allow_past:      bool = False,
     notify_merchant: bool = True,
+    # T3-c (2026-09-18, Salman's decision, same shape as the two above). A HISTORICAL entry is a
+    # record of something that already happened, and reality does not obey the schedule that is
+    # configured today: `rk` and `barberlab-test` close on Mondays, so «أحمد إجا الاثنين الساعة ٤»
+    # -- a walk-in the barber really served -- is refused by a rule about when the shop is OPEN.
+    # R-2 was ratified for exactly that case on 2026-09-17 and was NOT implementable until now:
+    # `allow_past` does not reach this check, which runs unconditionally.
+    #
+    # True preserves every existing caller byte for byte. Only a caller that explicitly says "this
+    # already happened" turns it off, and that is the whole point -- skipping the schedule must be
+    # something an operation ASKS FOR, never something it inherits.
+    enforce_working_hours: bool = True,
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -436,7 +447,8 @@ async def create_reservation(
             client = await prisma_client.client.find_unique(where={"id": client_id})
             working_hours = (client.config or {}).get("working_hours") if client else None
 
-    _check_working_hours(reserved_at, working_hours)
+    if enforce_working_hours:
+        _check_working_hours(reserved_at, working_hours)
 
     # -- Conflict Check --------------------------------------------------------------------------
     if resource:

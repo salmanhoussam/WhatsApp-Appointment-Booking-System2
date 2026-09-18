@@ -588,9 +588,15 @@ async def main():
     check("all four governed replies still load",
           all(k in lia._REPLIES for k in lia._REQUIRED_REPLIES))
     check("no new Arabic refusal wording was invented in Python (F0.7 constraint)",
-          lia_src.count("خدمة الحجوزات مش مفعّلة على هالمحل.") == 3
+          # TRANSITION (2026-09-18, T4). WAS 3. One of the three moved into app/prompts/lia.md as
+          # `reservations_inactive`, because T4 made that branch reachable for a second operation
+          # and the prompt file's rule is «كل رسالة تُنقَل حين يلمسها تغيير حقيقي». The constraint
+          # this check really defends is unchanged: no NEW refusal wording invented in Python.
+          lia_src.count("خدمة الحجوزات مش مفعّلة على هالمحل.") == 2
           and "مش مسموح" not in lia_src and "ما عندك صلاحية" not in lia_src,
           f"reuses of the existing sentence: {lia_src.count('خدمة الحجوزات مش مفعّلة على هالمحل.')}")
+    check("   and the moved one is the same sentence, not a rewrite",
+          lia._REPLIES["reservations_inactive"].strip() == "خدمة الحجوزات مش مفعّلة على هالمحل.")
 
     print("\n── nothing here touched a network, a database or a send ──")
     check("no real prisma client was used (every case installed a fake)",

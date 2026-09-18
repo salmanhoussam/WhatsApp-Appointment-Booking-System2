@@ -155,7 +155,10 @@ _REGISTRY: dict[str, OperationDefinition] = {
         legacy_roles  = RESERVATION_LEGACY_ROLES,
         service_key   = "reservations",
         write_fn      = _write_create_reservation,
-        mirrors_route = "app/api/v1/admin/reservations.py:220",
+        # Corrected 2026-09-18: was :220, which is `update_status` today — the file moved under
+        # it. The POST that actually mirrors this operation is :302, and the gate it carries
+        # (reservations.write + RESERVATION_ROLES) is identical, so only the citation drifted.
+        mirrors_route = "app/api/v1/admin/reservations.py:302",
     ),
     "create_catalog_item": OperationDefinition(
         name          = "create_catalog_item",

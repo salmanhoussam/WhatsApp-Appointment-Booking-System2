@@ -102,16 +102,26 @@ async def main():
                          "reserved_at", "duration_min", "notes", "metadata", "customer_email",
                          "source"],
           str(names[:10]))
-    check("T3-b added exactly two, at the end (was: ten parameters)",
-          names[10:] == ["allow_past", "notify_merchant"], str(names[10:]))
-    kinds = {n: sig.parameters[n].kind for n in ("allow_past", "notify_merchant")}
+    # TRANSITION (2026-09-18). WAS `["allow_past", "notify_merchant"]` after T3-b. T3-c added the
+    # third: `enforce_working_hours`. R-2 — a historical entry does not answer to the schedule
+    # configured today — was ratified on 2026-09-17 and was NOT implementable until it existed,
+    # because `_check_working_hours` ran unconditionally and `allow_past` never reached it.
+    check("T3-b/T3-c added exactly three, at the end (was: ten parameters)",
+          names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours"],
+          str(names[10:]))
+    kinds = {n: sig.parameters[n].kind
+             for n in ("allow_past", "notify_merchant", "enforce_working_hours")}
     check("   and both are KEYWORD-ONLY — no positional call can land on them by accident",
           all(k is inspect.Parameter.KEYWORD_ONLY for k in kinds.values()), str(kinds))
     defaulted = {n: p.default for n, p in sig.parameters.items()
                  if p.default is not inspect.Parameter.empty}
     check("the defaults are exactly these (was: {customer_email: None, source: None})",
+          # TRANSITION (2026-09-18): `enforce_working_hours: True` joined. Like `notify_merchant`
+          # and unlike `allow_past`, its default is a TRUE preservation — every existing caller
+          # keeps being checked against the schedule exactly as before.
           defaulted == {"customer_email": None, "source": None,
-                        "allow_past": False, "notify_merchant": True}, str(defaulted))
+                        "allow_past": False, "notify_merchant": True,
+                        "enforce_working_hours": True}, str(defaulted))
 
     print("\n── 2. INVARIANT — the three callers, and NOTHING else calls it ──")
     # COUNTED AS CALLS, NOT AS TEXT. The first version of this check used a regex and answered
@@ -130,8 +140,14 @@ async def main():
                     nm = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
                     if nm == "create_reservation":
                         sites.append(f"{path}:{node.lineno}")
-    check("exactly three CALL sites in app/ (definitions are not callers)",
-          len(sites) == 3, " · ".join(sites))
+    # TRANSITION (2026-09-18). WAS three. Lia is the FOURTH caller, and the first one that ever
+    # asks for the past: T4 records an appointment the owner says already happened. The invariant
+    # this section defends is unchanged and is asserted below — the three ORIGINAL callers still
+    # pass none of the new parameters, so none of their behaviour moved.
+    check("exactly four CALL sites in app/ — the three routes/flow, plus Lia (was three)",
+          len(sites) == 4, " · ".join(sites))
+    check("   and the fourth is Lia, not a second write path into the table",
+          sum("lia_owner_entry" in s_ for s_ in sites) == 1, " · ".join(sites))
 
     expected = {
         "admin route":   ["client_id", "module_key", "customer_name", "customer_phone",
@@ -147,8 +163,16 @@ async def main():
         kw = call_keywords(path)
         check(f"{label}: passes exactly {len(expected[label])} keywords",
               kw == expected[label], str(kw))
-        check(f"   {label}: passes NEITHER new parameter today",
-              "allow_past" not in kw and "notify_merchant" not in kw)
+        check(f"   {label}: passes NONE of the three new parameters today",
+              not {"allow_past", "notify_merchant", "enforce_working_hours"} & set(kw))
+
+    # And Lia's own call, asserted as the opposite: it passes all three EXPLICITLY, because
+    # recording the past must be asked for rather than inherited from a missing guard.
+    lia_kw = call_keywords("app/services/lia_owner_entry.py")
+    check("Lia passes all three new parameters explicitly",
+          {"allow_past", "notify_merchant", "enforce_working_hours"} <= set(lia_kw), str(lia_kw))
+    check("   and it is the only caller that names source=\"lia\"",
+          "source" in lia_kw)
 
     print("\n── 3. INVARIANT — each caller's own past guard, parsed not read ──")
     check("admin route really compares reserved_at against now()",

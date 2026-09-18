@@ -202,7 +202,11 @@ async def main():
         ("ضيف شامبو كيراتين بـ12 دولار", lia._AMBIGUOUS),
         ("مرحبا", None),
         ("بدي احجز دقن بكرا", None),                  # a customer, untouched — still silent
-        ("سجل إنه أحمد إجا مبارح", None),             # a RECORD verb stays narrow until T4
+        # TRANSITION (2026-09-18). WAS None — a RECORD verb was deliberately kept out so that
+        # «سجل» could not be answered with "خدمة أو بضاعة؟", promising a third thing that did not
+        # exist. T4 built it, so the same sentence now opens a reservation. The narrowness was
+        # never the property being defended; not promising the unbuilt was.
+        ("سجل إنه أحمد إجا مبارح", "create_reservation"),
         ("ضيف", None),                                # too short
         ("ضيف واحد", lia._INCOMPLETE),                # mine, but empty -> guided, not ignored
     ]
@@ -213,8 +217,13 @@ async def main():
     check("the gate holds NO product-name dictionary (asserted on code, not on the file)",
           not any(w in gate_src for w in ("شامبو", "جل", "مشط", "كريم")))
     check("   ambiguity is its own value, never a silent preference for the live operation",
-          "_AMBIGUOUS" in gate_src and "return 'create_service'" in gate_src
-          and gate_src.index("_AMBIGUOUS") < gate_src.index("return 'create_service'"))
+          # TRANSITION (2026-09-18). The gate used to return the literal `'create_service'`; with
+          # three families it now returns `named[0]` from a list built in a fixed order. The
+          # property is the same and is asserted directly instead of through a string: more than
+          # one family named is _AMBIGUOUS, never a preference for the live operation.
+          "_AMBIGUOUS" in gate_src and "len(named) > 1" in gate_src
+          and lia._entry_family("ضيف خدمة وبضاعة") == lia._AMBIGUOUS
+          and lia._entry_family("ضيف موعد وخدمة") == lia._AMBIGUOUS)
 
     # ── S3-AC-3 · D9's order with a second operation ─────────────────────────
     print("\n── S3-AC-3. D9 order: C -> ① -> [operation] -> A/B -> model ──")
