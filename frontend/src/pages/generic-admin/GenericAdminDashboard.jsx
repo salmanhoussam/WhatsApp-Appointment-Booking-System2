@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion }           from 'framer-motion'
 import adminApi          from '../../utils/admin.config'
@@ -15,6 +15,11 @@ import CustomersTab      from './tabs/CustomersTab'
 import { useAdminRole, useAdminBarberId } from '../../hooks/useAdminRole'
 import useAdminIdentity, { hasPermission } from '../../hooks/useAdminIdentity'
 import TeamTab from './tabs/TeamTab'
+// Lia Live Test Console — NOT a tab: absent from every nav, reached only by typing
+// /{slug}/dashboard/lia-live-test, and refusing to render for any slug but barberlab-test.
+// Lazy so it never costs a real tenant's login a byte. Zero backend routes were added for it;
+// it reads evidence through endpoints that already exist.
+const LiaLiveTest = lazy(() => import('./LiaLiveTest'))
 import { contentSchema }  from '../../tenant-os/schemas/content'
 import { mediaSchema }    from '../../tenant-os/schemas/media'
 import useImageUpload     from '../../hooks/useImageUpload'
@@ -683,6 +688,16 @@ export default function GenericAdminDashboard() {
         return <ComingSoonTab label="الإشعارات" color={color} />
       case 'settings':
         return <SettingsTab settings={settings} onUpdated={setSettings} color={color} changeTab={changeTab} hasReservations={hasReservations} />
+      case 'lia-live-test':
+        // Deliberately below every real tab and outside `NAV`, so nothing about the dashboard's
+        // navigation changes. The unknown-tab redirect at the effect above is scoped to
+        // `isPermissionBased`, so a legacy owner reaches this; a permission-based account would
+        // be sent back to its first nav item, which is the documented fragility.
+        return (
+          <Suspense fallback={null}>
+            <LiaLiveTest />
+          </Suspense>
+        )
       default:
         return null
     }
