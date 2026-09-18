@@ -1,0 +1,107 @@
+🔥 Lia: extraction UNAVAILABLE (AuthenticationError) — not an owner error
+🔥 Lia: unavailable for 96178727986 at b9034129-d4ab-49c2-a8f6-2bd3b9ed922a — owner told, not blamed
+🔥 Lia: extraction UNAVAILABLE (AuthenticationError) — not an owner error
+🔥 Lia: unavailable for 96178727986 at b9034129-d4ab-49c2-a8f6-2bd3b9ed922a — owner told, not blamed
+target: aws-0-eu-central-1.pooler.supabase.com  (via DATABASE_URL)
+
+── sealing every write path before connecting ──
+  prisma write methods sealed                    275
+  log_security_event                             replaced with a recorder
+  seal verified by a real attempt                blocked: CatalogItemActions.create
+
+── 1. the tenant, read ──
+  slug -> id                                     barberlab-test -> b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+
+── 2. the shelves, as `_resolve_store_category` really reads them ──
+  store categories                               1
+     ·                                           'منتجات العناية'  id=bf5138bc-490f-484f-8bd0-62acfb7ce547
+  _resolve_store_category ->                     bf5138bc-490f-484f-8bd0-62acfb7ce547
+     which is                                    منتجات العناية
+  ALL categories (any module)                    2
+     ·                                           'الخدمات'  module=catalog
+     ·                                           'منتجات العناية'  module=store
+
+── 3. the items, and the duplicate D1 was about ──
+  items (all / active)                           9 / 9
+  ACTIVE duplicate names, folded                 1
+     🔴                                           'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=[5.0, 5.0]
+     ·                                           'واكس تصفيف الشعر'  10.0 USD  shelf='منتجات العناية'
+     ·                                           'بلسم للشعر'  9.0 USD  shelf='منتجات العناية'
+     ·                                           'مشط خشب'  5.0 USD  shelf='منتجات العناية'
+     ·                                           'شامبو كيراتين'  12.0 USD  shelf='منتجات العناية'
+     ·                                           'مشط خشب'  5.0 USD  shelf='منتجات العناية'
+     ·                                           'جل تصفيف الشعر'  7.0 USD  shelf='منتجات العناية'
+     ·                                           'عطر ريحة رجالي'  22.0 USD  shelf='منتجات العناية'
+     ·                                           'زيت للشعر'  5.0 USD  shelf='منتجات العناية'
+     ·                                           'سبراي تثبيت الشعر'  8.0 USD  shelf='منتجات العناية'
+
+── 4. `_find_existing_product` on the real rows ──
+  'مشط خشب'                                      'مشط خشب' id=8ec69af2-9b34-4adb-92fe-163c7a53f91d shelf='منتجات العناية'
+  'مشط خشب '                                     'مشط خشب' id=8ec69af2-9b34-4adb-92fe-163c7a53f91d shelf='منتجات العناية'
+  'مشط خشپ'                                      no match
+  'ماكينه حلاقه'                                 no match
+  'بلسم للشعر لا يوجد'                           no match
+
+── 5. the REAL try_handle, real extraction, on the real data ──
+
+  «ضيف منتج مشط خشب بـ5 دولار»
+     state                                       IDLE
+     buttons                                     []
+     titles                                      []
+      | المساعد مش متوفّر هلق 🔧 ضيف الخدمة من اللوحة، وأنا رح كون جاهز بعدين.
+
+  «ضيف ماكينة حلاقة 20 دولار»
+     state                                       LIA_AWAITING_FAMILY
+     buttons                                     []
+     titles                                      []
+      | خدمة أو بضاعة؟ 🤔
+      | الخدمة إلها مدة والزبون يحجزها، والبضاعة يشتريها. قلّي وحدة فيهن وأنا بكمّل.
+
+  «dif mantoj shampoo keratin b 12 dollar»
+     state                                       IDLE
+     buttons                                     []
+     titles                                      []
+      | المساعد مش متوفّر هلق 🔧 ضيف الخدمة من اللوحة، وأنا رح كون جاهز بعدين.
+
+── 5b. same path, extraction faked because THIS MACHINE's key is refused ──
+
+  «ضيف منتج مشط خشب بـ5 دولار»   (extracted name 'مشط خشب')
+     state                                       LIA_AWAITING_DUP
+     buttons                                     [('__LIA_DUP_EDIT__', '__LIA_DUP_NEW__', '__LIA_CANCEL__')]
+     titles                                      [('✏️ عدّل الموجود', '➕ صنف جديد', '❌ إلغاء')]
+      | «مشط خشب» موجود عندك أصلاً — 5.0 USD، بقسم «منتجات العناية».
+      | بدك تعدّل الموجود، ولا تضيف صنف تاني بنفس الاسم؟
+      | شو بدك تعمل؟
+
+  «ضيف منتج مشط خشب بـ5 دولار»   (extracted name 'مشط خشب ')
+     state                                       LIA_AWAITING_DUP
+     buttons                                     [('__LIA_DUP_EDIT__', '__LIA_DUP_NEW__', '__LIA_CANCEL__')]
+     titles                                      [('✏️ عدّل الموجود', '➕ صنف جديد', '❌ إلغاء')]
+      | «مشط خشب » موجود عندك أصلاً — 5.0 USD، بقسم «منتجات العناية».
+      | بدك تعدّل الموجود، ولا تضيف صنف تاني بنفس الاسم؟
+      | شو بدك تعمل؟
+
+  «ضيف منتج شامبو كيراتين بـ12 دولار»   (extracted name 'شامبو كيراتين')
+     state                                       LIA_AWAITING_DUP
+     buttons                                     [('__LIA_DUP_EDIT__', '__LIA_DUP_NEW__', '__LIA_CANCEL__')]
+     titles                                      [('✏️ عدّل الموجود', '➕ صنف جديد', '❌ إلغاء')]
+      | «شامبو كيراتين» موجود عندك أصلاً — 12.0 USD، بقسم «منتجات العناية».
+      | بدك تعدّل الموجود، ولا تضيف صنف تاني بنفس الاسم؟
+      | شو بدك تعمل؟
+
+  «ضيف منتج بلسم جديد بـ9 دولار»   (extracted name 'بلسم جديد')
+     state                                       LIA_AWAITING_CONFIRM
+     buttons                                     [('__LIA_CONFIRM__', '__LIA_CANCEL__')]
+     titles                                      [('✅ ضيفها', '❌ إلغاء')]
+      | هيك فهمت 👇
+      | 
+      | *المنتج:*  بلسم جديد
+      | *السعر:*   9.0 USD
+      | *الفئة:*   منتجات العناية
+      | أضيفها هلق؟
+
+── 6. what left this process ──
+  production writes ATTEMPTED                    0
+     (any non-zero is a finding)                 none
+  audit rows that WOULD have been written        4: ['lia_draft_opened', 'lia_draft_opened', 'lia_draft_opened', 'lia_draft_opened']
+  WhatsApp sends                                 0 — the send boundary is a recorder
