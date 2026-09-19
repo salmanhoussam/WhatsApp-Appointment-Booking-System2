@@ -10,4 +10,4 @@ preview editing deployed (e290e59) but NOT yet exercised live.
 | `r1-live-reservation-created.md` + `r1-live-db.txt` + `r1-live-railway-backend.txt` | **first reservation created by Lia from a sentence** (86efa834), every field checked |
 
 Unknowns carried: a-vs-b never separated (moot after R1) · two DROPPED messages at 17:23/17:24 (content unknown) ·
-defaults + edit at the preview not yet tested live · Step 3 (links) blocked.
+Step 3 (links) blocked.
