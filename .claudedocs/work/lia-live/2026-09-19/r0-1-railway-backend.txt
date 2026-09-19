@@ -1,0 +1,6 @@
+INFO httpx2: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+INFO app.services.lia_owner_entry: lia_extract_raw sender=…7986 state=None op=create_reservation stop=end_turn tok=1087/86 raw_len=228 json=ok schema=ok intent=create_reservation confidence=low unresolved=['customer_phone'] unresolved_other=0 customer_name=present customer_phone=absent reserved_at=2026-09-18T16:00:00 reserved_at_iso=ok service_name=قص شعر barber_name=None notes=absent other_keys=0
+INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzMzkzMUQ3REEzMDJDMDM3QTUA)
+INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzMzkzMUQ3REEzMDJDMDM3QTUA status=sent recipient=96178727986 ts=1789823639
+INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzMzkzMUQ3REEzMDJDMDM3QTUA status=delivered recipient=96178727986 ts=1789823639
+INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzMzkzMUQ3REEzMDJDMDM3QTUA status=read recipient=96178727986 ts=1789823639

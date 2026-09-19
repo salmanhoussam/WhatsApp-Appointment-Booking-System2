@@ -1,0 +1,5 @@
+14:23:42 WARNING app.services.whatsapp_flow: ⚠️  No client resolved for display_phone=96179022398 (session bound=False) — message DROPPED, customer 96178727986 got no reply
+14:24:03 WARNING app.services.whatsapp_flow: ⚠️  No client resolved for display_phone=96179022398 (session bound=False) — message DROPPED, customer 96178727986 got no reply
+14:31:35 INFO httpx2: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:31:35 INFO app.services.lia_owner_entry: lia_extract_raw sender=…7986 state=None op=create_reservation stop=end_turn tok=1092/88 raw_len=230 json=ok schema=ok intent=create_reservation confidence=low unresolved=['customer_phone'] unresolved_other=0 customer_name=present customer_phone=absent reserved_at=2026-09-18T16:00:00 reserved_at_iso=ok service_name=قص شعر barber_name=سامي notes=absent other_keys=0
+14:31:35 INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBI0N0Q1MzU3QkU4MTZFNjcxQTgA)
