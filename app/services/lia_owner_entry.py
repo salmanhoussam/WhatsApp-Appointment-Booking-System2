@@ -660,7 +660,10 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "auto_label",
                      # The service edit text names a price and a duration -- wrong on an
                      # appointment preview (the 6th "text for one context shown in another").
-                     "reservation_edit_unclear")
+                     "reservation_edit_unclear",
+                     # 2026-09-19, Salman: the first reply of an appointment greets the person
+                     # by name («أهلاً سلمان، نسيت تقلّي الحلاق»).
+                     "greet_prefix")
 
 
 def _load_prompt() -> str:
@@ -870,6 +873,45 @@ async def _apply_reservation_defaults(draft: dict) -> None:
             data["barber_name"] = brb.name
             auto.add("barber_name")
     draft["defaulted"] = sorted(auto)
+
+
+# A barber offered as a BUTTON (2026-09-19, Salman: «إذا عند الحلاق بطلع الأوبشن زرار»). The id
+# carries the Barber row id, so a tap resolves to exactly one row of THIS shop -- never a name.
+BARBER_PICK_PREFIX = "lia_barber:"
+
+
+def _take_greeting(draft: dict) -> str:
+    """«أهلاً {first name}، » ONCE per appointment draft, then "". 2026-09-19.
+
+    The name is the first word of the talking account's `fullName`, read when the draft opened.
+    No name, no greeting -- never a placeholder. Marked on the draft BEFORE the caller saves it.
+    """
+    if draft.get("greeted") or _draft_operation(draft) != "create_reservation":
+        return ""
+    draft["greeted"] = True
+    name = (draft.get("actor_name") or "").strip()
+    # The space is added HERE: the reply loader strips each text, so a trailing space in lia.md
+    # never survives (measured: «أهلاً سلمان،نسيت»).
+    return _REPLIES["greet_prefix"].format(name=name).strip() + " " if name else ""
+
+
+async def _ask_barber(wa, phone: str, draft: dict, text: str) -> None:
+    """Ask for the barber WITH the shop's real barbers as buttons (up to 3, WhatsApp's limit).
+
+    More than three -> the same question as text with the names listed, as before. Typing a name
+    still works in every case: the tap is a shortcut, not the only door.
+    """
+    barbers = await _list_barbers(draft["client_id"])
+    if 1 <= len(barbers) <= 3:
+        await wa.send_interactive_buttons(
+            to=phone, text=text,
+            buttons=[{"type": "reply",
+                      "reply": {"id": f"{BARBER_PICK_PREFIX}{b.id}",
+                                "title": (getattr(b, "name", "") or "—").strip()[:20]}}
+                     for b in barbers])
+        return
+    names = " · ".join((getattr(b, "name", "") or "").strip() for b in barbers)
+    await wa.send_text(phone, f"{text}\n{names}" if names else text)
 
 
 async def _list_barbers(client_id: str) -> list:
@@ -1332,9 +1374,11 @@ async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> boo
         names = " · ".join((getattr(r, "name", "") or "") for r in barbers)
         draft["data"].pop("barber_name", None)
         draft["asking"] = "barber_name"
+        greeting = _take_greeting(draft)
         _save_draft(session, draft)
         session.state = LIA_AWAITING_FIELD
-        await wa.send_text(phone, _REPLIES["reservation_barber_unknown"].format(names=names))
+        await _ask_barber(wa, phone, draft,
+                          greeting + _REPLIES["reservation_barber_unknown"].format(names=names))
         return False
 
     # The ROW's own spelling replaces what he typed, for the same reason F-C1 exists: the preview
@@ -1423,9 +1467,9 @@ def _reservation_preview_text(draft: dict) -> str:
     return text
 
 
-async def _send_preview(wa, phone: str, draft: dict) -> None:
+async def _send_preview(wa, phone: str, draft: dict, greeting: str = "") -> None:
     if _draft_operation(draft) == "create_reservation":
-        await wa.send_text(phone, _reservation_preview_text(draft))
+        await wa.send_text(phone, greeting + _reservation_preview_text(draft))
         await wa.send_interactive_buttons(
             to=phone,
             text=_REPLIES["reservation_confirm"],
@@ -2047,6 +2091,25 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         await wa.send_text(sender_phone, _REPLIES["confirm_nudge"])
         return session
 
+    # ── 1.9 A barber TAPPED from the buttons (2026-09-19). ──
+    # Resolved by the row id the button carries, against THIS shop's active barbers -- a stale or
+    # foreign id matches nothing and the question is asked again, with the buttons.
+    if (draft and session is not None and session.state == LIA_AWAITING_FIELD
+            and msg_type in ("button_reply", "list_reply")
+            and draft.get("asking") == "barber_name"
+            and str(value or "").startswith(BARBER_PICK_PREFIX)):
+        wanted = str(value)[len(BARBER_PICK_PREFIX):]
+        brb = next((b for b in await _list_barbers(draft["client_id"])
+                    if str(getattr(b, "id", "")) == wanted), None)
+        if brb is None:
+            await _ask_barber(wa, sender_phone, draft, _REPLIES["reservation_ask_barber"])
+            return session
+        draft["data"]["barber_name"] = brb.name
+        draft["defaulted"] = [f for f in (draft.get("defaulted") or []) if f != "barber_name"]
+        draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != "barber_name"]
+        await _advance(wa, sender_phone, session, draft)
+        return session
+
     # ── 2. An answer to one asked field. ──
     if draft and session is not None and session.state == LIA_AWAITING_FIELD and msg_type == "text":
         field = draft.get("asking")
@@ -2388,6 +2451,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # 2026-09-19: the TALKING account's own barber row, for the default barber. Read from the
         # user row already resolved above -- no second lookup, and never matched by name.
         "actor_barber_id": getattr(user, "barberId", None),
+        # The first word of the talking account's name, for the one greeting (2026-09-19).
+        "actor_name": ((getattr(user, "fullName", None) or "").split() or [""])[0],
         "category_id":   category_id,
         "category_name": category_name,
         "started_at":    datetime.now(timezone.utc).isoformat(),
@@ -2423,9 +2488,13 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     for field in required:
         if draft["data"].get(field) in (None, "", []):
             draft["asking"] = field
+            greeting = _take_greeting(draft)
             _save_draft(session, draft)
             session.state = LIA_AWAITING_FIELD
-            await wa.send_text(phone, questions[field])
+            if field == "barber_name" and _draft_operation(draft) == "create_reservation":
+                await _ask_barber(wa, phone, draft, greeting + questions[field])
+            else:
+                await wa.send_text(phone, greeting + questions[field])
             return
 
     try:
@@ -2499,6 +2568,7 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
             )
             return
 
+    greeting = _take_greeting(draft)
     _save_draft(session, draft)
     session.state = LIA_AWAITING_CONFIRM
-    await _send_preview(wa, phone, draft)
+    await _send_preview(wa, phone, draft, greeting)

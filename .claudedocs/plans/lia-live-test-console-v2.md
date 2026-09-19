@@ -47,6 +47,11 @@ pressed straight from the phone, and it should be **easy to use for rk or any te
   (needs storage). Proposal: per device plus export, for now.
 - **D-3 · button titles/texts on the page** are dashboard copy (Arabic), not Lia texts, and are shown at review.
 
+## Decided
+- **D-1 (Salman, 2026-09-19):** tests stay on **barberlab-test**. rk is about to be asked to start using Lia for
+  real, so rk is a USER, not a test target — it runs the same build and gets every update with each deploy. The
+  page keeps its barberlab-test restriction for running tests; opening it to other tenants is not needed now.
+
 ## Out of scope
 Any Lia behaviour change · a new backend route · Step 3 (account↔barber links, Ali's phone) · R2/R3/R4.
 

@@ -601,6 +601,55 @@ async def main():
           lia._REPLIES["reservation_edit_unclear"] in wa2.joined()
           and "السعر" not in wa2.joined(), wa2.joined()[:90])
 
+    # ── 11 · the barber as buttons, and a greeting by name (Salman, 2026-09-19, live 19:33) ──
+    print("\n── 11. «أهلاً سلمان، نسيت تقلّي الحلاق» + the barbers as buttons ──")
+    SALMAN = FakeUser("u-bl", BL)
+    SALMAN.fullName = "سلمان حسين"                              # no barber link
+    no_barber = lambda t: extraction(customer_name="عادل", customer_phone="70123321",
+                                     reserved_at=PAST.isoformat(), service_name="قص شعر")
+    async with Env(extract=no_barber, users=[SALMAN]) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4 قص شعر")
+        want = "أهلاً سلمان، " + lia._REPLIES["reservation_ask_barber"]
+        msg = [o for o in wa.out if o[0] == "buttons"]
+        check("the first reply greets him by his FIRST name and asks for the barber",
+              msg and msg[0][1] == want, repr(msg[0][1] if msg else wa.joined()[:80]))
+        check("   the shop's barbers are BUTTONS carrying their row ids",
+              msg and msg[0][2] == (f"{lia.BARBER_PICK_PREFIX}brb-1", f"{lia.BARBER_PICK_PREFIX}brb-2"),
+              str(msg[0][2] if msg else None))
+        wa2, out2 = await send(roundtrip(out), f"{lia.BARBER_PICK_PREFIX}brb-2", "button_reply")
+        check("a TAP on «حسين» fills the barber and goes to the preview",
+              out2.state == lia.LIA_AWAITING_CONFIRM and "حسين" in wa2.joined(), wa2.joined()[:120])
+        check("   the greeting is said ONCE — not again on the preview",
+              "أهلاً" not in wa2.joined())
+        wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ writes the TAPPED barber's id", env.calls and
+              env.calls[0]["metadata"]["barber_id"] == "brb-2", str(env.calls[:1]))
+
+    async with Env(extract=no_barber, users=[SALMAN]) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4 قص شعر")
+        wa2, out2 = await send(roundtrip(out), f"{lia.BARBER_PICK_PREFIX}brb-other-shop", "button_reply")
+        check("a stale or foreign barber id matches nothing → asked again, with buttons, nothing set",
+              out2.state == lia.LIA_AWAITING_FIELD and any(o[0] == "buttons" for o in wa2.out)
+              and not lia._load_draft(out2)["data"].get("barber_name"), wa2.joined()[:80])
+        wa3, out3 = await send(roundtrip(out2), "جعفر")
+        check("typing the name still works — the buttons are a shortcut, not the only door",
+              out3.state == lia.LIA_AWAITING_CONFIRM and "جعفر" in wa3.joined())
+
+    FIVE = BARBERS + [Row(id=f"brb-{i}", name=f"حلاق{i}", isActive=True) for i in (3, 4)]
+    async with Env(extract=no_barber, users=[SALMAN], barbers=FIVE) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4 قص شعر")
+        check("more than 3 barbers (WhatsApp's button limit) → the question with the names as text",
+              not any(o[0] == "buttons" for o in wa.out) and "حلاق4" in wa.joined(), wa.joined()[:120])
+
+    async with Env(extract=full, users=[SALMAN]) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح 4 قص شعر مع جعفر")
+        check("when the FIRST reply is the preview, the preview is what greets him",
+              wa.out and wa.out[0][1].startswith("أهلاً سلمان، "), wa.out[0][1][:40] if wa.out else "")
+    async with Env(extract=no_barber) as env:                      # FakeUser without a name
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4 قص شعر")
+        check("no name on the account → no greeting, never a placeholder",
+              "أهلاً" not in wa.joined() and "{name}" not in wa.joined())
+
     print("\n── nothing left this process ──")
     check("the real functions are restored",
           reservation_service.create_reservation.__module__ == "app.services.reservation_service"
