@@ -2165,7 +2165,21 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             "المساعد مش متوفّر هلق 🔧 ضيف الخدمة من اللوحة، وأنا رح كون جاهز بعدين.",
         )
         return session
-    if extraction is None or extraction.confidence == "low":
+    # 🔴 R1 (2026-09-19, Salman's decision): FOR A RESERVATION, THE SERVER JUDGES THE JSON -- NOT
+    # THE MODEL'S GRADE OF ITSELF. Measured live twice on d3d6785 (R0): the model read «سجل موعد
+    # لأحمد مبارح الساعة 4 شعر مع سامي» completely and correctly -- name, yesterday 16:00, service,
+    # barber -- and still said `low`, because only the phone was missing. The prompt gives no such
+    # reason for `low`, and obeying it here, BEFORE `_advance` looks at anything, turned "one field
+    # missing" into «ما فهمت» and no draft, every time.
+    #
+    # So a schema-valid reservation always opens a draft: `_advance` asks for whatever is missing
+    # (a missing or unreadable time included), `LiaReservationDraft` validates the values,
+    # `_resolve_reservation_rows` checks the names against this shop's real rows, and nothing is
+    # written until the owner presses ✅ on a preview that shows exactly what will be stored.
+    # `confidence` still travels -- into the lia_draft_opened audit row -- as information, not a
+    # gate. Service and product keep the old gate; widening this is a separate decision.
+    unclear = extraction is None or (extraction.confidence == "low" and not is_reservation)
+    if unclear:
         await wa.send_text(
             sender_phone,
             _REPLIES["reservation_unclear"] if is_reservation else

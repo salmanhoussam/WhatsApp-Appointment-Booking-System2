@@ -112,12 +112,18 @@ def roundtrip(s):
                                 json.loads(json.dumps(_session_to_state_data(s)))))
 
 
-def extraction(**data):
-    """A REAL Pydantic extraction built from real values — never a hand-made stand-in."""
+def extraction(confidence="high", **data):
+    """A REAL Pydantic extraction built from real values — never a hand-made stand-in.
+
+    `confidence` IS A PARAMETER, and it was not (TRANSITION, 2026-09-19): it used to be the
+    literal "high", so the `low` branch -- the one the production model actually takes (R0,
+    measured twice) -- had never run once in this suite. That is why T4 was green locally and
+    produced zero drafts live. A fake kinder than reality tests the fake.
+    """
     unresolved = [k for k in ("customer_name", "customer_phone", "reserved_at", "service_name")
                   if data.get(k) in (None, "")]
     return LiaReservationExtraction.model_validate(
-        {"intent": "create_reservation", "confidence": "high",
+        {"intent": "create_reservation", "confidence": confidence,
          "data": {k: v for k, v in data.items() if v is not None},
          "unresolved": unresolved})
 
@@ -375,6 +381,67 @@ async def main():
           str([k for k in texts if any(ord(c) > 0x1F000 for c in lia._REPLIES[k])]))
     check("the service prompt is STILL byte-identical (893 chars)",
           len(lia._SYSTEM_PROMPT) == 893, str(len(lia._SYSTEM_PROMPT)))
+
+    # ── 8 · R1 — the server judges the JSON, not the model's grade of itself ──
+    print("\n── 8. R1 — a `low` reservation still opens a draft; the server asks what is missing ──")
+    # The two shapes R0 measured on production (d3d6785, 2026-09-19), verbatim in what matters:
+    # schema valid, the date read correctly, `unresolved=['customer_phone']`, and `low`.
+    r0_2 = lambda t: extraction(confidence="low", customer_name="أحمد",
+                                reserved_at=PAST.isoformat(), service_name="قص شعر",
+                                barber_name="جعفر")
+    async with Env(extract=r0_2) as env:
+        wa, out = await send(session_idle(), "سجل موعد لأحمد مبارح الساعة 4 شعر مع سامي")
+        check("🔴 TRANSITION — R0-2's live shape (low, only the phone missing) opens a DRAFT"
+              "  [was: «ما فهمت الموعد», no draft]",
+              out is not None and out.state == lia.LIA_AWAITING_FIELD,
+              str(getattr(out, "state", None)))
+        check("   and asks for the one thing missing — the phone",
+              lia._REPLIES["reservation_ask_phone"] in wa.joined(), wa.joined()[:80])
+        check("   🔴 «ما فهمت» is NOT sent", lia._REPLIES["reservation_unclear"] not in wa.joined())
+        check("   nothing written", len(env.calls) == 0)
+        wa2, out2 = await send(roundtrip(out), "ما عندي رقمه")
+        check("   the conversation continues to the preview — no second model call decides",
+              out2.state == lia.LIA_AWAITING_CONFIRM, str(out2.state))
+        check("   🔴 still nothing written before ✅", len(env.calls) == 0)
+        wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ is the only door: ONE reservation, after the owner's tap", len(env.calls) == 1)
+
+    r0_1 = lambda t: extraction(confidence="low", customer_name="أحمد",
+                                reserved_at=PAST.isoformat(), service_name="قص شعر")
+    async with Env(extract=r0_1) as env:
+        wa, out = await send(session_idle(), "سجل موعد لأحمد مبارح الساعة 4 شعر")
+        check("R0-1's live shape (low, phone AND barber missing) opens a draft too",
+              out is not None and out.state == lia.LIA_AWAITING_FIELD
+              and lia._REPLIES["reservation_ask_phone"] in wa.joined(), wa.joined()[:80])
+
+    bad_time = lambda t: extraction(confidence="low", customer_name="أحمد",
+                                    customer_phone="70123456", reserved_at="بعدين",
+                                    service_name="قص شعر", barber_name="جعفر")
+    async with Env(extract=bad_time) as env:
+        wa, out = await send(session_idle(), "سجل موعد لأحمد بعدين قص شعر مع جعفر")
+        check("an UNREADABLE time is not «ما فهمت» either — the server asks «إيمتى؟»",
+              lia._REPLIES["reservation_ask_when"] in wa.joined()
+              and out.state == lia.LIA_AWAITING_FIELD, wa.joined()[:80])
+        check("   and nothing is written", len(env.calls) == 0)
+
+    async with Env(extract=lambda t: None) as env:
+        wa, out = await send(session_idle(), "سجل موعد لأحمد مبارح")
+        check("INVARIANT — an answer that fails the schema is still «ما فهمت الموعد»",
+              lia._REPLIES["reservation_unclear"] in wa.joined(), wa.joined()[:80])
+        check("   and opens no draft", lia._load_draft(out) in (None, {}) if out else True)
+
+    orig_product = lia._extract_product
+    lia._extract_product = lambda text: _done(
+        __import__("app.schemas.lia_drafts", fromlist=["x"]).LiaProductExtraction.model_validate(
+            {"intent": "create_product", "confidence": "low",
+             "data": {"name_ar": "شامبو", "price": 12}}))
+    try:
+        async with Env() as env:
+            wa, out = await send(session_idle(), "ضيف منتج شامبو بـ12 دولار")
+            check("INVARIANT — the gate is unchanged for a PRODUCT: low is still «ما فهمت»",
+                  lia._REPLIES["product_unclear"].split("\n")[0] in wa.joined(), wa.joined()[:90])
+    finally:
+        lia._extract_product = orig_product
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",
