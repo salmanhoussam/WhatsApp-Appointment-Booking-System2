@@ -459,6 +459,47 @@ async def main():
     finally:
         lia._extract_product = orig_product
 
+    # ── 9 · cancel and expiry are worded for the operation they end (2026-09-19) ──
+    print("\n── 9. cancel / expiry speak about what the owner was actually doing ──")
+    # Live, 18:21: Salman cancelled an APPOINTMENT and was told «ابعتلي الخدمة… الاسم والسعر
+    # والمدة» -- a service's instructions. The 5th "text for one context shown in another".
+    full = lambda t: extraction(customer_name="عادل طالب", customer_phone="70123321",
+                                reserved_at=PAST.isoformat(), service_name="قص شعر",
+                                barber_name="جعفر")
+    async with Env(extract=full) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل طالب 70123321 مبارح الساعة 4 مع جعفر")
+        check("setup: the preview is on screen", out.state == lia.LIA_AWAITING_CONFIRM, str(out.state))
+        wa2, out2 = await send(roundtrip(out), lia.CANCEL_ID, "button_reply")
+        check("❌ on an appointment → «تمام، ألغيت الموعد…»",
+              lia._REPLIES["reservation_cancelled"] in wa2.joined(), wa2.joined()[:90])
+        check("   🔴 and NOT the service's «الاسم والسعر والمدة»  [TRANSITION: it was]",
+              "الاسم والسعر والمدة" not in wa2.joined())
+        check("   nothing written, draft gone", len(env.calls) == 0 and lia._load_draft(out2) is None)
+
+        wa, out = await send(session_idle(), "سجل موعد عادل طالب 70123321 مبارح الساعة 4 مع جعفر")
+        stale = roundtrip(out)
+        stale.lia[lia.DRAFT_KEY]["started_at"] = (
+            datetime.now(timezone.utc) - timedelta(minutes=lia.DRAFT_WINDOW_MIN + 1)).isoformat()
+        wa3, out3 = await send(stale, lia.CONFIRM_ID, "button_reply")
+        check("an EXPIRED appointment draft → «مرّ وقت طويل فألغيت الموعد…»",
+              lia._REPLIES["reservation_expired"] in wa3.joined(), wa3.joined()[:90])
+        check("   🔴 and a stale ✅ writes nothing", len(env.calls) == 0)
+        check("   and the state is back to IDLE", out3.state == "IDLE", str(out3.state))
+
+    check("a PRODUCT's cancel and expiry name a product, not a service",
+          lia._per_operation("create_product", "cancelled") == "product_cancelled"
+          and lia._per_operation("create_product", "expired") == "product_expired"
+          and "المنتج" in lia._REPLIES["product_cancelled"] + lia._REPLIES["product_expired"])
+    check("INVARIANT — a SERVICE keeps its exact old texts (cancel, and the old expiry literal)",
+          lia._per_operation("create_service", "cancelled") == "cancel"
+          and lia._REPLIES["service_expired"]
+          == "مرّ وقت طويل على الطلب فألغيته 🙂 ابعتلي الخدمة من جديد إذا بدك.")
+    import unicodedata as _u
+    check("the four new texts carry no Emoji",
+          not any(_u.category(c) == "So" or ord(c) > 0x1F000
+                  for k in ("reservation_cancelled", "reservation_expired",
+                            "product_cancelled", "product_expired") for c in lia._REPLIES[k]))
+
     print("\n── nothing left this process ──")
     check("the real functions are restored",
           reservation_service.create_reservation.__module__ == "app.services.reservation_service"

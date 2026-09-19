@@ -645,7 +645,14 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "reservation_no_barbers", "reservation_no_services",
                      "reservation_preview", "reservation_preview_past", "reservation_confirm",
                      "reservation_created", "reservation_conflict", "reservation_unclear",
-                     "reservations_inactive", "walkin_label")
+                     "reservations_inactive", "walkin_label",
+                     # 2026-09-19. Cancel and expiry, PER OPERATION. The single `cancel` text was
+                     # written for a service («الاسم والسعر والمدة») and reached an owner who had
+                     # just cancelled an APPOINTMENT -- the 5th "text written for one context
+                     # shown in another". `service_expired` is the old inline literal, moved here
+                     # unchanged so every expiry text lives under the drift rule.
+                     "reservation_cancelled", "reservation_expired",
+                     "product_cancelled", "product_expired", "service_expired")
 
 
 def _load_prompt() -> str:
@@ -945,6 +952,27 @@ async def _extract_edit(draft_data: dict, instruction: str) -> Optional["object"
         return None
 
 # ── Draft state ───────────────────────────────────────────────────────────────
+
+def _stale_draft_operation(session) -> Optional[str]:
+    """The operation of the stored draft EVEN IF it has aged out -- for wording its expiry only."""
+    data = getattr(session, "lia", None) or {}
+    raw = data.get(DRAFT_KEY) if isinstance(data, dict) else None
+    return _draft_operation(raw) if isinstance(raw, dict) else None
+
+
+def _per_operation(op_name: Optional[str], moment: str) -> str:
+    """The reply key for a cancel or an expiry, worded for the operation it ends.
+
+    `moment` is "cancelled" or "expired". A service keeps the original texts: `cancel` for a
+    cancel (its wording was right for a service) and `service_expired` for an expiry. Anything
+    unreadable falls back to the service wording -- the behaviour before 2026-09-19.
+    """
+    if op_name == "create_reservation":
+        return f"reservation_{moment}"
+    if op_name == "create_product":
+        return f"product_{moment}"
+    return "cancel" if moment == "cancelled" else "service_expired"
+
 
 def _load_draft(session) -> Optional[dict]:
     """The active draft, or None when there is none or it has aged out.
@@ -1710,13 +1738,14 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # dead conversation: Lia would decline the message (no draft) and the state router has no
     # LIA_* branch, so nothing would answer at all.
     if session is not None and not draft and session.state in _DRAFT_STATES:
+        # The aged-out draft is still in the session -- `_load_draft` only stops RETURNING it --
+        # so its operation is read from there, BEFORE it is cleared, to word the expiry for what
+        # the owner was actually doing.
+        expired_op = _stale_draft_operation(session)
         session.state = "IDLE"
         _save_draft(session, None)
         logger.info("⏲  Lia: draft window expired for %s — state reset to IDLE", sender_phone)
-        await wa.send_text(
-            sender_phone,
-            "مرّ وقت طويل على الطلب فألغيته 🙂 ابعتلي الخدمة من جديد إذا بدك.",
-        )
+        await wa.send_text(sender_phone, _REPLIES[_per_operation(expired_op, "expired")])
         return session
 
     # ── 0.1 The same guard for the family question, which has no draft. ──
@@ -1852,7 +1881,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 # "تمام، ألغيت الطلب 👌" while the expiry message two blocks up told him how to
                 # start again -- two logics for one moment. The text lives in
                 # app/prompts/lia.md, under the drift rule, not in this line.
-                await wa.send_text(sender_phone, _REPLIES["cancel"])
+                await wa.send_text(sender_phone,
+                                   _REPLIES[_per_operation(_draft_operation(draft), "cancelled")])
                 return session
 
         # ── A TYPED MESSAGE HERE IS AN EDIT, not a failure to press a button. ──

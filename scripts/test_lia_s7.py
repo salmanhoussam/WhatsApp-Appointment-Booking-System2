@@ -525,8 +525,10 @@ async def main():
     # decision that button titles are a separate question, and moved `reservations_inactive` OUT
     # (-1) while the same sentence remains twice more in branches T4 did not touch (+... net +2).
     # The number is a baseline that makes the next one visible, never a rule.
-    check("the un-migrated owner-facing literals are pinned at 33 (was 31 before T4)",
-          len(_sent_literals) == 33, str(len(_sent_literals)))
+    # 33 -> 32 (2026-09-19): the draft-expiry sentence «مرّ وقت طويل على الطلب فألغيته…» moved
+    # into lia.md as `service_expired` when cancel/expiry became per-operation.
+    check("the un-migrated owner-facing literals are pinned at 32 (was 33; expiry text moved)",
+          len(_sent_literals) == 32, str(len(_sent_literals)))
     # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
     check("a RECORD verb now opens a reservation — T4 is built, so the promise is real",
           lia._entry_family("سجل إنه أحمد إجا مبارح") == "create_reservation")
