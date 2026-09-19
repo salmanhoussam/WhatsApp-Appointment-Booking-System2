@@ -1,143 +1,86 @@
-// Lia Live Test Console — served from YOUR domain, inside the already-JWT-gated dashboard.
+// Lia Live Test Console v2 — the owner's page for live-testing Lia FROM HIS PHONE.
+// Plan: .claudedocs/plans/lia-live-test-console-v2.md (D-1: barberlab-test only · D-2: device only).
 //
-// WHY IT LIVES HERE AND NOT AS AN EXTERNAL PAGE (Salman, 2026-09-18): the console must be part of
-// the tenant's own environment, not a third-party page. `/:slug/dashboard/*` is already behind
-// `ProtectedRoute` on both `alzabt.` and `demo.` (App.jsx:196), so this route needs:
-//     · ZERO new backend routes          · ZERO auth changes
-//     · ZERO nav entries for any tenant  · lazy-loaded, so it never weighs on a real login
-// It is reached only by typing the URL: /{slug}/dashboard/lia-live-test
+// WHAT IT IS: a launcher and a notebook. Every typed step is one tap that opens WhatsApp on the
+// central bot number with the message already written; every button step just tells the owner to
+// press the button inside WhatsApp. The owner records only what he SEES (three states + a note).
 //
-// 🔴 WHY IT IS NOT IN THE NAV, and why that works without touching the nav guard: the guard at
-// GenericAdminDashboard.jsx:634 force-redirects an unknown tab, but it is scoped to
-// `isPermissionBased` accounts. A legacy owner (TENANT_ADMIN with permissions IS NULL — Salman's
-// own account shape at barberlab-test) is not subject to it, so a nav-invisible tab renders. If
-// that account is ever migrated to a permission array, this page starts bouncing to the first nav
-// item; that is the one known fragility and it is written here rather than discovered later.
+// WHAT IT IS NOT: evidence. The DB rows, Railway log lines and SecurityAuditLog stay with
+// `scripts/lia_live_evidence.py` and Claude. v1's evidence fields (state/DB/record/log) and its
+// 28-scenario report were removed because the owner could not fill them from a phone.
 //
-// 🔴 WHAT THIS PAGE CANNOT PROVE, stated in the UI as well as here. Two of the six evidence types
-// can never come from a browser session:
-//     · SecurityAuditLog has ZERO endpoints in app/api/ — reading it needs a new route, which was
-//       explicitly refused. Yet a proven REFUSAL is half of what makes tenant isolation evidence
-//       (an absent row alone is equally consistent with a bug).
-//     · The negative boundary (rk, mr-h) is unreachable BY DESIGN — this JWT is scoped to one
-//       tenant, and reading another's rows is exactly what multi-tenancy forbids.
-// Both stay with `scripts/lia_live_evidence.py`. This console complements that script; it does
-// not replace it, and it never decides a verdict.
+// WIRING (unchanged from v1): served at /{slug}/dashboard/lia-live-test by GenericAdminDashboard's
+// `case 'lia-live-test'` (lazy + Suspense), behind ProtectedRoute. Not in the nav. The unknown-tab
+// redirect there is scoped to `isPermissionBased`, so a legacy owner (permissions IS NULL) reaches
+// this page; a permission-based account would bounce to its first nav item — the known fragility.
+//
+// ZERO new backend routes. ZERO writes. Reads: the public whatsapp-link (the central number) and,
+// on demand, the existing admin reservations/customers lists.
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import adminApi from '../../utils/admin.config'
-import { T, FONT } from './theme'
+import publicApi from '../../utils/publicApi'
+import { FONT } from './theme'
 
-// The tenant this console is allowed to run against. Hard-coded on purpose: Salman's standing
-// rule is that the live test never touches `rk`, and a slug read from the URL would make that a
-// matter of who typed what.
+// D-1 (Salman, 2026-09-19): live tests run on barberlab-test only. rk is a USER of Lia, not a
+// test target. Hard-coded on purpose, so it is never a matter of who typed which URL.
 const ALLOWED_SLUG = 'barberlab-test'
-// The commit that BUILT the behaviour this checklist describes (T4). Deliberately not "the
-// deployment hash to expect": shipping this page is itself a deploy, so pinning an exact hash
-// here could never be satisfied by the deploy that carries it. What matters is that the running
-// build CONTAINS this commit — which is what the log-correlation step checks, and it is why a
-// run must never start on an older deploy (the mistake that nearly happened on 2026-09-18, when
-// the new build existed but the old one was still the RUNNING instance).
-const LIA_BUILD = '06f9a5b'
-const STORE_KEY = 'lia_live_test_results_v1'
+const STORE_KEY = 'lia_console_v2'
 
-const VERDICTS = [
-  ['pass',    'ناجح',                  T.green],
-  ['fail',    'فاشل',                  T.danger],
-  ['risk',    'سلوك مؤكَّد / خطر منتج', '#B45309'],
-  ['unknown', 'غير محسوم',             T.textSecond],
+const STATES = [
+  ['none', 'ما جرّبت'],
+  ['ok',   'زبطت متل المتوقع'],
+  ['off',  'طلعت غير شي'],
 ]
 
-const SECTIONS = [
-  ['A · القناة', [
-    ['L-01', 'أول رسالة: الترحيب يصل', 'مرحبا',
-      'ترحيب ليا وزرّ «احجز موعد». جلسة واحدة، وردّ واحد لا مكرَّر.'],
-    ['L-02', 'الردّ صادر من النسخة المنشورة', '—',
-      `سطر لوج يحمل هذه الرسالة بعينها، من نشرٍ يحتوي ${LIA_BUILD}. بلا سطر ⇒ غير محسوم، لا ناجح.`],
-    ['L-03', 'رسالتان متتاليتان بسرعة', 'مرحبا',
-      'لا ردّ مزدوج على الرسالة الواحدة.'],
-  ]],
-  ['B · الهوية', [
-    ['L-04', 'رقم غير معروف يطلب أمر مالك', 'ضيف منتج شامبو بـ12 دولار',
-      'صمت تام + صفر كتابة. (من رقم آخر إن توفّر)'],
-    ['L-05', 'رقمك يطلب الأمر نفسه', 'ضيف منتج شامبو تجريبي بـ12 دولار',
-      'يدخل مسار المالك ويعرض معاينة قبل أي كتابة.'],
-    ['L-06', 'التينانت الصحيح وحده', '—',
-      'الصفّ الجديد على barberlab-test فقط — يُقرأ من قاعدة البيانات لا من الرسالة.'],
-  ]],
-  ['C · خدمة وبضاعة', [
-    ['L-07', 'خدمة كاملة بجملة واحدة', 'ضيف خدمة قص شعر 10 دولار ونص ساعة',
-      'معاينة، ثم تأكيد، ثم صفّ CatalogService حقيقي.'],
-    ['L-08', 'الصمت الذي أسقط اختبار ١٧ أيلول', 'ضيف ماكينة حلاقة 20 دولار',
-      'سؤال «خدمة أو بضاعة أو موعد؟» — لا صمت.'],
-    ['L-09', 'الجواب يُستأنف من النص الأصلي', 'بضاعة',
-      'يكمل من «ماكينة حلاقة 20 دولار»، لا من كلمة «بضاعة».'],
-    ['L-10', 'الفرانكو يُفهم', 'dif mantoj shampoo keratin b 12 dollar',
-      'يدخل المسار، والاسم المستخرج يعود بالعربية.'],
-  ]],
-  ['D · التكرار — العطب الأول', [
-    ['L-11', 'اسم موجود أصلاً', 'ضيف منتج مشط خشب بـ5 دولار',
-      'يعرض الاسم المخزَّن والسعر والقسم، وثلاثة أزرار، وصفر كتابة.'],
-    ['L-12', '«عدّل الموجود»', '[اضغط زرّ: عدّل الموجود]',
-      'سؤال: السعر، الاسم، ولا القسم؟'],
-    ['L-13', 'جواب باسم حقل غير مبنيّ', 'الاسم',
-      '«هلق فيني عدّل السعر بس» — ولا حلقة مفرغة.'],
-    ['L-14', 'تعديل السعر وحده', '7',
-      'قاعدة البيانات: السعر وحده تغيّر، والاسم والقسم كما هما.'],
-    ['L-15', 'مسافات زائدة والإلغاء', 'ضيف منتج  مشط خشب  بـ5 دولار',
-      'يجد الصفّ نفسه رغم المسافات · والإلغاء صفر كتابة.'],
-  ]],
-  ['E · لا صمت', [
-    ['L-16', 'فعل بلا حمولة', 'ضيف',
-      '«شو بدك تضيف؟ اكتبلي الاسم والسعر» — لا صمت.'],
-    ['L-17', 'غموض صريح', 'ضيف خدمة وبضاعة',
-      'سؤال ثلاثي، والجواب بعده يُستقبَل ولا يسقط.'],
-  ]],
-  ['F · الفرانكو والحدود', [
-    ['L-18', 'أنت كزبون بالفرانكو', 'bade e7jez da8n',
-      'مسار حجز الزبون — لا مسار المالك.'],
-    ['L-19', 'فخّ ndif', 'bade mkan ndif w mrattab',
-      'لا يُقرأ فعلاً ولا يدخل مسار المالك.'],
-  ]],
-  ['G+H · موعد ماضٍ وزبون', [
-    ['L-20', 'الجملة التي طلبتها', 'سجّللي إنو أحمد إجا مبارح الساعة 4 وعمل قص شعر',
-      'يسأل عن الناقص، ثم معاينة تقول صراحة إنه موعد ماضي.'],
-    ['L-21', 'التأكيد وحده يكتب', '[اضغط زرّ: سجّله]',
-      'DB: source=lia · pending · الساعة بلا تحويل · barberId · serviceId · customerId. وصفر إشعار تاجر على هاتفك.'],
-    ['L-22', 'الزبون الطيّار', 'ما عندي رقمه',
-      'يُقبل، والرقم WALK_IN. النتيجة تُسجَّل «سلوك مؤكَّد / خطر منتج» — لا «ناجح».'],
-    ['L-23', 'زبون برقم حقيقي مرتين', 'سجل موعد لسمير 70123456 بكرا الساعة 5 قص شعر',
-      'صفّ زبون واحد للرقم نفسه، لا اثنان.'],
-  ]],
-  ['I · موعد مستقبلي', [
-    ['L-24', 'الإشعار بثلاث طبقات', 'سجل موعد لكريم 70999888 بكرا الساعة 6 حلاقة دقن',
-      '① نداء داخلي ② قبول ميتا ③ وصول فعلي على هاتفك. سجّل الثلاثة منفصلة، ولا تخلطها.'],
-    ['L-25', 'تعارض', 'نفس الحلاق ونفس الساعة',
-      'رسالة التعارض، ولا صفّ ثانٍ في قاعدة البيانات.'],
-  ]],
-  ['J+K · المقاطعة والأزرار', [
-    ['L-26', 'المقاطعة', 'ابدأ «ضيف منتج …» ثم: انسى الموضوع واحجزلي موعد',
-      'لا يُحتجَز في الحالة القديمة، ولا تُكمَل العملية القديمة بالغلط.'],
-    ['L-27', 'الضغط مرتين', '[اضغط زرّ التأكيد مرتين]',
-      'سجلّ واحد فقط. وزرّ قديم بعد انتهاء المسودة ⇒ صفر كتابة.'],
-  ]],
-  ['L · العدائي', [
-    ['L-28', 'محاولة تينانت آخر', 'ضيف منتج تجربة بـ1 دولار على محل rk',
-      'رفض آمن + صفر كتابة. وصفّ الرفض في سجلّ التدقيق يُقرأ بالسكربت، لا من هنا.'],
-  ]],
+// Real messages from the 2026-09-19 verified live runs — verbatim. Every starter ends at ❌, so a
+// run never writes a real row unless the owner changes it himself.
+const STARTERS = [
+  { id: 's-past-no-number', title: 'موعد ماضي بلا رقم',
+    steps: ['سجل موعد لأحمد مبارح الساعة 4 شعر مع سامي', 'زبون طيار', 'اضغط ❌'],
+    expected: 'ليا بتسأل عن الرقم، بعدين بتعرض المعاينة، وبعد ❌: «تمام، ألغيت الموعد…».' },
+  { id: 's-greet-barber-buttons', title: 'ترحيب + أزرار الحلاق + خدمة تلقائية',
+    steps: ['سجل موعد عادل 70123321 مبارح الساعة 4', 'اضغط [زياد]', 'اضغط ❌'],
+    expected: '«أهلاً …، نسيت تقلّي الحلاق. مين فيهم؟» مع أزرار الحلاقين، بعدين معاينة فيها «شعر ودقن (تلقائي)».' },
+  { id: 's-edit-time', title: 'تعديل الوقت من المعاينة',
+    steps: ['سجل موعد عادل 70123321 مبارح الساعة 4 مع سامي', 'خليها الساعة 5', 'اضغط ❌'],
+    expected: 'معاينة جديدة على الساعة 17:00.' },
+  { id: 's-edit-barber', title: 'تعديل الحلاق من المعاينة',
+    steps: ['سجل موعد عادل 70123321 مبارح الساعة 4 مع سامي', 'خليه مع زياد', 'اضغط ❌'],
+    expected: 'معاينة جديدة والحلاق فيها زياد.' },
+  { id: 's-unknown-barber', title: 'حلاق مش موجود',
+    steps: ['سجل موعد عادل 70123321 مبارح الساعة 4 مع سامي', 'خليه مع كريم', 'اضغط ❌'],
+    expected: 'السؤال عن الحلاق مع لائحة الحلاقين الحقيقية.' },
+  { id: 's-future', title: 'موعد مستقبلي',
+    steps: ['سجل موعد لسامر 70123321 بكرا الساعة 3 مع سامي', 'اضغط ❌'],
+    expected: 'معاينة بلا سطر «موعد ماضي».' },
+  { id: 's-product', title: 'منتج',
+    steps: ['ضيف منتج شامبو بـ12 دولار', 'اضغط ❌'],
+    expected: 'معاينة المنتج قبل أي حفظ، و❌ بتلغيها.' },
 ]
 
-const ALL_IDS = SECTIONS.flatMap(([, items]) => items.map((t) => t[0]))
+const EMPTY = { custom: [], results: {}, hidden: [] }
 
-function loadResults() {
+// Every read/write is wrapped: private windows, blocked site data and quota errors all throw here,
+// and the page must keep working in memory when they do.
+function load() {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '{}')
+    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null')
+    if (!raw || typeof raw !== 'object') return EMPTY
+    return {
+      custom: Array.isArray(raw.custom)
+        ? raw.custom.filter((c) => c && typeof c.id === 'string' && typeof c.title === 'string'
+            && Array.isArray(c.steps) && c.steps.every((s) => typeof s === 'string'))
+        : [],
+      results: raw.results && typeof raw.results === 'object' ? raw.results : {},
+      hidden: Array.isArray(raw.hidden) ? raw.hidden : [],
+    }
   } catch {
-    return {}
+    return EMPTY
   }
 }
 
-function saveResults(data) {
+function save(data) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(data))
     return true
@@ -146,353 +89,483 @@ function saveResults(data) {
   }
 }
 
-// Arabic folding, the same shape Lia matches names with — so "is this a duplicate" is asked her
-// way rather than a stricter one that would quietly report zero.
-function foldAr(s) {
-  return (s || '')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ة/g, 'ه')
-    .replace(/ـ/g, '')
-    .replace(/[ً-ْ]/g, '')
-    .replace(/\s+/g, ' ')
+// A line starting with «اضغط» is a WhatsApp button tap, not a message to type.
+function parseStep(line) {
+  const t = line.trim()
+  if (t.startsWith('اضغط')) {
+    const label = t.slice('اضغط'.length).trim().replace(/^\[|\]$/g, '').trim()
+    return { tap: true, label: label || '…' }
+  }
+  return { tap: false, text: t }
+}
+
+function toLines(text) {
+  return text.split('\n').map((l) => l.trim()).filter(Boolean)
+}
+
+function newId() {
+  return `c-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch { /* fall through to the textarea path */ }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
 }
 
 export default function LiaLiveTest() {
   const { slug: routeSlug } = useParams()
   const slug = routeSlug || ''
-  const [results, setResults] = useState(loadResults)
+
+  const [store, setStore] = useState(load)
+  const [persists, setPersists] = useState(true)
+  const [botNumber, setBotNumber] = useState(null)
+  const [botState, setBotState] = useState('loading') // loading | ready | off
   const [open, setOpen] = useState({})
-  const [report, setReport] = useState('')
+  const [form, setForm] = useState(null) // null | { id?, title, steps, expected }
+  const [exportMsg, setExportMsg] = useState('')
+  const [exportText, setExportText] = useState('')
   const [evidence, setEvidence] = useState(null)
   const [evidenceErr, setEvidenceErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const [persists, setPersists] = useState(true)
 
+  useEffect(() => { setPersists(save(store)) }, [store])
+
+  // The central bot number comes ONLY from the tenant's public whatsapp-link. Never hardcoded,
+  // and never the owner's personal wa.me number that marketing pages use.
   useEffect(() => {
-    setPersists(saveResults(results))
-  }, [results])
+    if (slug !== ALLOWED_SLUG) return undefined
+    let alive = true
+    publicApi
+      .get('/reservations/whatsapp-link', { params: { client_slug: slug } })
+      .then((res) => {
+        const data = res?.data?.data
+        let num = null
+        if (data?.available && data?.url) {
+          try { num = new URL(data.url).pathname.replace(/\D/g, '') } catch { num = null }
+        }
+        if (!alive) return
+        if (num && num.length >= 8) { setBotNumber(num); setBotState('ready') } else setBotState('off')
+      })
+      .catch(() => { if (alive) setBotState('off') })
+    return () => { alive = false }
+  }, [slug])
 
-  const setField = useCallback((id, field, value) => {
-    setResults((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), [field]: value } }))
-  }, [])
+  const tests = useMemo(() => [
+    ...STARTERS.filter((s) => !store.hidden.includes(s.id)).map((s) => ({ ...s, starter: true })),
+    ...store.custom.map((c) => ({ ...c, starter: false })),
+  ], [store])
+
+  const hiddenStarters = STARTERS.filter((s) => store.hidden.includes(s.id))
 
   const counts = useMemo(() => {
-    const c = { pass: 0, fail: 0, risk: 0, unknown: 0 }
-    ALL_IDS.forEach((id) => {
-      const v = results[id]?.verdict
-      if (v && c[v] !== undefined) c[v] += 1
-    })
-    return { ...c, done: c.pass + c.fail + c.risk + c.unknown }
-  }, [results])
+    const c = { none: 0, ok: 0, off: 0 }
+    tests.forEach((t) => { const k = store.results[t.id]?.status; c[k in c ? k : 'none'] += 1 })
+    return c
+  }, [tests, store.results])
 
-  // Reads evidence through endpoints that ALREADY EXIST — no route was added for this page.
-  // Everything here is scoped to this tenant by the same JWT the dashboard already uses.
+  const setResult = useCallback((id, field, value) => {
+    setStore((s) => ({ ...s, results: { ...s.results, [id]: { ...(s.results[id] || {}), [field]: value } } }))
+  }, [])
+
+  const isOpen = (t) => (open[t.id] !== undefined ? open[t.id] : (store.results[t.id]?.status || 'none') === 'none')
+
+  const saveForm = () => {
+    const steps = toLines(form.steps)
+    const title = form.title.trim()
+    if (!title || !steps.length) return
+    const entry = { id: form.id || newId(), title, steps, expected: form.expected.trim() }
+    setStore((s) => ({
+      ...s,
+      custom: form.id ? s.custom.map((c) => (c.id === form.id ? entry : c)) : [...s.custom, entry],
+    }))
+    setOpen((o) => ({ ...o, [entry.id]: true }))
+    setForm(null)
+  }
+
+  const removeCustom = (id) => {
+    if (!window.confirm('نحذف هالاختبار عن هالجهاز؟')) return
+    setStore((s) => {
+      const results = { ...s.results }
+      delete results[id]
+      return { ...s, custom: s.custom.filter((c) => c.id !== id), results }
+    })
+  }
+
+  const setHidden = (id, hide) => setStore((s) => ({
+    ...s, hidden: hide ? [...new Set([...s.hidden, id])] : s.hidden.filter((h) => h !== id),
+  }))
+
+  const exportAll = async () => {
+    const label = Object.fromEntries(STATES)
+    const lines = [`Lia — دفتر الاختبار — ${slug} — ${new Date().toLocaleString('ar')}`, '']
+    tests.forEach((t, i) => {
+      const r = store.results[t.id] || {}
+      lines.push(`${i + 1}. ${t.title}${t.starter ? '' : ' (مكتوب يدوياً)'}`)
+      t.steps.forEach((s, j) => lines.push(`   ${j + 1}) ${s}`))
+      if (t.expected) lines.push(`   المتوقّع: ${t.expected}`)
+      lines.push(`   النتيجة: ${label[r.status || 'none']}`)
+      if (r.note) lines.push(`   ملاحظة: ${r.note.replace(/\n/g, ' / ')}`)
+      lines.push('')
+    })
+    const text = lines.join('\n')
+    const ok = await copyText(text)
+    setExportMsg(ok ? 'انتسخ ✓' : '')
+    setExportText(ok ? '' : text)
+    if (ok) setTimeout(() => setExportMsg(''), 2500)
+  }
+
+  // Light, read-only view through endpoints that already exist, scoped by the dashboard's own JWT.
   const readEvidence = useCallback(async () => {
     setBusy(true)
     setEvidenceErr('')
     try {
-      const [res, cust, prod] = await Promise.all([
-        adminApi.get('/reservations/'),
-        adminApi.get('/customers/'),
-        adminApi.get('/store/products'),
-      ])
+      const [res, cust] = await Promise.all([adminApi.get('/reservations/'), adminApi.get('/customers/')])
       const rows = (x) => (Array.isArray(x?.data?.data) ? x.data.data : x?.data?.data?.items || [])
-      const products = rows(prod)
-      const groups = {}
-      products.filter((p) => p.is_active !== false).forEach((p) => {
-        const k = foldAr(p.name_ar)
-        groups[k] = groups[k] || []
-        groups[k].push(p)
-      })
       setEvidence({
         at: new Date().toLocaleTimeString('ar'),
-        reservations: rows(res).slice(0, 8),
-        customers: rows(cust).slice(0, 8),
-        walkIn: rows(cust).filter((c) => c.phone === 'WALK_IN'),
-        duplicates: Object.entries(groups).filter(([, v]) => v.length > 1),
-        productCount: products.length,
+        reservations: rows(res).slice(0, 5),
+        customers: rows(cust).slice(0, 5),
       })
     } catch (e) {
-      setEvidenceErr(e?.response?.status ? `الخادم ردّ ${e.response.status}` : 'تعذّر القراءة')
+      setEvidenceErr(e?.response?.status ? `الخادم ردّ ${e.response.status}` : 'تعذّرت القراءة')
     } finally {
       setBusy(false)
     }
   }, [])
 
-  const generate = useCallback(() => {
-    const lines = [`LIA LIVE VERIFICATION — ${slug} — lia build ${LIA_BUILD}`, '']
-    SECTIONS.forEach(([section, items]) => {
-      lines.push(`== ${section}`)
-      items.forEach(([id, title, msg]) => {
-        const s = results[id] || {}
-        const verdict = VERDICTS.find((v) => v[0] === s.verdict)
-        lines.push(`${id} | ${title}`)
-        lines.push(`  input   : ${msg}`)
-        lines.push(`  reply   : ${(s.reply || '—').replace(/\n/g, ' / ')}`)
-        lines.push(`  state   : ${s.before || '—'} -> ${s.after || '—'}`)
-        lines.push(`  db      : ${s.dbres || '—'}   record: ${s.rec || '—'}`)
-        lines.push(`  notes   : ${(s.notes || '—').replace(/\n/g, ' / ')}`)
-        lines.push(`  VERDICT : ${verdict ? verdict[1] : '—'}`)
-      })
-      lines.push('')
-    })
-    setReport(lines.join('\n'))
-  }, [results, slug])
-
   if (slug !== ALLOWED_SLUG) {
     return (
-      <div style={{ ...card, borderColor: T.danger }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>هذه الصفحة محصورة بـ {ALLOWED_SLUG}</h2>
-        <p style={{ color: T.textSecond, margin: '8px 0 0' }}>
-          الاختبار الحيّ لا يُجرى على أي تينانت آخر. المحل الحالي: <b>{slug || '—'}</b>
-        </p>
+      <div className="llt" dir="rtl">
+        <style>{CSS}</style>
+        <section className="llt-hero">
+          <p className="llt-eyebrow">LIA · LIVE CONSOLE</p>
+          <h1 className="llt-h1">هالصفحة بس لـ {ALLOWED_SLUG}</h1>
+          <p className="llt-sub">الاختبار الحيّ ما بيصير على أي محل تاني. المحل الحالي: <b>{slug || '—'}</b></p>
+        </section>
       </div>
     )
   }
 
+  const waHref = (text) => `https://wa.me/${botNumber}?text=${encodeURIComponent(text)}`
+
   return (
-    <div style={{ fontFamily: FONT, color: T.textPrimary, direction: 'rtl' }}>
-      <div style={{ ...card, background: '#FFFBEB', borderColor: '#FCD34D' }}>
-        <b>هذه الصفحة تسجّل ولا تقرّر.</b>
-        <p style={{ margin: '6px 0 0', color: T.textSecond, fontSize: 13, lineHeight: 1.8 }}>
-          الدليل هو رسالة واتساب التي وصلت، وسطر لوج Railway، وصفّ قاعدة البيانات — لا حقلٌ مكتوب
-          فيه «ناجح». وأي سيناريو بلا سطر لوج يربطه بنشرٍ يحتوي <b>{LIA_BUILD}</b> يُسجَّل
-          «غير محسوم».
-          <br />
-          وسجلّ التدقيق والحدّ السلبي (rk · mr-h) لا يمكن قراءتهما من هنا — الأول بلا endpoint،
-          والثاني يمنعه عزل التينانت نفسه. يبقيان في <code>scripts/lia_live_evidence.py</code>.
-        </p>
-      </div>
+    <div className="llt" dir="rtl">
+      <style>{CSS}</style>
 
-      <div style={{ ...card, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ fontSize: 13 }}>
-          أُجري <b>{counts.done}</b> من <b>{ALL_IDS.length}</b>
+      <section className="llt-hero">
+        <p className="llt-eyebrow">LIA · LIVE CONSOLE · {slug}</p>
+        <h1 className="llt-h1">جرّب ليا من تلفونك</h1>
+        <p className="llt-sub">كل كبسة خضرا بتفتح واتساب والرسالة جاهزة — إنت بس اكبس «إرسال».</p>
+        <div className="llt-wa-status" data-state={botState}>
+          <span className="llt-dot" />
+          {botState === 'loading' && 'عم نجيب رقم ليا…'}
+          {botState === 'ready' && <>رقم ليا جاهز <span className="llt-num" dir="ltr">+{botNumber}</span></>}
+          {botState === 'off' && 'رقم ليا مش مضبوط هون — كبسات الإرسال مخفية.'}
         </div>
-        {VERDICTS.map(([k, label, color]) => (
-          <div key={k} style={{ fontSize: 13, color }}>
-            {label} <b>{counts[k]}</b>
-          </div>
-        ))}
-        {!persists && (
-          <div style={{ fontSize: 12, color: T.danger }}>
-            التخزين المحلي مرفوض في هذا المتصفح — ولّد التقرير قبل إغلاق الصفحة.
-          </div>
-        )}
-      </div>
-
-      <div style={card}>
-        <button type="button" onClick={readEvidence} disabled={busy} style={btnPrimary}>
-          {busy ? 'يقرأ…' : 'اقرأ الدليل من قاعدة البيانات'}
-        </button>
-        <span style={{ fontSize: 12, color: T.textSecond, marginRight: 10 }}>
-          عبر endpoints قائمة فعلاً: الحجوزات · العملاء · المنتجات
-        </span>
-        {evidenceErr && <p style={{ color: T.danger, fontSize: 13 }}>{evidenceErr}</p>}
-        {evidence && (
-          <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.9 }}>
-            <div style={{ color: T.textSecond }}>قراءة {evidence.at}</div>
-            <div>أصناف نشطة: <b>{evidence.productCount}</b> · أسماء مكرَّرة:{' '}
-              <b style={{ color: evidence.duplicates.length ? T.danger : T.green }}>
-                {evidence.duplicates.length}
-              </b>
+        <div className="llt-tally">
+          {STATES.map(([k, label]) => (
+            <div key={k} className="llt-tally-item" data-s={k}>
+              <b>{counts[k]}</b><span>{label}</span>
             </div>
-            {evidence.duplicates.map(([name, rows]) => (
-              <div key={name} style={{ color: T.danger }}>
-                «{name}» ×{rows.length} — {rows.map((r) => r.id?.slice(0, 8)).join(' · ')}
+          ))}
+        </div>
+      </section>
+
+      <p className="llt-disclaimer">
+        هالصفحة دفتر ملاحظات، مش دليل. الدليل (قاعدة البيانات واللوج) بيقرأه Claude من السيرفر.
+        {!persists && <span className="llt-warn"> التخزين مقفول بهالمتصفح — ملاحظاتك رح تروح إذا سكّرت الصفحة، انسخها قبل.</span>}
+      </p>
+
+      <div className="llt-toolbar">
+        <button type="button" className="llt-btn llt-btn-dark"
+                onClick={() => setForm({ title: '', steps: '', expected: '' })}>
+          + اكتب اختبار جديد
+        </button>
+        <button type="button" className="llt-btn llt-btn-quiet" onClick={exportAll}>
+          {exportMsg || 'انسخ الكل'}
+        </button>
+      </div>
+      {exportText && (
+        <div className="llt-card llt-pad">
+          <p className="llt-small">النسخ التلقائي ما زبط — حدّد النص وانسخه يدوياً:</p>
+          <textarea className="llt-input llt-mono" rows={8} readOnly value={exportText}
+                    onFocus={(e) => e.target.select()} />
+        </div>
+      )}
+
+      {form && (
+        <TestForm form={form} setForm={setForm} onSave={saveForm} onCancel={() => setForm(null)} />
+      )}
+
+      <ol className="llt-list">
+        {tests.map((t, idx) => {
+          const r = store.results[t.id] || {}
+          const status = r.status || 'none'
+          const expanded = isOpen(t)
+          return (
+            <li key={t.id} className="llt-card llt-test" data-s={status}>
+              <button type="button" className="llt-test-head" aria-expanded={expanded}
+                      onClick={() => setOpen((o) => ({ ...o, [t.id]: !expanded }))}>
+                <span className="llt-idx">{String(idx + 1).padStart(2, '0')}</span>
+                <span className="llt-test-title">
+                  {t.title}
+                  <span className="llt-meta">{t.steps.length} خطوات{t.starter ? '' : ' · مكتوب يدوياً'}</span>
+                </span>
+                <span className="llt-badge" data-s={status}>{Object.fromEntries(STATES)[status]}</span>
+              </button>
+
+              {expanded && (
+                <div className="llt-body">
+                  <ol className="llt-steps">
+                    {t.steps.map((line, i) => {
+                      const step = parseStep(line)
+                      return (
+                        <li key={i} className="llt-step">
+                          <span className="llt-step-n">{i + 1}</span>
+                          {step.tap ? (
+                            <div className="llt-tap">
+                              <span>اضغط الزر في واتساب</span>
+                              <span className="llt-chip">{step.label}</span>
+                            </div>
+                          ) : (
+                            <div className="llt-send">
+                              <div className="llt-bubble">{step.text}</div>
+                              {botState === 'ready' && (
+                                <a className="llt-btn llt-btn-wa" href={waHref(step.text)}
+                                   target="_blank" rel="noopener noreferrer">
+                                  افتح بواتساب
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ol>
+
+                  {t.expected && (
+                    <div className="llt-expected">
+                      <span className="llt-label">المتوقّع</span>
+                      <p>{t.expected}</p>
+                    </div>
+                  )}
+
+                  <div className="llt-label">شو صار؟</div>
+                  <div className="llt-seg" role="radiogroup" aria-label="النتيجة">
+                    {STATES.map(([k, label]) => (
+                      <button key={k} type="button" role="radio" aria-checked={status === k}
+                              className="llt-seg-btn" data-s={k}
+                              onClick={() => setResult(t.id, 'status', k)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea className="llt-input" rows={2} placeholder="ملاحظة (اختياري) — شو شفت بالظبط؟"
+                            aria-label="ملاحظة" value={r.note || ''}
+                            onChange={(e) => setResult(t.id, 'note', e.target.value)} />
+
+                  <div className="llt-row-actions">
+                    {t.starter ? (
+                      <button type="button" className="llt-link" onClick={() => setHidden(t.id, true)}>إخفاء</button>
+                    ) : (
+                      <>
+                        <button type="button" className="llt-link"
+                                onClick={() => setForm({ id: t.id, title: t.title, steps: t.steps.join('\n'), expected: t.expected || '' })}>
+                          تعديل
+                        </button>
+                        <button type="button" className="llt-link llt-link-danger" onClick={() => removeCustom(t.id)}>حذف</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+
+      {hiddenStarters.length > 0 && (
+        <div className="llt-card llt-pad">
+          <div className="llt-label">اختبارات مخفية</div>
+          {hiddenStarters.map((s) => (
+            <div key={s.id} className="llt-hidden-row">
+              <span>{s.title}</span>
+              <button type="button" className="llt-link" onClick={() => setHidden(s.id, false)}>رجّعه</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <details className="llt-card llt-pad llt-evidence">
+        <summary>آخر ما انكتب بقاعدة البيانات <span className="llt-meta">قراءة فقط</span></summary>
+        <button type="button" className="llt-btn llt-btn-quiet" onClick={readEvidence} disabled={busy}>
+          {busy ? 'عم يقرا…' : 'اقرا هلّق'}
+        </button>
+        {evidenceErr && <p className="llt-warn">{evidenceErr}</p>}
+        {evidence && (
+          <div className="llt-ev">
+            <p className="llt-small">قراءة {evidence.at}</p>
+            <div className="llt-label">آخر الحجوزات</div>
+            {evidence.reservations.length === 0 && <p className="llt-small">ولا حجز.</p>}
+            {evidence.reservations.map((r) => (
+              <div key={r.id} className="llt-ev-row">
+                <b>{r.customer_name || '—'}</b>
+                <span dir="ltr">{r.reserved_at || '—'}</span>
+                <span>{r.status || '—'} · {r.source || '—'}</span>
               </div>
             ))}
-            {evidence.walkIn.length > 0 && (
-              <div style={{ color: '#B45309' }}>
-                زبون طيّار: {evidence.walkIn.length} صفّ — سجّله «سلوك مؤكَّد / خطر منتج»، لا «ناجح».
-              </div>
-            )}
-            <div style={{ marginTop: 6 }}>آخر الحجوزات:</div>
-            {evidence.reservations.map((r) => (
-              <div key={r.id} style={{ fontFamily: 'monospace', fontSize: 12, direction: 'ltr', textAlign: 'left' }}>
-                {r.id?.slice(0, 8)} · {r.reserved_at} · {r.status} · src={r.source || '—'} · {r.customer_name}
+            <div className="llt-label">آخر الزباين</div>
+            {evidence.customers.length === 0 && <p className="llt-small">ولا زبون.</p>}
+            {evidence.customers.map((c, i) => (
+              <div key={c.phone ?? `np-${i}`} className="llt-ev-row">
+                <b>{c.name || 'بدون اسم'}</b>
+                <span dir="ltr">{c.no_phone ? 'بدون رقم' : c.phone}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      {SECTIONS.map(([section, items]) => (
-        <div key={section}>
-          <h3 style={{ fontSize: 13, color: T.textSecond, margin: '26px 0 10px', fontWeight: 700 }}>
-            {section}
-          </h3>
-          {items.map(([id, title, msg, expected]) => {
-            const s = results[id] || {}
-            const v = VERDICTS.find((x) => x[0] === s.verdict)
-            const isOpen = !!open[id]
-            return (
-              <div
-                key={id}
-                style={{
-                  ...card,
-                  marginBottom: 8,
-                  padding: 0,
-                  borderInlineStartWidth: 4,
-                  borderInlineStartStyle: 'solid',
-                  borderInlineStartColor: v ? v[2] : T.border,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpen((o) => ({ ...o, [id]: !o[id] }))}
-                  style={rowBtn}
-                >
-                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: T.textSecond }}>{id}</span>
-                  <span style={{ flex: 1, textAlign: 'start', fontWeight: 600, fontSize: 14 }}>{title}</span>
-                  <span style={{ fontSize: 12, color: v ? v[2] : T.textMuted }}>
-                    {v ? v[1] : 'لم يُجرَّب'}
-                  </span>
-                </button>
-
-                {isOpen && (
-                  <div style={{ padding: '0 14px 14px', display: 'grid', gap: 10 }}>
-                    {msg !== '—' && (
-                      <div style={{ background: T.pageBg, borderRadius: 8, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 14 }}>{msg}</div>
-                        <button
-                          type="button"
-                          style={btnGhost}
-                          onClick={() => navigator.clipboard?.writeText(msg)}
-                        >
-                          نسخ النص
-                        </button>
-                      </div>
-                    )}
-                    <div style={{ fontSize: 13, color: T.textSecond }}>
-                      <b style={{ color: T.textPrimary }}>المتوقَّع: </b>{expected}
-                    </div>
-
-                    <Field label="ردّ ليا كما وصل حرفياً" id={`${id}-reply`}>
-                      <textarea
-                        id={`${id}-reply`} style={inputS} rows={3}
-                        value={s.reply || ''} onChange={(e) => setField(id, 'reply', e.target.value)}
-                      />
-                    </Field>
-
-                    <div style={two}>
-                      <Field label="الحالة قبل" id={`${id}-before`}>
-                        <input id={`${id}-before`} style={inputS} value={s.before || ''}
-                               onChange={(e) => setField(id, 'before', e.target.value)} />
-                      </Field>
-                      <Field label="الحالة بعد" id={`${id}-after`}>
-                        <input id={`${id}-after`} style={inputS} value={s.after || ''}
-                               onChange={(e) => setField(id, 'after', e.target.value)} />
-                      </Field>
-                    </div>
-
-                    <div style={two}>
-                      <Field label="كتابة في قاعدة البيانات؟" id={`${id}-db`}>
-                        <select id={`${id}-db`} style={inputS} value={s.dbres || ''}
-                                onChange={(e) => setField(id, 'dbres', e.target.value)}>
-                          <option value="" />
-                          <option value="no-expected">لا — وهذا المطلوب</option>
-                          <option value="yes-expected">نعم — وهذا المطلوب</option>
-                          <option value="yes-unexpected">نعم — وما كان لازم</option>
-                          <option value="no-unexpected">لا — وكان لازم</option>
-                          <option value="unread">لم تُقرأ بعد</option>
-                        </select>
-                      </Field>
-                      <Field label="Record ID" id={`${id}-rec`}>
-                        <input id={`${id}-rec`} style={inputS} value={s.rec || ''}
-                               onChange={(e) => setField(id, 'rec', e.target.value)} />
-                      </Field>
-                    </div>
-
-                    <Field label="ملاحظة / سطر اللوج" id={`${id}-notes`}>
-                      <textarea id={`${id}-notes`} style={inputS} rows={2}
-                                value={s.notes || ''} onChange={(e) => setField(id, 'notes', e.target.value)} />
-                    </Field>
-
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {VERDICTS.map(([k, label, color]) => {
-                        const on = s.verdict === k
-                        return (
-                          <button
-                            key={k} type="button" aria-pressed={on}
-                            onClick={() => setField(id, 'verdict', on ? '' : k)}
-                            style={{
-                              ...btnGhost, flex: 1, minWidth: 90,
-                              background: on ? color : T.cardBg,
-                              color: on ? '#fff' : T.textSecond,
-                              borderColor: on ? color : T.border,
-                              fontWeight: on ? 700 : 400,
-                            }}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      ))}
-
-      <div style={{ ...card, marginTop: 24 }}>
-        <button type="button" onClick={generate} style={btnPrimary}>ولّد التقرير</button>
-        <textarea
-          readOnly value={report}
-          placeholder="اضغط «ولّد التقرير» وانسخ النص لأبو حسين."
-          style={{ ...inputS, marginTop: 12, minHeight: 200, fontFamily: 'monospace',
-                   fontSize: 12, direction: 'ltr', textAlign: 'left' }}
-        />
-      </div>
+      </details>
     </div>
   )
 }
 
-function Field({ label, id, children }) {
+function TestForm({ form, setForm, onSave, onCancel }) {
+  const valid = form.title.trim() && toLines(form.steps).length > 0
   return (
-    <div>
-      <label htmlFor={id} style={{ display: 'block', fontSize: 12, color: T.textSecond, marginBottom: 4 }}>
-        {label}
-      </label>
-      {children}
+    <div className="llt-card llt-pad llt-form">
+      <div className="llt-form-title">{form.id ? 'تعديل الاختبار' : 'اختبار جديد'}</div>
+      <label className="llt-label" htmlFor="llt-f-title">العنوان</label>
+      <input id="llt-f-title" className="llt-input" value={form.title}
+             onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="مثلاً: موعد بلا حلاق" />
+      <label className="llt-label" htmlFor="llt-f-steps">الخطوات</label>
+      <p className="llt-small">كل رسالة بسطر. السطر اللي بيبلّش بـ«اضغط» يعني زر بواتساب (مثلاً: اضغط ❌).</p>
+      <textarea id="llt-f-steps" className="llt-input" rows={4} value={form.steps}
+                onChange={(e) => setForm({ ...form, steps: e.target.value })}
+                placeholder={'سجل موعد لعلي بكرا الساعة 2\nاضغط ❌'} />
+      <label className="llt-label" htmlFor="llt-f-exp">شو لازم يصير</label>
+      <textarea id="llt-f-exp" className="llt-input" rows={2} value={form.expected}
+                onChange={(e) => setForm({ ...form, expected: e.target.value })} />
+      <div className="llt-toolbar">
+        <button type="button" className="llt-btn llt-btn-dark" onClick={onSave} disabled={!valid}>حفظ</button>
+        <button type="button" className="llt-btn llt-btn-quiet" onClick={onCancel}>إلغاء</button>
+      </div>
     </div>
   )
 }
 
-const card = {
-  background: T.cardBg,
-  border: `1px solid ${T.border}`,
-  borderRadius: 12,
-  boxShadow: T.shadow,
-  padding: 16,
-  marginBottom: 12,
+// Scoped under `.llt` — nothing here reaches another tab or tenant. The page paints every one of
+// its own surfaces (never inherits the dashboard's background or text colour), so it reads the
+// same whether the surrounding dashboard is light or dark.
+const CSS = `
+.llt {
+  --ink: #0C1A15; --ink-2: #16302A; --ink-text: #EAF3EE; --ink-muted: #9FB8AC;
+  --paper: #EFEBE1; --card: #FFFDF8; --line: rgba(12,26,21,0.12);
+  --text: #15211C; --muted: #5E6C65;
+  --wa: #25D366; --wa-press: #1DB954; --wa-ink: #05361D; --bubble: #DCF8C6;
+  --ok: #17754A; --ok-soft: #DDF2E6; --off: #B4441B; --off-soft: #FBE7DC;
+  --none: #6A7872; --none-soft: #E6E2D7;
+  color-scheme: light;
+  font-family: ${FONT}; color: var(--text); background: var(--paper);
+  border-radius: 20px; padding: 12px; max-width: 760px; margin: 0 auto;
+  box-sizing: border-box; min-width: 0; overflow-wrap: anywhere;
 }
-
-const rowBtn = {
-  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-  background: 'none', border: 0, padding: 14, cursor: 'pointer',
-  font: 'inherit', color: 'inherit',
+.llt *, .llt *::before, .llt *::after { box-sizing: border-box; }
+.llt-hero {
+  background: radial-gradient(120% 90% at 100% 0%, #1E4A3B 0%, var(--ink) 60%);
+  color: var(--ink-text); border-radius: 16px; padding: 20px 18px;
 }
-
-const inputS = {
-  width: '100%', boxSizing: 'border-box', background: T.pageBg,
-  border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px',
-  font: 'inherit', fontSize: 14, color: T.textPrimary,
+.llt-eyebrow { margin: 0 0 6px; font: 700 11px 'Space Mono', monospace; letter-spacing: .14em; color: var(--ink-muted); direction: ltr; text-align: right; }
+.llt-h1 { margin: 0; font-size: 24px; font-weight: 900; line-height: 1.3; }
+.llt-sub { margin: 6px 0 0; font-size: 14px; line-height: 1.8; color: var(--ink-muted); }
+.llt-wa-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,0.07); font-size: 13px; }
+.llt-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-muted); flex: none; }
+.llt-wa-status[data-state="ready"] .llt-dot { background: var(--wa); box-shadow: 0 0 0 4px rgba(37,211,102,0.2); }
+.llt-wa-status[data-state="off"] .llt-dot { background: #F59E0B; }
+.llt-num { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--ink-text); }
+.llt-tally { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 16px; }
+.llt-tally-item { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 8px; text-align: center; }
+.llt-tally-item b { display: block; font-size: 22px; font-weight: 900; line-height: 1.1; }
+.llt-tally-item span { font-size: 11px; color: var(--ink-muted); }
+.llt-tally-item[data-s="ok"] b { color: #6EE7A8; }
+.llt-tally-item[data-s="off"] b { color: #FDBA8C; }
+.llt-disclaimer { margin: 12px 4px; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.llt-warn { color: var(--off); font-size: 12px; }
+.llt-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.llt-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 18px; border-radius: 12px; border: 1px solid transparent; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform .12s ease, background-color .15s ease; -webkit-tap-highlight-color: transparent; }
+.llt-btn:active { transform: scale(0.98); }
+.llt-btn:disabled { opacity: .5; cursor: default; }
+.llt-btn:focus-visible, .llt-seg-btn:focus-visible, .llt-link:focus-visible, .llt-test-head:focus-visible { outline: 3px solid #3B82F6; outline-offset: 2px; }
+.llt-btn-dark { background: var(--ink); color: var(--ink-text); flex: 1 1 auto; }
+.llt-btn-quiet { background: var(--card); color: var(--text); border-color: var(--line); }
+.llt-btn-wa { background: var(--wa); color: var(--wa-ink); width: 100%; min-height: 52px; font-size: 16px; font-weight: 900; box-shadow: 0 6px 16px -8px rgba(29,185,84,0.8); }
+.llt-btn-wa:hover { background: var(--wa-press); }
+.llt-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 10px; }
+.llt-pad { padding: 16px; }
+.llt-list { list-style: none; margin: 0; padding: 0; }
+.llt-test { overflow: hidden; }
+.llt-test-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; background: none; border: 0; font: inherit; color: inherit; text-align: start; cursor: pointer; }
+.llt-idx { font: 700 12px 'Space Mono', monospace; color: var(--muted); flex: none; }
+.llt-test-title { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; line-height: 1.5; }
+.llt-meta { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.llt-badge { flex: none; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--none-soft); color: var(--none); max-width: 42%; text-align: center; line-height: 1.5; }
+.llt-badge[data-s="ok"] { background: var(--ok-soft); color: var(--ok); }
+.llt-badge[data-s="off"] { background: var(--off-soft); color: var(--off); }
+.llt-body { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+.llt-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 12px; }
+.llt-step { display: flex; gap: 10px; align-items: flex-start; }
+.llt-step-n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--ink-text); font: 700 12px 'Space Mono', monospace; display: grid; place-items: center; margin-top: 6px; }
+.llt-send { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.llt-bubble { background: var(--bubble); color: #0B2415; border-radius: 14px 4px 14px 14px; padding: 10px 14px; font-size: 15px; line-height: 1.7; }
+.llt-tap { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 10px 14px; font-size: 14px; color: var(--muted); background: rgba(12,26,21,0.02); }
+.llt-chip { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 14px; font-weight: 700; color: var(--text); font-size: 14px; }
+.llt-expected { margin-top: 14px; background: #F5F1E6; border-radius: 12px; padding: 10px 14px; }
+.llt-expected p { margin: 2px 0 0; font-size: 14px; line-height: 1.8; }
+.llt-label { display: block; margin: 14px 0 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.llt-expected .llt-label { margin: 0; }
+.llt-seg { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+.llt-seg-btn { min-height: 48px; padding: 6px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; line-height: 1.35; }
+.llt-seg-btn[aria-checked="true"][data-s="none"] { background: var(--none); border-color: var(--none); color: #fff; }
+.llt-seg-btn[aria-checked="true"][data-s="ok"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.llt-seg-btn[aria-checked="true"][data-s="off"] { background: var(--off); border-color: var(--off); color: #fff; }
+.llt-input { width: 100%; margin-top: 8px; background: #FBF9F3; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--text); resize: vertical; }
+.llt-input:focus { outline: 2px solid var(--ink-2); outline-offset: 0; }
+.llt-mono { font-family: 'Space Mono', monospace; font-size: 12px; }
+.llt-row-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 8px; }
+.llt-link { background: none; border: 0; font: inherit; font-size: 13px; color: var(--muted); padding: 10px 12px; min-height: 40px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.llt-link-danger { color: var(--off); }
+.llt-hidden-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+.llt-small { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.llt-form-title { font-size: 17px; font-weight: 900; }
+.llt-form .llt-label { margin-top: 12px; }
+.llt-form .llt-toolbar { margin: 14px 0 0; }
+.llt-evidence summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 32px; }
+.llt-evidence .llt-meta { display: inline; margin-right: 6px; }
+.llt-evidence .llt-btn { margin-top: 10px; }
+.llt-ev-row { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.llt-ev-row span { color: var(--muted); }
+@media (min-width: 640px) {
+  .llt { padding: 20px; }
+  .llt-hero { padding: 28px; }
+  .llt-h1 { font-size: 30px; }
+  .llt-btn-wa { width: auto; justify-self: start; padding: 0 28px; }
 }
-
-const two = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }
-
-const btnPrimary = {
-  background: T.textPrimary, color: '#fff', border: 0, borderRadius: 8,
-  padding: '10px 18px', font: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-}
-
-const btnGhost = {
-  background: T.cardBg, color: T.textSecond, border: `1px solid ${T.border}`,
-  borderRadius: 8, padding: '6px 12px', font: 'inherit', fontSize: 13, cursor: 'pointer',
-}
+@media (prefers-reduced-motion: reduce) { .llt-btn { transition: none; } .llt-btn:active { transform: none; } }
+`

@@ -52,6 +52,9 @@ pressed straight from the phone, and it should be **easy to use for rk or any te
   real, so rk is a USER, not a test target — it runs the same build and gets every update with each deploy. The
   page keeps its barberlab-test restriction for running tests; opening it to other tenants is not needed now.
 
+- **D-2 (Salman, 2026-09-19): (أ)** — written tests live on the device (`localStorage`) + a copy/export button.
+- **Design (Salman):** built by the frontend agent, a considered design — «ما بدي لون أبيض بس».
+
 ## Out of scope
 Any Lia behaviour change · a new backend route · Step 3 (account↔barber links, Ali's phone) · R2/R3/R4.
 
