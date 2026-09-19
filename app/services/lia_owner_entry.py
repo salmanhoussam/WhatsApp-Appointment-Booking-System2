@@ -610,6 +610,8 @@ _WELCOME_END   = "<!--LIA_WELCOME_END-->"
 # T4: the reservation block, a FOURTH model-facing block. Separate for the same reason the
 # product one is: a different question, different required fields, and its own pinned intent.
 _RESERVATION_START = "<!--LIA_RESERVATION_PROMPT_START-->"
+_RES_EDIT_START = "<!--LIA_RESERVATION_EDIT_PROMPT_START-->"
+_RES_EDIT_END   = "<!--LIA_RESERVATION_EDIT_PROMPT_END-->"
 _RESERVATION_END   = "<!--LIA_RESERVATION_PROMPT_END-->"
 _EDIT_START = "<!--LIA_EDIT_PROMPT_START-->"
 _EDIT_END   = "<!--LIA_EDIT_PROMPT_END-->"
@@ -652,7 +654,13 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # shown in another". `service_expired` is the old inline literal, moved here
                      # unchanged so every expiry text lives under the drift rule.
                      "reservation_cancelled", "reservation_expired",
-                     "product_cancelled", "product_expired", "service_expired")
+                     "product_cancelled", "product_expired", "service_expired",
+                     # 2026-09-19. Marks a barber or service the SERVER filled in, so the owner
+                     # sees in the preview what he did not say.
+                     "auto_label",
+                     # The service edit text names a price and a duration -- wrong on an
+                     # appointment preview (the 6th "text for one context shown in another").
+                     "reservation_edit_unclear")
 
 
 def _load_prompt() -> str:
@@ -743,6 +751,7 @@ _PRODUCT_PROMPT = _load_block(_PRODUCT_PROMPT_START, _PRODUCT_PROMPT_END, "produ
 _WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
 _EDIT_PROMPT = _load_block(_EDIT_START, _EDIT_END, "edit prompt")
 _RESERVATION_PROMPT = _load_block(_RESERVATION_START, _RESERVATION_END, "reservation prompt")
+_RESERVATION_EDIT_PROMPT = _load_block(_RES_EDIT_START, _RES_EDIT_END, "reservation edit prompt")
 _REPLIES = _load_replies()
 
 
@@ -798,6 +807,69 @@ async def _extract_reservation(text: str) -> Optional["object"]:
     now = datetime.now()
     prompt = _RESERVATION_PROMPT.format(now=f"{now:%Y-%m-%d %H:%M} ({fmt_reserved_at(now)})")
     return await _ask_model(prompt, text, LiaReservationExtraction)
+
+
+async def _extract_reservation_edit(draft_data: dict, instruction: str) -> Optional["object"]:
+    """One edit instruction against a RESERVATION draft -> a LiaReservationEditPatch, None, or
+    _UNAVAILABLE. 2026-09-19.
+
+    The service edit reader knows name/price/duration only, so «خلّيه مع زياد» on an appointment
+    preview was «ما فهمت». Needed the moment the server started filling the barber and service in
+    by default: a default the owner cannot correct is a guess he has to cancel to escape.
+
+    The model sees the draft's five fields and the current time (a «خليها الساعة 5» keeps the
+    draft's date), and returns only what changed. The same transport as every other extraction.
+    """
+    from app.schemas.lia_drafts import LiaReservationEditPatch
+    from app.services.whatsapp_notifications import fmt_reserved_at
+    now = datetime.now()
+    prompt = _RESERVATION_EDIT_PROMPT.format(now=f"{now:%Y-%m-%d %H:%M} ({fmt_reserved_at(now)})")
+    visible = {k: draft_data.get(k) for k in _RESERVATION_FIELDS
+               if draft_data.get(k) not in (None, "")}
+    payload = ("المسوّدة الحالية:\n" + json.dumps(visible, ensure_ascii=False)
+               + "\n\nتعليمة المالك:\n" + (instruction or "").strip())
+    return await _ask_model(prompt, payload, LiaReservationEditPatch)
+
+
+_RESERVATION_FIELDS = ("customer_name", "customer_phone", "reserved_at", "service_name",
+                       "barber_name")
+
+# Salman, 2026-09-19: «إذا الخدمة مش موجودة يحطها افتراضياً شعر ودقن». Matched FOLDED against this
+# shop's real services; a shop without it gets the question, exactly as before.
+_DEFAULT_SERVICE_NAME = "شعر ودقن"
+
+
+async def _apply_reservation_defaults(draft: dict) -> None:
+    """Fill a missing service and barber the way Salman decided, ONCE per draft. 2026-09-19.
+
+    Supersedes R-6 («an unnamed barber is a question, never a choice») by Salman's own decision:
+      * service missing -> «شعر ودقن» if this shop has it;
+      * barber missing  -> the barber row linked to the account TALKING (`User.barberId`, read
+        when the draft opened) if it is active here. No link, no default -- never a name match.
+    Anything filled here is listed in `draft["defaulted"]` so the preview marks it «(تلقائي)», and
+    every one of them can be changed by a sentence at the preview before ✅.
+
+    ONCE, deliberately: `_resolve_reservation_rows` drops a name it cannot resolve and asks, and a
+    second pass here would put the same default straight back -- a loop the owner cannot leave.
+    """
+    if draft.get("defaults_applied"):
+        return
+    draft["defaults_applied"] = True
+    data, auto = draft["data"], set(draft.get("defaulted") or [])
+    if not data.get("service_name"):
+        wanted = _fold_ar(_DEFAULT_SERVICE_NAME)
+        svc = next((s for s in await _list_services(draft["client_id"])
+                    if _fold_ar(getattr(s, "nameAr", "") or "") == wanted), None)
+        if svc is not None:
+            data["service_name"] = svc.nameAr
+            auto.add("service_name")
+    if not data.get("barber_name") and draft.get("actor_barber_id"):
+        brb = next((b for b in await _list_barbers(draft["client_id"])
+                    if str(getattr(b, "id", "")) == str(draft["actor_barber_id"])), None)
+        if brb is not None:
+            data["barber_name"] = brb.name
+            auto.add("barber_name")
+    draft["defaulted"] = sorted(auto)
 
 
 async def _list_barbers(client_id: str) -> list:
@@ -1203,6 +1275,26 @@ def _parse_field_answer(field: str, text: str):
     return int(number) if field == "duration_min" else number
 
 
+def _normalise_reservation_changes(changes: dict) -> dict:
+    """Server-side checks on a reservation edit before it touches the draft. 2026-09-19."""
+    out = {}
+    for field, value in changes.items():
+        if field == "customer_phone":
+            parsed = _parse_field_answer("customer_phone", str(value))
+            if parsed:
+                out[field] = parsed
+        elif field == "reserved_at":
+            try:
+                out[field] = datetime.fromisoformat(str(value)).replace(tzinfo=None).isoformat()
+            except ValueError:
+                pass
+        elif field in _RESERVATION_FIELDS:
+            cleaned = " ".join(str(value).split())
+            if cleaned:
+                out[field] = cleaned
+    return out
+
+
 async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> bool:
     """Turn the two NAMES the model returned into the two real ids the write needs. T4.
 
@@ -1319,10 +1411,13 @@ def _reservation_preview_text(draft: dict) -> str:
             when = datetime.fromisoformat(when)
         except ValueError:
             pass
+    auto = set(draft.get("defaulted") or [])
+    mark = lambda field: (f"{data.get(field)} {_REPLIES['auto_label']}" if field in auto
+                          else data.get(field))
     text = _REPLIES["reservation_preview"].format(
         customer=data.get("customer_name"), phone=phone_shown,
         when=fmt_reserved_at(when) if isinstance(when, datetime) else when,
-        service=data.get("service_name"), barber=data.get("barber_name"))
+        service=mark("service_name"), barber=mark("barber_name"))
     if isinstance(when, datetime) and _is_past(when):
         text += "\n" + _REPLIES["reservation_preview_past"]
     return text
@@ -1898,17 +1993,28 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # LIA_AWAITING_CONFIRM. There is no path here that writes, and none that applies a change
         # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
         if msg_type == "text" and (value or "").strip():
-            patch = await _extract_edit(draft.get("data") or {}, value)
+            is_res_draft = _draft_operation(draft) == "create_reservation"
+            patch = await (_extract_reservation_edit(draft.get("data") or {}, value) if is_res_draft
+                           else _extract_edit(draft.get("data") or {}, value))
             if patch is _UNAVAILABLE:
                 # Ours, not his -- and the draft is untouched, so the two working actions are
                 # offered instead of sending him to the dashboard.
                 await wa.send_text(sender_phone, _REPLIES["edit_unavailable"])
                 return session
             changes = patch.changes.applied() if patch is not None else {}
-            if patch is None or patch.confidence == "low" or not changes:
+            if is_res_draft and changes:
+                # The SERVER normalises what the model read, exactly as it does for an answered
+                # field: a phone through the one phone normaliser (WALK_IN words included), a time
+                # parsed to prove it is a date. Anything that does not survive is not applied.
+                changes = _normalise_reservation_changes(changes)
+            # R1's rule, applied to edits: for a reservation the server judges the change, so a
+            # `low` grade with a readable change is not a refusal. Service/product keep the gate.
+            unclear_edit = (patch is None or not changes
+                            or (patch.confidence == "low" and not is_res_draft))
+            if unclear_edit:
                 logger.info("🤷 Lia: edit not understood for %s — asking, draft kept intact",
                             sender_phone)
-                await wa.send_text(sender_phone, _REPLIES["edit_unclear"])
+                await wa.send_text(sender_phone, _REPLIES["reservation_edit_unclear" if is_res_draft else "edit_unclear"])
                 return session
 
             # MERGED ON A COPY. A patch that passes its own validation can still be refused by
@@ -1928,10 +2034,12 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             except Exception as exc:
                 logger.info("🚫 Lia: edit %s rejected by the draft contract (%s) — old draft kept",
                             list(changes), type(exc).__name__)
-                await wa.send_text(sender_phone, _REPLIES["edit_unclear"])
+                await wa.send_text(sender_phone, _REPLIES["reservation_edit_unclear" if is_res_draft else "edit_unclear"])
                 return session
 
             draft["data"] = merged
+            # A value the owner has now SAID is no longer an automatic one.
+            draft["defaulted"] = [f for f in (draft.get("defaulted") or []) if f not in changes]
             logger.info("✏️  Lia: draft edited for %s — fields=%s", sender_phone, list(changes))
             await _advance(wa, sender_phone, session, draft)
             return session
@@ -2277,6 +2385,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         "client_id":     client_id,
         "actor":         actor,
         "actor_id":      actor_id,
+        # 2026-09-19: the TALKING account's own barber row, for the default barber. Read from the
+        # user row already resolved above -- no second lookup, and never matched by name.
+        "actor_barber_id": getattr(user, "barberId", None),
         "category_id":   category_id,
         "category_name": category_name,
         "started_at":    datetime.now(timezone.utc).isoformat(),
@@ -2305,6 +2416,9 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     written into this loop, so a product is never asked how long it takes.
     """
     required, questions, draft_cls = _op_spec(_draft_operation(draft))
+
+    if _draft_operation(draft) == "create_reservation":
+        await _apply_reservation_defaults(draft)
 
     for field in required:
         if draft["data"].get(field) in (None, "", []):

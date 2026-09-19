@@ -372,3 +372,40 @@ class LiaReservationExtraction(BaseModel):
     confidence: Literal["high", "medium", "low"]
     data:       dict = Field(default_factory=dict)
     unresolved: list[str] = Field(default_factory=list)
+
+
+class LiaReservationChanges(BaseModel):
+    """The PARTIAL set of reservation fields one edit instruction asked to change. 2026-09-19.
+
+    Same safety property as `LiaDraftChanges`: every field is optional, so "he did not mention the
+    barber" is an ABSENT field, never a re-emitted value. No ids, no price, no duration -- the
+    server re-resolves names to this shop's real rows and validates the whole draft again.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    customer_name:  Optional[str] = Field(default=None, max_length=120)
+    customer_phone: Optional[str] = Field(default=None, max_length=32)
+    reserved_at:    Optional[str] = Field(default=None, max_length=40)
+    service_name:   Optional[str] = Field(default=None, max_length=200)
+    barber_name:    Optional[str] = Field(default=None, max_length=120)
+
+    def applied(self) -> dict:
+        """Only the fields that were actually set, ready to merge onto a draft."""
+        return {k: v for k, v in self.model_dump().items() if v not in (None, "")}
+
+
+class LiaReservationEditPatch(BaseModel):
+    """One edit instruction against a RESERVATION draft already on the owner's screen. 2026-09-19.
+
+    A class of its own rather than a widened `LiaEditPatch`, for the reason `LiaIntent` records:
+    the operation is known before the model is called, and the service edit contract has no
+    reservation fields to put «خلّيه مع زياد» into.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    intent:     Literal["edit_reservation"]
+    confidence: Literal["high", "medium", "low"]
+    changes:    LiaReservationChanges = Field(default_factory=LiaReservationChanges)
+    unresolved: list[str] = Field(default_factory=list)

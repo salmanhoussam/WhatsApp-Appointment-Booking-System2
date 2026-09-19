@@ -129,27 +129,33 @@ def extraction(confidence="high", **data):
 
 
 class Env:
-    def __init__(self, extract=None, raises=None, barbers=None, services=None):
-        self.extract, self.raises = extract, raises
+    def __init__(self, extract=None, raises=None, barbers=None, services=None, users=None,
+                 edit=None):
+        self.extract, self.raises, self.edit = extract, raises, edit
+        self.users = users
         self.barbers = BARBERS if barbers is None else barbers
         self.services = SERVICES if services is None else services
         self.calls = []
 
     async def __aenter__(self):
         self._orig = (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
-                      reservation_service.create_reservation, lia._extract_reservation)
-        self._restore_auth = install(users=[OWNER_BL])
+                      reservation_service.create_reservation, lia._extract_reservation,
+                      lia._extract_reservation_edit)
+        self._restore_auth = install(users=self.users or [OWNER_BL])
         barber_repo.list_barbers = lambda *a, **kw: _done(list(self.barbers))
         catalog_service_repo.list_catalog_services = lambda *a, **kw: _done(list(self.services))
         reservation_service.create_reservation = self._create
         if self.extract is not None:
             lia._extract_reservation = lambda text: _done(self.extract(text))
+        if self.edit is not None:
+            lia._extract_reservation_edit = lambda data, text: _done(self.edit(data, text))
         return self
 
     async def __aexit__(self, *exc):
         self._restore_auth()
         (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
-         reservation_service.create_reservation, lia._extract_reservation) = self._orig
+         reservation_service.create_reservation, lia._extract_reservation,
+         lia._extract_reservation_edit) = self._orig
         return False
 
     async def _create(self, **kw):
@@ -499,6 +505,101 @@ async def main():
           not any(_u.category(c) == "So" or ord(c) > 0x1F000
                   for k in ("reservation_cancelled", "reservation_expired",
                             "product_cancelled", "product_expired") for c in lia._REPLIES[k]))
+
+    # ── 10 · defaults, marked, and correctable at the preview (Salman, 2026-09-19) ──
+    print("\n── 10. default service «شعر ودقن» + the talking account's barber, then edit ──")
+    from test_lia_foundation import FakeUser
+    from app.schemas.lia_drafts import LiaReservationEditPatch
+    OWNER_HUSSEIN = FakeUser("u-bl", BL)
+    OWNER_HUSSEIN.barberId = "brb-2"                           # linked to the barber «حسين»
+    WITH_DEFAULT = SERVICES + [Row(id="svc-3", nameAr="شعر ودقن", durationMin=30)]
+    bare = lambda t: extraction(customer_name="عادل", customer_phone="70123321",
+                                reserved_at=PAST.isoformat())
+    edit_to = lambda conf, **ch: (lambda data, text: LiaReservationEditPatch.model_validate(
+        {"intent": "edit_reservation", "confidence": conf, "changes": ch}))
+
+    async with Env(extract=bare, services=WITH_DEFAULT, users=[OWNER_HUSSEIN],
+                   edit=edit_to("high", barber_name="جعفر")) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4")
+        check("no service, no barber, a LINKED account → straight to the preview, nothing asked",
+              out.state == lia.LIA_AWAITING_CONFIRM, str(out.state))
+        auto = lia._REPLIES["auto_label"]
+        check(f"   the service is «شعر ودقن {auto}»", f"شعر ودقن {auto}" in wa.joined(), wa.joined()[:160])
+        check(f"   the barber is the talking account's own — «حسين {auto}»",
+              f"حسين {auto}" in wa.joined())
+        check("   nothing written yet", len(env.calls) == 0)
+
+        wa2, out2 = await send(roundtrip(out), "لا خليه مع جعفر")
+        check("an EDIT at the preview changes the barber — «جعفر», re-previewed",
+              out2.state == lia.LIA_AWAITING_CONFIRM and "جعفر" in wa2.joined(), wa2.joined()[:160])
+        check(f"   and the barber is no longer marked {auto}; the service still is",
+              f"جعفر {auto}" not in wa2.joined() and f"شعر ودقن {auto}" in wa2.joined())
+        wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        kw = env.calls[0] if env.calls else {}
+        check("✅ writes ONE reservation with the EDITED barber and the default service",
+              len(env.calls) == 1 and kw.get("metadata") == {"barber_id": "brb-1",
+                                                             "service_id": "svc-3"},
+              str(kw.get("metadata")))
+
+    async with Env(extract=bare, services=WITH_DEFAULT) as env:        # OWNER_BL: no barber link
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4")
+        check("an account with NO barber link → the barber is ASKED, never guessed by name",
+              lia._REPLIES["reservation_ask_barber"] in wa.joined(), wa.joined()[:90])
+        check("   while the service default still applies",
+              lia._load_draft(out)["data"].get("service_name") == "شعر ودقن")
+
+    async with Env(extract=bare, users=[OWNER_HUSSEIN]) as env:        # shop has no «شعر ودقن»
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4")
+        check("a shop WITHOUT «شعر ودقن» → the service is asked, as before",
+              lia._REPLIES["reservation_ask_service"] in wa.joined(), wa.joined()[:90])
+
+    full = lambda t: extraction(customer_name="عادل", customer_phone="70123321",
+                                reserved_at=PAST.isoformat(), service_name="قص شعر",
+                                barber_name="جعفر")
+    async with Env(extract=full, edit=edit_to("low", barber_name="حسين")) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح 4 قص شعر مع جعفر")
+        wa2, out2 = await send(roundtrip(out), "مع حسين")
+        check("R1 for edits: a readable change graded `low` is still APPLIED",
+              "حسين" in wa2.joined() and out2.state == lia.LIA_AWAITING_CONFIRM, wa2.joined()[:120])
+
+    async with Env(extract=full, edit=edit_to("high", barber_name="زياد")) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح 4 قص شعر مع جعفر")
+        wa2, out2 = await send(roundtrip(out), "خليه مع زياد")
+        check("an edit naming a barber this shop does not have → the question WITH the real list",
+              "جعفر" in wa2.joined() and "حسين" in wa2.joined()
+              and out2.state == lia.LIA_AWAITING_FIELD, wa2.joined()[:120])
+        check("   and nothing written", len(env.calls) == 0)
+
+    later = PAST.replace(hour=17).isoformat()
+    async with Env(extract=full, edit=edit_to("high", reserved_at=later)) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح 4 قص شعر مع جعفر")
+        wa2, out2 = await send(roundtrip(out), "خليها الساعة 5")
+        check("an edit of the TIME moves the appointment — 17:00 in the new preview",
+              "17:00" in wa2.joined(), wa2.joined()[:140])
+
+    async with Env(extract=full, edit=lambda d, t: LiaReservationEditPatch.model_validate(
+            {"intent": "edit_reservation", "confidence": "low", "changes": {}})) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح 4 قص شعر مع جعفر")
+        wa2, out2 = await send(roundtrip(out), "خليها أحسن")
+        check("an edit with NO readable change → «ما فهمت شو بدك تعدّل…», the draft kept",
+              lia._REPLIES["reservation_edit_unclear"] in wa2.joined()
+              and out2.state == lia.LIA_AWAITING_CONFIRM, wa2.joined()[:90])
+
+    # Asserted on the PARSED function, not on text: a comment mentioning a name lookup would pass
+    # a grep. `ast.unparse` drops comments and docstrings are skipped, so only real code counts.
+    import ast, inspect, textwrap
+    fn = ast.parse(textwrap.dedent(inspect.getsource(lia._apply_reservation_defaults))).body[0]
+    fn.body = [n for n in fn.body if not (isinstance(n, ast.Expr)
+                                           and isinstance(getattr(n, "value", None), ast.Constant))]
+    code = ast.unparse(fn)
+    check("the default barber comes from the account's LINK — the code reads actor_barber_id and "
+          "never matches a barber by name",
+          "actor_barber_id" in code and "getattr(b, 'id'" in code
+          and "_match_by_name" not in code and "b.name ==" not in code
+          and "getattr(b, 'name'" not in code, code[:0])
+    check("an unreadable edit on an APPOINTMENT says so in appointment words, not price/duration",
+          lia._REPLIES["reservation_edit_unclear"] in wa2.joined()
+          and "السعر" not in wa2.joined(), wa2.joined()[:90])
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",
