@@ -239,7 +239,10 @@ async def main():
         check("   and the same wall-clock date the owner meant",
               (kw["reserved_at"].year, kw["reserved_at"].month, kw["reserved_at"].day)
               == (PAST.year, PAST.month, PAST.day))
-        check("the owner is told it is recorded", "أحمد" in wa2.joined(), wa2.joined())
+        # TRANSITION (2026-09-19, Salman): the text is now exactly «تم تسجيل الموعد بنجاح.» —
+        # it WAS «تمام، سجّلت موعد {customer} — {when} مع {barber}.», so this asserted «أحمد».
+        check("the owner is told it is recorded — «تم تسجيل الموعد بنجاح.»",
+              "تم تسجيل الموعد بنجاح." in wa2.joined(), wa2.joined())
         check("   and the draft is consumed, so a second tap writes nothing",
               lia._load_draft(out2) is None and out2.state == "IDLE")
         wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
@@ -403,8 +406,21 @@ async def main():
         check("   the conversation continues to the preview — no second model call decides",
               out2.state == lia.LIA_AWAITING_CONFIRM, str(out2.state))
         check("   🔴 still nothing written before ✅", len(env.calls) == 0)
-        wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        audits = []
+        orig_audit = lia.log_security_event
+        lia.log_security_event = lambda **kw: (audits.append(kw), _done(None))[1]
+        try:
+            wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        finally:
+            lia.log_security_event = orig_audit
         check("   ✅ is the only door: ONE reservation, after the owner's tap", len(env.calls) == 1)
+        check("   the owner is told exactly «تم تسجيل الموعد بنجاح.» (Salman's text, 2026-09-19)",
+              "تم تسجيل الموعد بنجاح." in wa3.joined(), wa3.joined()[:80])
+        written = [a for a in audits if a.get("event_type") == "lia_owner_create_reservation"]
+        check("   the audit records the service's duration — the row's 30, not None"
+              "  [TRANSITION: was None]",
+              written and written[0]["detail"].get("duration_min") == env.calls[0].get("duration_min") == 30,
+              str(written[0]["detail"].get("duration_min") if written else "no audit"))
 
     r0_1 = lambda t: extraction(confidence="low", customer_name="أحمد",
                                 reserved_at=PAST.isoformat(), service_name="قص شعر")

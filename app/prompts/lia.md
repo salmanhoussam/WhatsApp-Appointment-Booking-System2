@@ -383,7 +383,7 @@ Lia — قواعدها التشغيلية. هذا الملفّ prompt، لا و�
 سجّله هلق؟
 
 [[reservation_created]]
-تمام، سجّلت موعد {customer} — {when} مع {barber}.
+تم تسجيل الموعد بنجاح.
 
 [[reservation_conflict]]
 {barber} عنده موعد تاني بنفس الوقت. غيّر الساعة أو الحلاق.

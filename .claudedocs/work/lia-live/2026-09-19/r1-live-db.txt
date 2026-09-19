@@ -1,0 +1,40 @@
+sealed 275 write methods · seal proven by a real attempt
+window: since 2026-09-19T14:45:00+00:00 (UTC)   ·   target: barberlab-test
+
+── RESERVATIONS created in the window ──────────────────────────────────
+   1 row(s)
+   · id=86efa834-76a7-4a89-8400-e948b34010d9
+     customer='أحمد' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-18 16:00:00+00:00  duration=20  status=pending
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=7638e48b-5390-4829-8258-581662d7ca7f
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'service_id': '7638e48b-5390-4829-8258-581662d7ca7f'}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+
+── CUSTOMERS created in the window  (the walk-in merge is measured here) 
+   1 row(s)
+   · id=dade1bdd-9091-4f44-b4ca-87fef91014e4  phone='WALK_IN'  name='أحمد'
+   🟡 WALK_IN row dade1bdd-9091-4f44-b4ca-87fef91014e4 name='أحمد' — 1 reservation(s) point at it
+   ⇒ record as 'Confirmed behavior / Product risk', never PASS
+
+── CATALOG rows created in the window ──────────────────────────────────
+   CatalogItem (product): 0
+   CatalogService (bookable): 0
+
+── DUPLICATE CHECK — the whole active catalogue, folded (D1's own question) 
+   active items: 10   ·   duplicate names: 1
+   🔴 'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=['5', '5']
+
+── AUDIT TRAIL — every Lia decision in the window, refusals included ───
+   2 row(s)
+   · 14:52:36  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'intent': 'create_reservation', 'operation': 'create_reservation', 'confidence': 'low', 'unresolved': ['customer_phone'], 'sender_phone': '96178727986'}
+   · 14:53:46  lia_owner_create_reservation tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'price': None, 'row_id': '86efa834-76a7-4a89-8400-e948b34010d9', 'source': 'whatsapp_text', 'name_ar': None, 'operation': 'create_reservation', 'historical': True, 'permission': 'reservations.write', 'reserved_at': '2026-09-18T16:00:00', 'service_key': 'reservations', 'duration_min': None, 'sender_phone': '96178727986'}
+
+── NEGATIVE BOUNDARY — the deployment reaches these, the test does not ─
+   ✅ rk: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ✅ mr-h: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ⚠️  zero rows is NECESSARY, not SUFFICIENT — pair it with a refusal in the audit
+
+── what left this process ──────────────────────────────────────────────
+   production writes attempted: 0  
+   WhatsApp sends: 0 — this script has no send boundary at all

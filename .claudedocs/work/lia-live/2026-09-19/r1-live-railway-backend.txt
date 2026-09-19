@@ -1,0 +1,18 @@
+14:52:38 INFO httpx2: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:52:38 INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJFNjFBRkREM0FBM0FFNTc1OTUA)
+14:52:39 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJFNjFBRkREM0FBM0FFNTc1OTUA status=delivered recipient=96178727986 ts=1789829558
+14:52:39 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJFNjFBRkREM0FBM0FFNTc1OTUA status=sent recipient=96178727986 ts=1789829558
+14:52:39 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJFNjFBRkREM0FBM0FFNTc1OTUA status=read recipient=96178727986 ts=1789829558
+14:53:09 INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJGMTY1RURFNTlDMUUyMEE4MzYA)
+14:53:09 INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzNkE5NjBEQTcxMTJEODJDNUQA)
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJGMTY1RURFNTlDMUUyMEE4MzYA status=sent recipient=96178727986 ts=1789829580
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzNkE5NjBEQTcxMTJEODJDNUQA status=sent recipient=96178727986 ts=1789829581
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJGMTY1RURFNTlDMUUyMEE4MzYA status=delivered recipient=96178727986 ts=1789829580
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBJGMTY1RURFNTlDMUUyMEE4MzYA status=read recipient=96178727986 ts=1789829580
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzNkE5NjBEQTcxMTJEODJDNUQA status=delivered recipient=96178727986 ts=1789829581
+14:53:09 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBIzNkE5NjBEQTcxMTJEODJDNUQA status=read recipient=96178727986 ts=1789829581
+14:53:49 INFO app.services.lia_owner_entry: ✅ Lia: create_reservation 86efa834-76a7-4a89-8400-e948b34010d9 created for b9034129-d4ab-49c2-a8f6-2bd3b9ed922a by owner e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+14:53:49 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBI0NjhGNDIxMDYzRDcyNjJGNEMA status=delivered recipient=96178727986 ts=1789829626
+14:53:49 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBI0NjhGNDIxMDYzRDcyNjJGNEMA status=sent recipient=96178727986 ts=1789829626
+14:53:49 INFO app.api.v1.webhook: 📬 WhatsApp delivery status — wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBI0NjhGNDIxMDYzRDcyNjJGNEMA status=read recipient=96178727986 ts=1789829626
+14:53:49 INFO app.services.whatsapp_service: ✅ WhatsApp message accepted by Meta (wamid=wamid.HBgLOTYxNzg3Mjc5ODYVAgARGBI0NjhGNDIxMDYzRDcyNjJGNEMA)

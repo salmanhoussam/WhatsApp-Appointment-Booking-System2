@@ -1402,7 +1402,11 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
         detail={"row_id": created.get("id"),
                 "name_ar": getattr(validated, "name_ar", None),
                 "price": getattr(validated, "price", None),
-                "duration_min": getattr(validated, "duration_min", None),
+                # A reservation's duration lives on the DRAFT (it comes from the service row in
+                # `_resolve_reservation_rows`), not on the validated class -- reading only the
+                # class audited `None` for reservation 86efa834, whose row carries 20 (2026-09-19).
+                "duration_min": (getattr(validated, "duration_min", None)
+                                 or draft.get("duration_min")),
                 "reserved_at": (validated.reserved_at.isoformat()
                                 if getattr(validated, "reserved_at", None) else None),
                 "historical": (_is_past(validated.reserved_at)
