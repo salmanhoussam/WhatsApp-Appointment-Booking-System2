@@ -846,6 +846,84 @@ def _match_by_name(rows: list, spoken: str, attr: str = "nameAr"):
     return partial[0] if len(partial) == 1 else None
 
 
+# ── R0 · TEMPORARY DIAGNOSTIC — `lia_extract_raw` (2026-09-19) ─────────────────────────────────
+# Plan: .claudedocs/plans/lia-t4-remediation-findings-05-06-07-02.md §4 (v2). Finding 05's cause is
+# a hypothesis because the model's answer is logged nowhere. This line exists ONLY to tell those
+# hypotheses apart, and is REMOVED by its own commit right after STOP-2 -- it is not telemetry.
+#
+# It never writes `raw`, the owner's message, the prompt, a customer's name or phone, or anything
+# from `notes`: those are reduced to present/absent. Only the fields that decide the diagnosis are
+# written (confidence, unresolved field NAMES, reserved_at, service_name, barber_name). Reservation
+# extractions only. Any failure inside it is swallowed: it must not change what `_ask_model` returns.
+import contextvars as _contextvars
+
+_R0_CTX: "_contextvars.ContextVar[Optional[dict]]" = _contextvars.ContextVar("lia_r0_ctx",
+                                                                               default=None)
+_R0_FIELDS = ("customer_name", "customer_phone", "reserved_at", "service_name", "barber_name")
+
+
+def _r0_enum(value, allowed: tuple):
+    if value is None:
+        return None
+    return value if value in allowed else "<other>"
+
+
+def _log_extract_raw(resp, raw: str, model_cls) -> None:
+    try:
+        if getattr(model_cls, "__name__", "") != "LiaReservationExtraction":
+            return
+        ctx = _R0_CTX.get() or {}
+        usage = getattr(resp, "usage", None)
+        try:
+            obj = json.loads(raw)
+            json_ok = isinstance(obj, dict)
+        except Exception:
+            obj, json_ok = {}, False
+        obj = obj if isinstance(obj, dict) else {}
+        try:
+            model_cls.model_validate_json(raw)
+            schema_ok = True
+        except Exception:
+            schema_ok = False
+        data = obj.get("data") if isinstance(obj.get("data"), dict) else {}
+        unresolved = obj.get("unresolved") if isinstance(obj.get("unresolved"), list) else []
+        known = [u for u in unresolved if u in _R0_FIELDS]
+        at = data.get("reserved_at")
+        if not at:
+            at_iso = "absent"
+        else:
+            try:
+                datetime.fromisoformat(str(at))
+                at_iso = "ok"
+            except Exception:
+                at_iso = "fail"
+
+        def _pa(k):
+            return "present" if data.get(k) not in (None, "", []) else "absent"
+
+        logger.info(
+            "lia_extract_raw sender=…%s state=%s op=create_reservation stop=%s tok=%s/%s "
+            "raw_len=%d json=%s schema=%s intent=%s confidence=%s unresolved=%s unresolved_other=%d "
+            "customer_name=%s customer_phone=%s reserved_at=%s reserved_at_iso=%s "
+            "service_name=%s barber_name=%s notes=%s other_keys=%d",
+            ctx.get("sender4", "?"), ctx.get("state"), getattr(resp, "stop_reason", None),
+            getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None),
+            len(raw), "ok" if json_ok else "fail", "ok" if schema_ok else "fail",
+            # Only the contract's own values are echoed; anything else the model wrote here could
+            # carry a name (measured: "create_product <name>"), so it becomes a fixed token.
+            _r0_enum(obj.get("intent"), ("create_reservation", "create_product", "create_service")),
+            _r0_enum(obj.get("confidence"), ("high", "medium", "low")),
+            known, len(unresolved) - len(known),
+            _pa("customer_name"), _pa("customer_phone"),
+            (str(at)[:25] if at_iso == "ok" else "<unparseable>") if at else None, at_iso,
+            str(data.get("service_name"))[:40] if data.get("service_name") else None,
+            str(data.get("barber_name"))[:40] if data.get("barber_name") else None,
+            _pa("notes"), len([k for k in data if k not in _R0_FIELDS and k != "notes"]),
+        )
+    except Exception:                                           # pragma: no cover - diagnostic only
+        pass
+
+
 async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["object"]:
     """One model call, one contract. `_UNAVAILABLE` for our fault, None for an unusable answer.
 
@@ -868,6 +946,7 @@ async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["obje
         )
         raw = resp.content[0].text.strip()
         raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        _log_extract_raw(resp, raw, model_cls)          # R0 — TEMPORARY, logs only, never raises
         return model_cls.model_validate_json(raw)
     except Exception as exc:
         # An authentication or transport failure is NOT "the owner was unclear", and telling him
@@ -881,7 +960,17 @@ async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["obje
             logger.error("🔥 Lia: extraction UNAVAILABLE (%s) — not an owner error",
                          type(exc).__name__)
             return _UNAVAILABLE
-        logger.error("🔥 Lia extraction failed: %s", exc, exc_info=True)
+        # 🔴 NEVER THE EXCEPTION'S TEXT, AND NO TRACEBACK (2026-09-19, before R0 went live). A
+        # pydantic ValidationError quotes the model's answer back -- measured locally: a customer's
+        # name, phone and notes reached the log in 8 of 8 invalid answers. Only the exception type
+        # and pydantic's own error-type codes (fixed constants, never input) are written.
+        codes = []
+        if hasattr(exc, "errors"):
+            try:
+                codes = sorted({e.get("type", "?") for e in exc.errors(include_input=False)})
+            except Exception:
+                codes = []
+        logger.error("🔥 Lia extraction failed: %s %s", type(exc).__name__, codes)
         return None
 
 
@@ -1684,6 +1773,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     preserves the rule `_peek_session` exists for: an unresolvable message must not leave a phantom
     session behind.
     """
+    # R0 (TEMPORARY, 2026-09-19): correlation only, read by `_log_extract_raw`. Removed with it.
+    _R0_CTX.set({"sender4": (sender_phone or "")[-4:],
+                 "state": getattr(session, "state", None) if session is not None else None})
     draft = _load_draft(session) if session is not None else None
 
     # ── 0. A Lia state with no live draft: the window expired. ──
