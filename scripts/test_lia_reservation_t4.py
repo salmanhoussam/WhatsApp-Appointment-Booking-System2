@@ -833,18 +833,22 @@ async def main():
           lia._entry_family("بدي احجز موعد") is None)
 
     # Three walk-ins, nothing but names: the questions must be answerable one at a time.
+    # TRANSITION (D-4, same day): this fixture used to leave the PHONE missing and answer it three
+    # times, which is how the per-item prefix was exercised. A reported visit no longer asks for a
+    # number at all, so the barber — which Lia does still ask for, one name at a time — carries the
+    # test instead. Nothing about the prefix changed; the question behind it did.
     walkins = lambda t: extraction(
         customer_name="علي", customer_phone=None, reserved_at=MORNING.isoformat(),
-        service_name="قص شعر", barber_name="جعفر", time_said=False,
+        service_name="قص شعر", time_said=False,
         extra=[{"customer_name": n, "reserved_at": MORNING.isoformat(), "time_said": False,
-                "service_name": "قص شعر", "barber_name": "جعفر"} for n in ("محمد", "أحمد")])
+                "service_name": "قص شعر"} for n in ("محمد", "أحمد")])
     async with Env(extract=walkins) as env:
         wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
         check("the FIRST question carries no «بالنسبة لـ» — there is nothing to disambiguate yet",
               "بالنسبة" not in wa.joined(), wa.joined()[:80])
         check("   and the visit verb is recorded on the draft for write time",
               (lia._load_draft(out) or {}).get("visit_reported") is True)
-        wa2, out2 = await send(roundtrip(out), "ما عندي رقمه")
+        wa2, out2 = await send(roundtrip(out), "جعفر")
         check("answering علي moves to محمد, and the question SAYS so",
               "بالنسبة لـمحمد،" in wa2.joined(), wa2.joined()[:90])
         check("   the space after «،» survives the reply loader's strip",
@@ -856,11 +860,12 @@ async def main():
               and [i["data"]["customer_name"] for i in d2["rest"]] == ["أحمد"],
               str([i["data"]["customer_name"] for i in d2["done"]]))
         check("   and علي's own answer is not re-asked",
-              d2["done"][0]["data"]["customer_phone"] == WALK_IN_PHONE)
-        wa3, out3 = await send(roundtrip(out2), "ما عندي رقمه")
+              d2["done"][0]["data"]["barber_name"] == "جعفر"
+              and d2["done"][0]["data"]["customer_phone"] == WALK_IN_PHONE)
+        wa3, out3 = await send(roundtrip(out2), "جعفر")
         check("answering محمد moves to أحمد, named again",
               "بالنسبة لـأحمد،" in wa3.joined(), wa3.joined()[:90])
-        wa4, out4 = await send(roundtrip(out3), "ما عندي رقمه")
+        wa4, out4 = await send(roundtrip(out3), "جعفر")
         d4 = lia._load_draft(out4) or {}
         starts = [i["data"]["reserved_at"][11:16] for i in d4["done"]] + \
                  [d4["data"]["reserved_at"][11:16]]
@@ -902,8 +907,7 @@ async def main():
                 "service_name": "قص شعر", "barber_name": "جعفر",
                 "customer_phone": "ما عندي رقمه"} for n in ("محمد", "أحمد")])
     async with Env(extract=visit) as env:
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
-        wa1, out1 = await send(roundtrip(out), "ما عندي رقمه")
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
         body = wa1.joined()
         check("the preview lists all three, numbered, in his order",
               all(f"*{n}.* {who}" in body for n, who in ((1, "علي"), (2, "محمد"), (3, "أحمد"))),
@@ -941,8 +945,7 @@ async def main():
 
     async with Env(extract=visit) as env:
         env.calls_hook = _second_clashes
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
-        wa1, out1 = await send(roundtrip(out), "ما عندي رقمه")
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
         wa2, out2 = await send(roundtrip(out1), lia.CONFIRM_ID, "button_reply")
         said = wa2.joined()
         check("D-6 — the two that worked are NAMED, and so is the one that did not",
@@ -968,8 +971,7 @@ async def main():
               lia._REPLIES["reservation_time_approx"] not in wa.joined())
 
     async with Env(extract=visit) as env:
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
-        wa1, out1 = await send(roundtrip(out), "ما عندي رقمه")
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
         wa2, out2 = await send(roundtrip(out1), lia.CANCEL_ID, "button_reply")
         check("T5-10 — ❌ on a list says «ألغيت المواعيد», not «ألغيت الموعد»",
               lia._REPLIES["reservation_cancelled_multi"] in wa2.joined()
@@ -984,14 +986,42 @@ async def main():
         check("INVARIANT — and its cancel text is the singular one, untouched",
               lia._REPLIES["reservation_cancelled"] in wa2.joined())
 
+    # D-4: a reported visit with no number does not ask for one.
+    no_phones = lambda t: extraction(
+        customer_name="علي", customer_phone=None, reserved_at=MORNING.isoformat(),
+        service_name="قص شعر", barber_name="جعفر", time_said=False,
+        extra=[{"customer_name": n, "reserved_at": MORNING.isoformat(), "time_said": False,
+                "service_name": "قص شعر", "barber_name": "جعفر"} for n in ("محمد", "أحمد")])
+    async with Env(extract=no_phones) as env:
+        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        body = wa.joined()
+        check("D-4 — three names, no numbers, and Lia asks for NONE of them",
+              lia._REPLIES["reservation_ask_phone"] not in body
+              and lia._REPLIES["reservation_confirm_multi"] in body, body[:120])
+        d = lia._load_draft(out) or {}
+        check("   every one is a walk-in, marked «(تلقائي)» so he can still correct it",
+              all(i["data"]["customer_phone"] == WALK_IN_PHONE for i in lia._all_items(d))
+              and all("customer_phone" in (i.get("defaulted") or [])
+                      for i in lia._all_items(d)),
+              str([i.get("defaulted") for i in lia._all_items(d)]))
+        check("   and the preview shows «زبون طيار», not an empty field",
+              body.count(lia._REPLIES["walkin_label"]) == 3, str(body.count("طيار")))
+
+    no_phone_appt = lambda t: extraction(
+        customer_name="أحمد", customer_phone=None, reserved_at=PAST.isoformat(),
+        service_name="قص شعر", barber_name="جعفر")
+    async with Env(extract=no_phone_appt) as env:
+        wa, out = await send(session_idle(), "سجل موعد لأحمد مبارح الساعة 4 مع جعفر")
+        check("INVARIANT — «سجل موعد … مبارح» has no visit verb, so the number is still ASKED",
+              lia._REPLIES["reservation_ask_phone"] in wa.joined(), wa.joined()[:90])
+
     # ── 16 · T5-5 — editing one of a list (2026-09-20) ──
     print("\n── 16. T5-5: «خلّي موعد محمد مع زياد» — named, or asked ──")
     patch_barber = lambda d, t: LiaReservationEditPatch.model_validate(
         {"intent": "edit_reservation", "confidence": "high",
          "changes": {"barber_name": "حسين"}, "unresolved": []})
     async with Env(extract=visit, edit=patch_barber) as env:
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
-        wa1, out1 = await send(roundtrip(out), "ما عندي رقمه")
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
         wa2, out2 = await send(roundtrip(out1), "خليه مع حسين")
         check("an edit that names NOBODY asks which one — it never guesses",
               lia._REPLIES["reservation_edit_which"] in wa2.joined(), wa2.joined()[:80])

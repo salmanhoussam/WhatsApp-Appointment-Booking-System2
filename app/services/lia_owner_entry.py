@@ -910,6 +910,26 @@ async def _apply_reservation_defaults(draft: dict) -> None:
         if svc is not None:
             data["service_name"] = svc.nameAr
             auto.add("service_name")
+    # D-4 (2026-09-20, approved): a visit he says he already performed, with no number given, is
+    # a walk-in — «اليوم الصبح حلقت لعلي ومحمد وأحمد» carries no phones and never will. Asking for
+    # three numbers that do not exist is what would kill the feature.
+    #
+    # SCOPED TO A REPORTED VISIT, and the scope is the decision: «سجل موعد لأحمد مبارح الساعة ٤»
+    # is a historical APPOINTMENT, Lia still asks for its number exactly as she did yesterday, and
+    # the T4 flow is untouched. Marked «(تلقائي)» and editable like every other filled-in value,
+    # so he can still say «رقمه 70…» at the preview.
+    if (not data.get("customer_phone") and draft.get("visit_reported")
+            and data.get("reserved_at")):
+        from app.schemas.lia_drafts import WALK_IN_PHONE
+        try:
+            when = data["reserved_at"]
+            past = _is_past(when if isinstance(when, datetime)
+                            else datetime.fromisoformat(str(when)))
+        except ValueError:
+            past = False
+        if past:
+            data["customer_phone"] = WALK_IN_PHONE
+            auto.add("customer_phone")
     if not data.get("barber_name") and draft.get("actor_barber_id"):
         brb = next((b for b in await _list_barbers(draft["client_id"])
                     if str(getattr(b, "id", "")) == str(draft["actor_barber_id"])), None)
