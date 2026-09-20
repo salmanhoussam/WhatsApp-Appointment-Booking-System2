@@ -17,10 +17,10 @@
 | | |
 |---|---|
 | **Owns which data?** | 🔴 **None.** Lia owns no table and creates none. |
-| **Writes through** | `catalog_service_service.admin_create_service()` — the same function `POST /api/v1/admin/catalog-services` calls — and, since 2026-09-17, `catalog_service.admin_create_item()`, the same function `POST /api/v1/admin/store/products` calls. The functions themselves, not copies of their bodies. **Two operations, zero new write paths.** |
-| **Owned by** | The Reservations domain. Lia is an INTERFACE onto `catalog` (see `capabilities/catalog.md`). |
-| **Prompt** | `app/prompts/lia.md` — governed by `repository-hygiene.md`'s Persona & Prompt Drift rule. |
-| **Contracts** | `app/schemas/lia_drafts.py` — `LiaExtraction`, `LiaServiceDraft`. |
+| **Writes through** | `catalog_service_service.admin_create_service()` — the same function `POST /api/v1/admin/catalog-services` calls — since 2026-09-17 `catalog_service.admin_create_item()`, the same function `POST /api/v1/admin/store/products` calls — and since 2026-09-19 `reservation_service.create_reservation()`, the same function the public booking route calls. The functions themselves, not copies of their bodies. **Three operations, zero new write paths.** |
+| **Owned by** | Two domains, and the split is the point: `create_service` / `create_product` are an INTERFACE onto `catalog` (`capabilities/catalog.md`); `create_reservation` is an INTERFACE onto the Reservation capability. Lia owns neither — she is a third caller of write paths that already existed. |
+| **Prompt** | `app/prompts/lia.md` — governed by `repository-hygiene.md`'s Persona & Prompt Drift rule. Four prompt blocks, sentinel-delimited: service · product · reservation · reservation-edit. |
+| **Contracts** | `app/schemas/lia_drafts.py` — `LiaExtraction`, `LiaServiceDraft`, `LiaProductDraft`, `LiaReservationExtraction`, `LiaReservationDraft`, `LiaReservationChanges`, `LiaReservationEditPatch`. |
 | **Service** | `app/services/lia_owner_entry.py`. |
 
 ---
@@ -78,8 +78,13 @@ question. Lia does not add to the empty-column pile.
 |---|---|---|
 | `create_service` from text | **1** | ✅ **Live** |
 | Edit the draft before saving | **1.1** | ✅ **Live** — shipped 2026-09-13 |
-| `create_product` from text | **S3** | ✅ **Built 2026-09-17** — 99 checks, awaiting live verification (S5) |
+| `create_product` from text | **S3** | ✅ **Live** — verified on production 2026-09-18 |
+| `create_reservation` from text | **T4** | ✅ **Live 2026-09-19** — first real row `86efa834` on `barberlab-test` |
+| Default service + default barber, marked «(تلقائي)» | T4.1 | ✅ **Live** — service «شعر ودقن»; barber from the TALKING account's `User.barberId`, matched by id, never by name |
+| Edit a reservation from its preview | T4.2 | ✅ **Live** — its own prompt + `LiaReservationEditPatch`; the service editor did not know reservation fields |
+| The barbers as WhatsApp buttons + a greeting by name | T4.3 | ✅ **Live** — ≤3 barbers become buttons (`lia_barber:<id>`), more become a list; greeting said once per draft |
 | `create_product_batch` (up to 10) | **S4** | 🔵 Next — B1/B3/B4 in `plans/lia-product-entry.md` |
+| More than one customer in one message (a day's visit log · two full appointments) | **T5** | 🔴 **Open defect, decided 2026-09-20** — the prompt answers `low` for a second appointment (`lia.md:273`) and R1 made the server ignore `low` for reservations, so the second one is **silently dropped**. Salman's decision (2026-09-20): **one draft holding them all, in order**, and the real need is a DAY'S VISIT LOG («اليوم الصبح حلقت لعلي ومحمد وأحمد») for accounting — the same shape a photographed page of names will arrive in later. Measured the same day: that exact sentence does not even reach Lia (`_entry_family` → `None` → dropped in silence). Plan → `plans/lia-two-appointments.md` |
 | `create_service` from image + caption | 2 | 🔵 Planned |
 | `create_service` from voice | 3 | 🔵 Planned — needs a second provider (Anthropic has no STT) |
 | Read / analyse (the Analyst role) | **2** | 🔵 **Vision — §Maturity & Future** |
@@ -99,6 +104,8 @@ which is a different thing from a soft delete.
 |---|---|---|
 | The in-flight draft | `whatsapp_sessions.stateData` → key `lia` | A Prisma table. 10-minute window, inside the session's own 30. |
 | The created service | `catalog_services` | Written by the existing service layer. |
+| The created product | `catalog_items` | Written by `catalog_service.admin_create_item()`. |
+| The created appointment | `reservations` (+ a find-or-create `customers` row) | Written by `reservation_service.create_reservation()`. `source='lia'`, `status='pending'`. `reservedAt` is a **naive local wall clock** — never converted. A customer with no number becomes `WALK_IN`, and every walk-in merges into one row (an accepted product risk, Salman 2026-09-18). **The customer's phone is normalised to the stored form at the point it enters the draft** (2026-09-20) so a dictated number and a typed one cannot produce two rows for one person. |
 | The audit trail | `SecurityAuditLog` | `lia_draft_opened` · `lia_{actor}_{operation}` (so `lia_owner_create_service` is unchanged and `lia_owner_create_product` is new) · `lia_draft_cancelled` · `lia_entry_refused` · `lia_write_refused`. Every write event carries `operation`, `permission` and `service_key`, so the audit row says which authorisation was actually evaluated rather than leaving it to be inferred. |
 
 ---
@@ -187,9 +194,20 @@ itself calls.
 
 ## Maturity & Future
 
-**Maturity: Phase 1 live, one real tenant, one real operation, one day old.** Not yet reviewed
-under `architecture-review-loop.md`; due for its first Maturity Review once a second operation
-ships.
+**Maturity, updated 2026-09-20: three operations live on one real tenant (`barberlab-test`), each
+verified on production, not locally.** `create_service` (09-13) · `create_product` (09-18) ·
+`create_reservation` (09-19). The deployment reaches `rk` and `mr-h` too, and their emptiness
+during every test window is **measured, not assumed** (`scripts/lia_live_evidence.py`).
+
+**Due for its first Maturity Review — and the trigger is contradictory, which is itself recorded
+rather than resolved by whoever reads it next.** The paragraph this replaced set the trigger at
+"a second operation ships", and the third has now shipped. But `architecture-review-loop.md`'s
+mechanical gate admits a `maturity/<topic>.md` file only for a topic that already has a real
+`verification/*.md`, `reviews/*.md` or a ratified ADR, and **Lia has none of the three** — her
+evidence lives in `work/lia-live/*` and `work/lia-s7-preflight/*`, which that gate does not
+count. So: **DUE by this document's own words, NOT DUE by the standing rule.** Opening the
+ledger, or writing Lia's first Verification document so the gate is satisfied honestly, is
+Salman's call — not something to settle by picking the more convenient reading.
 
 ### 🔑 Vision 1 — Memory is the Database. Only.
 
@@ -428,6 +446,13 @@ D0 excludes anyway. That reduction is deliberate and is recorded as an open item
 | 4 | Owner-entry messages are **not recorded** in `whatsapp_messages` — Lia runs before tenant resolution, so no conversation exists yet. History gap, not a correctness gap. | 🟡 Named follow-up |
 | 5 | An English input filled `name_ar` by translating and left `name_en` null — a fillable column left empty, the very class of gap this contract argues against. | 🟢 Small, backlog |
 | 6 | No retention policy exists for any media, which Phase 2/3 will need. | 🔴 Decision required |
+| 7 | **A second appointment in one message is silently dropped.** The prompt answers `low` for it (`app/prompts/lia.md:273`); R1 (2026-09-19) made the server stop obeying `low` for reservations, and nothing replaced that signal. Named as a risk when R1 was decided; now a live defect. | 🔴 Decided 2026-09-20 → one draft holding both |
+| 8 | **A dictated customer phone was stored raw.** `_parse_field_answer` normalised a phone the owner TYPED as an answer; nothing normalised one he DICTATED in the sentence, so one person could become two `customers` rows and the first was unreachable by any outbound send. **Fixed 2026-09-20** at the point the value enters the draft (not at validation — the preview must quote what will actually be stored). No production row had carried the defect yet. | 🟢 Fixed, before any bad row |
+| 9 | **The account↔barber link is unreachable from the dashboard for an owner.** `TeamTab.jsx:632` shows the selector only when `requiresBarber`, true for the `staff` preset alone; the backend accepts `barber_id` for any preset (`team.py:466`). rk's owner was linked by an approved one-off write on 2026-09-20 instead. Showing the control for every preset is **not decided**. | 🟡 Decision required |
+| 10 | **«ما معي رقمه» is not recognised as walk-in** — only «ما عندي رقمه» and its siblings are (`_WALKIN_WORDS`). Safe (it falls through to the question) but repetitive for an owner who says it the other way. Widening the list changes what Lia recognises, so it waits for a word. | 🟢 Small, decision required |
+| 11 | **Lia has no `verification/*.md` of her own**, so the Maturity Review gate above cannot be satisfied without one. See §Maturity. | 🟡 Decision required |
+| 12 | **`WALK_IN` is not a customer identity, but the implementation uses a SHARED `Customer` placeholder row.** Verified today: it never collides with a real customer (the sentinel matches no phone), the real name is kept on the `Reservation` itself, and no notification is sent. Not satisfied: every walk-in of every day shares one row. **Accepted as a documented temporary trade-off (Salman, 2026-09-20) and must be re-evaluated before reporting / customer-history / CRM is taken seriously.** No `customerId=null` path and no write-path change is opened now. | 🟡 Product/domain debt, dated |
+| 13 | **`arrived` has no correction path.** Terminal in `TRANSITIONS` (both directions), excluded from the customer-cancel query, and the repository has **no delete path for a reservation at all** — only `edit_reservation` (which carries no status guard) can still touch such a row. So a visit logged in error stays. **Explicitly NOT a blocker for D-2 (Salman, 2026-09-20): it is separate data-governance debt.** | 🟡 Data-governance debt, dated |
 
 ---
 
