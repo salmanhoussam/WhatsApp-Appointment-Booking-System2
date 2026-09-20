@@ -133,19 +133,32 @@ def extraction(confidence="high", extra=None, **data):
          "unresolved": unresolved})
 
 
+def _known_from(rows, name):
+    """The same three rules the real `_known_customer_phone` applies, over a list in memory."""
+    from app.schemas.lia_drafts import WALK_IN_PHONE
+    wanted = lia._fold_ar(name or "")
+    hits = {getattr(r, "phone", None) for r in rows
+            if lia._fold_ar(getattr(r, "name", "") or "") == wanted
+            and getattr(r, "phone", None) and r.phone != WALK_IN_PHONE}
+    return hits.pop() if len(hits) == 1 else None
+
+
 class Env:
     def __init__(self, extract=None, raises=None, barbers=None, services=None, users=None,
-                 edit=None):
+                 edit=None, customers=None):
         self.extract, self.raises, self.edit = extract, raises, edit
         self.users = users
         self.barbers = BARBERS if barbers is None else barbers
         self.services = SERVICES if services is None else services
+        # The shop's own customer table (T5, 2026-09-20). Empty by default, which is exactly the
+        # state every test written before this one assumed: Lia finds nothing and asks.
+        self.customers = customers or []
         self.calls = []
 
     async def __aenter__(self):
         self._orig = (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
                       reservation_service.create_reservation, lia._extract_reservation,
-                      lia._extract_reservation_edit)
+                      lia._extract_reservation_edit, lia._known_customer_phone)
         self._restore_auth = install(users=self.users or [OWNER_BL])
         barber_repo.list_barbers = lambda *a, **kw: _done(list(self.barbers))
         catalog_service_repo.list_catalog_services = lambda *a, **kw: _done(list(self.services))
@@ -154,14 +167,19 @@ class Env:
             lia._extract_reservation = lambda text: _done(self.extract(text))
         if self.edit is not None:
             lia._extract_reservation_edit = lambda data, text: _done(self.edit(data, text))
+        # The REAL lookup would open a database connection; its rules are exercised against the
+        # real function in its own section instead, from a list of real rows.
+        lia._known_customer_phone = lambda cid, name: _done(
+            _known_from(self.customers, name))
         return self
 
     async def __aexit__(self, *exc):
         self._restore_auth()
         (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
          reservation_service.create_reservation, lia._extract_reservation,
-         lia._extract_reservation_edit) = self._orig
+         lia._extract_reservation_edit, lia._known_customer_phone) = self._orig
         return False
+
 
     async def _create(self, **kw):
         """Mirrors the real signature's KEYWORD contract, and refuses like it does."""
@@ -844,8 +862,13 @@ async def main():
                 "service_name": "قص شعر"} for n in ("محمد", "أحمد")])
     async with Env(extract=walkins) as env:
         wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
-        check("the FIRST question carries no «بالنسبة لـ» — there is nothing to disambiguate yet",
-              "بالنسبة" not in wa.joined(), wa.joined()[:80])
+        # TRANSITION (2026-09-20, from the live round): this used to assert the OPPOSITE — that
+        # the first question carries no name, "because there is nothing to disambiguate yet". The
+        # reasoning was wrong and a real owner proved it within the hour: asked a bare «شو رقم
+        # الزبون؟» about the first of two customers, he answered for BOTH in one message. The list
+        # exists from the first question, and so does the ambiguity.
+        check("even the FIRST question says whose it is, once there is a list",
+              "بالنسبة لـعلي،" in wa.joined(), wa.joined()[:80])
         check("   and the visit verb is recorded on the draft for write time",
               (lia._load_draft(out) or {}).get("visit_reported") is True)
         wa2, out2 = await send(roundtrip(out), "جعفر")
@@ -1088,6 +1111,208 @@ async def main():
     # job, not a new failure — but it IS a behaviour the folding created.
     check("two rows that fold to the same name are ambiguous, so he is asked",
           lia._match_by_name([_Row("دقن"), _Row("ذقن")], "دقن") is None)
+
+    # ── 18 · the live round of 2026-09-20, replayed message by message ──
+    print("\n── 18. «كلهم غيّرلهم الخدمة» — and the deadlock that came before it ──")
+    # Every line below is what Salman actually sent between 16:39 and 16:41, in order, from the
+    # screenshot and the backend log. The old code answered three of them with the wrong question.
+    SVC_SD = SERVICES + [Row(id="svc-sd", nameAr="شعر ودقن", durationMin=30)]
+    def _patch(changes, conf="high"):
+        return lambda d, t: LiaReservationEditPatch.model_validate(
+            {"intent": "edit_reservation", "confidence": conf,
+             "changes": changes, "unresolved": []})
+
+    async with Env(extract=visit, edit=_patch({"service_name": "شعر وذقن"}),
+                   services=SVC_SD) as env:
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        check("setup: the three are previewed", out1.state == lia.LIA_AWAITING_CONFIRM)
+        check("T5-13 — the past line is PLURAL under a list  [TRANSITION: «وهاد موعد ماضي»]",
+              lia._REPLIES["reservation_preview_past_multi"] in wa1.joined()
+              and lia._REPLIES["reservation_preview_past"] not in wa1.joined())
+        # 16:40 — states the change, names nobody.
+        wa2, out2 = await send(roundtrip(out1), "الخدمة اللي عملوها كانت شعر وذقن.")
+        check("it asks WHO — «خليه مع زياد» also names nobody and means one, so it cannot guess",
+              lia._REPLIES["reservation_edit_which"] in wa2.joined())
+        check("   🔴 but the CHANGE he already stated is HELD, not dropped"
+              "  [TRANSITION: it was thrown away, and the next message had to carry it again]",
+              (lia._load_draft(out2) or {}).get("pending_edit") == {"service_name": "شعر وذقن"},
+              str((lia._load_draft(out2) or {}).get("pending_edit")))
+        env.edit = _patch({}, "low")                    # «كلهم» carries no change of its own
+        wa3, out3 = await send(roundtrip(out2), "كلهم")
+        d3 = lia._load_draft(out3) or {}
+        got = [(i["data"]["customer_name"], i["data"]["service_name"], i.get("service_id"))
+               for i in lia._all_items(d3)]
+        check("«كلهم» finishes it in ONE word — all three, with the held change",
+              got == [("علي", "شعر ودقن", "svc-sd"), ("محمد", "شعر ودقن", "svc-sd"),
+                      ("أحمد", "شعر ودقن", "svc-sd")], str(got))
+        check("   «شعر وذقن» reached the shop's «شعر ودقن» — one letter apart, and each item "
+              "resolved its OWN id", all(i.get("service_id") == "svc-sd"
+                                         for i in lia._all_items(d3)))
+        check("   the order and the hours survived the rewrite",
+              [i["data"]["reserved_at"][11:16] for i in lia._all_items(d3)]
+              == ["09:00", "09:30", "10:00"],
+              str([i["data"]["reserved_at"][11:16] for i in lia._all_items(d3)]))
+        check("   the new list IS the confirmation — no extra message invented for it",
+              lia._REPLIES["reservation_confirm_multi"] in wa3.joined()
+              and "شعر ودقن" in wa3.joined())
+        check("   and the held change is spent",
+              d3.get("pending_edit") is None and d3.get("edit_target") is None)
+
+    async with Env(extract=visit, edit=_patch({"service_name": "شعر وذقن"}),
+                   services=SVC_SD) as env:
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa2, out2 = await send(roundtrip(out1), "كلهم علي ومحمد وأحمد، الخدمة شعر وذقن")
+        check("naming EVERY one of them is not an ambiguity — it is «all of them», in one message"
+              "  [TRANSITION: answered with «أي واحد بدك تعدّل؟»]",
+              all(i["data"]["service_name"] == "شعر ودقن"
+                  for i in lia._all_items(lia._load_draft(out2)))
+              and lia._REPLIES["reservation_edit_which"] not in wa2.joined(), wa2.joined()[:70])
+
+    # The two-step answer in the other order: a name first, then the change.
+    async with Env(extract=visit, edit=_patch({}, "low"), services=SVC_SD) as env:
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa2, out2 = await send(roundtrip(out1), "أحمد")
+        check("T5-12 — a bare NAME is accepted, not met with «ما فهمت»"
+              "  [TRANSITION: «ما فهمت شو بدك تعدّل»]",
+              "تمام، أحمد." in wa2.joined()
+              and lia._REPLIES["reservation_edit_unclear"] not in wa2.joined(), wa2.joined()[:80])
+        check("   and the one he named is remembered",
+              (lia._load_draft(out2) or {}).get("edit_target") is not None)
+        env.edit = _patch({"service_name": "شعر وذقن"})
+        wa3, out3 = await send(roundtrip(out2), "الخدمة شعر وذقن.")
+        got = [(i["data"]["customer_name"], i["data"]["service_name"])
+               for i in lia._all_items(lia._load_draft(out3))]
+        check("THE DEADLOCK IS CLOSED — «أحمد» then «الخدمة شعر وذقن» changes أحمد, and him only",
+              got == [("علي", "قص شعر"), ("محمد", "قص شعر"), ("أحمد", "شعر ودقن")], str(got))
+        check("   and the remembered name is spent, not left to catch the next message",
+              (lia._load_draft(out3) or {}).get("edit_target") is None)
+
+    async with Env(extract=visit, edit=_patch({"barber_name": "حسين"})) as env:
+        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa2, out2 = await send(roundtrip(out1), "خلي موعد محمد مع حسين")
+        got = [(i["data"]["customer_name"], i["data"]["barber_name"])
+               for i in lia._all_items(lia._load_draft(out2))]
+        check("INVARIANT — naming ONE still changes only that one, in a single message",
+              got == [("علي", "جعفر"), ("محمد", "حسين"), ("أحمد", "جعفر")], str(got))
+
+    # ── 19 · one answer about two people (2026-09-20, live 18:11) ──
+    print("\n── 19. «عادل رقمه موجود وابو السلو زبون طيار» — one message, two customers ──")
+    # His words, verbatim, and the old behaviour was worse than not understanding: the plain
+    # parse found «طيار» anywhere in the sentence and recorded عادل — the one he said HAS a
+    # number — as a walk-in, silently.
+    FIVE = (datetime.now() + timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0)
+    SAMI = [Row(id="b-sami", name="سامي", isActive=True)]
+    TWO_SVC = SERVICES + [Row(id="sd", nameAr="شعر ودقن", durationMin=30),
+                          Row(id="dq", nameAr="دقن", durationMin=15)]
+    pair = lambda t: extraction(
+        customer_name="عادل طالب", customer_phone=None, reserved_at=FIVE.isoformat(),
+        service_name="دقن", barber_name="سامي",
+        extra=[{"customer_name": "ابو السلو", "service_name": "شعر ودقن", "barber_name": "سامي",
+                "reserved_at": (FIVE + timedelta(minutes=30)).isoformat()}])
+    check("the plain parser still reads the whole sentence as one walk-in — unchanged, and it is "
+          "why the router exists",
+          lia._parse_field_answer(
+              "customer_phone", "عادل رقمه موجود لازم وابو السلو زبون طيار") == WALK_IN_PHONE)
+    async with Env(extract=pair, barbers=SAMI, services=TWO_SVC) as env:
+        wa1, out1 = await send(session_idle(),
+                               "سجلي عادل طالب دقن وابو السلو شعر ودقن الساعة 5 و 5:30 مع سامي")
+        check("the first question names عادل, so he can tell who it is about",
+              "بالنسبة لـعادل طالب،" in wa1.joined(), wa1.joined()[:80])
+        wa2, out2 = await send(roundtrip(out1), "عادل رقمه موجود لازم وابو السلو زبون طيار")
+        got = [(i["data"]["customer_name"], i["data"].get("customer_phone"))
+               for i in lia._every_item(lia._load_draft(out2))]
+        check("ابو السلو gets the walk-in he was told about"
+              "  [TRANSITION: it landed on عادل, the opposite of what was said]",
+              got == [("عادل طالب", None), ("ابو السلو", WALK_IN_PHONE)], str(got))
+        check("   and عادل is asked AGAIN, because nothing he said about him parsed",
+              lia._REPLIES["reservation_ask_phone"] in wa2.joined())
+        check("   the re-ask still says whose it is",
+              "بالنسبة لـعادل طالب،" in wa2.joined(), wa2.joined()[:70])
+        wa3, out3 = await send(roundtrip(out2), "70123321")
+        d3 = lia._load_draft(out3) or {}
+        final = [(i["data"]["customer_name"], i["data"]["customer_phone"],
+                  i["data"]["reserved_at"][11:16]) for i in lia._all_items(d3)]
+        check("both end up right — his number for عادل, walk-in for ابو السلو, 17:00 and 17:30",
+              final == [("عادل طالب", "96170123321", "17:00"),
+                        ("ابو السلو", WALK_IN_PHONE, "17:30")], str(final))
+        check("   and ابو السلو was never asked for a number he had already been given",
+              lia._REPLIES["reservation_ask_phone"] not in wa3.joined())
+        check("   the hour each of them was given is the hour he said, not one Lia spaced out",
+              out3.state == lia.LIA_AWAITING_CONFIRM)
+
+    # He answers with a first name only, while the draft holds the full one.
+    async with Env(extract=pair, barbers=SAMI, services=TWO_SVC) as env:
+        wa1, out1 = await send(session_idle(), "سجلي عادل طالب وابو السلو مع سامي")
+        wa2, out2 = await send(roundtrip(out1), "ابو السلو زبون طيار")
+        got = [(i["data"]["customer_name"], i["data"].get("customer_phone"))
+               for i in lia._every_item(lia._load_draft(out2))]
+        check("naming ONLY the other one puts the value on him, and leaves the asked one open",
+              got == [("عادل طالب", None), ("ابو السلو", WALK_IN_PHONE)], str(got))
+
+    async with Env(extract=pair, barbers=SAMI, services=TWO_SVC) as env:
+        wa1, out1 = await send(session_idle(), "سجلي عادل طالب وابو السلو مع سامي")
+        wa2, out2 = await send(roundtrip(out1), "زبون طيار")
+        got = [(i["data"]["customer_name"], i["data"].get("customer_phone"))
+               for i in lia._every_item(lia._load_draft(out2))]
+        check("INVARIANT — an answer naming NOBODY is still the answer to the question on screen",
+              got[0] == ("عادل طالب", WALK_IN_PHONE), str(got))
+
+    async with Env(extract=single) as env:
+        wa, out = await send(session_idle(), "سجل موعد عادل 70123321 مبارح الساعة 4 مع جعفر")
+        check("INVARIANT — one customer: no name on any question, nothing routed anywhere",
+              "بالنسبة" not in wa.joined(), wa.joined()[:60])
+
+    # ── 20 · the shop already knows him (2026-09-20, Salman's own idea, live) ──
+    print("\n── 20. «ما فينا نخليه يفحص جدول كوستومر قبل ما يسأل؟» ──")
+    KNOWN = [Row(name="كريم", phone="96179360798"),
+             Row(name="أحمد", phone=WALK_IN_PHONE),
+             Row(name="سامر", phone="96170111111"),
+             Row(name="سامر", phone="96170222222")]
+    nameless = lambda who: (lambda t: extraction(
+        customer_name=who, customer_phone=None, reserved_at=PAST.isoformat(),
+        service_name="قص شعر", barber_name="جعفر"))
+
+    async with Env(extract=nameless("كريم"), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد كريم مبارح الساعة 4 مع جعفر")
+        d = lia._load_draft(out) or {}
+        check("a customer the shop already has is not asked for again",
+              d["data"]["customer_phone"] == "96179360798"
+              and lia._REPLIES["reservation_ask_phone"] not in wa.joined(),
+              str(d["data"].get("customer_phone")))
+        check("   and it is marked «(تلقائي)», so he sees a number he did not type",
+              "customer_phone" in (d.get("defaulted") or [])
+              and f"96179360798 {lia._REPLIES['auto_label']}" in wa.joined(), wa.joined()[:120])
+
+    async with Env(extract=nameless("كريم "), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد كريم مبارح الساعة 4 مع جعفر")
+        check("   folded, so a trailing space or a spelling variant still finds him",
+              (lia._load_draft(out) or {})["data"]["customer_phone"] == "96179360798")
+
+    async with Env(extract=nameless("سامر"), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد سامر مبارح الساعة 4 مع جعفر")
+        check("🔴 TWO customers with one name is the ordinary case — so Lia ASKS, never picks",
+              lia._REPLIES["reservation_ask_phone"] in wa.joined()
+              and not (lia._load_draft(out) or {})["data"].get("customer_phone"),
+              wa.joined()[:70])
+
+    async with Env(extract=nameless("أحمد"), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد أحمد مبارح الساعة 4 مع جعفر")
+        check("🔴 the shared WALK_IN row is a placeholder, not a person — it answers nothing",
+              lia._REPLIES["reservation_ask_phone"] in wa.joined(),
+              str((lia._load_draft(out) or {})["data"].get("customer_phone")))
+
+    async with Env(extract=nameless("زياد"), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد زياد مبارح الساعة 4 مع جعفر")
+        check("INVARIANT — someone the shop has never seen is still asked about",
+              lia._REPLIES["reservation_ask_phone"] in wa.joined())
+
+    async with Env(extract=lambda t: extraction(
+            customer_name="كريم", customer_phone="70999888", reserved_at=PAST.isoformat(),
+            service_name="قص شعر", barber_name="جعفر"), customers=KNOWN) as env:
+        wa, out = await send(session_idle(), "سجل موعد كريم 70999888 مبارح الساعة 4 مع جعفر")
+        check("INVARIANT — a number HE gave wins over the stored one, always",
+              (lia._load_draft(out) or {})["data"]["customer_phone"] == "96170999888",
+              str((lia._load_draft(out) or {})["data"]["customer_phone"]))
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",

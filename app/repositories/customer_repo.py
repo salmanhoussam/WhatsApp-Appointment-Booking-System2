@@ -14,6 +14,23 @@ class CustomerRepository:
             }
         )
 
+    async def list_for_client(self, client_id: str) -> list:
+        """Every customer of ONE tenant — name and phone, nothing joined. T5, 2026-09-20.
+
+        Salman's own idea, mid-test: «ما فينا نخليه يفحص جدول كوستومر قبل ما يسأل؟» — a returning
+        customer's number is already in the shop's own table, so asking for it again is asking
+        the owner for something the system already knows.
+
+        Deliberately NOT `list_with_reservations`: that one joins every reservation to build the
+        admin registry, and the caller here needs two columns. Reading the heavier query for the
+        lighter question is how a chat handler starts costing what a dashboard page costs.
+
+        The Arabic folding that decides whether two spellings are the same person happens in the
+        service layer, not here — Postgres does not fold «أحمد» and «احمد» the way `_fold_ar`
+        does, and a half-match in SQL would be worse than none.
+        """
+        return await self.db.customer.find_many(where={"clientId": client_id})
+
     async def create(self, client_id: str, data: dict):
         """Create a new customer profile."""
         return await self.db.customer.create(

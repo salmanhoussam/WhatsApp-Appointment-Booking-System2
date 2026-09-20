@@ -715,6 +715,10 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "reservation_confirm_multi", "reservation_created_multi",
                      "reservation_created_partial", "reservation_edit_which",
                      "reservation_cancelled_multi", "reservation_expired_multi",
+                     # T5-12 · T5-13 (2026-09-20). The first closes a deadlock the live round
+                     # walked into; the second is the past line in the plural, because «وهاد موعد
+                     # ماضي» was appearing under a list of three.
+                     "reservation_edit_named", "reservation_preview_past_multi",
                      # 2026-09-19, Salman: the first reply of an appointment greets the person
                      # by name («أهلاً سلمان، نسيت تقلّي الحلاق»).
                      "greet_prefix")
@@ -896,6 +900,44 @@ _RESERVATION_FIELDS = ("customer_name", "customer_phone", "reserved_at", "servic
 _DEFAULT_SERVICE_NAME = "شعر ودقن"
 
 
+async def _known_customer_phone(client_id: str, name: str) -> Optional[str]:
+    """This shop's stored number for a customer it already knows, or None. READ ONLY.
+
+    Salman, mid-test 2026-09-20: «ما فينا نخليه يفحص جدول كوستومر قبل ما يسأل؟» — and he is
+    right: for anyone who has been here before, the number is already in his own table, and
+    asking for it again is asking him for something the system has.
+
+    THREE CONDITIONS, AND EACH ONE CLOSES A REAL WAY OF GETTING IT WRONG:
+
+      · the folded name matches EXACTLY ONE row — two customers called «أحمد» is the ordinary
+        case in a barbershop, and picking either would put a stranger's number on a booking, so
+        more than one match means Lia asks, as she does everywhere else ambiguity appears.
+      · the row's phone is a real number, never the `WALK_IN` sentinel — that row is a shared
+        placeholder, not a person (this capability's own Finding 12), so it can never answer
+        "what is this customer's number".
+      · the value lands marked «(تلقائي)» like every other filled-in field, so the preview shows
+        him a number he did not type and he can replace it before anything is written.
+
+    Matched on the FULL folded name only. `_name_at`'s first-name fallback is for finding who a
+    sentence is about, where being wrong costs a re-ask; here being wrong costs a real phone
+    number on a real appointment.
+    """
+    from app.repositories.customer_repo import CustomerRepository
+    from app.schemas.lia_drafts import WALK_IN_PHONE
+    wanted = _fold_ar(name or "")
+    if not wanted:
+        return None
+    try:
+        rows = await CustomerRepository(prisma_client).list_for_client(client_id)
+    except Exception as exc:                       # pragma: no cover - a read must never block
+        logger.warning("Lia: could not read the customer table for %s: %s", client_id, exc)
+        return None
+    hits = {getattr(r, "phone", None) for r in rows
+            if _fold_ar(getattr(r, "name", "") or "") == wanted
+            and getattr(r, "phone", None) and r.phone != WALK_IN_PHONE}
+    return hits.pop() if len(hits) == 1 else None
+
+
 async def _apply_reservation_defaults(draft: dict) -> None:
     """Fill a missing service and barber the way Salman decided, ONCE per draft. 2026-09-19.
 
@@ -920,6 +962,15 @@ async def _apply_reservation_defaults(draft: dict) -> None:
         if svc is not None:
             data["service_name"] = svc.nameAr
             auto.add("service_name")
+    # The shop's own table, before the owner is asked (Salman, 2026-09-20). Ordered BEFORE the
+    # walk-in default deliberately: a customer the shop already knows has a real number, and
+    # recording him as a walk-in because the sentence carried no digits would lose the one link
+    # that makes his history his.
+    if not data.get("customer_phone") and data.get("customer_name"):
+        known = await _known_customer_phone(draft["client_id"], data["customer_name"])
+        if known:
+            data["customer_phone"] = known
+            auto.add("customer_phone")
     # D-4 (2026-09-20, approved): a visit he says he already performed, with no number given, is
     # a walk-in — «اليوم الصبح حلقت لعلي ومحمد وأحمد» carries no phones and never will. Asking for
     # three numbers that do not exist is what would kill the feature.
@@ -1533,6 +1584,69 @@ def _focus_item(draft: dict, pos: int) -> bool:
     return True
 
 
+# «كلهم» — what an owner says when the correction is about the whole list. Lebanese «كلّن» is
+# here beside the standard forms because that is what he actually types.
+_COLLECTIVE_WORDS = ("كلهم", "كلياتهم", "كلهن", "الكل", "للكل", "لكلهم", "الجميع", "كلن", "كلياتن")
+
+
+def _edit_scope(draft: dict, instruction: str) -> tuple[str, Optional[int]]:
+    """("all", None) · ("one", pos) · ("ask", None) — who a correction at the preview is about.
+
+    Measured live on 2026-09-20, and every one of these came from that one conversation:
+
+      «الخدمة اللي عملوها كانت شعر وذقن»  names nobody, and means ALL OF THEM
+      «كلهم علي ومحمد وأحمد»               names everybody, and means the same thing
+      «خلي موعد محمد مع حسين»              names one
+      «خليه مع زياد»                        names nobody and means one — the only real question
+
+    NAMING EVERY ONE OF THEM IS NOT AN AMBIGUITY. The first version treated "three hits" and
+    "zero hits" identically, because both returned None from `_match_item` -- so «كلهم علي ومحمد
+    وأحمد» was answered with «أي واحد بدك تعدّل؟», twice. Two opposite intents collapsed into one
+    refusal.
+    """
+    folded = _fold_ar(instruction or "")
+    items = _all_items(draft)
+    named = [i.get("pos", 0) for i in items
+             if (i.get("data") or {}).get("customer_name")
+             and _fold_ar(i["data"]["customer_name"]) in folded]
+    if any(_fold_ar(w) in folded for w in _COLLECTIVE_WORDS) or len(named) == len(items) > 1:
+        return "all", None
+    if len(named) == 1:
+        return "one", named[0]
+    # A target he named in the PREVIOUS message and has not changed since. This is what makes the
+    # two-step answer work: «أحمد» then «الخدمة شعر ودقن». Without it the two questions each
+    # invite exactly what the other rejects, which is the deadlock the live test walked into.
+    if not named and draft.get("edit_target") is not None:
+        return "one", draft["edit_target"]
+    return "ask", None
+
+
+def _rewind_for_edit(draft: dict) -> None:
+    """Put every item back in the queue so the walk re-resolves all of them. T5, 2026-09-20.
+
+    A change that applies to the whole list changes each item's NAMES, and a name is not an id:
+    «خلّي الخدمة شعر ودقن» has to become three real `serviceId`s, one lookup per item, or two of
+    the three rows would be written against the service he replaced. So the ids are dropped and
+    `_advance` walks the list again exactly as it did the first time.
+
+    Nothing is re-ASKED: every answered field is still in each item's `data`, so the walk finds
+    them filled and goes straight to resolution. And each item keeps its own `settled` flag, so
+    the hours do not march forward by one service length per correction.
+    """
+    items = _all_items(draft)
+    first, rest = items[0], items[1:]
+    draft["data"] = first["data"]
+    draft["pos"] = first.get("pos", 0)
+    draft["settled"] = first.get("settled", False)
+    draft["defaulted"] = first.get("defaulted") or []
+    draft["done"] = []
+    draft["rest"] = [{"data": i["data"], "pos": i.get("pos", 0),
+                      "settled": i.get("settled", False),
+                      "defaulted": i.get("defaulted") or [], "time_said": True} for i in rest]
+    for key in ("service_id", "barber_id", "duration_min"):
+        draft.pop(key, None)
+
+
 def _match_item(draft: dict, instruction: str) -> Optional[int]:
     """Which of them «خلّي موعد علي مع زياد» is about — by NAME, or None. T5-8's promise.
 
@@ -1592,7 +1706,12 @@ def _next_item(draft: dict) -> None:
     draft["time_said"] = bool(nxt.get("time_said", True))
     for key in _ITEM_KEYS:
         draft.pop(key, None)
-    draft["pos"] = pos + 1
+    # A queue entry written by `_rewind_for_edit` carries its own place in the list and whether
+    # its hour is already fixed; a fresh one from the extraction carries neither, and then the
+    # position is simply the next one along.
+    draft["pos"] = nxt.get("pos", pos + 1)
+    draft["settled"] = bool(nxt.get("settled", False))
+    draft["defaulted"] = nxt.get("defaulted") or []
 
 
 def _item_lead(draft: dict) -> str:
@@ -1606,12 +1725,62 @@ def _item_lead(draft: dict) -> str:
     The trailing space is added HERE because `_load_replies` strips every text -- the same real
     bug that made the greeting read «أهلاً سلمان،نسيت» on 2026-09-19.
     """
-    if not draft.get("done"):
+    # WHENEVER THERE IS A LIST, INCLUDING ITS FIRST NAME. The first version said the prefix only
+    # once something sat in `done` -- "nothing to disambiguate yet" -- and that reasoning was
+    # wrong, measured live 2026-09-20 18:11: «سجلي عادل طالب دقن وابو السلو شعر ودقن» was answered
+    # with a bare «شو رقم الزبون؟», so the owner could not tell it was asking about عادل alone and
+    # answered for BOTH of them in one message. The list exists from the first question; so does
+    # the ambiguity.
+    if len(_every_item(draft)) < 2:
         return ""
     name = (draft.get("data") or {}).get("customer_name")
     if not name:
         return ""
     return _REPLIES["reservation_item_prefix"].format(name=name).strip() + " "
+
+
+def _route_answer_by_name(draft: dict, field: str, text: str, fallback):
+    """Give each name he mentioned the part of his answer that was about it.
+
+    Returns the value for the item currently being asked, or None when he said nothing about it.
+
+    THE NAMES COME FROM THE DRAFT, NEVER FROM THE TEXT. Only customers already in this draft are
+    looked for, each segment runs through the SAME `_parse_field_answer` every other answer uses,
+    and a segment that parses to nothing changes nothing -- so the worst case is the question
+    being asked again, never a value he did not give.
+
+    A message that mentions nobody is left exactly as it was parsed: «زبون طيار» on its own is
+    still the answer to the question on the screen.
+    """
+    folded = _fold_ar(text or "")
+    if not folded:
+        return fallback
+    marks = []
+    for item in _every_item(draft):
+        name = (item.get("data") or {}).get("customer_name")
+        if not name:
+            continue
+        at = _name_at(folded, name)
+        if at >= 0:
+            marks.append((at, item))
+    if not marks:
+        return fallback
+    marks.sort(key=lambda m: m[0])
+    mine = None
+    for n, (at, item) in enumerate(marks):
+        end = marks[n + 1][0] if n + 1 < len(marks) else len(folded)
+        value = _parse_field_answer(field, folded[at:end])
+        if value is None:
+            continue
+        if item.get("data") is draft.get("data"):
+            mine = value
+        else:
+            # Written straight onto the other item's own dict, wherever it is sitting — `done`
+            # keeps its place, and one still queued simply finds the field filled when its turn
+            # comes, so it is never asked. Compared by IDENTITY, not by position: a queued entry
+            # has no position until it is taken out.
+            item["data"][field] = value
+    return mine
 
 
 def _normalise_reservation_changes(changes: dict) -> dict:
@@ -1758,6 +1927,36 @@ def _all_items(draft: dict) -> list[dict]:
     return sorted((draft.get("done") or []) + [live], key=lambda i: i.get("pos", 0))
 
 
+def _every_item(draft: dict) -> list[dict]:
+    """Walked, live, AND still queued — the whole list as the owner sees it in his own message.
+
+    Distinct from `_all_items`, and the distinction is the bug it was born from: that one answers
+    "what will be written", so it stops at the live item because nothing behind it is resolved
+    yet. Asking it "how many people is this message about" gave 1 while two names sat in `rest`,
+    so the first question lost its «بالنسبة لـ» and a two-customer answer was never routed.
+    """
+    return ((draft.get("done") or [])
+            + [{"data": draft.get("data") or {}, "pos": draft.get("pos", 0)}]
+            + list(draft.get("rest") or []))
+
+
+def _name_at(folded_text: str, name: str) -> int:
+    """Where he referred to this customer in his sentence, or -1.
+
+    The full name first, then its first word: the draft holds «عادل طالب» because that is how he
+    dictated it, and one message later he writes «عادل». A single short word is not enough to go
+    on, so anything under three letters is only matched in full.
+    """
+    wanted = _fold_ar(name or "")
+    if not wanted:
+        return -1
+    at = folded_text.find(wanted)
+    if at >= 0:
+        return at
+    first = wanted.split(" ")[0]
+    return folded_text.find(first) if len(first) >= 3 else -1
+
+
 def _item_preview_line(item: dict, index: int) -> str:
     """One line of the multi-item preview. T5-2, approved verbatim 2026-09-20.
 
@@ -1778,13 +1977,15 @@ def _item_preview_line(item: dict, index: int) -> str:
             when = datetime.fromisoformat(when)
         except ValueError:
             pass
+    phone_shown = (_REPLIES["walkin_label"] if data.get("customer_phone") == WALK_IN_PHONE
+                   else data.get("customer_phone"))
+    if "customer_phone" in auto:
+        phone_shown = f"{phone_shown} {_REPLIES['auto_label']}"
     return _REPLIES["reservation_item_line"].format(
         n=index,
         customer=data.get("customer_name"),
         when=fmt_reserved_at(when) if isinstance(when, datetime) else when,
-        service=mark("service_name"), barber=mark("barber_name"),
-        phone=(_REPLIES["walkin_label"] if data.get("customer_phone") == WALK_IN_PHONE
-               else data.get("customer_phone")))
+        service=mark("service_name"), barber=mark("barber_name"), phone=phone_shown)
 
 
 def _reservation_preview_multi_text(draft: dict) -> str:
@@ -1800,7 +2001,9 @@ def _reservation_preview_multi_text(draft: dict) -> str:
     if any(isinstance(i.get("data", {}).get("reserved_at"), str)
            and _is_past(datetime.fromisoformat(i["data"]["reserved_at"]))
            for i in items if i.get("data", {}).get("reserved_at")):
-        text += "\n" + _REPLIES["reservation_preview_past"]
+        # T5-13: the singular «وهاد موعد ماضي» under a list of three was the ninth instance of a
+        # text written for one context appearing in another — and one I added myself, the same day.
+        text += "\n" + _REPLIES["reservation_preview_past_multi"]
     return text
 
 
@@ -1817,6 +2020,11 @@ def _reservation_preview_text(draft: dict) -> str:
     data = draft["data"]
     phone_shown = (_REPLIES["walkin_label"] if data.get("customer_phone") == WALK_IN_PHONE
                    else data.get("customer_phone"))
+    # The phone can be an automatic value too, since 2026-09-20 -- a walk-in Lia assumed for a
+    # reported visit, or a number read out of the shop's own customer table. It was the one
+    # filled-in field the preview showed WITHOUT saying so.
+    if "customer_phone" in set(draft.get("defaulted") or []):
+        phone_shown = f"{phone_shown} {_REPLIES['auto_label']}"
     when = data.get("reserved_at")
     if isinstance(when, str):
         try:
@@ -2517,14 +2725,11 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
         if msg_type == "text" and (value or "").strip():
             is_res_draft = _draft_operation(draft) == "create_reservation"
-            # T5-5 · D-3: with a list on the screen, «خليه مع زياد» does not say whose. Naming one
-            # of them targets that one; naming none (or two) is a QUESTION, never a guess.
+            # T5-5 · D-3, rewritten 2026-09-20 after the live round walked into a deadlock.
+            # «خليه مع زياد» does not say whose; «كلهم» and naming every one of them do.
+            scope, target = "one", None
             if is_res_draft and len(_all_items(draft)) > 1:
-                target = _match_item(draft, value)
-                if target is None:
-                    await wa.send_text(sender_phone, _REPLIES["reservation_edit_which"])
-                    return session
-                _focus_item(draft, target)
+                scope, target = _edit_scope(draft, value)
             patch = await (_extract_reservation_edit(draft.get("data") or {}, value) if is_res_draft
                            else _extract_edit(draft.get("data") or {}, value))
             if patch is _UNAVAILABLE:
@@ -2540,9 +2745,42 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 changes = _normalise_reservation_changes(changes)
             # R1's rule, applied to edits: for a reservation the server judges the change, so a
             # `low` grade with a readable change is not a refusal. Service/product keep the gate.
-            unclear_edit = (patch is None or not changes
-                            or (patch.confidence == "low" and not is_res_draft))
+            # WHO and WHAT arrive in either order, and neither is thrown away while the other is
+            # asked for. «الخدمة اللي عملوها كانت شعر وذقن» states the change and names nobody, so
+            # the change is HELD while Lia asks who — and his one-word answer finishes it. The old
+            # code asked the question and dropped the change, so the next message had to carry it
+            # again, and that message named nobody either. Measured live, 2026-09-20 16:40.
+            if is_res_draft and scope == "ask":
+                if changes:
+                    draft["pending_edit"] = changes
+                    _save_draft(session, draft)
+                    await wa.send_text(sender_phone, _REPLIES["reservation_edit_which"])
+                    return session
+                await wa.send_text(sender_phone, _REPLIES["reservation_edit_which"])
+                return session
+            if is_res_draft and scope == "one":
+                _focus_item(draft, target)
+            # He has now said WHO, and WHAT was already on the table.
+            if is_res_draft and not changes and draft.get("pending_edit"):
+                changes = draft.pop("pending_edit")
+            unclear_edit = (not changes
+                            or (patch is not None and patch.confidence == "low"
+                                and not is_res_draft))
             if unclear_edit:
+                # HE ANSWERED THE QUESTION WE ASKED, and being told «ما فهمت» for it is the bug
+                # this branch exists to close. «أي واحد بدك تعدّل؟ قلّي اسمه» invites a bare name;
+                # a bare name carries no change, so the old code fell through to «ما فهمت شو بدك
+                # تعدّل», which invites a bare change — and a bare change names nobody, so the
+                # first question fired again. Two questions each asking for exactly what the other
+                # rejects, with nothing remembered between them. Measured live, 13:40–13:42.
+                if is_res_draft and target is not None and draft.get("edit_target") != target:
+                    draft["edit_target"] = target
+                    _save_draft(session, draft)
+                    name = (draft.get("data") or {}).get("customer_name") or ""
+                    await wa.send_text(
+                        sender_phone,
+                        _REPLIES["reservation_edit_named"].format(name=name).strip() + " ")
+                    return session
                 logger.info("🤷 Lia: edit not understood for %s — asking, draft kept intact",
                             sender_phone)
                 await wa.send_text(sender_phone, _REPLIES["reservation_edit_unclear" if is_res_draft else "edit_unclear"])
@@ -2571,6 +2809,19 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             draft["data"] = merged
             # A value the owner has now SAID is no longer an automatic one.
             draft["defaulted"] = [f for f in (draft.get("defaulted") or []) if f not in changes]
+            # The correction landed, so the name he gave a message ago has done its job.
+            draft.pop("edit_target", None)
+            draft.pop("pending_edit", None)
+            if scope == "all":
+                # «كلهم غيّرلهم الخدمة». Merged into every item, then the whole list is walked
+                # again so each one resolves the new name to ITS own real row id -- a name is not
+                # an id, and writing two of the three against the replaced service is exactly the
+                # silent wrong row this file refuses everywhere else.
+                for one in _all_items(draft):
+                    one["data"].update(changes)
+                    one["defaulted"] = [f for f in (one.get("defaulted") or [])
+                                        if f not in changes]
+                _rewind_for_edit(draft)
             if "reserved_at" in changes:
                 # He gave this one an hour himself, so it stops being a slot the server chose:
                 # the item is re-settled around his value, and it keeps it.
@@ -2627,10 +2878,21 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                         parsed = None
         else:
             parsed = _parse_field_answer(field, value)
+            # AN ANSWER CAN BE ABOUT SOMEONE ELSE, OR ABOUT BOTH (2026-09-20, live). Asked for
+            # عادل's number, he wrote «عادل رقمه موجود لازم وابو السلو زبون طيار» -- and the plain
+            # parse found the word «طيار» anywhere in it and recorded عادل as a walk-in, the exact
+            # opposite of what he said, silently. Splitting it by the names already in the draft
+            # gives each of them the part he wrote about THEM.
+            if len(_every_item(draft)) > 1:
+                parsed = _route_answer_by_name(draft, field, value, parsed)
         if parsed is None:
             # Re-asked in the DRAFT's own wording: a product must not be asked "شو اسم الخدمة؟".
+            # And it keeps its «بالنسبة لـ»: the answer that did not land was about SOMEONE, and
+            # dropping the name on the second asking is how a re-ask starts looking like a
+            # different question.
             _, questions, _ = _op_spec(_draft_operation(draft))
-            await wa.send_text(sender_phone, questions.get(field, "ما فهمت، جرّب مرّة تانية."))
+            await wa.send_text(sender_phone, _item_lead(draft)
+                               + questions.get(field, "ما فهمت، جرّب مرّة تانية."))
             return session
         draft["data"][field] = parsed
         draft["unresolved"] = [f for f in draft.get("unresolved", []) if f != field]

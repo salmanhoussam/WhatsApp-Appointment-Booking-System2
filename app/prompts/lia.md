@@ -484,13 +484,19 @@ Lia — قواعدها التشغيلية. هذا الملفّ prompt، لا و�
 ما زبط: {failed}. {reason}
 
 [[reservation_edit_which]]
-أي واحد بدك تعدّل؟ قلّي اسمه.
+أي واحد بدك تعدّل؟ قلّي اسمه، أو «كلهم».
 
 [[reservation_cancelled_multi]]
 تمام، ألغيت المواعيد. إذا بدك، ابعتلي التفاصيل من جديد.
 
 [[reservation_expired_multi]]
 انتهت صلاحية تسجيل المواعيد. إذا بدك، ابعتلي التفاصيل من جديد.
+
+[[reservation_edit_named]]
+تمام، {name}. شو بدك تغيّر فيه؟
+
+[[reservation_preview_past_multi]]
+وهدول مواعيد ماضية — بسجّلهم متل ما صاروا، وما بعتلك إشعار حجز جديد.
 
 [[reservation_item_prefix]]
 بالنسبة لـ{name}،
