@@ -1051,6 +1051,44 @@ async def main():
               lia._REPLIES["reservation_edit_which"] not in wa2.joined()
               and "حسين" in wa2.joined(), wa2.joined()[:90])
 
+    # ── 17 · «ذقن» and «دقن» are the same beard (2026-09-20, live) ──
+    print("\n── 17. one wrong letter still finds the row ──")
+    # Salman, live, mid-test: «ذقن دقن لازم يتعامل مع الامر حتى لو حرف غلط». The shop's row is
+    # «شعر ودقن» and he wrote «شعر وذقن» — one letter, and nothing matched.
+    class _Row:
+        def __init__(self, n):
+            self.nameAr = self.name = n
+            self.id = n
+    SHOP = [_Row(n) for n in ("شعر ودقن", "شعر", "دقن", "كرياتين", "تنظيف البشرة", "حنة أو صبغة")]
+    for spoken, expected in (("شعر وذقن", "شعر ودقن"),       # ذ/د — the live case
+                             ("ذقن", "دقن"),
+                             ("تنضيف البشرة", "تنظيف البشرة"),   # ظ/ض
+                             ("كراتين", "كرياتين"),              # a dropped letter
+                             ("كريتين", "كرياتين"),              # a swapped one
+                             ("حنه او صبغه", "حنة أو صبغة")):    # the folding that already existed
+        got = lia._match_by_name(SHOP, spoken)
+        check(f"«{spoken}» → «{expected}»", getattr(got, "nameAr", None) == expected,
+              str(getattr(got, "nameAr", None)))
+    check("INVARIANT — the dialect pairs fold, and only those",
+          lia._fold_ar("تلاتة") == lia._fold_ar("ثلاثة")
+          and lia._fold_ar("ضهر") == lia._fold_ar("ظهر"))
+    check("INVARIANT — letters that separate REAL words are left alone (ق/ك · س/ص)",
+          lia._fold_ar("كلب") != lia._fold_ar("قلب")
+          and lia._fold_ar("سعر") != lia._fold_ar("صعر"))
+    check("a short word still needs to be exact — one edit in three letters is a third of it",
+          lia._match_by_name(SHOP, "شعب") is None, str(lia._match_by_name(SHOP, "شعب")))
+    check("INVARIANT — two rows one letter away from what he said is NO match, never a guess",
+          lia._match_by_name([_Row("زياد"), _Row("زياب")], "زيار", attr="name") is None)
+    check("   and the near match runs LAST — an exact row still wins over a one-letter one",
+          getattr(lia._match_by_name([_Row("كرياتين"), _Row("كراتين")], "كراتين"),
+                  "nameAr", None) == "كراتين")
+    # And the folding's own consequence, stated rather than discovered later: a shop that really
+    # carries «دقن» AND «ذقن» as two services can no longer be told apart by name, so Lia asks
+    # with the real list instead of picking one. That is this function's oldest rule doing its
+    # job, not a new failure — but it IS a behaviour the folding created.
+    check("two rows that fold to the same name are ambiguous, so he is asked",
+          lia._match_by_name([_Row("دقن"), _Row("ذقن")], "دقن") is None)
+
     print("\n── nothing left this process ──")
     check("the real functions are restored",
           reservation_service.create_reservation.__module__ == "app.services.reservation_service"

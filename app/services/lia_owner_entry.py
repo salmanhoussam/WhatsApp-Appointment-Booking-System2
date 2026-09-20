@@ -299,7 +299,17 @@ _GREETINGS = frozenset({
 # take away his only way into the customer flow, on the one tenant we test on.
 BOOK_ID = "__LIA_BOOK__"
 
-_AR_FOLD = (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي"), ("ة", "ه"), ("ـ", ""))
+_AR_FOLD = (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي"), ("ة", "ه"), ("ـ", ""),
+            # 2026-09-20, Salman: «ذقن دقن لازم يتعامل مع الأمر حتى لو حرف غلط». Measured live
+            # that day: the shop's service is stored «شعر ودقن» and he wrote «شعر وذقن», one
+            # letter apart, and nothing matched.
+            #
+            # THESE THREE PAIRS ARE THE DIALECT, NOT TYPOS. Lebanese writes the sound, Modern
+            # Standard writes the letter: دقن/ذقن · تلاتة/ثلاثة · ضهر/ظهر. The same owner will
+            # write the row one way and speak of it the other, on the same day. Folding them is
+            # deterministic and reversible in meaning — unlike ق/ك or س/ص, which separate real
+            # words and are deliberately NOT here.
+            ("ذ", "د"), ("ث", "ت"), ("ظ", "ض"))
 
 
 def _fold_ar(text: str) -> str:
@@ -1028,7 +1038,48 @@ def _match_by_name(rows: list, spoken: str, attr: str = "nameAr"):
     if exact:
         return None
     partial = [r for r, f in folded if f and (wanted in f or f in wanted)]
-    return partial[0] if len(partial) == 1 else None
+    if len(partial) == 1:
+        return partial[0]
+    if partial:
+        return None
+    # LAST RESORT, ONE LETTER (2026-09-20, Salman: «حتى لو حرف غلط»). Folding already absorbs the
+    # dialect spellings; this catches the rest — a slip, a doubled letter, a missing one. It runs
+    # only after exact and containment have both found nothing, and it keeps this function's
+    # governing rule intact: MORE THAN ONE CANDIDATE IS NO MATCH. Guessing between two real
+    # services would put the wrong one on a real appointment, and the question that follows a
+    # None costs the owner one message.
+    near = [r for r, f in folded if f and _within_one_edit(wanted, f)]
+    return near[0] if len(near) == 1 else None
+
+
+def _within_one_edit(a: str, b: str) -> bool:
+    """True when `a` becomes `b` by changing, adding or removing a single character.
+
+    Written out rather than pulled from a library: the whole question is "is the distance at most
+    one", which is answered by walking each string once, and a general edit-distance matrix would
+    do strictly more work to answer strictly less precisely. Guards the short strings — «شعر» and
+    «دقن» are three letters, and at that length one edit is a third of the word, so anything
+    shorter than four characters must match exactly.
+    """
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 4 or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(1 for x, y in zip(a, b) if x != y) == 1
+    short, long_ = (a, b) if len(a) < len(b) else (b, a)
+    i = j = 0
+    skipped = False
+    while i < len(short) and j < len(long_):
+        if short[i] == long_[j]:
+            i += 1
+            j += 1
+        elif skipped:
+            return False
+        else:
+            skipped = True
+            j += 1
+    return True
 
 
 async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["object"]:
