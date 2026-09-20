@@ -383,6 +383,27 @@ async def create_reservation(
     # already happened" turns it off, and that is the whole point -- skipping the schedule must be
     # something an operation ASKS FOR, never something it inherits.
     enforce_working_hours: bool = True,
+    # T5 (2026-09-20, Salman's decision, the third of this same shape). A visit the owner SAYS he
+    # performed is not a booking waiting to happen, and the accounting view depends on the
+    # difference: OverviewTab.jsx:512 counts `arrived` as completed work.
+    #
+    # In his own words, and this is the governing rule rather than a paraphrase of it:
+    #   "Explicit owner-reported completed visit is sufficient evidence for `arrived`; no
+    #    additional business confirmation of completion is required. Preview/confirm only
+    #    validates the extracted fields before writing."
+    #
+    # THE DATE ALONE NEVER IMPLIES ATTENDANCE, and that invariant predates this parameter --
+    # scripts/test_lia_reservation_t1.py:18 has pinned it since T1: "a recorded past appointment
+    # is not an attendance claim". «سجل موعد لأحمد مبارح» therefore stays `pending`; only an
+    # explicit visit verb («حلقتلو») earns `arrived`. This parameter does not decide that; it only
+    # makes the distinction expressible.
+    #
+    # `"pending"` preserves all four existing callers byte for byte -- the value was a hardcoded
+    # literal in `create_data` until now, so the default IS the old line. Writing the status
+    # directly is also the only safe route: `pending -> arrived` is not a legal transition
+    # (TRANSITIONS above), so "create then update_status" would have to pass through `confirmed`,
+    # which sends the CUSTOMER a confirmation -- a message a historical visit must never produce.
+    status: str = "pending",
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -392,6 +413,15 @@ async def create_reservation(
     repo = ReservationRepository(prisma_client)
 
     # -- Validate ------------------------------------------------------------------------------
+    # The status the row will be BORN with, checked against the same list `update_status` checks
+    # against — one vocabulary, not two. First, before any row is read, for the same reason the
+    # past guard is first: a refusal should not cost a database round trip. The column itself is
+    # a plain String with a `pending` default and no database enum, so nothing downstream would
+    # reject an invented value — this line is the only thing standing between a typo and a row no
+    # query in the system can see (every listing filters on these exact names).
+    if status not in VALID_STATUSES:
+        raise ValueError(f"Invalid status. Use: {VALID_STATUSES}")
+
     # The past guard, first, before any row is read: a refusal should not cost a database round
     # trip, and it belongs to Validate rather than to Working Hours (a past date is not a
     # scheduling conflict, it is a different kind of request entirely).
@@ -520,7 +550,7 @@ async def create_reservation(
         "customerId":    customer.id,
         "reservedAt":    reserved_at,
         "durationMin":   effective_duration,
-        "status":        "pending",
+        "status":        status,
         "notes":         notes,
     }
     # Prisma's generated types for an optional Json? field reject a bare `None`/`dict` --

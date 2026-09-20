@@ -106,11 +106,18 @@ async def main():
     # third: `enforce_working_hours`. R-2 — a historical entry does not answer to the schedule
     # configured today — was ratified on 2026-09-17 and was NOT implementable until it existed,
     # because `_check_working_hours` ran unconditionally and `allow_past` never reached it.
-    check("T3-b/T3-c added exactly three, at the end (was: ten parameters)",
-          names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours"],
+    # TRANSITION (2026-09-20). WAS the three above. T5 added the fourth, `status`, for the one
+    # thing the three could not express: a visit the owner SAYS he performed is completed work,
+    # not a booking waiting to happen (`OverviewTab.jsx:512` counts `arrived` as completed). The
+    # date alone still never implies attendance — `test_lia_reservation_t1.py:18` pins that, and
+    # T5 does not touch it; only an explicit visit verb earns `arrived`, and Lia decides that,
+    # not this signature.
+    check("T3-b/T3-c/T5 added exactly four, at the end (was: three, and before that ten "
+          "parameters with none)",
+          names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours", "status"],
           str(names[10:]))
     kinds = {n: sig.parameters[n].kind
-             for n in ("allow_past", "notify_merchant", "enforce_working_hours")}
+             for n in ("allow_past", "notify_merchant", "enforce_working_hours", "status")}
     check("   and both are KEYWORD-ONLY — no positional call can land on them by accident",
           all(k is inspect.Parameter.KEYWORD_ONLY for k in kinds.values()), str(kinds))
     defaulted = {n: p.default for n, p in sig.parameters.items()
@@ -119,9 +126,13 @@ async def main():
           # TRANSITION (2026-09-18): `enforce_working_hours: True` joined. Like `notify_merchant`
           # and unlike `allow_past`, its default is a TRUE preservation — every existing caller
           # keeps being checked against the schedule exactly as before.
+          # TRANSITION (2026-09-20): `status: "pending"` joined, and its default is the most
+          # literal preservation of the four — the value was a hardcoded `"status": "pending"`
+          # inside `create_data` until T5 moved it up into the signature. The default IS the old
+          # line, which is why all four existing callers stay byte-for-byte unaffected.
           defaulted == {"customer_email": None, "source": None,
                         "allow_past": False, "notify_merchant": True,
-                        "enforce_working_hours": True}, str(defaulted))
+                        "enforce_working_hours": True, "status": "pending"}, str(defaulted))
 
     print("\n── 2. INVARIANT — the three callers, and NOTHING else calls it ──")
     # COUNTED AS CALLS, NOT AS TEXT. The first version of this check used a regex and answered

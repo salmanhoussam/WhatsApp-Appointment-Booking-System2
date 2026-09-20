@@ -38,7 +38,7 @@ writing a service into the wrong shop is not recoverable by the owner who did no
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -114,6 +114,18 @@ DUP_NEW_ID  = "__LIA_DUP_NEW__"
 # question becomes three-way.
 _ADD_VERBS = ("ضيف", "ضيّف", "اضف", "أضف", "زيد", "add", "create")
 _RECORD_VERBS = ("سجل", "سجّل")
+# D-5 (2026-09-20, Salman's decision, APPROVED WITHIN THIS LIMIT). The owner reporting his own
+# finished work does not say «سجّل» -- he says what he did: «اليوم الصبح حلقت لي علي، محمد
+# وأحمد». MEASURED that day, before the decision: `_entry_family` returned None for that exact
+# sentence, so it never reached Lia at all -- no tenant, no model call, no reply, dropped in
+# silence.
+#
+# THE VERB OPENS THE PATH AND DECIDES NOTHING ELSE, which is the whole of Salman's limit: it does
+# not infer the service, the time, or who the customer is. Those come from the model, from the
+# defaults he already approved (T4.1), or from a question. Deliberately NOT generalised to "any
+# verb that implies a service" -- the order stays
+# visit action -> reservation intent -> extraction -> validation -> preview -> confirmation -> write.
+_VISIT_VERBS = ("حلقت", "حلقنا", "قصيت", "قصينا")
 # FRANCO ARABIC, S7 (2026-09-18, Salman's decision 3). The owner writes Latin letters with digits
 # standing in for letters -- 3=ع, 7=ح, 2=ء, 5=خ -- and that is INPUT UNDERSTANDING only: nothing
 # Lia sends back is ever Franco.
@@ -138,7 +150,25 @@ def _has_franco(low: str, words: tuple) -> bool:
     """Whole-word match for a Latin-script token -- see `_FRANCO_ADD_VERBS` for why not substring."""
     return any(re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", low) for w in words)
 # The union stays under the original name: "is there a Lia verb here at all" is still one question.
-_ENTRY_VERBS = _ADD_VERBS + _RECORD_VERBS
+_ENTRY_VERBS = _ADD_VERBS + _RECORD_VERBS + _VISIT_VERBS
+
+
+def _has_visit_verb(text: str) -> bool:
+    """Did the owner say the service ALREADY HAPPENED? D-5 · D-2, 2026-09-20.
+
+    Read in two places, which is why it is a function and not an inline `any(...)`: it decides
+    that the message may enter the reservation path at all, and later that the row is born
+    `arrived` rather than `pending`. Salman's governing rule:
+
+        "Explicit owner-reported completed visit is sufficient evidence for `arrived`; no
+         additional business confirmation of completion is required."
+
+    THE DATE IS NOT THE EVIDENCE — THIS VERB IS. «سجل موعد لأحمد مبارح الساعة ٤» is a historical
+    APPOINTMENT and stays `pending`; `scripts/test_lia_reservation_t1.py:18` has pinned that
+    since T1 and T5 does not touch it.
+    """
+    low = " ".join((text or "").split()).lower()
+    return any(v in low for v in _VISIT_VERBS)
 _ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
 
 
@@ -228,7 +258,13 @@ def _entry_family(text: str) -> Optional[str]:
     # No noun at all. A RECORD verb is now enough on its own -- «سجّللي إنو أحمد إجا مبارح الساعة
     # ٤» is a reservation and names nothing. An ADD verb still is not: «ضيف أحمد الساعة ٤» could
     # be any of the three, so it goes to the question.
-    if any(v in low for v in _RECORD_VERBS) or _has_franco(low, _FRANCO_RECORD_VERBS):
+    # D-5 (2026-09-20): a VISIT verb reads the same way and for the same reason -- «حلقت لعلي
+    # ومحمد وأحمد» names no family noun either, and what it reports is a reservation that already
+    # happened. It is placed here, in the no-noun branch, rather than earlier: a message that DOES
+    # name a family keeps being read by its noun, so «ضيف خدمة… وحلقت» still goes to the question
+    # instead of being decided by the verb.
+    if (any(v in low for v in _RECORD_VERBS) or _has_franco(low, _FRANCO_RECORD_VERBS)
+            or _has_visit_verb(low)):
         return "create_reservation"
     if not (any(v in low for v in _ADD_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
         return None
@@ -661,6 +697,14 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # The service edit text names a price and a duration -- wrong on an
                      # appointment preview (the 6th "text for one context shown in another").
                      "reservation_edit_unclear",
+                     # T5-1…T5-11 (2026-09-20, every one approved verbatim by Salman, one at a
+                     # time, before any of this code existed). The singular texts beside them are
+                     # untouched: a one-customer message reads exactly as it did yesterday.
+                     "reservation_item_prefix", "reservation_preview_multi",
+                     "reservation_item_line", "reservation_time_approx",
+                     "reservation_confirm_multi", "reservation_created_multi",
+                     "reservation_created_partial", "reservation_edit_which",
+                     "reservation_cancelled_multi", "reservation_expired_multi",
                      # 2026-09-19, Salman: the first reply of an appointment greets the person
                      # by name («أهلاً سلمان، نسيت تقلّي الحلاق»).
                      "greet_prefix")
@@ -1074,15 +1118,20 @@ def _stale_draft_operation(session) -> Optional[str]:
     return _draft_operation(raw) if isinstance(raw, dict) else None
 
 
-def _per_operation(op_name: Optional[str], moment: str) -> str:
+def _per_operation(op_name: Optional[str], moment: str, many: bool = False) -> str:
     """The reply key for a cancel or an expiry, worded for the operation it ends.
 
     `moment` is "cancelled" or "expired". A service keeps the original texts: `cancel` for a
     cancel (its wording was right for a service) and `service_expired` for an expiry. Anything
     unreadable falls back to the service wording -- the behaviour before 2026-09-19.
+
+    `many` (T5-10/T5-11, approved 2026-09-20) picks the plural wording for a list. The singular
+    texts say «ألغيت **الموعد**… ابعتلي **الزبون والوقت والخدمة**», which would reach an owner
+    who had just cancelled three of them -- the seventh and eighth instances of "a text written
+    for one context shown in another". The singular forms are untouched.
     """
     if op_name == "create_reservation":
-        return f"reservation_{moment}"
+        return f"reservation_{moment}_multi" if many else f"reservation_{moment}"
     if op_name == "create_product":
         return f"product_{moment}"
     return "cancel" if moment == "cancelled" else "service_expired"
@@ -1317,6 +1366,183 @@ def _parse_field_answer(field: str, text: str):
     return int(number) if field == "duration_min" else number
 
 
+# ── T5 · more than one customer in one message (2026-09-20) ──────────────────
+#
+# Salman's real need, in his own words: «اليوم الصبح حلقت لي علي، محمد وأحمد. هون الوقت ماله قيمة
+# بالظبط متى، المهم يسجّل الزباين مشان يعمل حسابات بعدين» -- a DAY'S VISIT LOG, not two
+# appointments. The same shape a photographed page of names will arrive in later, which is why it
+# is worth getting right now rather than reshaping twice.
+_MAX_ITEMS = 3              # D-7: this TEXT interface only. The image stage decides its own.
+
+
+def _clean_item(raw: dict, known: set) -> dict:
+    """One extracted appointment, ready to enter a draft. ONE path for every item.
+
+    Two jobs, and both existed before T5 -- they are gathered here so `data` and each entry of
+    `extra` cannot drift apart:
+
+    FILTERED to the draft class's own fields, which closes a real livelock: `data` is a free dict
+    on the extraction contract, so a stray key would reach `_advance`, fail validation on a field
+    that has no question, and re-ask forever.
+
+    PHONE NORMALISED at the point the value ENTERS the draft (2026-09-20), because a number the
+    owner TYPES as an answer goes through `_parse_field_answer` and one he DICTATES did not --
+    the same person could become two `customers` rows, the first unreachable by any outbound send
+    (`rules/phone-numbers.md`). Not done at validation time: the preview reads `draft["data"]`
+    while the write reads the validated model, so normalising there would show him one number and
+    store another. An unreadable number becomes absent, which makes it a QUESTION, never a guess.
+    """
+    data = {k: v for k, v in (raw or {}).items() if k in known}
+    phone_said = data.get("customer_phone")
+    if phone_said:
+        data["customer_phone"] = _parse_field_answer("customer_phone", str(phone_said))
+        if not data["customer_phone"]:
+            data.pop("customer_phone", None)
+    return data
+
+
+def _sequence_time(cursor: Optional[datetime], said_at: datetime, time_said: bool,
+                   duration_min: Optional[int]) -> tuple[datetime, datetime]:
+    """(this item's start, the cursor after it) — the ONE rule that serves both T5 modes.
+
+    Salman's decision (2026-09-20): sequential from the start of the period, spaced by the
+    service's own duration. «اليوم الصبح» with a 30-minute service gives 09:00 · 09:30 · 10:00,
+    in the order he said the names.
+
+    THIS IS A DATABASE REQUIREMENT, NOT A PREFERENCE. `reservations_active_barber_slot_uidx` is a
+    real partial unique index on `(client_id, barber_id, reserved_at)` WHERE the status is one of
+    pending/confirmed/arrived -- and `arrived` is inside it. Three names at one time collide at
+    the index, not merely at the Python conflict check, so spacing them is what makes the write
+    possible at all.
+
+    The MODEL never invents an hour: when the owner gave only a day or a period it answers
+    `time_said=false` with the period's start, and the distribution is the server's decision.
+    An explicit hour is used exactly as said and moves the cursor past itself, so a mixed message
+    keeps what he actually stated.
+    """
+    start = said_at if (time_said or cursor is None) else cursor
+    return start, start + timedelta(minutes=duration_min or 30)
+
+
+# Everything that belongs to ONE item and must not survive into the next one. `data` is replaced
+# outright; these are cleared, because a leftover `barber_id` from علي would be written onto محمد.
+_ITEM_KEYS = ("service_id", "barber_id", "duration_min", "defaulted", "defaults_applied",
+              "asking", "settled")
+
+
+def _focus_item(draft: dict, pos: int) -> bool:
+    """Make the item at `pos` the live one, so the existing machinery can work on it. T5-5.
+
+    The whole edit path — the patch, the merge, the re-validation, the name→id resolution — is
+    written against `draft["data"]`. Rather than teach each of those to address an item by index,
+    the one being edited is brought to `data` and the previous occupant is filed back with its
+    own `pos`, so the list he reads never reorders. Returns False when `pos` is already live.
+    """
+    if draft.get("pos", 0) == pos:
+        return False
+    target = next((i for i in (draft.get("done") or []) if i.get("pos") == pos), None)
+    if target is None:
+        return False
+    draft["done"] = [i for i in draft["done"] if i.get("pos") != pos] + [{
+        "data":         draft["data"],
+        "service_id":   draft.get("service_id"),
+        "barber_id":    draft.get("barber_id"),
+        "duration_min": draft.get("duration_min"),
+        "defaulted":    draft.get("defaulted"),
+        "pos":          draft.get("pos", 0),
+        "settled":      draft.get("settled", False),
+    }]
+    draft["data"] = target["data"]
+    draft["pos"] = pos
+    for key in _ITEM_KEYS:
+        draft.pop(key, None)
+    for key in ("service_id", "barber_id", "duration_min", "defaulted", "settled"):
+        if target.get(key) is not None:
+            draft[key] = target[key]
+    return True
+
+
+def _match_item(draft: dict, instruction: str) -> Optional[int]:
+    """Which of them «خلّي موعد علي مع زياد» is about — by NAME, or None. T5-8's promise.
+
+    None means "ask", never "guess the first one": with three names on the screen, picking one
+    because it was listed first would write a change onto a customer he did not mention. Two
+    names in one instruction is also None — that is ambiguous, and ambiguity is a question in
+    this module by long-standing rule (I-3).
+    """
+    folded = _fold_ar(instruction or "")
+    hits = [i.get("pos", 0) for i in _all_items(draft)
+            if (i.get("data") or {}).get("customer_name")
+            and _fold_ar(i["data"]["customer_name"]) in folded]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _settle_item(draft: dict) -> None:
+    """Give the finished item its final wall clock, and move the batch cursor past it.
+
+    Called once per item, AFTER `_resolve_reservation_rows` -- which is the first moment the
+    service's real `durationMin` is known, and the spacing is that duration. Before that point
+    there is nothing to space by except a guess.
+    """
+    if draft.get("settled"):
+        # Re-entered after an edit. The hour is already this item's own; re-running the cursor
+        # would walk every later item forward by one more service length each time he corrects
+        # a name. An edit that changes the TIME clears this flag, so a real change still lands.
+        return
+    said = draft["data"].get("reserved_at")
+    when = said if isinstance(said, datetime) else datetime.fromisoformat(str(said))
+    cursor = draft.get("time_cursor")
+    start, after = _sequence_time(datetime.fromisoformat(cursor) if cursor else None,
+                                  when, bool(draft.get("time_said", True)),
+                                  draft.get("duration_min"))
+    draft["data"]["reserved_at"] = start.isoformat()
+    draft["time_cursor"] = after.isoformat()
+    # Remembered across items so the preview can say «الساعات تقريبيّة» only when the server
+    # really did choose one. One item he did not time is enough to make the list approximate.
+    draft["settled"] = True
+    if not draft.get("time_said", True):
+        draft["all_times_said"] = False
+
+
+def _next_item(draft: dict) -> None:
+    """Retire the finished item into `done`, and load the next one into `data`."""
+    pos = draft.get("pos", 0)
+    draft.setdefault("done", []).append({
+        "data":         draft["data"],
+        "service_id":   draft.get("service_id"),
+        "barber_id":    draft.get("barber_id"),
+        "duration_min": draft.get("duration_min"),
+        "defaulted":    draft.get("defaulted"),
+        "pos":          pos,
+        "settled":      draft.get("settled", False),
+    })
+    nxt = draft["rest"].pop(0)
+    draft["data"] = nxt["data"]
+    draft["time_said"] = bool(nxt.get("time_said", True))
+    for key in _ITEM_KEYS:
+        draft.pop(key, None)
+    draft["pos"] = pos + 1
+
+
+def _item_lead(draft: dict) -> str:
+    """«بالنسبة لـعلي،» — which of them a question is about. T5-7, approved 2026-09-20.
+
+    BY NAME, NOT BY NUMBER, and that was Salman's own reasoning: the names are what he typed, so
+    «بالنسبة لمحمد» is something he can act on while «الموعد التاني» makes him count. Empty for
+    the first item (nothing to disambiguate) and empty when the missing field IS the name, where
+    the plain question is already the clearest thing to say.
+
+    The trailing space is added HERE because `_load_replies` strips every text -- the same real
+    bug that made the greeting read «أهلاً سلمان،نسيت» on 2026-09-19.
+    """
+    if not draft.get("done"):
+        return ""
+    name = (draft.get("data") or {}).get("customer_name")
+    if not name:
+        return ""
+    return _REPLIES["reservation_item_prefix"].format(name=name).strip() + " "
+
+
 def _normalise_reservation_changes(changes: dict) -> dict:
     """Server-side checks on a reservation edit before it touches the draft. 2026-09-19."""
     out = {}
@@ -1362,7 +1588,8 @@ async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> boo
         draft["asking"] = "service_name"
         _save_draft(session, draft)
         session.state = LIA_AWAITING_FIELD
-        await wa.send_text(phone, _REPLIES["reservation_service_unknown"].format(names=names))
+        await wa.send_text(phone, _item_lead(draft)
+                           + _REPLIES["reservation_service_unknown"].format(names=names))
         return False
 
     barbers = await _list_barbers(client_id)
@@ -1378,7 +1605,8 @@ async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> boo
         _save_draft(session, draft)
         session.state = LIA_AWAITING_FIELD
         await _ask_barber(wa, phone, draft,
-                          greeting + _REPLIES["reservation_barber_unknown"].format(names=names))
+                          greeting + _item_lead(draft)
+                          + _REPLIES["reservation_barber_unknown"].format(names=names))
         return False
 
     # The ROW's own spelling replaces what he typed, for the same reason F-C1 exists: the preview
@@ -1436,6 +1664,75 @@ def _preview_text(draft_data: dict, category_name: str,
     return "\n".join(lines)
 
 
+def _all_items(draft: dict) -> list[dict]:
+    """Every item this draft will write, in the order he said them. One item = a one-element list.
+
+    `done` holds the ones already completed and `data` is the live one, so this is simply the two
+    put back together — the single place that knows the draft's shape, so the preview, the commit
+    loop and the cancel wording cannot each invent their own idea of "how many".
+    """
+    live = {
+        "data":         draft.get("data") or {},
+        "service_id":   draft.get("service_id"),
+        "barber_id":    draft.get("barber_id"),
+        "duration_min": draft.get("duration_min"),
+        "defaulted":    draft.get("defaulted"),
+        "pos":          draft.get("pos", 0),
+        "settled":      draft.get("settled", False),
+    }
+    # SORTED BY `pos`, NOT BY WHERE THEY HAPPEN TO SIT. Editing one of them makes it the live
+    # item, and without an explicit position «خلّي موعد علي مع زياد» would quietly move علي to the
+    # end of the list he is reading. The order is his, and it is the one thing this feature was
+    # asked for -- «لازم بس تسجلهم بالترتيب».
+    return sorted((draft.get("done") or []) + [live], key=lambda i: i.get("pos", 0))
+
+
+def _item_preview_line(item: dict, index: int) -> str:
+    """One line of the multi-item preview. T5-2, approved verbatim 2026-09-20.
+
+    A COMPACT LINE RATHER THAN THE FIVE-LINE BLOCK, and that is a real choice: the single
+    appointment's block is five lines, so three of them would be fifteen on a phone screen. The
+    single-item preview keeps that block byte for byte — this shape exists only once there is a
+    list to read.
+    """
+    from app.schemas.lia_drafts import WALK_IN_PHONE
+    from app.services.whatsapp_notifications import fmt_reserved_at
+    data = item.get("data") or {}
+    auto = set(item.get("defaulted") or [])
+    mark = lambda field: (f"{data.get(field)} {_REPLIES['auto_label']}" if field in auto
+                          else data.get(field))
+    when = data.get("reserved_at")
+    if isinstance(when, str):
+        try:
+            when = datetime.fromisoformat(when)
+        except ValueError:
+            pass
+    return _REPLIES["reservation_item_line"].format(
+        n=index,
+        customer=data.get("customer_name"),
+        when=fmt_reserved_at(when) if isinstance(when, datetime) else when,
+        service=mark("service_name"), barber=mark("barber_name"),
+        phone=(_REPLIES["walkin_label"] if data.get("customer_phone") == WALK_IN_PHONE
+               else data.get("customer_phone")))
+
+
+def _reservation_preview_multi_text(draft: dict) -> str:
+    """The whole list, before anything is written. T5-1 · T5-2 · T5-3, approved verbatim."""
+    items = _all_items(draft)
+    text = _REPLIES["reservation_preview_multi"] + "\n\n" + "\n\n".join(
+        _item_preview_line(item, n) for n, item in enumerate(items, start=1))
+    # Said only when the SERVER chose an hour. If he stated every time himself there is nothing
+    # approximate about them, and claiming otherwise would be a small lie in a message whose whole
+    # job is to be checkable.
+    if not draft.get("all_times_said", True):
+        text += "\n\n" + _REPLIES["reservation_time_approx"]
+    if any(isinstance(i.get("data", {}).get("reserved_at"), str)
+           and _is_past(datetime.fromisoformat(i["data"]["reserved_at"]))
+           for i in items if i.get("data", {}).get("reserved_at")):
+        text += "\n" + _REPLIES["reservation_preview_past"]
+    return text
+
+
 def _reservation_preview_text(draft: dict) -> str:
     """What the owner reads BEFORE a reservation is written. T4.
 
@@ -1469,12 +1766,19 @@ def _reservation_preview_text(draft: dict) -> str:
 
 async def _send_preview(wa, phone: str, draft: dict, greeting: str = "") -> None:
     if _draft_operation(draft) == "create_reservation":
-        await wa.send_text(phone, greeting + _reservation_preview_text(draft))
+        many = len(_all_items(draft)) > 1
+        await wa.send_text(phone, greeting + (_reservation_preview_multi_text(draft) if many
+                                              else _reservation_preview_text(draft)))
         await wa.send_interactive_buttons(
             to=phone,
-            text=_REPLIES["reservation_confirm"],
+            text=_REPLIES["reservation_confirm_multi"] if many else _REPLIES["reservation_confirm"],
             buttons=[
-                {"type": "reply", "reply": {"id": CONFIRM_ID, "title": "✅ سجّله"}},
+                # T5-9, approved 2026-09-20. The message and the button had to move together --
+                # «سجّلهن هلق؟» above a button reading «سجّله» is the same class of mismatch this
+                # file has already paid for five times. Still an inline literal here, like every
+                # other button title, and that remains a known F-C2 gap rather than a new one.
+                {"type": "reply", "reply": {"id": CONFIRM_ID,
+                                            "title": "✅ سجّلهم" if many else "✅ سجّله"}},
                 {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
             ],
         )
@@ -1546,8 +1850,13 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
         logger.warning("🚫 Lia: write refused at commit time (%s) from %s", reason, phone)
         return
 
+    if op.name == "create_reservation" and len(_all_items(draft)) > 1:
+        await _commit_reservations(wa, phone, client_id, draft, op, actor, actor_id)
+        return
+
     if op.name == "create_reservation":
-        created = await _write_reservation(wa, phone, client_id, validated, draft)
+        created = await _write_reservation(wa, phone, client_id, validated,
+                                           _all_items(draft)[0], _row_status(draft, validated))
     elif op.name == "create_product":
         created = await _write_product(wa, phone, client_id, validated)
     else:
@@ -1761,7 +2070,85 @@ async def _write_product(wa, phone: str, client_id: str, validated) -> Optional[
     return created
 
 
-async def _write_reservation(wa, phone: str, client_id: str, validated, draft: dict):
+def _row_status(draft: dict, validated) -> str:
+    """`arrived` or `pending` — D-2, decided 2026-09-20, in Salman's own words:
+
+        "Explicit owner-reported completed visit is sufficient evidence for `arrived`; no
+         additional business confirmation of completion is required. Preview/confirm only
+         validates the extracted fields before writing."
+
+    TWO CONDITIONS, BOTH REQUIRED. The VERB is the evidence — «حلقتلو» — and the date alone never
+    is: «سجل موعد لأحمد مبارح الساعة ٤» is a historical APPOINTMENT and stays `pending`, the
+    invariant `scripts/test_lia_reservation_t1.py:18` has pinned since T1. And it must actually be
+    past: a visit cannot have been completed at a time that has not arrived.
+    """
+    if draft.get("visit_reported") and _is_past(validated.reserved_at):
+        return "arrived"
+    return "pending"
+
+
+async def _commit_reservations(wa, phone: str, client_id: str, draft: dict, op,
+                               actor: Optional[str], actor_id: Optional[str]) -> None:
+    """Write every item in the list, in order, and report each one's real outcome. D-6.
+
+    NO TRANSACTION, AND THAT IS THE DECISION, NOT AN OVERSIGHT (Salman, 2026-09-20): a successful
+    reservation is never rolled back because a later one clashed, and Lia has no delete path with
+    which to undo one anyway. What replaces the transaction is honesty — the owner is told exactly
+    which names were recorded and which were not, and why.
+
+    EVERY ITEM GOES THROUGH THE SAME GATES as a single one: its own validation, its own name→id
+    resolution (done in `_advance`, before this), its own conflict check inside
+    `create_reservation`, and one authorisation check that already passed for this batch in
+    `_commit`. Nothing is written on a weaker path because it arrived in a list.
+    """
+    from app.schemas.lia_drafts import LiaReservationDraft
+    done, failed, reason = [], [], ""
+    for item in _all_items(draft):
+        data = item.get("data") or {}
+        try:
+            validated = LiaReservationDraft.model_validate(data)
+        except Exception as exc:
+            logger.error("🔥 Lia: item failed final validation: %s", exc)
+            failed.append(data.get("customer_name") or "—")
+            reason = reason or _REPLIES["reservation_unclear"]
+            continue
+        status = _row_status(draft, validated)
+        row, why = await _try_write_reservation(client_id, validated, item, status)
+        if row is None:
+            failed.append(validated.customer_name)
+            reason = reason or why
+            continue
+        done.append(validated.customer_name)
+        await log_security_event(
+            event_type=f"lia_{actor}_{op.name}", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"row_id": row.get("id"), "duration_min": item.get("duration_min"),
+                    "reserved_at": validated.reserved_at.isoformat(),
+                    "historical": _is_past(validated.reserved_at), "status": status,
+                    "batch": len(_all_items(draft)),
+                    "operation": op.name, "permission": op.permission,
+                    "service_key": op.service_key,
+                    "sender_phone": phone, "source": "whatsapp_text"},
+            actor=actor_id,
+        )
+        logger.info("✅ Lia: %s %s created for %s by %s %s (%s)",
+                    op.name, row.get("id"), client_id, actor, actor_id, status)
+
+    # Joined OUTSIDE the send call on purpose. `test_lia_s7.py` counts every Arabic literal that
+    # reaches a `send_*`, so that a new owner-facing sentence can never slip in unnoticed; a list
+    # separator is punctuation, not a message, and letting it inflate that count would make the
+    # one real signal noisier for nothing.
+    _sep = "، "
+    if failed and done:
+        await wa.send_text(phone, _REPLIES["reservation_created_partial"].format(
+            done=_sep.join(done), failed=_sep.join(failed), reason=reason))
+    elif failed:
+        await wa.send_text(phone, reason)
+    else:
+        await wa.send_text(phone, _REPLIES["reservation_created_multi"])
+
+
+async def _write_reservation(wa, phone: str, client_id: str, validated, item: dict,
+                             status: str = "pending"):
     """Write ONE reservation through the existing service. T4, 2026-09-18.
 
     THE THREE KEYWORDS ARE THE WHOLE DECISION, and each one is a ratified rule rather than a
@@ -1778,39 +2165,56 @@ async def _write_reservation(wa, phone: str, client_id: str, validated, draft: d
     `module_key="barber"` mirrors `whatsapp_reservation_flow.py:886` literally, and is what all 52
     production reservations carry.
     """
+    row, reason = await _try_write_reservation(client_id, validated, item, status)
+    if row is None:
+        await wa.send_text(phone, reason)
+    return row
+
+
+async def _try_write_reservation(client_id: str, validated, item: dict, status: str):
+    """(row, None) or (None, the owner-facing reason). T5, 2026-09-20.
+
+    SPLIT OUT OF `_write_reservation` SO A LIST CAN FAIL HONESTLY. Sending from inside the write
+    was right while one message meant one reservation; with three of them it would mean three
+    separate refusals arriving between successes, instead of the one explicit per-item result
+    D-6 asked for. Nothing about the write itself changed -- same function, same three keywords,
+    same translations.
+
+    The reason is always one of this file's OWN controlled texts, never the exception: Salman's
+    condition on T5-6 was that `{reason}` stay a controlled message and never a raw error.
+    """
     from app.services import reservation_service
     past = _is_past(validated.reserved_at)
     when = validated.reserved_at.replace(tzinfo=timezone.utc)
     try:
-        return await reservation_service.create_reservation(
+        row = await reservation_service.create_reservation(
             client_id      = client_id,
             module_key     = "barber",
             customer_name  = validated.customer_name,
             customer_phone = validated.customer_phone,
             reserved_at    = when,
-            duration_min   = draft.get("duration_min"),
+            duration_min   = item.get("duration_min"),
             notes          = validated.notes,
-            metadata       = {"barber_id": draft.get("barber_id"),
-                              "service_id": draft.get("service_id")},
+            metadata       = {"barber_id": item.get("barber_id"),
+                              "service_id": item.get("service_id")},
             source         = "lia",
             allow_past            = past,
             notify_merchant       = not past,
             enforce_working_hours = not past,
+            status                = status,
         )
+        return row, None
     except ValueError as exc:
         # The service says why in a sentence meant for a developer. The owner gets the one case he
         # can act on -- a clash -- and anything else is logged rather than pasted at him.
         if "already booked" in str(exc):
-            await wa.send_text(phone, _REPLIES["reservation_conflict"].format(
-                barber=validated.barber_name or "الحلاق"))
-        else:
-            logger.error("🔥 Lia: reservation refused for %s: %s", client_id, exc)
-            await wa.send_text(phone, _REPLIES["reservation_unclear"])
-        return None
+            return None, _REPLIES["reservation_conflict"].format(
+                barber=validated.barber_name or "الحلاق")
+        logger.error("🔥 Lia: reservation refused for %s: %s", client_id, exc)
+        return None, _REPLIES["reservation_unclear"]
     except Exception as exc:                                   # pragma: no cover - write failure
         logger.error("🔥 Lia: reservation write failed for %s: %s", client_id, exc)
-        await wa.send_text(phone, _REPLIES["reservation_unclear"])
-        return None
+        return None, _REPLIES["reservation_unclear"]
 
 
 async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tuple[bool, str]:
@@ -1881,10 +2285,13 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # so its operation is read from there, BEFORE it is cleared, to word the expiry for what
         # the owner was actually doing.
         expired_op = _stale_draft_operation(session)
+        # Counted BEFORE the draft is cleared, for the same reason its operation is.
+        expired_many = len((session.lia or {}).get(DRAFT_KEY, {}).get("done") or []) > 0
         session.state = "IDLE"
         _save_draft(session, None)
         logger.info("⏲  Lia: draft window expired for %s — state reset to IDLE", sender_phone)
-        await wa.send_text(sender_phone, _REPLIES[_per_operation(expired_op, "expired")])
+        await wa.send_text(sender_phone,
+                           _REPLIES[_per_operation(expired_op, "expired", expired_many)])
         return session
 
     # ── 0.1 The same guard for the family question, which has no draft. ──
@@ -2021,7 +2428,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 # start again -- two logics for one moment. The text lives in
                 # app/prompts/lia.md, under the drift rule, not in this line.
                 await wa.send_text(sender_phone,
-                                   _REPLIES[_per_operation(_draft_operation(draft), "cancelled")])
+                                   _REPLIES[_per_operation(_draft_operation(draft), "cancelled",
+                                                           len(_all_items(draft)) > 1)])
                 return session
 
         # ── A TYPED MESSAGE HERE IS AN EDIT, not a failure to press a button. ──
@@ -2038,6 +2446,14 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
         if msg_type == "text" and (value or "").strip():
             is_res_draft = _draft_operation(draft) == "create_reservation"
+            # T5-5 · D-3: with a list on the screen, «خليه مع زياد» does not say whose. Naming one
+            # of them targets that one; naming none (or two) is a QUESTION, never a guess.
+            if is_res_draft and len(_all_items(draft)) > 1:
+                target = _match_item(draft, value)
+                if target is None:
+                    await wa.send_text(sender_phone, _REPLIES["reservation_edit_which"])
+                    return session
+                _focus_item(draft, target)
             patch = await (_extract_reservation_edit(draft.get("data") or {}, value) if is_res_draft
                            else _extract_edit(draft.get("data") or {}, value))
             if patch is _UNAVAILABLE:
@@ -2084,6 +2500,11 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             draft["data"] = merged
             # A value the owner has now SAID is no longer an automatic one.
             draft["defaulted"] = [f for f in (draft.get("defaulted") or []) if f not in changes]
+            if "reserved_at" in changes:
+                # He gave this one an hour himself, so it stops being a slot the server chose:
+                # the item is re-settled around his value, and it keeps it.
+                draft["settled"] = False
+                draft["time_said"] = True
             logger.info("✏️  Lia: draft edited for %s — fields=%s", sender_phone, list(changes))
             await _advance(wa, sender_phone, session, draft)
             return session
@@ -2432,7 +2853,11 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # draft, so that cannot happen.
     _, _, draft_cls = _op_spec(op.name)
     known = set(draft_cls.model_fields)
-    dropped = [k for k in (extraction.data or {}) if k not in known]
+    # `time_said` is a real part of the reservation contract (T5) that is deliberately NOT a draft
+    # field -- it says how `reserved_at` was arrived at, not what it is. Naming it here keeps it
+    # out of the "dropped, not a field of" warning, which is for surprises.
+    carried = known | ({"time_said"} if op.name == "create_reservation" else set())
+    dropped = [k for k in (extraction.data or {}) if k not in carried]
     if dropped:
         logger.info("🧹 Lia: dropped %s from a %s extraction — not fields of %s",
                     dropped, op.name, draft_cls.__name__)
@@ -2443,7 +2868,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # `_draft_operation` reads both -- so a deploy mid-conversation costs nobody his draft.
         "operation":     op.name,
         "intent":        extraction.intent,
-        "data":          {k: v for k, v in (extraction.data or {}).items() if k in known},
+        "data":          _clean_item(extraction.data, known),
         "unresolved":    list(extraction.unresolved or []),
         "client_id":     client_id,
         "actor":         actor,
@@ -2458,10 +2883,27 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         "started_at":    datetime.now(timezone.utc).isoformat(),
         "asking":        None,
     }
+    if op.name == "create_reservation":
+        # T5 slice 1: the queue is BUILT here and consumed later. `data` stays the item being
+        # completed -- every existing reader (`_advance`, `_resolve_reservation_rows`, the
+        # preview, `_commit`, `_parse_field_answer`) goes on reading exactly what it read
+        # before -- and the rest wait their turn, in the order he said them.
+        draft["time_said"] = bool((extraction.data or {}).get("time_said", True))
+        # D-2: the EVIDENCE for `arrived`, captured from the sentence that opened the draft --
+        # never from the date, and never from the model. Read here, where the owner's own words
+        # are still in hand, and used at write time. `entry_text` rather than `value` so that a
+        # message resumed after the family question is still judged by what he originally wrote.
+        draft["visit_reported"] = _has_visit_verb(entry_text)
+        draft["done"] = []
+        draft["rest"] = [
+            {"data": _clean_item(item, known),
+             "time_said": bool((item or {}).get("time_said", True))}
+            for item in (getattr(extraction, "extra", None) or [])[:_MAX_ITEMS - 1]
+        ]
     await log_security_event(
         event_type="lia_draft_opened", client_id=client_id, endpoint=_ENDPOINT,
         detail={"intent": extraction.intent, "operation": op.name,
-                "confidence": extraction.confidence,
+                "confidence": extraction.confidence, "items": 1 + len(draft.get("rest") or []),
                 "unresolved": draft["unresolved"], "sender_phone": sender_phone},
         actor=actor_id,
     )
@@ -2489,12 +2931,13 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
         if draft["data"].get(field) in (None, "", []):
             draft["asking"] = field
             greeting = _take_greeting(draft)
+            lead = _item_lead(draft)
             _save_draft(session, draft)
             session.state = LIA_AWAITING_FIELD
             if field == "barber_name" and _draft_operation(draft) == "create_reservation":
-                await _ask_barber(wa, phone, draft, greeting + questions[field])
+                await _ask_barber(wa, phone, draft, greeting + lead + questions[field])
             else:
-                await wa.send_text(phone, greeting + questions[field])
+                await wa.send_text(phone, greeting + lead + questions[field])
             return
 
     try:
@@ -2532,6 +2975,16 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     # filled and the draft is still held, so a refusal here costs nothing and writes nothing.
     if _draft_operation(draft) == "create_reservation":
         if not await _resolve_reservation_rows(wa, phone, session, draft):
+            return
+        # The item is complete: it has its ids and, with them, the service's real duration. Give
+        # it its wall clock, then hand the conversation to the next name he said. RECURSION, not a
+        # loop, because the next item may itself be missing a field -- and then this function has
+        # to do exactly what it does for a first item: ask, and come back when he answers.
+        _settle_item(draft)
+        if draft.get("rest"):
+            _next_item(draft)
+            _save_draft(session, draft)
+            await _advance(wa, phone, session, draft)
             return
 
     if _draft_operation(draft) == "create_product" and not draft.get("dup_ack"):

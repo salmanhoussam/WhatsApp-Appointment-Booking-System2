@@ -371,6 +371,17 @@ class LiaReservationExtraction(BaseModel):
     intent:     Literal["create_reservation"]
     confidence: Literal["high", "medium", "low"]
     data:       dict = Field(default_factory=dict)
+    # T5 (2026-09-20). MORE THAN ONE CUSTOMER IN ONE MESSAGE — «اليوم الصبح حلقت لعلي ومحمد
+    # وأحمد». The FIRST stays in `data`, so a single-appointment message keeps byte-identical
+    # shape and every existing reader is untouched; the rest arrive here in the order they were
+    # said. Declared rather than tolerated: the class forbids extra keys, so an undeclared field
+    # would make the whole extraction invalid instead of silently arriving.
+    #
+    # WHY THIS EXISTS AT ALL: the prompt used to answer `low` for a second appointment, and R1
+    # (2026-09-19) made the server stop obeying `low` for reservations -- so the second one was
+    # being dropped in silence. A defect we created with our eyes open, named as a risk the day
+    # we chose it.
+    extra:      list[dict] = Field(default_factory=list)
     unresolved: list[str] = Field(default_factory=list)
 
 

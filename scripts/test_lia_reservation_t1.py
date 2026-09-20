@@ -178,17 +178,23 @@ async def _drain():
 
 
 async def book(reserved_at, working_hours=WORKING_HOURS, existing=None, phone="96170123456",
-               allow_past=True, notify_merchant=True):
+               allow_past=True, notify_merchant=True, status=None):
     """`allow_past` defaults to True here because this suite IS the historical measurement.
 
     Added 2026-09-17 with T3-b. Before it, the past was reachable because no guard existed —
     which is precisely the accident the new parameter removes. So every call in this file now
     ASKS for the past explicitly, which is the contract Salman decided: the past is opened by an
     operation saying so, never inherited from the absence of a check.
+
+    `status=None` (T5, 2026-09-20) means "do not pass the argument at all", not "pass pending".
+    The difference is the whole point of the regression check in
+    `test_reservation_contract_t5.py`: a caller that says nothing must land on the service's own
+    default, and that is only proven by a call that genuinely omits the keyword.
     """
     prisma, sends, restore = install(working_hours, existing)
     try:
         result = await rs.create_reservation(
+            **({"status": status} if status is not None else {}),
             allow_past      = allow_past,
             notify_merchant = notify_merchant,
             client_id      = CLIENT,

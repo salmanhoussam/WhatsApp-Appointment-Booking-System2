@@ -527,6 +527,12 @@ async def main():
     # The number is a baseline that makes the next one visible, never a rule.
     # 33 -> 32 (2026-09-19): the draft-expiry sentence «مرّ وقت طويل على الطلب فألغيته…» moved
     # into lia.md as `service_expired` when cancel/expiry became per-operation.
+    # 2026-09-20 (T5): STILL 32, AND THAT IS A COINCIDENCE WORTH WRITING DOWN rather than a sign
+    # nothing moved. Two real movements cancelled: «الحلاق» (the conflict message's barber
+    # fallback) left this count when the raw write was split out of the sending path (-1), and
+    # «✅ سجّلهم» joined it (+1) — the plural confirm button, a literal by the same standing
+    # decision that keeps «✅ سجّله» and «❌ إلغاء» as literals. The list separator in the partial
+    # message is deliberately joined outside the send call, so punctuation never inflates this.
     check("the un-migrated owner-facing literals are pinned at 32 (was 33; expiry text moved)",
           len(_sent_literals) == 32, str(len(_sent_literals)))
     # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
