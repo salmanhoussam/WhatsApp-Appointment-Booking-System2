@@ -1,0 +1,21 @@
+customerPhone "96176985477"
+clientId null
+conversationId null
+step "IDLE"
+stateData {"lia": {}, "guests": null, "unit_id": null, "check_in": null, "check_out": null, "unit_name": null, "client_slug": "", "property_id": null, "customer_name": null, "property_name": null, "res_barber_id": null, "res_service_id": null, "res_barber_name": null, "res_duration_min": null, "res_service_name": null, "res_customer_name": null, "res_slot_datetime": null}
+expiresAt "2026-09-21 09:35:09.987000+00:00"
+updatedAt "2026-09-21 09:05:09.988000+00:00"
+conversation null
+----
+customerPhone "96178727986"
+clientId null
+conversationId "7ee24c80-a0dd-4ec2-a4c2-20f1c306a11b"
+step "IDLE"
+stateData {"lia": {}, "guests": null, "unit_id": null, "check_in": null, "check_out": null, "unit_name": null, "client_slug": "", "property_id": null, "customer_name": null, "property_name": null, "res_barber_id": null, "res_service_id": null, "res_barber_name": null, "res_duration_min": null, "res_service_name": null, "res_customer_name": null, "res_slot_datetime": null}
+expiresAt "2026-09-21 09:28:57.183000+00:00"
+updatedAt "2026-09-21 08:58:57.185000+00:00"
+conversation null
+----
+rk config keys ['font', 'hero', 'story', 'content', 'working_hours', 'catalog_layout', 'page_background']
+working_hours {"open_time": "09:00", "close_time": "21:00", "closed_days": ["monday"]}
+attempted ['CatalogItemActions.create']
