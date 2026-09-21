@@ -206,9 +206,14 @@ async def main():
     # FIVE since S7 (2026-09-17). `update_product` joined because the live test exposed a dead
     # end: once Lia says "this already exists", refusing and stopping sends the owner back to the
     # dashboard. Same gate and permission as create_product, read off store.py's PATCH route.
-    check("exactly five operations registered (was four before S7)",
+    # TRANSITION (2026-09-21). WAS five. `log_daily_visits` (completed, paid work -- Salman's
+    # decision after Hussein's live round on rk) and `daily_report` («تقرير اليوم», a read with the
+    # GET route's own permission) joined. Neither adds a write path: the first writes through
+    # `create_reservation`, the second writes nothing.
+    check("exactly seven operations registered (was five before the daily log)",
           ops.names() == ("create_catalog_item", "create_product", "create_reservation",
-                          "create_service", "update_product"),
+                          "create_service", "daily_report", "log_daily_visits",
+                          "update_product"),
           str(ops.names()))
     check("   update_product shares create_product's gate and permission exactly",
           ops.get("update_product").service_key == OP_PRODUCT.service_key

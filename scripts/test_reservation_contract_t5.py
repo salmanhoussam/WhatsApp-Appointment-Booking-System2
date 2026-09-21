@@ -181,22 +181,39 @@ async def main():
               + ("passing `status` deliberately" if lia else "none passing `status`"),
               len(passes) >= 1 and (any(passes) if lia else not any(passes)), str(passes))
     check("all four callers accounted for, none forgotten", total >= 4, str(total))
-    # And the value Lia passes is not a literal it invented at the call site: it comes from the
-    # one function that encodes D-2, so the rule lives in a single readable place.
+    # TRANSITION (2026-09-21, D-A). WAS: one Lia call site whose `status` came from `_row_status`,
+    # the single function that turned a visit verb into `arrived`, feeding both reservation write
+    # paths. D-A moved reported visits OUT of the reservation flow into `log_daily_visits`, and
+    # `_row_status` was deleted with the branch. The rule now lives in the operation itself:
+    #   the appointment path passes a status that is only ever "pending";
+    #   the daily completed log passes "arrived" -- Salman: "Lia daily completed operation may
+    #   pass arrived" -- and nothing else in Lia does.
     src = open(os.path.join(ROOT, "app/services/lia_owner_entry.py"), encoding="utf-8").read()
-    call = next(n for n in ast.walk(ast.parse(src))
-                if isinstance(n, ast.Call)
-                and getattr(n.func, "attr", None) == "create_reservation")
-    passed = next(k.value for k in call.keywords if k.arg == "status")
-    check("   the value at the call site is never a hardcoded status",
-          not isinstance(passed, ast.Constant), ast.dump(passed)[:60])
-    # It is forwarded from `_row_status`, which is where D-2 actually lives — and it is used on
-    # BOTH write paths (the single reservation and the batch), so neither can drift into writing
-    # `arrived` on its own terms.
-    producers = [n for n in ast.walk(ast.parse(src))
-                 if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_row_status"]
-    check("   and `_row_status` — the one place D-2 is encoded — feeds both write paths",
-          len(producers) == 2, str(len(producers)))
+    tree = ast.parse(src)
+    owners = {}
+    for fn in ast.walk(tree):
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for n in ast.walk(fn):
+                if (isinstance(n, ast.Call)
+                        and getattr(n.func, "attr", None) == "create_reservation"):
+                    owners[fn.name] = next((k.value for k in n.keywords if k.arg == "status"),
+                                           None)
+    check("Lia calls create_reservation from exactly two functions",
+          set(owners) == {"_try_write_reservation", "_commit_daily_log"}, str(sorted(owners)))
+    res = owners.get("_try_write_reservation")
+    check("   the appointment path forwards a variable, not a literal",
+          res is not None and not isinstance(res, ast.Constant),
+          ast.dump(res)[:60] if res is not None else "missing")
+    daily = owners.get("_commit_daily_log")
+    check("   the daily log passes the literal 'arrived' — completed, paid work",
+          isinstance(daily, ast.Constant) and daily.value == "arrived",
+          ast.dump(daily)[:60] if daily is not None else "missing")
+    pend = [n for n in ast.walk(tree)
+            if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "status"
+                                                 for t in n.targets)]
+    check("   and every `status =` assignment in Lia is 'pending' — no path invents 'arrived'",
+          pend and all(isinstance(n.value, ast.Constant) and n.value.value == "pending"
+                       for n in pend), str([ast.dump(n.value)[:30] for n in pend]))
 
     print("\n" + ("ALL GREEN" if ok else "FAILURES ABOVE"))
     return 0 if ok else 1

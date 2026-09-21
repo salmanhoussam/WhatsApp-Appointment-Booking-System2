@@ -39,6 +39,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 
@@ -125,6 +126,11 @@ _RECORD_VERBS = ("سجل", "سجّل")
 # defaults he already approved (T4.1), or from a question. Deliberately NOT generalised to "any
 # verb that implies a service" -- the order stays
 # visit action -> reservation intent -> extraction -> validation -> preview -> confirmation -> write.
+#
+# 2026-09-21 (Salman, D-A): these four verbs now open `log_daily_visits`, NOT the reservation. A
+# visit he reports is completed, paid work; routing it through the reservation flow is what made
+# Hussein's live round ask for phones and working hours that do not apply. The list is exactly
+# these four -- «عملتله» was explicitly NOT added.
 _VISIT_VERBS = ("حلقت", "حلقنا", "قصيت", "قصينا")
 # FRANCO ARABIC, S7 (2026-09-18, Salman's decision 3). The owner writes Latin letters with digits
 # standing in for letters -- 3=ع, 7=ح, 2=ء, 5=خ -- and that is INPUT UNDERSTANDING only: nothing
@@ -156,9 +162,9 @@ _ENTRY_VERBS = _ADD_VERBS + _RECORD_VERBS + _VISIT_VERBS
 def _has_visit_verb(text: str) -> bool:
     """Did the owner say the service ALREADY HAPPENED? D-5 · D-2, 2026-09-20.
 
-    Read in two places, which is why it is a function and not an inline `any(...)`: it decides
-    that the message may enter the reservation path at all, and later that the row is born
-    `arrived` rather than `pending`. Salman's governing rule:
+    2026-09-21 (D-A): it now opens `log_daily_visits`, and the reservation flow no longer reads it
+    at all -- `arrived` is written by the daily log, which exists for exactly this. Salman's
+    governing rule, unchanged:
 
         "Explicit owner-reported completed visit is sufficient evidence for `arrived`; no
          additional business confirmation of completion is required."
@@ -169,6 +175,74 @@ def _has_visit_verb(text: str) -> bool:
     """
     low = " ".join((text or "").split()).lower()
     return any(v in low for v in _VISIT_VERBS)
+
+
+# ── Daily completed log · families without a verb (2026-09-21) ───────────────
+DAILY_LOG_OP = "log_daily_visits"
+DAILY_REPORT_OP = "daily_report"
+# A domain invariant, enforced by the SERVER before any write. Salman: «أكثر من 15: لا تكتب أول
+# 15 ثم تتجاهل الباقي. أوقف العملية قبل أي write واطلب تقسيمها.»
+MAX_DAILY_LOG_ITEMS = 15
+
+# Arabic-Indic and Persian digits are what an owner's keyboard types half the time.
+_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
+_TOKEN = re.compile(r"\d+(?:[.,]\d+)?|[^\W\d_]+")
+# Currency words sit next to an amount and are not part of anybody's name.
+_CURRENCY_WORDS = frozenset({"دولار", "دولارات", "ليرة", "ليره", "الف", "ألف", "usd", "lbp",
+                             "dollar", "dollars", "ل", "$"})
+# An amount is at most five digits. Six or more is a PHONE NUMBER, and a customer sending his
+# number must never be read as a cash line.
+_MAX_AMOUNT_DIGITS = 5
+
+
+def _norm_digits(text: str) -> str:
+    return (text or "").translate(_DIGITS)
+
+
+def _is_report_request(low: str) -> bool:
+    """«تقرير اليوم» / «تقرير» -- a short message that is only the request. Nothing longer: a
+    sentence that merely mentions a report is not asking for one."""
+    words = _fold_ar(low).split()
+    return 1 <= len(words) <= 3 and any(w in ("تقرير", "التقرير") for w in words)
+
+
+def _looks_like_daily_log(low: str) -> bool:
+    """«علي 10، محمد 7، أحمد 5» -- at least one amount, and every amount follows a name.
+
+    A SHAPE, NOT A DICTIONARY, and deliberately narrow. It never fires when the message carries a
+    Lia verb or a family noun: «سجل موعد لأحمد مبارح الساعة 4» has a number after words too, and
+    must stay a reservation. A phone number (six digits or more) disqualifies the whole message.
+    """
+    if any(v in low for v in _ADD_VERBS + _RECORD_VERBS + _VISIT_VERBS):
+        return False
+    if any(o in low for o in _ENTRY_OBJECTS + _PRODUCT_OBJECTS + _RESERVATION_OBJECTS):
+        return False
+    # And the SAME words in Franco -- «dif mantoj shampoo b 12 dollar» is a product, not a cash
+    # line. Caught by test_lia_s7 on the first run of this change.
+    if _has_franco(low, _FRANCO_ADD_VERBS + _FRANCO_RECORD_VERBS + _FRANCO_SERVICE_WORDS
+                   + _FRANCO_PRODUCT_WORDS + _FRANCO_RESERVATION_WORDS):
+        return False
+    if ":" in low:
+        return False                                  # a clock time, not an amount
+    # A digit glued to a Latin letter is FRANCO, where digits are letters -- «bade 7le2a bokra» is
+    # a customer asking for a haircut, and its «7» is a ح, not seven dollars. Caught by
+    # test_lia_s7 once a trailing name was allowed.
+    if re.search(r"[a-z]\d|\d[a-z]", _norm_digits(low)):
+        return False
+    words_since, amounts = 0, 0
+    for tok in _TOKEN.findall(_norm_digits(low)):
+        if tok[0].isdigit():
+            if len(tok.split(".")[0].split(",")[0]) > _MAX_AMOUNT_DIGITS:
+                return False
+            if words_since == 0 or words_since > 5:
+                return False
+            amounts += 1
+            words_since = 0
+        elif tok not in _CURRENCY_WORDS:
+            words_since += 1
+    # A trailing name WITHOUT an amount is still the same list -- «علي 10، محمد» is Salman's own
+    # example of a missing amount, which must become a question (DL-9), not a silence.
+    return amounts >= 1 and words_since <= 5
 _ENTRY_OBJECTS = ("خدمة", "خدمه", "سيرفس", "service")
 
 
@@ -232,6 +306,14 @@ def _entry_family(text: str) -> Optional[str]:
     question costs no model call either, so the wider gate is free.
     """
     low = " ".join((text or "").split()).lower()
+    # 2026-09-21. Two families that carry no verb, checked FIRST and each by its own narrow shape
+    # rather than by a word list: «تقرير اليوم», and a list of «name amount» pairs. A sender that
+    # does not resolve to an owner falls through to the customer flow for both (see try_handle),
+    # so the cost of a customer typing «علي 10» is one owner lookup, never a swallowed message.
+    if _is_report_request(low):
+        return DAILY_REPORT_OP
+    if _looks_like_daily_log(low):
+        return DAILY_LOG_OP
     if len(low) < 6:
         return None
     # A VERB IS STILL REQUIRED FOR EVERY PATH, and this line is load-bearing. The first S7 draft
@@ -263,9 +345,11 @@ def _entry_family(text: str) -> Optional[str]:
     # happened. It is placed here, in the no-noun branch, rather than earlier: a message that DOES
     # name a family keeps being read by its noun, so «ضيف خدمة… وحلقت» still goes to the question
     # instead of being decided by the verb.
-    if (any(v in low for v in _RECORD_VERBS) or _has_franco(low, _FRANCO_RECORD_VERBS)
-            or _has_visit_verb(low)):
+    if any(v in low for v in _RECORD_VERBS) or _has_franco(low, _FRANCO_RECORD_VERBS):
         return "create_reservation"
+    # D-A (2026-09-21): a visit he reports is completed work, not an appointment.
+    if _has_visit_verb(low):
+        return DAILY_LOG_OP
     if not (any(v in low for v in _ADD_VERBS) or _has_franco(low, _FRANCO_ADD_VERBS)):
         return None
     # Is there anything to add? A price-like number, or at least two words beyond the verb. This
@@ -659,6 +743,9 @@ _RESERVATION_START = "<!--LIA_RESERVATION_PROMPT_START-->"
 _RES_EDIT_START = "<!--LIA_RESERVATION_EDIT_PROMPT_START-->"
 _RES_EDIT_END   = "<!--LIA_RESERVATION_EDIT_PROMPT_END-->"
 _RESERVATION_END   = "<!--LIA_RESERVATION_PROMPT_END-->"
+# 2026-09-21: the daily completed log -- a model-facing block of its own, for its own operation.
+_DAILY_LOG_START = "<!--LIA_DAILY_LOG_PROMPT_START-->"
+_DAILY_LOG_END   = "<!--LIA_DAILY_LOG_PROMPT_END-->"
 _EDIT_START = "<!--LIA_EDIT_PROMPT_START-->"
 _EDIT_END   = "<!--LIA_EDIT_PROMPT_END-->"
 # Owner-facing wording that this round changes. NOT the whole file's messages -- see the block's
@@ -721,7 +808,15 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "reservation_edit_named", "reservation_preview_past_multi",
                      # 2026-09-19, Salman: the first reply of an appointment greets the person
                      # by name («أهلاً سلمان، نسيت تقلّي الحلاق»).
-                     "greet_prefix")
+                     "greet_prefix",
+                     # DL-1…DL-15 (2026-09-21, every one approved verbatim by Salman before this
+                     # code was written). DL-6 and DL-8 are NOT here: they reuse
+                     # `reservation_confirm_multi` and `reservation_created_partial`, as approved.
+                     "daily_log_preview", "daily_log_line", "daily_log_service_unknown",
+                     "daily_log_total", "daily_log_time_approx", "daily_log_created",
+                     "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
+                     "daily_log_expired", "daily_report_header", "daily_report_total",
+                     "daily_report_empty")
 
 
 def _load_prompt() -> str:
@@ -813,6 +908,7 @@ _WELCOME = _load_block(_WELCOME_START, _WELCOME_END, "welcome", min_len=40)
 _EDIT_PROMPT = _load_block(_EDIT_START, _EDIT_END, "edit prompt")
 _RESERVATION_PROMPT = _load_block(_RESERVATION_START, _RESERVATION_END, "reservation prompt")
 _RESERVATION_EDIT_PROMPT = _load_block(_RES_EDIT_START, _RES_EDIT_END, "reservation edit prompt")
+_DAILY_LOG_PROMPT = _load_block(_DAILY_LOG_START, _DAILY_LOG_END, "daily log prompt")
 _REPLIES = _load_replies()
 
 
@@ -971,26 +1067,10 @@ async def _apply_reservation_defaults(draft: dict) -> None:
         if known:
             data["customer_phone"] = known
             auto.add("customer_phone")
-    # D-4 (2026-09-20, approved): a visit he says he already performed, with no number given, is
-    # a walk-in — «اليوم الصبح حلقت لعلي ومحمد وأحمد» carries no phones and never will. Asking for
-    # three numbers that do not exist is what would kill the feature.
-    #
-    # SCOPED TO A REPORTED VISIT, and the scope is the decision: «سجل موعد لأحمد مبارح الساعة ٤»
-    # is a historical APPOINTMENT, Lia still asks for its number exactly as she did yesterday, and
-    # the T4 flow is untouched. Marked «(تلقائي)» and editable like every other filled-in value,
-    # so he can still say «رقمه 70…» at the preview.
-    if (not data.get("customer_phone") and draft.get("visit_reported")
-            and data.get("reserved_at")):
-        from app.schemas.lia_drafts import WALK_IN_PHONE
-        try:
-            when = data["reserved_at"]
-            past = _is_past(when if isinstance(when, datetime)
-                            else datetime.fromisoformat(str(when)))
-        except ValueError:
-            past = False
-        if past:
-            data["customer_phone"] = WALK_IN_PHONE
-            auto.add("customer_phone")
+    # D-4 (2026-09-20) lived here -- a reported visit filled its phone with WALK_IN. REMOVED
+    # 2026-09-21 by D-A: a reported visit no longer enters this flow at all (`log_daily_visits`),
+    # so a reservation draft that reaches this line is an appointment, and an appointment's number
+    # is asked for, exactly as T4 always did.
     if not data.get("barber_name") and draft.get("actor_barber_id"):
         brb = next((b for b in await _list_barbers(draft["client_id"])
                     if str(getattr(b, "id", "")) == str(draft["actor_barber_id"])), None)
@@ -1011,7 +1091,8 @@ def _take_greeting(draft: dict) -> str:
     The name is the first word of the talking account's `fullName`, read when the draft opened.
     No name, no greeting -- never a placeholder. Marked on the draft BEFORE the caller saves it.
     """
-    if draft.get("greeted") or _draft_operation(draft) != "create_reservation":
+    if draft.get("greeted") or _draft_operation(draft) not in ("create_reservation",
+                                                                 DAILY_LOG_OP):
         return ""
     draft["greeted"] = True
     name = (draft.get("actor_name") or "").strip()
@@ -1133,7 +1214,8 @@ def _within_one_edit(a: str, b: str) -> bool:
     return True
 
 
-async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["object"]:
+async def _ask_model(system_prompt: str, text: str, model_cls,
+                     max_tokens: int = 512) -> Optional["object"]:
     """One model call, one contract. `_UNAVAILABLE` for our fault, None for an unusable answer.
 
     `model_cls` is a Pydantic class with `extra="forbid"` and a one-value `intent` Literal, so the
@@ -1149,7 +1231,7 @@ async def _ask_model(system_prompt: str, text: str, model_cls) -> Optional["obje
         client = anthropic.AsyncAnthropic(api_key=api_key)
         resp = await client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=512,
+            max_tokens=max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": text}],
         )
@@ -1254,6 +1336,10 @@ def _per_operation(op_name: Optional[str], moment: str, many: bool = False) -> s
     """
     if op_name == "create_reservation":
         return f"reservation_{moment}_multi" if many else f"reservation_{moment}"
+    if op_name == DAILY_LOG_OP:
+        # DL-11 / DL-12 (2026-09-21, approved verbatim). NOT the reservation texts: those say
+        # «المواعيد», and this was never an appointment.
+        return f"daily_log_{moment}"
     if op_name == "create_product":
         return f"product_{moment}"
     return "cancel" if moment == "cancelled" else "service_expired"
@@ -1543,7 +1629,8 @@ def _sequence_time(cursor: Optional[datetime], said_at: datetime, time_said: boo
     keeps what he actually stated.
     """
     start = said_at if (time_said or cursor is None) else cursor
-    return start, start + timedelta(minutes=duration_min or 30)
+    # D-C (2026-09-21): the platform's own default, read -- not a second literal 30 of Lia's.
+    return start, start + timedelta(minutes=duration_min or _default_duration_min())
 
 
 # Everything that belongs to ONE item and must not survive into the next one. `data` is replaced
@@ -1853,7 +1940,7 @@ async def _resolve_reservation_rows(wa, phone: str, session, draft: dict) -> boo
     # must show what will be written, not what was heard.
     draft["service_id"]   = svc.id
     draft["barber_id"]    = brb.id
-    draft["duration_min"] = getattr(svc, "durationMin", None) or 30
+    draft["duration_min"] = getattr(svc, "durationMin", None) or _default_duration_min()
     draft["data"]["service_name"] = getattr(svc, "nameAr", "") or draft["data"]["service_name"]
     draft["data"]["barber_name"]  = getattr(brb, "name", "") or draft["data"]["barber_name"]
     return True
@@ -2112,6 +2199,22 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
         logger.error("🔥 Lia: draft named unknown operation %r — write refused", op_name)
         return
 
+    if op.name == DAILY_LOG_OP:
+        # Re-authorised at the moment of the write, exactly like every other operation. The
+        # daily log has no single draft class to re-validate: each line was checked as it entered
+        # the draft, and `create_reservation` validates each row again on the way in.
+        ok, reason = await _still_authorised(phone, client_id, op)
+        if not ok:
+            await log_security_event(
+                event_type="lia_write_refused", client_id=client_id, endpoint=_ENDPOINT,
+                detail={"reason": reason, "operation": op.name, "sender_phone": phone},
+                actor=actor_id,
+            )
+            logger.warning("🚫 Lia: daily log refused at commit time (%s) from %s", reason, phone)
+            return
+        await _commit_daily_log(wa, phone, draft, op, actor, actor_id)
+        return
+
     try:
         validated = draft_cls.model_validate(draft["data"])
     except Exception as exc:
@@ -2135,7 +2238,7 @@ async def _commit(wa, phone: str, session, draft: dict, clear_draft) -> None:
 
     if op.name == "create_reservation":
         created = await _write_reservation(wa, phone, client_id, validated,
-                                           _all_items(draft)[0], _row_status(draft, validated))
+                                           _all_items(draft)[0])
     elif op.name == "create_product":
         created = await _write_product(wa, phone, client_id, validated)
     else:
@@ -2349,23 +2452,6 @@ async def _write_product(wa, phone: str, client_id: str, validated) -> Optional[
     return created
 
 
-def _row_status(draft: dict, validated) -> str:
-    """`arrived` or `pending` — D-2, decided 2026-09-20, in Salman's own words:
-
-        "Explicit owner-reported completed visit is sufficient evidence for `arrived`; no
-         additional business confirmation of completion is required. Preview/confirm only
-         validates the extracted fields before writing."
-
-    TWO CONDITIONS, BOTH REQUIRED. The VERB is the evidence — «حلقتلو» — and the date alone never
-    is: «سجل موعد لأحمد مبارح الساعة ٤» is a historical APPOINTMENT and stays `pending`, the
-    invariant `scripts/test_lia_reservation_t1.py:18` has pinned since T1. And it must actually be
-    past: a visit cannot have been completed at a time that has not arrived.
-    """
-    if draft.get("visit_reported") and _is_past(validated.reserved_at):
-        return "arrived"
-    return "pending"
-
-
 async def _commit_reservations(wa, phone: str, client_id: str, draft: dict, op,
                                actor: Optional[str], actor_id: Optional[str]) -> None:
     """Write every item in the list, in order, and report each one's real outcome. D-6.
@@ -2391,7 +2477,9 @@ async def _commit_reservations(wa, phone: str, client_id: str, draft: dict, op,
             failed.append(data.get("customer_name") or "—")
             reason = reason or _REPLIES["reservation_unclear"]
             continue
-        status = _row_status(draft, validated)
+        # D-A (2026-09-21): an appointment is born `pending`, always. `arrived` belongs to
+        # `log_daily_visits`, where the owner reports work already done.
+        status = "pending"
         row, why = await _try_write_reservation(client_id, validated, item, status)
         if row is None:
             failed.append(validated.customer_name)
@@ -2524,6 +2612,518 @@ async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tu
     if op is None:
         return True, _R_OK
     return await _authorise_operation(client_id, user, op)
+
+
+# ── Daily completed log · the operation (2026-09-21) ─────────────────────────
+#
+# Plan: .claudedocs/plans/lia-daily-cash-log-and-mobile-landing.md (v2), every decision approved by
+# Salman on 2026-09-21. «علي 10، محمد 7، أحمد 5» is work ALREADY DONE and cash ALREADY TAKEN, so it
+# never meets a reservation question: no phone, no hour, no availability, no working hours, no
+# merchant alert, no second confirmation that the visit happened.
+#
+# 🔴 THE SERVER ENFORCES THE INVARIANTS, NOT THE MODEL. The model only reads names, amounts and
+# service words. Everything below is decided here, and every one is pinned by
+# scripts/test_lia_daily_log.py:
+#     at most MAX_DAILY_LOG_ITEMS, refused BEFORE any write, never truncated
+#     an amount counts only if the owner wrote that number (`_said_amount`)
+#     a missing amount is a question (DL-9), never a price from the list
+#     a service that matches nothing is kept as said and never blocks the line
+#     the four write keywords are fixed, never derived from the clock
+#
+# WHERE IT LANDS: a `Reservation` through the ONE write path, `create_reservation`, with
+# `status="arrived"` and the amount under `metadata.daily_log` -- a TEMPORARY BRIDGE (Finding 14 in
+# capabilities/lia.md) until a payment domain exists. `daily_report` is that key's only consumer,
+# and it counts a row only when `source == "lia"`, `daily_log.v == 1` and `status == "arrived"`:
+# `source` is set by the server per caller, so a key written through the website or the dashboard
+# is never counted.
+
+DAILY_LOG_KEY = "daily_log"
+DAILY_LOG_VERSION = 1
+# T5's period rule, unchanged: الصبح 09:00 · بعد الضهر 14:00 · المسا 18:00, and the morning when
+# he names no period.
+_PERIOD_START = {"morning": 9, "afternoon": 14, "evening": 18}
+_DEFAULT_PERIOD = "morning"
+_MAX_AMOUNT = Decimal("100000")
+_ACTIVE_STATUSES = ("pending", "confirmed", "arrived")
+
+
+def _default_duration_min() -> int:
+    """The platform's own default for a barber reservation -- never a second number of Lia's.
+
+    `create_reservation` applies exactly this when it is given no duration
+    (`reservation_service.py`, `MODULE_DEFAULTS`), so reading it here keeps the placement and the
+    row's own `durationMin` agreeing. D-C (Salman, 2026-09-21): no daily-log duration of its own.
+    """
+    from app.services.reservation_service import MODULE_DEFAULTS
+    return MODULE_DEFAULTS["barber"]["duration_min"]
+
+
+def _amounts_in(text: str) -> list:
+    """Every number the owner actually wrote, as Decimals. Six digits or more is a phone, not money."""
+    out = []
+    for tok in _TOKEN.findall(_norm_digits(text or "")):
+        if not tok[0].isdigit():
+            continue
+        num = tok.replace(",", ".")
+        if len(num.split(".")[0]) > _MAX_AMOUNT_DIGITS:
+            continue
+        try:
+            out.append(Decimal(num))
+        except InvalidOperation:
+            continue
+    return out
+
+
+def _fmt_amount(value) -> str:
+    """«10», never «10.0» -- the amount as he would write it. A string, so the draft stays JSON."""
+    d = Decimal(str(value))
+    return format(d.quantize(Decimal(1)) if d == d.to_integral_value() else d.normalize(), "f")
+
+
+def _money(value, currency: str) -> str:
+    return f"{_fmt_amount(value)} {currency or ''}".strip()
+
+
+def _said_amount(amount, said: list) -> Optional[str]:
+    """The model's amount ONLY IF the owner wrote that very number. Otherwise it is missing.
+
+    This is the anti-invention guard: a model that "helpfully" copies a neighbour's amount or a
+    service price produces a number that is not in the text, and it is dropped here -- which turns
+    it into a question, not into money he never mentioned.
+    """
+    if amount is None:
+        return None
+    try:
+        d = Decimal(str(amount))
+    except InvalidOperation:
+        return None
+    if d <= 0 or d > _MAX_AMOUNT:
+        return None
+    return _fmt_amount(d) if any(d == x for x in said) else None
+
+
+def _daily_items_from_shape(text: str) -> list[dict]:
+    """A deterministic read of «علي 10، محمد 7», used ONLY when the model gave nothing usable.
+
+    Names and amounts only. A service is never guessed here -- «علي حلاقة 10» becomes the name
+    «علي حلاقة», which the preview shows him before anything is written.
+    """
+    items, words = [], []
+    for tok in _TOKEN.findall(_norm_digits(text or "")):
+        if tok[0].isdigit():
+            if words:
+                items.append({"customer_name": " ".join(words),
+                              "amount": tok.replace(",", "."), "service_said": None})
+            words = []
+        elif tok.lower() not in _CURRENCY_WORDS:
+            words.append(tok)
+    return items
+
+
+async def _extract_daily_log(text: str) -> Optional["object"]:
+    """One owner message -> a LiaDailyLogExtraction, None, or _UNAVAILABLE. Same transport as
+    every other extraction; a larger token budget because fifteen names is a real day."""
+    from app.schemas.lia_drafts import LiaDailyLogExtraction
+    return await _ask_model(_DAILY_LOG_PROMPT, text, LiaDailyLogExtraction, max_tokens=1500)
+
+
+async def _tenant_currency(client_id: str) -> str:
+    """The tenant's own currency, copied onto each line at write time (`daily_log.currency`)."""
+    try:
+        client = await prisma_client.client.find_unique(where={"id": client_id})
+    except Exception as exc:                                   # pragma: no cover - read failure
+        logger.error("🔥 Lia: could not read currency for %s: %s", client_id, type(exc).__name__)
+        return ""
+    return (getattr(client, "currency", None) or "") if client else ""
+
+
+async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, actor, actor_id,
+                          user) -> bool:
+    """Read the message, enforce the cap, and open the draft. False means "nothing readable".
+
+    THE CAP IS CHECKED ON EVERYTHING READ, BEFORE A DRAFT EXISTS. Sixteen names are refused as
+    sixteen, so nothing downstream ever sees a list it would have to cut.
+    """
+    extraction = await _extract_daily_log(text)
+    raw, period, confidence = [], None, None
+    if extraction is not None and extraction is not _UNAVAILABLE:
+        raw = [i.model_dump() for i in extraction.items]
+        period, confidence = extraction.period, extraction.confidence
+    if not raw and _looks_like_daily_log(" ".join((text or "").split()).lower()):
+        # The model was unavailable or unusable, and the message is the plain list shape: read it
+        # without the model. A visit sentence has no such fallback -- its names are not a shape.
+        raw = _daily_items_from_shape(text)
+        confidence = confidence or "fallback"
+    if not raw:
+        logger.info("🤷 Lia: daily log unreadable for %s (%s) — not handled here", phone,
+                    "unavailable" if extraction is _UNAVAILABLE else "no items")
+        return False
+
+    if len(raw) > MAX_DAILY_LOG_ITEMS:
+        await log_security_event(
+            event_type="lia_daily_log_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": "too_many_items", "items": len(raw),
+                    "max": MAX_DAILY_LOG_ITEMS, "sender_phone": phone},
+            actor=actor_id,
+        )
+        await wa.send_text(phone, _REPLIES["daily_log_too_many"].format(
+            count=len(raw), max=MAX_DAILY_LOG_ITEMS))
+        return True
+
+    said = _amounts_in(text)
+    items = [{"customer_name": " ".join(str(r.get("customer_name") or "").split()),
+              "amount": _said_amount(r.get("amount"), said),
+              "service_said": (" ".join(str(r.get("service_said") or "").split()) or None)}
+             for r in raw]
+    items = [i for i in items if i["customer_name"]]
+    if not items:
+        return False
+
+    from app.core.permissions import scope_of
+    draft = {
+        "operation":       DAILY_LOG_OP,
+        "intent":          DAILY_LOG_OP,
+        "client_id":       client_id,
+        "actor":           actor,
+        "actor_id":        actor_id,
+        "actor_barber_id": getattr(user, "barberId", None),
+        "actor_name":      ((getattr(user, "fullName", None) or "").split() or [""])[0],
+        # A self-scoped account writes for its OWN barber only, and is never offered another.
+        "self_scoped":     scope_of(user) == "self",
+        "started_at":      datetime.now(timezone.utc).isoformat(),
+        "asking":          None,
+        # `data` and `unresolved` exist so the SHARED barber branches (button tap, typed answer)
+        # can hold the one thing they carry here: the barber's name.
+        "data":            {},
+        "unresolved":      [],
+        "items":           items,
+        "period":          period if period in _PERIOD_START else None,
+        "currency":        await _tenant_currency(client_id),
+    }
+    await log_security_event(
+        event_type="lia_draft_opened", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"intent": DAILY_LOG_OP, "operation": DAILY_LOG_OP, "confidence": confidence,
+                "items": len(items),
+                "amounts_missing": sum(1 for i in items if not i["amount"]),
+                "sender_phone": phone},
+        actor=actor_id,
+    )
+    await _advance(wa, phone, session, draft)
+    return True
+
+
+def _daily_line(item: dict, n: int, currency: str, service: Optional[str]) -> str:
+    """DL-2, with « · {service}» dropped -- and only that -- when there is no service."""
+    line = _REPLIES["daily_log_line"]
+    if not service:
+        line = line.replace(" · {service}", "")
+    return line.format(n=n, customer=item["customer_name"], service=service or "",
+                       amount=_money(item["amount"], currency))
+
+
+def _service_label(service_name: Optional[str], service_said: Optional[str]) -> Optional[str]:
+    """The shop's own row name when it matched; DL-3 around his words when it did not."""
+    if service_name:
+        return service_name
+    if service_said:
+        return _REPLIES["daily_log_service_unknown"].format(service_said=service_said)
+    return None
+
+
+async def _send_daily_confirm(wa, phone: str, draft: dict) -> None:
+    many = len(draft.get("items") or []) > 1
+    await wa.send_interactive_buttons(
+        to=phone,
+        text=_REPLIES["reservation_confirm_multi"] if many else _REPLIES["reservation_confirm"],
+        # The approved titles (2026-09-21): «✅ سجّلهم» for a list, «❌ إلغاء». Inline literals
+        # INSIDE the send call on purpose -- test_lia_s7 counts exactly these, and a helper
+        # returning them would hide three owner-facing strings from that count.
+        buttons=[
+            {"type": "reply", "reply": {"id": CONFIRM_ID,
+                                        "title": "✅ سجّلهم" if many else "✅ سجّله"}},
+            {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
+        ],
+    )
+
+
+async def _send_daily_preview(wa, phone: str, draft: dict, greeting: str = "") -> None:
+    """DL-1, one DL-2 per name in his order, DL-4, DL-5 -- then DL-6 with the two buttons."""
+    currency = draft.get("currency") or ""
+    items = draft.get("items") or []
+    lines = [_daily_line(i, n, currency, _service_label(i.get("service_name"), i.get("service_said")))
+             for n, i in enumerate(items, 1)]
+    total = sum((Decimal(i["amount"]) for i in items), Decimal(0))
+    body = "\n".join([_REPLIES["daily_log_preview"], *lines,
+                      _REPLIES["daily_log_total"].format(total=_money(total, currency)),
+                      _REPLIES["daily_log_time_approx"]])
+    await wa.send_text(phone, greeting + body)
+    await _send_daily_confirm(wa, phone, draft)
+
+
+def _apply_amount_answer(draft: dict, text: str) -> bool:
+    """His answer to DL-9. True when at least one missing amount was filled from HIS numbers.
+
+    One name missing and one number given: that number. Several: the first number after where he
+    named each one («محمد 7 وأحمد 5»); failing that, as many numbers as names, in order. Every
+    amount comes from this answer's own text, so nothing here can be invented either.
+    """
+    missing = [i for i in draft.get("items") or [] if not i.get("amount")]
+    nums = [d for d in _amounts_in(text) if Decimal(0) < d <= _MAX_AMOUNT]
+    if not missing or not nums:
+        return False
+    if len(missing) == 1 and len(nums) == 1:
+        missing[0]["amount"] = _fmt_amount(nums[0])
+        return True
+    folded = _fold_ar(_norm_digits(text))
+    changed = False
+    for item in missing:
+        at = _name_at(folded, item["customer_name"])
+        if at < 0:
+            continue
+        after = _amounts_in(folded[at:])
+        after = [d for d in after if Decimal(0) < d <= _MAX_AMOUNT]
+        if after:
+            item["amount"] = _fmt_amount(after[0])
+            changed = True
+    if not changed and len(nums) == len(missing):
+        for item, d in zip(missing, nums):
+            item["amount"] = _fmt_amount(d)
+        changed = True
+    return changed
+
+
+async def _ask_missing_amounts(wa, phone: str, session, draft: dict, greeting: str = "") -> None:
+    names = [i["customer_name"] for i in draft.get("items") or [] if not i.get("amount")]
+    draft["asking"] = "amount"
+    _save_draft(session, draft)
+    session.state = LIA_AWAITING_FIELD
+    _sep = "، "
+    await wa.send_text(phone, greeting + _REPLIES["daily_log_ask_amount"].format(
+        names=_sep.join(names)))
+
+
+async def _advance_daily_log(wa, phone: str, session, draft: dict) -> None:
+    """Barber, then services, then amounts -- and the preview once nothing is missing."""
+    client_id = draft["client_id"]
+
+    if not draft.get("barber_id"):
+        barbers = await _list_barbers(client_id)
+        said = (draft.get("data") or {}).get("barber_name")
+        brb = None
+        if draft.get("actor_barber_id"):
+            brb = next((b for b in barbers
+                        if str(getattr(b, "id", "")) == str(draft["actor_barber_id"])), None)
+        if brb is None and said and not draft.get("self_scoped"):
+            brb = _match_by_name(barbers, said, attr="name")
+        if brb is None:
+            if draft.get("self_scoped"):
+                # A self-scoped account records ITS OWN work only. With no linked barber there is
+                # nobody it may write for -- refused, like the list route's own fail-closed 403.
+                _save_draft(session, None)
+                session.state = "IDLE"
+                await log_security_event(
+                    event_type="lia_daily_log_refused", client_id=client_id, endpoint=_ENDPOINT,
+                    detail={"reason": "self_scope_without_barber", "sender_phone": phone},
+                    actor=draft.get("actor_id"),
+                )
+                return
+            draft["asking"] = "barber_name"
+            draft.setdefault("data", {}).pop("barber_name", None)
+            greeting = _take_greeting(draft)
+            _save_draft(session, draft)
+            session.state = LIA_AWAITING_FIELD
+            if said:
+                names = " · ".join((getattr(b, "name", "") or "").strip() for b in barbers)
+                await wa.send_text(phone, _REPLIES["reservation_barber_unknown"].format(names=names))
+            else:
+                await _ask_barber(wa, phone, draft, greeting + _REPLIES["reservation_ask_barber"])
+            return
+        draft["barber_id"] = str(brb.id)
+        draft["barber_name"] = getattr(brb, "name", "") or ""
+
+    services = None
+    for item in draft.get("items") or []:
+        if item.get("service_said") and "service_id" not in item:
+            services = services if services is not None else await _list_services(client_id)
+            svc = _match_by_name(services, item["service_said"])
+            item["service_id"] = str(svc.id) if svc is not None else None
+            item["service_name"] = (getattr(svc, "nameAr", None) or None) if svc is not None else None
+            item["duration_min"] = getattr(svc, "durationMin", None) if svc is not None else None
+
+    greeting = _take_greeting(draft)
+    if any(not i.get("amount") for i in draft.get("items") or []):
+        await _ask_missing_amounts(wa, phone, session, draft, greeting)
+        return
+
+    draft["asking"] = None
+    _save_draft(session, draft)
+    session.state = LIA_AWAITING_CONFIRM
+    await _send_daily_preview(wa, phone, draft, greeting)
+
+
+async def _place_daily_items(client_id: str, barber_id: str, draft: dict) -> list:
+    """(start, duration) per item: the first free slot for this barber today, from the period's
+    start, in his order. D-C (approved 2026-09-21).
+
+    It RESPECTS the collision rules instead of disabling them: `create_reservation`'s overlap check
+    has no off switch, and the partial unique index covers `arrived`. So the barber's real rows for
+    today are read first and every line is placed around them. Read at COMMIT time, not at preview
+    time, because a booking can land in between.
+    """
+    from app.services import reservation_service
+    now = datetime.now()                     # the shop's wall clock -- TZ=Asia/Beirut, see _is_past
+    day0 = datetime(now.year, now.month, now.day)
+    start_hour = _PERIOD_START.get(draft.get("period") or _DEFAULT_PERIOD,
+                                   _PERIOD_START[_DEFAULT_PERIOD])
+    rows = await reservation_service.list_reservations(
+        client_id=client_id, barber_id=barber_id,
+        date_from=day0.replace(tzinfo=timezone.utc),
+        date_to=(day0 + timedelta(days=1)).replace(tzinfo=timezone.utc), limit=500)
+    busy = []
+    for r in rows or []:
+        if r.get("status") not in _ACTIVE_STATUSES:
+            continue
+        s0 = datetime.fromisoformat(str(r["reserved_at"])).replace(tzinfo=None)
+        busy.append((s0, s0 + timedelta(minutes=int(r.get("duration_min") or 0))))
+    cursor = day0.replace(hour=start_hour)
+    out = []
+    for item in draft.get("items") or []:
+        minutes = int(item.get("duration_min") or _default_duration_min())
+        slot, moved = cursor, True
+        while moved:
+            moved = False
+            for b0, b1 in busy:
+                if slot < b1 and b0 < slot + timedelta(minutes=minutes):
+                    slot, moved = b1, True
+        out.append((slot, minutes))
+        busy.append((slot, slot + timedelta(minutes=minutes)))
+        cursor = slot + timedelta(minutes=minutes)
+    return out
+
+
+async def _commit_daily_log(wa, phone: str, draft: dict, op, actor, actor_id) -> None:
+    """Write each line through `create_reservation`, report each line's real outcome. D-6 applies:
+    no rollback, and the owner is told exactly which names were recorded."""
+    from app.schemas.lia_drafts import WALK_IN_PHONE
+    from app.services import reservation_service
+    client_id, barber_id = draft["client_id"], draft["barber_id"]
+    currency = draft.get("currency") or ""
+    items = draft.get("items") or []
+    placements = await _place_daily_items(client_id, barber_id, draft)
+    done, failed = [], []
+    for item, (start, minutes) in zip(items, placements):
+        metadata = {"barber_id": barber_id,
+                    DAILY_LOG_KEY: {"v": DAILY_LOG_VERSION, "amount": item["amount"],
+                                    "currency": currency,
+                                    # What he SAID, kept only when it matched nothing; a matched
+                                    # service is already the row's real `serviceId`.
+                                    "service_said": (None if item.get("service_id")
+                                                     else item.get("service_said"))}}
+        if item.get("service_id"):
+            metadata["service_id"] = item["service_id"]
+        try:
+            row = await reservation_service.create_reservation(
+                client_id      = client_id,
+                module_key     = "barber",
+                customer_name  = item["customer_name"],
+                # D-D (approved): no number means the shared walk-in row, never a name match.
+                customer_phone = WALK_IN_PHONE,
+                reserved_at    = start.replace(tzinfo=timezone.utc),
+                duration_min   = minutes,
+                notes          = None,
+                metadata       = metadata,
+                source         = "lia",
+                # The four keywords ARE the operation, and none of them is derived from the clock:
+                # the work is done, whatever hour the placement gave it.
+                allow_past            = True,
+                notify_merchant       = False,
+                enforce_working_hours = False,
+                status                = "arrived",
+            )
+        except Exception as exc:
+            logger.error("🔥 Lia: daily-log line refused for %s: %s", client_id, type(exc).__name__)
+            failed.append(item["customer_name"])
+            continue
+        done.append(item["customer_name"])
+        await log_security_event(
+            event_type=f"lia_{actor}_{op.name}", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"row_id": (row or {}).get("id"), "amount": item["amount"],
+                    "currency": currency, "service_matched": bool(item.get("service_id")),
+                    "batch": len(items), "status": "arrived",
+                    "operation": op.name, "permission": op.permission,
+                    "service_key": op.service_key, "sender_phone": phone,
+                    "source": "whatsapp_text"},
+            actor=actor_id,
+        )
+    logger.info("✅ Lia: daily log for %s — %d written, %d failed", client_id, len(done),
+                len(failed))
+    if not failed:
+        await wa.send_text(phone, _REPLIES["daily_log_created"])
+        return
+    _sep = "، "
+    await wa.send_text(phone, _REPLIES["reservation_created_partial"].format(
+        done=_sep.join(done) or "—", failed=_sep.join(failed), reason="").strip())
+
+
+def _is_daily_log_row(row) -> bool:
+    """The report's whole contract, in one place: written by Lia, version 1, and `arrived`."""
+    meta = getattr(row, "metadata", None)
+    entry = meta.get(DAILY_LOG_KEY) if isinstance(meta, dict) else None
+    if getattr(row, "source", None) != "lia" or getattr(row, "status", None) != "arrived":
+        return False
+    if not isinstance(entry, dict) or entry.get("v") != DAILY_LOG_VERSION:
+        return False
+    try:
+        return Decimal(str(entry.get("amount"))) > 0
+    except InvalidOperation:
+        return False
+
+
+async def _send_daily_report(wa, phone: str, client_id: str, user, actor_id) -> None:
+    """«تقرير اليوم»: today's daily-log lines -- name · service · amount -- and the total. READ ONLY."""
+    from fastapi import HTTPException
+    from app.core.permissions import scope_barber_id
+    from app.repositories.reservation_repo import ReservationRepository
+    try:
+        barber_id = scope_barber_id(user, "reservations")
+    except HTTPException:
+        await log_security_event(
+            event_type="lia_entry_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": "self_scope_without_barber", "operation": DAILY_REPORT_OP,
+                    "sender_phone": phone}, actor=actor_id,
+        )
+        return
+    now = datetime.now()
+    day0 = datetime(now.year, now.month, now.day)
+    rows = await ReservationRepository(prisma_client).list_by_client(
+        client_id, None, "arrived", day0.replace(tzinfo=timezone.utc),
+        (day0 + timedelta(days=1)).replace(tzinfo=timezone.utc), 500, barber_id)
+    mine = [r for r in rows or [] if _is_daily_log_row(r)]
+    await log_security_event(
+        event_type="lia_daily_report", client_id=client_id, endpoint=_ENDPOINT,
+        detail={"rows": len(mine), "scoped": barber_id is not None, "sender_phone": phone},
+        actor=actor_id,
+    )
+    if not mine:
+        await wa.send_text(phone, _REPLIES["daily_report_empty"])
+        return
+    names = {str(getattr(s, "id", "")): getattr(s, "nameAr", None)
+             for s in await _list_services(client_id)}
+    lines, total, currency = [], Decimal(0), ""
+    for n, r in enumerate(mine, 1):
+        entry = r.metadata[DAILY_LOG_KEY]
+        currency = currency or entry.get("currency") or ""
+        amount = Decimal(str(entry["amount"]))
+        total += amount
+        service = _service_label(names.get(str(getattr(r, "serviceId", None) or "")),
+                                 entry.get("service_said"))
+        lines.append(_daily_line({"customer_name": r.customerName, "amount": amount}, n,
+                                 entry.get("currency") or "", service))
+    body = "\n".join([_REPLIES["daily_report_header"].format(date=f"{day0.day}/{day0.month}"),
+                      *lines,
+                      _REPLIES["daily_report_total"].format(total=_money(total, currency),
+                                                            count=len(mine))])
+    await wa.send_text(phone, body)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -2723,6 +3323,11 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # re-validates the WHOLE draft and shows it again, and the state returns to
         # LIA_AWAITING_CONFIRM. There is no path here that writes, and none that applies a change
         # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
+        if msg_type == "text" and (value or "").strip() and _draft_operation(draft) == DAILY_LOG_OP:
+            # No edit contract was designed for the daily log, so a typed message at its preview
+            # is not guessed at: the approved question and its two buttons are shown again.
+            await _send_daily_confirm(wa, sender_phone, draft)
+            return session
         if msg_type == "text" and (value or "").strip():
             is_res_draft = _draft_operation(draft) == "create_reservation"
             # T5-5 · D-3, rewritten 2026-09-20 after the live round walked into a deadlock.
@@ -2854,6 +3459,17 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         return session
 
     # ── 2. An answer to one asked field. ──
+    if (draft and session is not None and session.state == LIA_AWAITING_FIELD
+            and msg_type == "text" and _draft_operation(draft) == DAILY_LOG_OP):
+        if draft.get("asking") == "amount":
+            if not _apply_amount_answer(draft, value):
+                await _ask_missing_amounts(wa, sender_phone, session, draft)
+                return session
+        elif draft.get("asking") == "barber_name":
+            draft.setdefault("data", {})["barber_name"] = " ".join((value or "").split())
+        await _advance(wa, sender_phone, session, draft)
+        return session
+
     if draft and session is not None and session.state == LIA_AWAITING_FIELD and msg_type == "text":
         field = draft.get("asking")
         # 🔴 «مبارح الساعة ٤» IS NOT PARSEABLE BY A REGEX, and pretending otherwise is how a
@@ -3006,6 +3622,13 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     # check; what changes is that the question now comes from the operation instead of being
     # frozen into this function.
     client_id, actor, actor_id, user, c_reason = await _resolve_actor(sender_phone)
+    if client_id is None and family in (DAILY_LOG_OP, DAILY_REPORT_OP) \
+            and not _has_visit_verb(entry_text):
+        # 2026-09-21. These two families are recognised by SHAPE, with no owner verb, so a
+        # customer can produce one («علي 10» as an answer to a question). Unlike a verb message,
+        # it must not be swallowed: not ours, and on to the customer flow, unaudited -- the same
+        # treatment a customer greeting gets.
+        return None
     if client_id is None:
         # C fell -- SILENT, for the reason A2-c established: an unresolved or ambiguous sender must
         # not learn that this number accepts owner commands. The attempt is recorded instead, now
@@ -3103,6 +3726,17 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             logger.warning("🚫 Lia: %s refused for %s on %s (%s)",
                            op.name, sender_phone, client_id, why)
         return session
+
+    if op.name == DAILY_REPORT_OP:
+        await _send_daily_report(wa, sender_phone, client_id, user, actor_id)
+        return session
+    if op.name == DAILY_LOG_OP:
+        if await _open_daily_log(wa, sender_phone, session, entry_text, client_id, actor,
+                                 actor_id, user):
+            return session
+        # Nothing readable, and no approved sentence exists for that yet: not handled here,
+        # rather than answered with a text written for another operation.
+        return None
 
     # The PROMPT follows the operation, and so does the contract that validates the answer. A
     # product prompt whose answer claims `create_service` fails `LiaProductExtraction` and lands
@@ -3222,11 +3856,6 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # preview, `_commit`, `_parse_field_answer`) goes on reading exactly what it read
         # before -- and the rest wait their turn, in the order he said them.
         draft["time_said"] = bool((extraction.data or {}).get("time_said", True))
-        # D-2: the EVIDENCE for `arrived`, captured from the sentence that opened the draft --
-        # never from the date, and never from the model. Read here, where the owner's own words
-        # are still in hand, and used at write time. `entry_text` rather than `value` so that a
-        # message resumed after the family question is still judged by what he originally wrote.
-        draft["visit_reported"] = _has_visit_verb(entry_text)
         draft["done"] = []
         draft["rest"] = [
             {"data": _clean_item(item, known),
@@ -3255,6 +3884,10 @@ async def _advance(wa, phone: str, session, draft: dict) -> None:
     WHICH fields are required now comes from the draft's operation (`_op_spec`) instead of being
     written into this loop, so a product is never asked how long it takes.
     """
+    if _draft_operation(draft) == DAILY_LOG_OP:
+        await _advance_daily_log(wa, phone, session, draft)
+        return
+
     required, questions, draft_cls = _op_spec(_draft_operation(draft))
 
     if _draft_operation(draft) == "create_reservation":

@@ -203,6 +203,11 @@ async def send(session, text, msg_type="text"):
 
 PAST = (datetime.now() - timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
 FUTURE = (datetime.now() + timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
+# TRANSITION (2026-09-21, D-A): the queue tests below used «اليوم الصبح حلقت لعلي ومحمد واحمد» as
+# their entry sentence. A visit verb now opens `log_daily_visits`, never the reservation flow, so
+# the same queue is reached the way an APPOINTMENT list is dictated: a record verb and a
+# reservation noun. The extraction is faked either way; only the gate saw the sentence.
+RES_LIST = "سجل مواعيد اليوم الصبح لعلي ومحمد واحمد"
 # T5: what the model answers for «اليوم الصبح» — the period's start, with time_said=false.
 MORNING = (datetime.now() - timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
 
@@ -836,11 +841,12 @@ async def main():
     # ── 14 · T5-3 — one name at a time, and the verb that opens the path (2026-09-20) ──
     print("\n── 14. T5-3: the queue is walked, each question says whose it is ──")
     # D-5, approved within its limit: the verb opens the path and decides NOTHING else.
-    check("«حلقت» now reaches Lia at all  [TRANSITION: `_entry_family` returned None, and the "
-          "message was dropped in silence — measured 2026-09-20]",
-          lia._entry_family("مرحبا اليوم الصبح حلقت لي علي، محمد واحمد") == "create_reservation")
-    check("   «قصينا» too, and both are read as a RESERVATION, not as a service",
-          lia._entry_family("قصينا اليوم لعلي ومحمد") == "create_reservation")
+    # TRANSITION (2026-09-21, D-A). WAS "create_reservation" for both. A visit he reports is
+    # completed work and opens `log_daily_visits`; the reservation flow no longer sees it at all.
+    check("«حلقت» reaches Lia as the DAILY LOG  [TRANSITION: was create_reservation, 2026-09-20]",
+          lia._entry_family("مرحبا اليوم الصبح حلقت لي علي، محمد واحمد") == lia.DAILY_LOG_OP)
+    check("   «قصينا» too — completed work, not an appointment  [TRANSITION: was create_reservation]",
+          lia._entry_family("قصينا اليوم لعلي ومحمد") == lia.DAILY_LOG_OP)
     check("   D-2 — the verb is the evidence, not the date: «سجل موعد … مبارح» is NOT a visit",
           lia._has_visit_verb("سجل موعد لأحمد مبارح الساعة 4") is False
           and lia._has_visit_verb("حلقت لأحمد مبارح") is True)
@@ -855,13 +861,17 @@ async def main():
     # times, which is how the per-item prefix was exercised. A reported visit no longer asks for a
     # number at all, so the barber — which Lia does still ask for, one name at a time — carries the
     # test instead. Nothing about the prefix changed; the question behind it did.
+    # TRANSITION (2026-09-21): D-4 is gone with the visit branch, so an appointment with no number
+    # would now be ASKED for one. The fixture says «ما عندي رقمه» itself, which keeps this test
+    # about what it was always about -- the per-item question -- carried by the barber.
     walkins = lambda t: extraction(
-        customer_name="علي", customer_phone=None, reserved_at=MORNING.isoformat(),
+        customer_name="علي", customer_phone="ما عندي رقمه", reserved_at=MORNING.isoformat(),
         service_name="قص شعر", time_said=False,
         extra=[{"customer_name": n, "reserved_at": MORNING.isoformat(), "time_said": False,
+                "customer_phone": "ما عندي رقمه",
                 "service_name": "قص شعر"} for n in ("محمد", "أحمد")])
     async with Env(extract=walkins) as env:
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa, out = await send(session_idle(), RES_LIST)
         # TRANSITION (2026-09-20, from the live round): this used to assert the OPPOSITE — that
         # the first question carries no name, "because there is nothing to disambiguate yet". The
         # reasoning was wrong and a real owner proved it within the hour: asked a bare «شو رقم
@@ -869,8 +879,9 @@ async def main():
         # exists from the first question, and so does the ambiguity.
         check("even the FIRST question says whose it is, once there is a list",
               "بالنسبة لـعلي،" in wa.joined(), wa.joined()[:80])
-        check("   and the visit verb is recorded on the draft for write time",
-              (lia._load_draft(out) or {}).get("visit_reported") is True)
+        check("   and no visit flag rides on an appointment draft any more  [TRANSITION: "
+              "`visit_reported` was True here, 2026-09-20]",
+              "visit_reported" not in (lia._load_draft(out) or {}))
         wa2, out2 = await send(roundtrip(out), "جعفر")
         check("answering علي moves to محمد, and the question SAYS so",
               "بالنسبة لـمحمد،" in wa2.joined(), wa2.joined()[:90])
@@ -924,13 +935,13 @@ async def main():
     # ── 15 · T5-4 — the list he reads, and the rows he gets (2026-09-20) ──
     print("\n── 15. T5-4: one preview for all of them, one ✅, one honest result ──")
     visit = lambda t: extraction(
-        customer_name="علي", customer_phone=None, reserved_at=MORNING.isoformat(),
+        customer_name="علي", customer_phone="ما عندي رقمه", reserved_at=MORNING.isoformat(),
         service_name="قص شعر", barber_name="جعفر", time_said=False,
         extra=[{"customer_name": n, "reserved_at": MORNING.isoformat(), "time_said": False,
                 "service_name": "قص شعر", "barber_name": "جعفر",
                 "customer_phone": "ما عندي رقمه"} for n in ("محمد", "أحمد")])
     async with Env(extract=visit) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         body = wa1.joined()
         check("the preview lists all three, numbered, in his order",
               all(f"*{n}.* {who}" in body for n, who in ((1, "علي"), (2, "محمد"), (3, "أحمد"))),
@@ -949,8 +960,9 @@ async def main():
         check("✅ writes THREE reservations, one per name, in order",
               [c["customer_name"] for c in env.calls] == ["علي", "محمد", "أحمد"],
               str([c["customer_name"] for c in env.calls]))
-        check("   D-2 — a reported visit is born 'arrived'",
-              [c.get("status") for c in env.calls] == ["arrived"] * 3,
+        check("   an appointment list is born 'pending'  [TRANSITION: 'arrived' ×3 when this "
+              "sentence was a visit verb — D-A moved `arrived` to the daily log]",
+              [c.get("status") for c in env.calls] == ["pending"] * 3,
               str([c.get("status") for c in env.calls]))
         check("   every one of them is a walk-in, and the NAMES are on the rows",
               all(c["customer_phone"] == WALK_IN_PHONE for c in env.calls))
@@ -968,7 +980,7 @@ async def main():
 
     async with Env(extract=visit) as env:
         env.calls_hook = _second_clashes
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), lia.CONFIRM_ID, "button_reply")
         said = wa2.joined()
         check("D-6 — the two that worked are NAMED, and so is the one that did not",
@@ -994,7 +1006,7 @@ async def main():
               lia._REPLIES["reservation_time_approx"] not in wa.joined())
 
     async with Env(extract=visit) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), lia.CANCEL_ID, "button_reply")
         check("T5-10 — ❌ on a list says «ألغيت المواعيد», not «ألغيت الموعد»",
               lia._REPLIES["reservation_cancelled_multi"] in wa2.joined()
@@ -1009,26 +1021,24 @@ async def main():
         check("INVARIANT — and its cancel text is the singular one, untouched",
               lia._REPLIES["reservation_cancelled"] in wa2.joined())
 
-    # D-4: a reported visit with no number does not ask for one.
+    # TRANSITION (2026-09-21, D-A). This block asserted D-4: «اليوم الصبح حلقت…» with no numbers
+    # asked for NONE of them and filled WALK_IN. The visit sentence now opens the daily log (no
+    # phone question exists there at all -- scripts/test_lia_daily_log.py), and an APPOINTMENT
+    # list with no numbers is asked for them, one name at a time, like any appointment.
     no_phones = lambda t: extraction(
         customer_name="علي", customer_phone=None, reserved_at=MORNING.isoformat(),
         service_name="قص شعر", barber_name="جعفر", time_said=False,
         extra=[{"customer_name": n, "reserved_at": MORNING.isoformat(), "time_said": False,
                 "service_name": "قص شعر", "barber_name": "جعفر"} for n in ("محمد", "أحمد")])
     async with Env(extract=no_phones) as env:
-        wa, out = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa, out = await send(session_idle(), RES_LIST)
         body = wa.joined()
-        check("D-4 — three names, no numbers, and Lia asks for NONE of them",
-              lia._REPLIES["reservation_ask_phone"] not in body
-              and lia._REPLIES["reservation_confirm_multi"] in body, body[:120])
-        d = lia._load_draft(out) or {}
-        check("   every one is a walk-in, marked «(تلقائي)» so he can still correct it",
-              all(i["data"]["customer_phone"] == WALK_IN_PHONE for i in lia._all_items(d))
-              and all("customer_phone" in (i.get("defaulted") or [])
-                      for i in lia._all_items(d)),
-              str([i.get("defaulted") for i in lia._all_items(d)]))
-        check("   and the preview shows «زبون طيار», not an empty field",
-              body.count(lia._REPLIES["walkin_label"]) == 3, str(body.count("طيار")))
+        check("an appointment list with no numbers ASKS, naming whose  [TRANSITION: D-4 asked none]",
+              lia._REPLIES["reservation_ask_phone"] in body and "بالنسبة لـعلي،" in body, body[:120])
+        check("   and nothing is filled in as WALK_IN on its own",
+              not (lia._load_draft(out) or {}).get("data", {}).get("customer_phone"))
+    check("   the visit sentence itself goes to the daily log instead",
+          lia._entry_family("اليوم الصبح حلقت لعلي ومحمد واحمد") == lia.DAILY_LOG_OP)
 
     no_phone_appt = lambda t: extraction(
         customer_name="أحمد", customer_phone=None, reserved_at=PAST.isoformat(),
@@ -1044,7 +1054,7 @@ async def main():
         {"intent": "edit_reservation", "confidence": "high",
          "changes": {"barber_name": "حسين"}, "unresolved": []})
     async with Env(extract=visit, edit=patch_barber) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), "خليه مع حسين")
         check("an edit that names NOBODY asks which one — it never guesses",
               lia._REPLIES["reservation_edit_which"] in wa2.joined(), wa2.joined()[:80])
@@ -1124,7 +1134,7 @@ async def main():
 
     async with Env(extract=visit, edit=_patch({"service_name": "شعر وذقن"}),
                    services=SVC_SD) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         check("setup: the three are previewed", out1.state == lia.LIA_AWAITING_CONFIRM)
         check("T5-13 — the past line is PLURAL under a list  [TRANSITION: «وهاد موعد ماضي»]",
               lia._REPLIES["reservation_preview_past_multi"] in wa1.joined()
@@ -1160,7 +1170,7 @@ async def main():
 
     async with Env(extract=visit, edit=_patch({"service_name": "شعر وذقن"}),
                    services=SVC_SD) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), "كلهم علي ومحمد وأحمد، الخدمة شعر وذقن")
         check("naming EVERY one of them is not an ambiguity — it is «all of them», in one message"
               "  [TRANSITION: answered with «أي واحد بدك تعدّل؟»]",
@@ -1170,7 +1180,7 @@ async def main():
 
     # The two-step answer in the other order: a name first, then the change.
     async with Env(extract=visit, edit=_patch({}, "low"), services=SVC_SD) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), "أحمد")
         check("T5-12 — a bare NAME is accepted, not met with «ما فهمت»"
               "  [TRANSITION: «ما فهمت شو بدك تعدّل»]",
@@ -1188,7 +1198,7 @@ async def main():
               (lia._load_draft(out3) or {}).get("edit_target") is None)
 
     async with Env(extract=visit, edit=_patch({"barber_name": "حسين"})) as env:
-        wa1, out1 = await send(session_idle(), "اليوم الصبح حلقت لعلي ومحمد واحمد")
+        wa1, out1 = await send(session_idle(), RES_LIST)
         wa2, out2 = await send(roundtrip(out1), "خلي موعد محمد مع حسين")
         got = [(i["data"]["customer_name"], i["data"]["barber_name"])
                for i in lia._all_items(lia._load_draft(out2))]

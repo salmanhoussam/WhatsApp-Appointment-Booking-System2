@@ -48,7 +48,7 @@ from pydantic import BaseModel, Field, field_validator
 # Pinning per class makes that mismatch structurally impossible rather than guarded against.
 # `create_reservation` added 2026-09-18 (T4). Same rule as above: it is vocabulary, never the
 # type of one extraction's `intent` -- the reservation prompt pins its own single value.
-LiaIntent = Literal["create_service", "create_product", "create_reservation"]
+LiaIntent = Literal["create_service", "create_product", "create_reservation", "log_daily_visits"]
 
 # Currencies the shops actually price in. Anything else is a question, not a conversion -- Lia
 # does no FX, ever.
@@ -420,3 +420,36 @@ class LiaReservationEditPatch(BaseModel):
     confidence: Literal["high", "medium", "low"]
     changes:    LiaReservationChanges = Field(default_factory=LiaReservationChanges)
     unresolved: list[str] = Field(default_factory=list)
+
+
+class LiaDailyLogItem(BaseModel):
+    """One line of a day's completed work: who, what they paid, and the service if he said one.
+
+    2026-09-21, Salman's decision. This is NOT a reservation: no phone, no time, no availability.
+    `amount` is Optional HERE on purpose -- the model reports what it read, and the SERVER decides
+    whether an amount counts (it must appear as a number in the owner's own text). A missing
+    amount is a question, never a price-list fallback: the service price is not what he was paid.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    customer_name: str = Field(min_length=1, max_length=100)
+    amount:        Optional[float] = None
+    service_said:  Optional[str] = Field(default=None, max_length=100)
+
+
+class LiaDailyLogExtraction(BaseModel):
+    """What the DAILY LOG prompt is allowed to return. 2026-09-21.
+
+    NO LENGTH LIMIT ON `items`, and that is deliberate: `MAX_DAILY_LOG_ITEMS` is a domain
+    invariant the SERVER enforces before any write. Capping it here would let a validation error
+    stand in for the explicit refusal Salman asked for, or -- worse -- tempt a truncation.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    intent:     Literal["log_daily_visits"]
+    confidence: Literal["high", "medium", "low"]
+    # The part of the day he named, if any: the placement starts there (T5's period rule).
+    period:     Optional[Literal["morning", "afternoon", "evening"]] = None
+    items:      list[LiaDailyLogItem] = Field(default_factory=list)

@@ -155,10 +155,14 @@ async def main():
     # asks for the past: T4 records an appointment the owner says already happened. The invariant
     # this section defends is unchanged and is asserted below — the three ORIGINAL callers still
     # pass none of the new parameters, so none of their behaviour moved.
-    check("exactly four CALL sites in app/ — the three routes/flow, plus Lia (was three)",
-          len(sites) == 4, " · ".join(sites))
-    check("   and the fourth is Lia, not a second write path into the table",
-          sum("lia_owner_entry" in s_ for s_ in sites) == 1, " · ".join(sites))
+    # TRANSITION (2026-09-21). WAS four, with Lia counted once. Lia now calls it from TWO places:
+    # the appointment path and the daily completed log («علي 10، محمد 7»). Both are the same
+    # service function -- the one write path -- so the property this section defends holds: the
+    # three original callers are untouched, and nothing writes the table around the Service.
+    check("exactly five CALL sites in app/ — the three routes/flow, plus Lia twice (was four)",
+          len(sites) == 5, " · ".join(sites))
+    check("   and the extra two are Lia, not a second write path into the table",
+          sum("lia_owner_entry" in s_ for s_ in sites) == 2, " · ".join(sites))
 
     expected = {
         "admin route":   ["client_id", "module_key", "customer_name", "customer_phone",

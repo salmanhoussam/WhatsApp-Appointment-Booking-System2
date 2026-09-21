@@ -533,8 +533,13 @@ async def main():
     # «✅ سجّلهم» joined it (+1) — the plural confirm button, a literal by the same standing
     # decision that keeps «✅ سجّله» and «❌ إلغاء» as literals. The list separator in the partial
     # message is deliberately joined outside the send call, so punctuation never inflates this.
-    check("the un-migrated owner-facing literals are pinned at 32 (was 33; expiry text moved)",
-          len(_sent_literals) == 32, str(len(_sent_literals)))
+    # TRANSITION (2026-09-21): 32 -> 35. The daily completed log's confirm buttons carry the
+    # three approved titles («✅ سجّلهم» / «✅ سجّله» / «❌ إلغاء») as inline literals, by the same
+    # standing decision that keeps every button title a literal. They were first moved into a
+    # shared helper, which dropped this count to 29 -- hiding three owner-facing strings from
+    # the one check that exists to show them. Reverted, so they are counted here.
+    check("the un-migrated owner-facing literals are pinned at 35 (was 32; daily-log buttons)",
+          len(_sent_literals) == 35, str(len(_sent_literals)))
     # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
     check("a RECORD verb now opens a reservation — T4 is built, so the promise is real",
           lia._entry_family("سجل إنه أحمد إجا مبارح") == "create_reservation")

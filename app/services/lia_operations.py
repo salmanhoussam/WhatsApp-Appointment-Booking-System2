@@ -82,6 +82,16 @@ def _write_create_reservation():
     return reservation_service.create_reservation
 
 
+def _read_daily_report():
+    """2026-09-21. A READ, registered here only so it is authorised from the same definition as
+    everything else Lia does: the permission and legacy tuple of `GET /admin/reservations/`.
+    `write_fn` is the registry's field name; for this one entry it holds the reader. Nothing is
+    written by `daily_report`, ever -- it has no path to a write function at all.
+    """
+    from app.repositories.reservation_repo import ReservationRepository
+    return ReservationRepository
+
+
 def _write_create_catalog_item():
     from app.services import catalog_service
     return catalog_service.admin_create_item
@@ -159,6 +169,30 @@ _REGISTRY: dict[str, OperationDefinition] = {
         # it. The POST that actually mirrors this operation is :302, and the gate it carries
         # (reservations.write + RESERVATION_ROLES) is identical, so only the citation drifted.
         mirrors_route = "app/api/v1/admin/reservations.py:302",
+    ),
+    # 2026-09-21, Salman's decision (plan: lia-daily-cash-log-and-mobile-landing.md). Work that
+    # was ALREADY DONE and paid for -- «علي 10، محمد 7» -- is not a booking attempt, so it is its
+    # own operation rather than a flag inside `create_reservation`. SAME write function, SAME
+    # permission and legacy tuple as a reservation: it lands in the same table through the one
+    # write path, and nothing about who may write it differs. What differs is the four keywords
+    # it passes (allow_past, notify_merchant, enforce_working_hours, status) -- all pre-existing.
+    "log_daily_visits": OperationDefinition(
+        name          = "log_daily_visits",
+        permission    = "reservations.write",
+        legacy_roles  = RESERVATION_LEGACY_ROLES,
+        service_key   = "reservations",
+        write_fn      = _write_create_reservation,
+        mirrors_route = "app/api/v1/admin/reservations.py:302",
+    ),
+    # «تقرير اليوم». Mirrors the GET list route: same permission, same legacy tuple, same scoping
+    # (a self-scoped account sees only its own barber's rows).
+    "daily_report": OperationDefinition(
+        name          = "daily_report",
+        permission    = "reservations.read",
+        legacy_roles  = RESERVATION_LEGACY_ROLES,
+        service_key   = "reservations",
+        write_fn      = _read_daily_report,
+        mirrors_route = "app/api/v1/admin/reservations.py:99-108",
     ),
     "create_catalog_item": OperationDefinition(
         name          = "create_catalog_item",
