@@ -343,8 +343,12 @@ function CalendarKPIRow({ total, countByStatus, color, isLoading }) {
  * top-level "Calendar" nav item and the "Reservations" nav item, per the Dashboard Navigation
  * Refactor (2026-08-03) -- rather than duplicating this tab's state/loading/request-sequencing
  * logic into a second component.
+ *
+ * `onOpenCalendar` (2026-09-21, D-E) -- set only by the Reservations tab. On a phone, where that tab
+ * is now the landing page, it renders the «التقويم» button that opens the Calendar tab. Desktop
+ * never shows it: nothing about the desktop layout changes.
  */
-export default function ReservationsTab({ color, defaultView = 'list', hideBarberPicker = false, myBarberId = null }) {
+export default function ReservationsTab({ color, defaultView = 'list', hideBarberPicker = false, myBarberId = null, onOpenCalendar = null }) {
   const [reservations, setReservations] = useState([])
   const [loading,      setLoading]      = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -786,6 +790,21 @@ export default function ReservationsTab({ color, defaultView = 'list', hideBarbe
             empty-slot click and List has no grid to click into. Opens the same shared CreatePopover
             anchored at the click point, defaultBarberId omitted (falls back to barbers[0]?.id, the
             exact path Week's own Create button already uses). */}
+        {/* D-E (2026-09-21): on a phone the list is the landing page, and the calendar is one tap
+            away — the existing Calendar tab, not a new view. DL-16, the tab's own label. */}
+        {isMobile && viewMode === 'list' && onOpenCalendar && (
+          <button
+            onClick={onOpenCalendar}
+            style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', fontFamily: FONT,
+              background: T.cardBg, border: `1px solid ${T.border}`, color: T.textSecond,
+            }}
+          >
+            التقويم
+          </button>
+        )}
+
         {viewMode === 'list' && (
           <button
             onClick={openCreate}

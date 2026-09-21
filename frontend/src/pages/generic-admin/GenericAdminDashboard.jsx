@@ -227,6 +227,16 @@ function buildNav(hasReservations, activeServices, isOwner = false) {
 // code -- this is a parallel, equivalent filter for THIS dashboard's real nav shape instead. Backend
 // enforcement (Phases A-C) does not depend on this in any way -- this is UI-only, per Salman's own
 // framing of Phase D.
+// D-E (2026-09-21). The width rule `isMobile` already uses, and the tab a reservations tenant
+// lands on for it: the list on a phone, the hour grid on a desktop.
+const MOBILE_MAX_WIDTH = 768
+function isPhoneWidth() {
+  return typeof window !== 'undefined' && window.innerWidth < MOBILE_MAX_WIDTH
+}
+function landingTab(isPhone) {
+  return isPhone ? 'reservations' : 'calendar'
+}
+
 const STAFF_NAV = [
   { id: 'calendar',     labelAr: 'التقويم',   Icon: IconCalendar  },
   { id: 'reservations', labelAr: 'الحجوزات',  Icon: IconList      },
@@ -434,8 +444,11 @@ export default function GenericAdminDashboard() {
   // True only once identity has actually resolved -- never assumed while it is still in flight.
   const isPermissionBased = isLegacy === false
 
+  // 2026-09-21 (Salman, D-E): on a PHONE the landing tab is today's reservations list, not the
+  // hour grid. Same width rule as `isMobile` below, read once here because this initializer runs
+  // before that state exists.
   const [activeTab,    setActiveTabRaw] = useState(
-    () => initialUrlTab || (isStaff ? 'calendar' : 'overview')
+    () => initialUrlTab || (isStaff ? landingTab(isPhoneWidth()) : 'overview')
   )
   const [settings,     setSettings]     = useState(null)
   const [loading,      setLoading]      = useState(true)
@@ -620,14 +633,19 @@ export default function GenericAdminDashboard() {
   // segment even when it named a valid tab. Skips entirely for STAFF -- that role's default is
   // already resolved synchronously in activeTab's own initializer above, so this effect has
   // nothing left to do for it (and firing anyway would just be a redundant post-mount navigate).
+  // 2026-09-21 (D-E): a phone lands on «الحجوزات» — the same ReservationsTab, list view, whose date
+  // filter already defaults to today — and reaches the calendar through its «التقويم» button.
+  // Desktop is unchanged. No tab is added to or removed from any nav, so no account sees a surface
+  // it could not open before; a permission-based account without it is still sent to its own
+  // first tab by the safety net below.
   const hasSetDefaultRef = useRef(false)
   useEffect(() => {
     if (isStaff) return
     if (hasReservations && !hasSetDefaultRef.current) {
       hasSetDefaultRef.current = true
-      if (!hadInitialUrlTabRef.current) changeTab('calendar')
+      if (!hadInitialUrlTabRef.current) changeTab(landingTab(isMobile))
     }
-  }, [hasReservations, changeTab, isStaff])
+  }, [hasReservations, changeTab, isStaff, isMobile])
 
   // Phase 2B-4 safety net, permission-based accounts only: land on a tab this account can actually
   // see. `activeTab`'s initializer runs before identity resolves and can only guess from the JWT's
@@ -666,7 +684,8 @@ export default function GenericAdminDashboard() {
       case 'calendar':
         return <ReservationsTab color={color} defaultView="today" hideBarberPicker={isStaff} myBarberId={myBarberId} />
       case 'reservations':
-        return <ReservationsTab color={color} defaultView="list" hideBarberPicker={isStaff} myBarberId={myBarberId} />
+        return <ReservationsTab color={color} defaultView="list" hideBarberPicker={isStaff} myBarberId={myBarberId}
+                                onOpenCalendar={() => changeTab('calendar')} />
       case 'myclients':
         return <MyClientsTab color={color} />
       case 'catalog':
