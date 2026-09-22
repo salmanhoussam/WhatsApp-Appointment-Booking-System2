@@ -550,11 +550,11 @@ Lia — قواعدها التشغيلية. هذا الملفّ prompt، لا و�
 [[daily_log_total]]
 المجموع: {total}
 
-[[daily_log_time_approx]]
-الساعات بالتقويم تقريبيّة.
+[[daily_log_weekdays]]
+الاثنين · الثلاثاء · الأربعاء · الخميس · الجمعة · السبت · الأحد
 
 [[daily_log_created]]
-تم تسجيل زباين اليوم.
+تسجّلت {weekday} {date}.
 
 [[daily_log_ask_amount]]
 قديش دفع {names}؟

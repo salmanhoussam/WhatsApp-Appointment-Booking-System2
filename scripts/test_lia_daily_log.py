@@ -235,8 +235,13 @@ async def main():
               and all(f"*{n}.* {who} · {amt} USD" in body
                       for n, who, amt in ((1, "علي", 10), (2, "محمد", 7), (3, "أحمد", 5))),
               body[:200])
-        check("   DL-4 the total, DL-5 the approximate hours",
-              "المجموع: 22 USD" in body and lia._REPLIES["daily_log_time_approx"] in body)
+        # TRANSITION 2026-09-23. This asserted «DL-4 the total, DL-5 the approximate hours» and
+        # required `_REPLIES["daily_log_time_approx"]` ("الساعات بالتقويم تقريبيّة.") to be in the
+        # body. Salman deleted that line after seeing it live, so the key no longer exists at all
+        # and the preview now ENDS at the total.
+        check("   DL-4 the total, and NO line about the calendar's hours",
+              "المجموع: 22 USD" in body and "daily_log_time_approx" not in lia._REPLIES
+              and "تقريبيّة" not in body, body[-120:])
         check("   DL-6 with «✅ سجّلهم» / «❌ إلغاء»",
               lia._REPLIES["reservation_confirm_multi"] in body
               and titles(wa) and titles(wa)[0] == ("✅ سجّلهم", "❌ إلغاء"), str(titles(wa)))
@@ -262,7 +267,19 @@ async def main():
               str(kw.get("metadata")))
         check("   amounts are strings, never floats", [c["metadata"]["daily_log"]["amount"]
                                                        for c in env.calls] == ["10", "7", "5"])
-        check("DL-7, once", wa2.joined() == lia._REPLIES["daily_log_created"], wa2.joined())
+        # TRANSITION 2026-09-23. This compared the reply to the raw key, whose value was the
+        # fixed sentence «تم تسجيل زباين اليوم.». Salman asked for the day and the date instead,
+        # so the key is now a TEMPLATE and the value is «تسجّلت {weekday} {date}.» -- and the day
+        # named is the day the ROWS carry, read back from the write call itself.
+        import datetime as _dt
+        _when = env.calls[0]["reserved_at"] if env.calls else _dt.datetime.now()
+        _expected = lia._REPLIES["daily_log_created"].format(
+            weekday=lia._WEEKDAYS[_when.weekday()],
+            date=f"{_when.day:02d}/{_when.month:02d}/{_when.year}")
+        check("DL-7, once, naming the day and the date of the rows",
+              wa2.joined() == _expected, f"{wa2.joined()!r} != {_expected!r}")
+        check("   and that date is TODAY, in the shop's own clock",
+              _when.date() == _dt.datetime.now().date(), str(_when))
         check("   and the draft is consumed", lia._load_draft(out2) is None and out2.state == "IDLE")
 
     # ── 3 · test 2 — services per line ───────────────────────────────────────
@@ -550,6 +567,74 @@ async def main():
         blob = json.dumps(lia._load_draft(out), ensure_ascii=False)
         check("the draft is plain JSON — amounts as strings, no Decimal, no datetime",
               '"amount": "10"' in blob, blob[:80])
+
+    # ── 16 · the correction contract — Salman's own live round, 2026-09-23 ──
+    print("\n── 16. a typed message at the preview is a CORRECTION, compared to the list ──")
+    # His real message and Lia's real reading of it: «احمد حيدر ١٠ الصبح ووأم وهاب الظهر ١٥»
+    # became «أحمد حيدر» and «أم وهاب», and his next message was «ويأم وهاب».
+    pair = lambda t: log(("أحمد حيدر", 10, None), ("أم وهاب", 15, None))
+    async with Env(extract=pair) as env:
+        wa, out = await send(session_idle(), "احمد حيدر 10 الصبح ووأم وهاب الظهر 15")
+        wa2, out2 = await send(roundtrip(out), "ويأم وهاب")
+        body = wa2.joined()
+        check("«ويأم وهاب» fixes the line it shares a word with — and ONLY that line",
+              "*2.* ويأم وهاب · 15 USD" in body and "*1.* أحمد حيدر · 10 USD" in body, body[:200])
+        check("   the WHOLE list comes back, not just the question",
+              lia._REPLIES["daily_log_preview"] in body and "المجموع: 25 USD" in body, body[:120])
+        check("   with the two buttons, still parked on the confirmation",
+              titles(wa2) and titles(wa2)[-1] == ("✅ سجّلهم", "❌ إلغاء")
+              and out2.state == lia.LIA_AWAITING_CONFIRM, str(titles(wa2)))
+        check("   and a correction WRITES NOTHING by itself", not env.calls)
+        wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ then writes the CORRECTED name, and the amount is untouched",
+              [c["customer_name"] for c in env.calls] == ["أحمد حيدر", "ويأم وهاب"]
+              and [c["metadata"]["daily_log"]["amount"] for c in env.calls] == ["10", "15"],
+              str([c["customer_name"] for c in env.calls]))
+        # VERBATIM, asserted against the raw typed string rather than a re-spelling of it: the
+        # leading waw is part of the name, and no normalisation may touch what he wrote.
+        check("   the stored name IS the typed text, character for character",
+              env.calls[1]["customer_name"] == "ويأم وهاب", repr(env.calls[1]["customer_name"]))
+
+    # The same draft, not a new one — and ❌ after a correction still cancels everything.
+    async with Env(extract=pair) as env:
+        wa, out = await send(session_idle(), "احمد حيدر 10 وأم وهاب 15")
+        before = dict(lia._load_draft(out))
+        wa2, out2 = await send(roundtrip(out), "ويأم وهاب")
+        after = lia._load_draft(out2)
+        check("a correction edits the SAME draft — no new draft, no second operation",
+              after["started_at"] == before["started_at"]
+              and after["client_id"] == before["client_id"]
+              and after["operation"] == lia.DAILY_LOG_OP
+              and len(after["items"]) == len(before["items"]) == 2,
+              f'{after["started_at"]} vs {before["started_at"]}')
+        wa3, out3 = await send(roundtrip(out2), lia.CANCEL_ID, "button_reply")
+        check("❌ after a correction → DL-11, nothing written, draft consumed",
+              wa3.joined() == lia._REPLIES["daily_log_cancelled"] and not env.calls
+              and lia._load_draft(out3) is None and out3.state == "IDLE", wa3.joined())
+
+    async with Env(extract=pair) as env:
+        wa, out = await send(session_idle(), "احمد حيدر 10 وأم وهاب 15")
+        wa2, out2 = await send(roundtrip(out), "بكرا منكمّل")
+        check("a message that matches no line → the approved question and its buttons, unchanged",
+              wa2.joined() == lia._REPLIES["reservation_confirm_multi"]
+              and titles(wa2) == [("✅ سجّلهم", "❌ إلغاء")], wa2.joined())
+        check("   and the list is untouched",
+              [i["customer_name"] for i in lia._load_draft(out2)["items"]]
+              == ["أحمد حيدر", "أم وهاب"], str(lia._load_draft(out2)["items"]))
+        wa3, out3 = await send(roundtrip(out2), "كريم 8")
+        check("q3 — a message carrying a NUMBER is out of this contract's scope: buttons, no edit",
+              wa3.joined() == lia._REPLIES["reservation_confirm_multi"]
+              and [i["customer_name"] for i in lia._load_draft(out3)["items"]]
+              == ["أحمد حيدر", "أم وهاب"], wa3.joined())
+
+    two_wahab = {"items": [{"customer_name": "أم وهاب", "amount": "15"},
+                           {"customer_name": "علي وهاب", "amount": "10"}]}
+    check("two lines share the word → None, never the first one",
+          lia._daily_correction_target(two_wahab, "وئام وهاب") is None)
+    check("   a one-character miss still finds its line («احمر» → «احمد»)",
+          lia._daily_correction_target({"items": [{"customer_name": "احمد"}]}, "احمر") == 0)
+    check("   and a message longer than the name column is refused",
+          lia._daily_correction_target(two_wahab, "وهاب " * 30) is None)
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",

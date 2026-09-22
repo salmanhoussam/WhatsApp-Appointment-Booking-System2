@@ -813,7 +813,11 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # code was written). DL-6 and DL-8 are NOT here: they reuse
                      # `reservation_confirm_multi` and `reservation_created_partial`, as approved.
                      "daily_log_preview", "daily_log_line", "daily_log_service_unknown",
-                     "daily_log_total", "daily_log_time_approx", "daily_log_created",
+                     # `daily_log_time_approx` was here until 2026-09-23 and is DELETED, not
+                     # renamed: Salman, seeing it live, asked for «هاي قصة جدول تلقائي شيلها».
+                     # `daily_log_weekdays` replaces it — the seven day names the success text
+                     # needs, kept in the prompt file with every other owner-facing word.
+                     "daily_log_total", "daily_log_weekdays", "daily_log_created",
                      "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
                      "daily_log_expired", "daily_report_header", "daily_report_total",
                      "daily_report_empty")
@@ -910,6 +914,25 @@ _RESERVATION_PROMPT = _load_block(_RESERVATION_START, _RESERVATION_END, "reserva
 _RESERVATION_EDIT_PROMPT = _load_block(_RES_EDIT_START, _RES_EDIT_END, "reservation edit prompt")
 _DAILY_LOG_PROMPT = _load_block(_DAILY_LOG_START, _DAILY_LOG_END, "daily log prompt")
 _REPLIES = _load_replies()
+
+
+def _load_weekdays() -> tuple:
+    """The seven day names, MONDAY FIRST -- the order `datetime.weekday()` itself uses.
+
+    Order is load-bearing and invisible in the text, so it is asserted here rather than trusted:
+    a file edited to seven names in another order would silently date every confirmation wrong.
+    Seven exactly, or the app does not start.
+    """
+    names = tuple(n.strip() for n in _REPLIES["daily_log_weekdays"].split("·") if n.strip())
+    if len(names) != 7:
+        raise RuntimeError(
+            f"Lia `daily_log_weekdays` in {_PROMPT_PATH} must list exactly 7 names separated by "
+            f"'·', Monday first -- found {len(names)}."
+        )
+    return names
+
+
+_WEEKDAYS = _load_weekdays()
 
 
 # Returned when the MODEL could not be reached at all -- a missing key, a dead key, a network
@@ -2853,9 +2876,11 @@ async def _send_daily_preview(wa, phone: str, draft: dict, greeting: str = "") -
     lines = [_daily_line(i, n, currency, _service_label(i.get("service_name"), i.get("service_said")))
              for n, i in enumerate(items, 1)]
     total = sum((Decimal(i["amount"]) for i in items), Decimal(0))
+    # No «الساعات بالتقويم تقريبيّة» line since 2026-09-23 (Salman, on seeing it live): the hour
+    # is an implementation detail of a NOT NULL column, and naming it invited a conversation about
+    # a schedule he is not keeping. The placement itself is unchanged.
     body = "\n".join([_REPLIES["daily_log_preview"], *lines,
-                      _REPLIES["daily_log_total"].format(total=_money(total, currency)),
-                      _REPLIES["daily_log_time_approx"]])
+                      _REPLIES["daily_log_total"].format(total=_money(total, currency))])
     await wa.send_text(phone, greeting + body)
     await _send_daily_confirm(wa, phone, draft)
 
@@ -2890,6 +2915,61 @@ def _apply_amount_answer(draft: dict, text: str) -> bool:
             item["amount"] = _fmt_amount(d)
         changed = True
     return changed
+
+
+def _daily_correction_target(draft: dict, text: str) -> Optional[int]:
+    """Which line a typed message at the preview is FIXING -- or None, which means "do not guess".
+
+    Salman, 2026-09-23, from his own live round: he wrote «احمد حيدر ١٠ الصبح ووأم وهاب الظهر ١٥»,
+    Lia read the second name as «أم وهاب», and his next message was «ويأم وهاب» -- a correction of
+    one word, not an answer to anything. It was ignored, and the two buttons were shown again.
+    His instruction: «الرسالة الثانية اذا ما كانت جواب بتكون تصحيح ... خليها تقارن».
+
+    The comparison, and nothing cleverer: one line must share a real word with the message (folded,
+    so «أم»/«ام» are the same word), or carry a word one character away from one of its words.
+    Zero matches or two matches both return None -- with several names on the screen, rewriting one
+    because it was listed first would put the wrong name on a real row.
+    """
+    items = draft.get("items") or []
+    if not items or len(text) > 100:
+        return None
+    # A number means he is talking about MONEY, not spelling -- «كريم 8» is a new line or a price
+    # change, and neither is in this contract's scope (Salman's own q3, 2026-09-23). The buttons
+    # answer that case, exactly as they did before this function existed.
+    if any(ch.isdigit() for ch in _norm_digits(text)):
+        return None
+    said = [w for w in _fold_ar(text).split() if w]
+    if not said:
+        return None
+    hits = []
+    for idx, item in enumerate(items):
+        words = [w for w in _fold_ar(item.get("customer_name") or "").split() if w]
+        if not words:
+            continue
+        shared = any(len(w) >= 3 and w in said for w in words)
+        near = any(_within_one_edit(w, other) for w in words for other in said)
+        if shared or near:
+            hits.append(idx)
+    return hits[0] if len(hits) == 1 else None
+
+
+def _apply_daily_correction(draft: dict, text: str) -> bool:
+    """Replace that one line's name with what he just typed, verbatim. True when something changed.
+
+    VERBATIM, including a leading «و»: «ويأم وهاب» is a name that starts with waw, not a name with
+    a connector glued to it, and stripping it would invent a third spelling of a customer nobody
+    can correct afterwards. Only `customer_name` moves (q1, approved 2026-09-23) -- the amount and
+    the service stay exactly as they were, and nothing is written: `_send_daily_preview` shows the
+    whole list again and the two buttons still decide.
+    """
+    idx = _daily_correction_target(draft, text)
+    if idx is None:
+        return False
+    fixed = " ".join((text or "").split())
+    if not fixed or fixed == draft["items"][idx].get("customer_name"):
+        return False
+    draft["items"][idx]["customer_name"] = fixed
+    return True
 
 
 async def _ask_missing_amounts(wa, phone: str, session, draft: dict, greeting: str = "") -> None:
@@ -3058,7 +3138,12 @@ async def _commit_daily_log(wa, phone: str, draft: dict, op, actor, actor_id) ->
     logger.info("✅ Lia: daily log for %s — %d written, %d failed", client_id, len(done),
                 len(failed))
     if not failed:
-        await wa.send_text(phone, _REPLIES["daily_log_created"])
+        # THE DAY OF THE ROWS, not the day of the sentence. They are the same day in every normal
+        # round, and they are NOT the same across midnight -- a log confirmed at 00:02 belongs to
+        # the day its rows were placed on, which is what `_place_daily_items` decided.
+        day = placements[0][0] if placements else datetime.now()
+        await wa.send_text(phone, _REPLIES["daily_log_created"].format(
+            weekday=_WEEKDAYS[day.weekday()], date=f"{day.day:02d}/{day.month:02d}/{day.year}"))
         return
     _sep = "، "
     await wa.send_text(phone, _REPLIES["reservation_created_partial"].format(
@@ -3324,8 +3409,17 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # LIA_AWAITING_CONFIRM. There is no path here that writes, and none that applies a change
         # silently: the principle stays AI proposes, Pydantic validates, the owner decides.
         if msg_type == "text" and (value or "").strip() and _draft_operation(draft) == DAILY_LOG_OP:
-            # No edit contract was designed for the daily log, so a typed message at its preview
-            # is not guessed at: the approved question and its two buttons are shown again.
+            # THE DAILY LOG'S OWN EDIT CONTRACT, and it is deliberately one field wide (Salman,
+            # 2026-09-23). A message here that is not an answer is a CORRECTION of a name in the
+            # list -- compared against it, applied to exactly one line, and shown back in full.
+            # When nothing matches or two lines do, the previous behaviour is unchanged: the
+            # approved question and its two buttons, never a guess.
+            if _apply_daily_correction(draft, value):
+                logger.info("✏️  Lia: daily-log name corrected for %s", draft.get("client_id"))
+                _save_draft(session, draft)
+                session.state = LIA_AWAITING_CONFIRM
+                await _send_daily_preview(wa, sender_phone, draft)
+                return session
             await _send_daily_confirm(wa, sender_phone, draft)
             return session
         if msg_type == "text" and (value or "").strip():
