@@ -1,0 +1,30 @@
+sealed 275 write methods · seal proven by a real attempt
+window: since 2026-09-21T18:10:00+00:00 (UTC)   ·   target: barberlab-test
+
+── RESERVATIONS created in the window ──────────────────────────────────
+   0 row(s)
+
+── CUSTOMERS created in the window  (the walk-in merge is measured here) 
+   0 row(s)
+   🟡 WALK_IN row dade1bdd-9091-4f44-b4ca-87fef91014e4 name='أحمد' — 1 reservation(s) point at it
+   ⇒ record as 'Confirmed behavior / Product risk', never PASS
+
+── CATALOG rows created in the window ──────────────────────────────────
+   CatalogItem (product): 0
+   CatalogService (bookable): 0
+
+── DUPLICATE CHECK — the whole active catalogue, folded (D1's own question) 
+   active items: 10   ·   duplicate names: 1
+   🔴 'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=['5', '5']
+
+── AUDIT TRAIL — every Lia decision in the window, refusals included ───
+   0 row(s)
+
+── NEGATIVE BOUNDARY — the deployment reaches these, the test does not ─
+   ✅ rk: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ✅ mr-h: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ⚠️  zero rows is NECESSARY, not SUFFICIENT — pair it with a refusal in the audit
+
+── what left this process ──────────────────────────────────────────────
+   production writes attempted: 0  
+   WhatsApp sends: 0 — this script has no send boundary at all

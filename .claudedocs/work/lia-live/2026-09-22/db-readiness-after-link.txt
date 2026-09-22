@@ -1,0 +1,17 @@
+sealed 275 · proven
+
+=== barberlab-test  id=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a  currency=USD
+  services: [('reservations', True), ('store', True), ('whatsapp_ordering', True), ('lia', True)]
+  user barberlab-test@demo.salmansaas.com phone='96178727986' role=TENANT_ADMIN perms=NULL scope=None
+  user 96170985212@barberlab-test.salmansaas.com phone='96170985212' role=MANAGER_RESERVATIONS perms=yes scope=all
+  barber 'سامي' id=7a702d87-cf60-45f8-a1b9-71766df9fd6f userId=None active=True
+  barber 'زياد' id=1b877682-a4ae-4945-bc52-e89b30e6a612 userId=None active=True
+  catalog services: [('البروتين للشعر', '30', 45, True), ('دقن', '6', 15, True), ('تمشيط أو تسريح', '5', 20, True), ('شعر', '8', 20, True), ('شعر ودقن', '12', 30, True), ('حنة أو صبغة', '15', 45, True), ('كرياتين', '25', 90, True), ('تنظيف البشرة', '30', 45, True), ('حلاقة اطفال', '5', 30, True), ('تجربة فاونديشن', '35', 60, True), ('غسيل شعر', '10', 30, True)]
+  reservations dated 2026-09-22: 0
+
+=== rk  id=7ef5c8c9-3d47-4aa9-b5e0-43b746ee2657  currency=USD
+sealed 275
+barberlab-test | 96178727986 | role TENANT_ADMIN | barberId 7a702d87-cf60-45f8-a1b9-71766df9fd6f
+barberlab-test | 96170985212 | role MANAGER_RESERVATIONS | barberId None
+rk | 96176985477 | role TENANT_ADMIN | barberId f64ce71e-682c-4f3c-b17d-5fc48e0adaf5
+rk | 96170764479 | role TENANT_ADMIN | barberId c75b89c3-03bb-4171-8f98-d971837dd162

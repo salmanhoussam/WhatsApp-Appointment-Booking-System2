@@ -282,3 +282,41 @@ column/table/migration · Customer model · `reservation_service.py` · the rese
 separate fix) · asking service-before-phone in the reservation flow (separate) · recording Lia's
 conversation text (Side Finding 1 — separate privacy decision) · Phase B/T · U-01 · Findings 12/13 ·
 the customer path's `_normalise_ar` · desktop redesign.
+
+
+---
+
+## Addendum — 2026-09-23, from the first real round (Salman's own phone)
+
+The round reached the preview twice and wrote nothing (he never pressed ✅). Evidence:
+`.claudedocs/work/lia-live/2026-09-23/db-salman-round.txt`. Two changes came out of it, both
+approved by him before any code:
+
+1. **§3's «الساعات بالتقويم تقريبيّة» line is DELETED** — «هاي قصة جدول تلقائي شيلها». The
+   placement itself is unchanged; only the sentence that advertised it is gone. The success text
+   `daily_log_created` becomes a template — «تسجّلت {weekday} {date}.» — dated from the **rows'**
+   own day (`placements[0][0]`), not from the moment of sending, so a log confirmed after midnight
+   still names the day its rows carry. The seven day names live in `app/prompts/lia.md` under
+   `daily_log_weekdays`, Monday first, and the loader refuses to start on anything but seven.
+
+2. **The daily log gains an edit contract it deliberately did not have** (§1 said "no words added
+   to the reservation flow"; this adds none either). A typed message at the preview is compared to
+   the list and treated as a correction of ONE name:
+   - matched by a shared folded word (≥3 chars) or a one-character miss (`_within_one_edit`);
+   - zero matches or two ⇒ unchanged behaviour: the approved question and its two buttons;
+   - a message carrying a digit ⇒ out of scope (q3), buttons — an amount change is not in it;
+   - the typed text becomes the name **verbatim**, leading «و» included («ويأم وهاب» is a name);
+   - nothing is written: the full list is shown again and ✅ still decides.
+
+   Decisions taken with it: q1 = the name only (not the amount, not the service) · q2 = no new
+   owner-facing text · q3 = a new name+amount at the preview stays out of scope.
+
+**Known limitation, stated rather than hidden:** a one-word name typed alone as a correction
+(«وئام» for «أم وهاب») matches nothing under these rules and falls to the buttons — shorter than
+four characters cannot use the one-edit rule, and nothing else is shared.
+
+**UX limitation, recorded at the Gate Review (Salman, 2026-09-23) and deliberately NOT fixed:** a
+second message that matches no line is answered by re-showing the approved question and its two
+buttons. That is safe — nothing is written and nothing is guessed — but it does not TELL him the
+message was not understood; it looks like the preview simply repeated itself. Out of R1/R2's
+scope by his explicit decision. Revisit only if it shows up in a real round.
