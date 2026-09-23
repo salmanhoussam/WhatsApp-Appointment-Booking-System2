@@ -692,8 +692,13 @@ async def main():
         check("🔴 ✅ writes ONE row — علي and محمد are not written a second time",
               len(env.calls) == 1 and env.calls[0]["customer_name"] == "حسين",
               str([c["customer_name"] for c in env.calls]))
-        check("   and a correction can only reach the draft's own line",
-              lia._daily_correction_target({"items": [{"customer_name": "حسين"}]}, "علي") is None)
+        # TRANSITION 2026-09-23 (same day, after his live round): this asserted that typing a
+        # RECORDED name with one unwritten line returns None — it encoded the similarity rule,
+        # which he then hit as a defect («عماد» against «زياد» did nothing). With one candidate
+        # the typed name IS that line, so it now returns 0. What the check was really protecting
+        # still holds and is proven in §18: a marked line is not in the draft, so it cannot change.
+        check("   with one unwritten line, any name targets THAT line (marked ones are untouchable)",
+              lia._daily_correction_target({"items": [{"customer_name": "حسين"}]}, "علي") == 0)
 
     # the cap counts the whole unwritten batch, not one message
     async with Env(extract=lambda t: (log(("زياد", 1, None)) if "زياد" in t
@@ -706,6 +711,191 @@ async def main():
         check("the sixteenth is refused by DL-10 — the batch is the unit, not the message",
               lia._REPLIES["daily_log_too_many"].format(count=16, max=15) in wa2.joined()
               and len(lia._load_draft(out2)["items"]) == 15 and not env.calls, wa2.joined())
+
+    # ── 18 · his live round, 2026-09-23 11:06 — one line on the screen ──────
+    print("\n── 18. one unwritten line: the name he types IS that line ──")
+    async with Env(extract=lambda t: log(("زياد", 10, None))) as env:
+        wa, out = await send(session_idle(), "زياد 10")
+        wa2, out2 = await send(roundtrip(out), "عماد")
+        body = wa2.joined()
+        # MEASURED LIVE: «عماد» against «زياد» is neither a shared word nor a one-character miss,
+        # so the similarity rule refused it and he got the buttons back. With one candidate there
+        # is nothing to disambiguate — requiring similarity guarded an ambiguity that did not exist.
+        check("«عماد» replaces the one name, and the list comes back with it",
+              "*1.* عماد · 10 USD" in body and lia._REPLIES["daily_log_preview"] in body
+              and "زياد" not in body, body[:160])
+        # TRANSITION 2026-09-23 (duplicate contract): the item now also carries `arrived_at`, so
+        # this compares the fields the rename must not touch instead of the whole dict.
+        only = lia._load_draft(out2)["items"]
+        check("   the amount survives the rename, nothing is written",
+              len(only) == 1 and (only[0]["customer_name"], only[0]["amount"],
+                                  only[0]["service_said"]) == ("عماد", "10", None)
+              and only[0].get("arrived_at") and not env.calls, str(only))
+        wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ writes the corrected name",
+              [c["customer_name"] for c in env.calls] == ["عماد"],
+              str([c["customer_name"] for c in env.calls]))
+
+    async with Env(extract=lambda t: log(("زياد", 10, None)), report_rows=written) as env:
+        wa, out = await send(session_idle(), "زياد 10")
+        wa2, out2 = await send(roundtrip(out), "عماد")
+        check("marked lines are not candidates — four of them, and the new one still wins",
+              [i["customer_name"] for i in lia._load_draft(out2)["items"]] == ["عماد"]
+              and "علي · 10 USD " + lia._REPLIES["daily_log_recorded"] in wa2.joined(),
+              wa2.joined()[:200])
+
+    # An instruction is not a name, even with one line on the screen.
+    for word in ("تقرير اليوم", "إلغاء", "لا"):
+        check(f"   {word!r} is an instruction, never the customer's name",
+              lia._daily_correction_target({"items": [{"customer_name": "زياد"}]}, word) is None)
+    check("   and with TWO lines the similarity rule still decides",
+          lia._daily_correction_target(
+              {"items": [{"customer_name": "أحمد"}, {"customer_name": "محمد"}]}, "عماد") is None)
+
+    # ── 19 · the duplicate branch — the contract, end states first ──────────
+    print("\n── 19. اسم مكرّر: N0…N4، وكلّ تغيير يرجع للكاشف ──")
+    dup2 = lambda t: log(("علي", 8, None), ("علي", 10, None), ("أحمد", 7, None))
+    START = "علي 8، علي 10، أحمد 7"
+
+    async def opened(env_extract=dup2, **kw):
+        env = Env(extract=env_extract, **kw)
+        await env.__aenter__()
+        wa, out = await send(session_idle(), START)
+        return env, wa, out
+
+    # the question itself: one message, the duplicates only, with their times
+    env, wa, out = await opened()
+    body = wa.joined()
+    check("سؤال التكرار: رسالة وحدة فيها المكرّر وحده — لا الليستة كلّها",
+          lia._REPLIES["daily_log_dup_header"].format(name="علي") in body
+          and "أحمد" not in body and "*1.*" in body and "*2.*" in body, body)
+    check("   فيها وقت وصول كل سطر",
+          body.count(":") >= 2 and lia._load_draft(out)["items"][0].get("arrived_at"), body[:120])
+    check("   بثلاثة أزرار، والمسودّة موقوفة على السؤال",
+          titles(wa)[-1] == ("اجمعهم", "عدّل الاسم", "اتركهم هيك")
+          and lia._load_draft(out)["asking"] == "duplicate"
+          and out.state == lia.LIA_AWAITING_FIELD, str(titles(wa)))
+    check("   ولا معاينة ولا كتابة قبل ما يقرّر",
+          lia._REPLIES["daily_log_preview"] not in body and not env.calls)
+    await env.__aexit__()
+
+    # N1 — keep
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), lia.DUP_KEEP_ID, "button_reply")
+    check("N1 «اتركهم هيك» ⇒ الثلاثة كما هي، والمعاينة رجعت",
+          [i["customer_name"] for i in lia._load_draft(out2)["items"]] == ["علي", "علي", "أحمد"]
+          and lia._REPLIES["daily_log_preview"] in wa2.joined()
+          and out2.state == lia.LIA_AWAITING_CONFIRM, wa2.joined()[:140])
+    wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+    check("   ✅ بتكتب ٣ صفوف", len(env.calls) == 3, str(len(env.calls)))
+    await env.__aexit__()
+
+    # N2 — merge
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), lia.DUP_MERGE_ID, "button_reply")
+    items = lia._load_draft(out2)["items"]
+    check("N2 «اجمعهم» ⇒ سطر واحد بالمجموع، بمكان الأوّل، ووقت الأوّل",
+          [(i["customer_name"], i["amount"]) for i in items] == [("علي", "18"), ("أحمد", "7")]
+          and items[0]["arrived_at"] == lia._load_draft(out)["items"][0]["arrived_at"], str(items))
+    wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+    check("   ✅ بتكتب صفّين لا ثلاثة، والمبلغ 18",
+          [(c["customer_name"], c["metadata"]["daily_log"]["amount"]) for c in env.calls]
+          == [("علي", "18"), ("أحمد", "7")], str(len(env.calls)))
+    await env.__aexit__()
+
+    # N3/N4 — rename, and the detector runs again
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), "الأوّل علي حيدر", "text")
+    check("N3 تعديل واحد ⇒ التكرار زال، والمعاينة رجعت",
+          [i["customer_name"] for i in lia._load_draft(out2)["items"]]
+          == ["علي حيدر", "علي", "أحمد"]
+          and lia._REPLIES["daily_log_preview"] in wa2.joined(), wa2.joined()[:140])
+    await env.__aexit__()
+
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), "الأوّل علي حيدر والتاني علي سلمان", "text")
+    check("N4 تعديل الاثنين برسالة وحدة",
+          [i["customer_name"] for i in lia._load_draft(out2)["items"]]
+          == ["علي حيدر", "علي سلمان", "أحمد"], str(lia._load_draft(out2)["items"]))
+    await env.__aexit__()
+
+    # 🔴 the invariant: a rename that creates a NEW duplicate is caught again
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), "الأوّل أحمد", "text")
+    check("🔴 الثابتة: تعديلٌ يصنع تكراراً جديداً ⇒ الكاشف يمسكه فوراً",
+          lia._load_draft(out2)["asking"] == "duplicate"
+          and lia._REPLIES["daily_log_dup_header"].format(name="أحمد") in wa2.joined(),
+          wa2.joined()[:120])
+    await env.__aexit__()
+
+    # a bare name with two candidates: ASK, never guess
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), "علي حيدر", "text")
+    check("اسمٌ بلا ترتيب ⇒ «أيّ واحد بدّك تعدّل؟» — لا تخمين",
+          wa2.joined() == lia._REPLIES["daily_log_dup_pick"]
+          and [t for t in titles(wa2)] == [("الأوّل", "التاني")], wa2.joined())
+    wa3, out3 = await send(roundtrip(out2), f"{lia.DUP_PICK_PREFIX}2", "button_reply")
+    check("   وبعد اختياره، الاسم اللي كتبه ينطبق على الثاني — بلا ما يعيد كتابته",
+          [i["customer_name"] for i in lia._load_draft(out3)["items"]]
+          == ["علي", "علي حيدر", "أحمد"], str(lia._load_draft(out3)["items"]))
+    await env.__aexit__()
+
+    # UNKNOWN / an old ✅ / ❌
+    env, wa, out = await opened()
+    wa2, out2 = await send(roundtrip(out), "شو هالحكي", "text")
+    check("رسالة غير مفهومة ⇒ يُعاد السؤال بأزراره، صفر كتابة، والمسودّة كما هي",
+          titles(wa2) and titles(wa2)[-1] == ("اجمعهم", "عدّل الاسم", "اتركهم هيك")
+          and lia._load_draft(out2)["items"] == lia._load_draft(out)["items"] and not env.calls)
+    wa3, out3 = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+    check("🔴 ✅ من فقاعة أقدم ⇒ لا كتابة، ويُعاد سؤال التكرار",
+          not env.calls and lia._load_draft(out3)["asking"] == "duplicate"
+          and lia._REPLIES["daily_log_dup_header"].format(name="علي") in wa3.joined(),
+          wa3.joined()[:100])
+    wa4, out4 = await send(roundtrip(out3), lia.CANCEL_ID, "button_reply")
+    check("N0 ❌ أثناء السؤال ⇒ إلغاء فوريّ، صفر كتابة",
+          wa4.joined() == lia._REPLIES["daily_log_cancelled"] and not env.calls
+          and lia._load_draft(out4) is None)
+    await env.__aexit__()
+
+    # ⛔ merge refused when the services differ
+    diff = lambda t: log(("علي", 8, "شعر"), ("علي", 10, "دقن"))
+    env, wa, out = await opened(env_extract=diff)
+    body = wa.joined()
+    check("⛔ خدمتان مختلفتان ⇒ زرّ «اجمعهم» ما بينعرض أصلاً (الخيار أ)",
+          titles(wa)[-1] == ("عدّل الاسم", "اتركهم هيك"), str(titles(wa)))
+    check("   ونصّ الرفض المُقَرّ هو السؤال نفسه",
+          lia._REPLIES["daily_log_dup_merge_refused"].format(
+              name="علي", first="شعر", second="دقن") in body, body)
+    wa2, out2 = await send(roundtrip(out), "اجمعهم", "text")
+    check("   وكتابة «اجمعهم» بالإيد ⇒ نفس الرفض · صفر حذف · صفر تغيير مبلغ",
+          [(i["customer_name"], i["amount"]) for i in lia._load_draft(out2)["items"]]
+          == [("علي", "8"), ("علي", "10")]
+          and lia._REPLIES["daily_log_dup_merge_refused"].split("{")[0] in wa2.joined()
+          and not env.calls, str(lia._load_draft(out2)["items"]))
+    wa3, out3 = await send(roundtrip(out2), lia.DUP_MERGE_ID, "button_reply")
+    check("   وزرّ «اجمعهم» من فقاعة أقدم ⇒ نفس الجدار",
+          len(lia._load_draft(out3)["items"]) == 2 and not env.calls)
+    await env.__aexit__()
+
+    # same service on both sides ⇒ merge allowed
+    same = lambda t: log(("علي", 8, "شعر"), ("علي", 10, "شعر"))
+    env, wa, out = await opened(env_extract=same)
+    check("خدمتان متطابقتان ⇒ الدمج متاح", titles(wa)[-1][0] == "اجمعهم", str(titles(wa)))
+    wa2, out2 = await send(roundtrip(out), lia.DUP_MERGE_ID, "button_reply")
+    check("   والدمج بيحفظ الخدمة والمجموع",
+          [(i["customer_name"], i["amount"], i.get("service_name")) for i in
+           lia._load_draft(out2)["items"]] == [("علي", "18", "شعر")],
+          str(lia._load_draft(out2)["items"]))
+    await env.__aexit__()
+
+    # one side without a service is NOT a difference
+    half = lambda t: log(("علي", 8, None), ("علي", 10, "شعر"))
+    env, wa, out = await opened(env_extract=half)
+    wa2, out2 = await send(roundtrip(out), lia.DUP_MERGE_ID, "button_reply")
+    check("سطر بلا خدمة + سطر بخدمة ⇒ دمجٌ مسموح، والخدمة الموجودة بتعيش",
+          [(i["amount"], i.get("service_name")) for i in lia._load_draft(out2)["items"]]
+          == [("18", "شعر")], str(lia._load_draft(out2)["items"]))
+    await env.__aexit__()
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",

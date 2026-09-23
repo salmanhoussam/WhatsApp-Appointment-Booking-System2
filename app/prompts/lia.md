@@ -553,6 +553,26 @@ Lia — قواعدها التشغيلية. هذا الملفّ prompt، لا و�
 [[daily_log_recorded]]
 (مسجّل)
 
+[[daily_log_dup_header]]
+«{name}» مكرّر بالليستة:
+
+[[daily_log_dup_line]]
+*{n}.* {customer} · {amount} · {at}
+
+[[daily_log_dup_question]]
+شو بدّك نعمل؟ هنّي نفس الشخص فنجمعهن بفاتورة وحدة؟
+أو بتحبّ تميّزهن وتعدّل اسم واحد فيهن؟ أو اتركهن هيك.
+
+[[daily_log_dup_merge_refused]]
+ما فيني اجمعهن: «{name}» الأوّل خدمته {first} والتاني {second}.
+ميّزهن بالاسم، أو اتركهن هيك.
+
+[[daily_log_dup_pick]]
+أيّ واحد بدّك تعدّل؟
+
+[[daily_log_dup_ask_name]]
+شو الاسم الصحيح؟
+
 [[daily_log_weekdays]]
 الاثنين · الثلاثاء · الأربعاء · الخميس · الجمعة · السبت · الأحد
 
