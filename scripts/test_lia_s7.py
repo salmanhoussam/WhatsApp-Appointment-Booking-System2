@@ -538,8 +538,16 @@ async def main():
     # standing decision that keeps every button title a literal. They were first moved into a
     # shared helper, which dropped this count to 29 -- hiding three owner-facing strings from
     # the one check that exists to show them. Reverted, so they are counted here.
-    check("the un-migrated owner-facing literals are pinned at 35 (was 32; daily-log buttons)",
-          len(_sent_literals) == 35, str(len(_sent_literals)))
+    # TRANSITION (2026-09-23): 35 -> 45, and the jump is bigger than the new buttons alone —
+    # which is the finding, not an accident. The duplicate branch's ten titles («اجمعهم» ·
+    # «عدّل الاسم» ×2 · «اتركهم هيك» ×2 · «الأوّل» · «التاني» · «التالت» · «سطر جديد», plus the
+    # refusal variant's pair) were first written into a `buttons = [...]` VARIABLE above the
+    # send call, and this counter only walks the call itself — so six owner-facing strings were
+    # invisible to it while the pin still read 35 and passed. Same class of miss as the helper
+    # that dropped it to 29 on 2026-09-21. The sends are now written out with their titles
+    # inline, so every one of them is counted here.
+    check("the un-migrated owner-facing literals are pinned at 45 (was 35; duplicate buttons)",
+          len(_sent_literals) == 45, str(len(_sent_literals)))
     # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
     check("a RECORD verb now opens a reservation — T4 is built, so the promise is real",
           lia._entry_family("سجل إنه أحمد إجا مبارح") == "create_reservation")

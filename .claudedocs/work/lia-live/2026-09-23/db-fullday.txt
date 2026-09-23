@@ -1,0 +1,95 @@
+sealed 275 write methods · seal proven by a real attempt
+window: since 2026-09-22T21:00:00+00:00 (UTC)   ·   target: barberlab-test
+
+── RESERVATIONS created in the window ──────────────────────────────────
+   7 row(s)
+   · id=0a439f99-e2e5-456d-9fba-29dcbc914904
+     customer='علي' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 09:00:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '10', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=a749809e-7042-4fa9-971a-4615eee94113
+     customer='محمد' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 09:30:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '7', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=e64712e3-01fc-4ace-b23d-9f7a7ea586f5
+     customer='علي' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 10:00:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '7', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=f20e3089-7fc2-4086-879d-5aa13552c4cd
+     customer='زياد' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 10:30:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '10', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=391ac8b1-03ba-4af5-9493-77ae3e68401a
+     customer='أحمد' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 11:00:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '10', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=fc8801d4-3568-43ba-bbd8-99559983bddc
+     customer='بلال' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 11:30:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '8', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=e9dc609a-d88a-456a-850c-5511d1017f7c
+     customer='بلال' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 12:00:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '12', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+
+── CUSTOMERS created in the window  (the walk-in merge is measured here) 
+   0 row(s)
+   🟡 WALK_IN row dade1bdd-9091-4f44-b4ca-87fef91014e4 name='أحمد' — 8 reservation(s) point at it
+   ⇒ record as 'Confirmed behavior / Product risk', never PASS
+
+── CATALOG rows created in the window ──────────────────────────────────
+   CatalogItem (product): 0
+   CatalogService (bookable): 0
+
+── DUPLICATE CHECK — the whole active catalogue, folded (D1's own question) 
+   active items: 10   ·   duplicate names: 1
+   🔴 'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=['5', '5']
+
+── AUDIT TRAIL — every Lia decision in the window, refusals included ───
+   15 row(s)
+   · 21:55:21  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 2, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 21:55:39  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'amount': '10', 'row_id': '0a439f99-e2e5-456d-9fba-29dcbc914904', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 21:55:40  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'amount': '7', 'row_id': 'a749809e-7042-4fa9-971a-4615eee94113', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 21:56:36  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 08:05:48  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 08:05:58  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 1, 'amount': '7', 'row_id': 'e64712e3-01fc-4ace-b23d-9f7a7ea586f5', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 08:06:13  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 08:06:38  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 1, 'amount': '10', 'row_id': 'f20e3089-7fc2-4086-879d-5aa13552c4cd', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 08:06:53  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 14:49:36  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 2, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 14:49:52  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'amount': '10', 'row_id': '391ac8b1-03ba-4af5-9493-77ae3e68401a', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 14:49:52  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'amount': '8', 'row_id': 'fc8801d4-3568-43ba-bbd8-99559983bddc', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 14:49:59  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 14:51:37  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 1, 'amount': '12', 'row_id': 'e9dc609a-d88a-456a-850c-5511d1017f7c', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 14:51:50  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 2, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'low', 'sender_phone': '96178727986', 'amounts_missing': 1}
+
+── NEGATIVE BOUNDARY — the deployment reaches these, the test does not ─
+   ✅ rk: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ✅ mr-h: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ⚠️  zero rows is NECESSARY, not SUFFICIENT — pair it with a refusal in the audit
+
+── what left this process ──────────────────────────────────────────────
+   production writes attempted: 0  
+   WhatsApp sends: 0 — this script has no send boundary at all

@@ -897,6 +897,117 @@ async def main():
           == [("18", "شعر")], str(lia._load_draft(out2)["items"]))
     await env.__aexit__()
 
+    # ── 20 · «مكتوب ↔ مسودّة» — عقد §9 ────────────────────────────────────
+    print("\n── 20. اسم مسجَّل اليوم + سطر جديد بنفس الاسم ──")
+    rec = lambda name, amount, svc=None: Row(
+        source="lia", status="arrived", customerName=name, serviceId=svc,
+        metadata={"barber_id": "brb-1",
+                  "daily_log": {"v": 1, "amount": amount, "currency": "USD",
+                                "service_said": None}})
+    WRITTEN = [rec("بلال", "8")]
+    one = lambda t: log(("بلال", 2, None))
+
+    async with Env(extract=one, report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "بلال 2")
+        body, d = wa.joined(), lia._load_draft(out)
+        check("§9-ج: سؤال بزرّين — «سطر جديد» و«عدّل الاسم»، بلا «اجمعهم»",
+              titles(wa) and titles(wa)[-1] == ("سطر جديد", "عدّل الاسم"), str(titles(wa)))
+        check("   بنصّ سلمان: المسجَّل بمبلغه، والسطر الجديد بمبلغه",
+              lia._REPLIES["daily_log_dup_recorded"].format(
+                  name="بلال", amount="8 USD", new="2 USD") in body, body)
+        check("   ولا معاينة ولا كتابة قبل القرار",
+              lia._REPLIES["daily_log_preview"] not in body and not env.calls
+              and d["asking"] == "recorded_dup" and out.state == lia.LIA_AWAITING_FIELD)
+        wa2, out2 = await send(roundtrip(out), lia.DUP_NEWLINE_ID, "button_reply")
+        check("«سطر جديد» ⇒ المعاينة بترجع، والاثنان بمكانهما",
+              lia._REPLIES["daily_log_preview"] in wa2.joined()
+              and f"*1.* بلال · 8 USD {lia._REPLIES['daily_log_recorded']}" in wa2.joined()
+              and "*2.* بلال · 2 USD" in wa2.joined(), wa2.joined()[:160])
+        check("   وما بيرجع يسأل عن نفس الاسم — الإقرار مسجَّل",
+              lia._load_draft(out2).get("recorded_ack") == ["بلال"]
+              and lia._load_draft(out2)["asking"] is None)
+        wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ بتكتب السطر الجديد وحده — المسجَّل ما انكتب مرّة تانية",
+              len(env.calls) == 1 and env.calls[0]["customer_name"] == "بلال"
+              and env.calls[0]["metadata"]["daily_log"]["amount"] == "2",
+              str([c["customer_name"] for c in env.calls]))
+
+    async with Env(extract=one, report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "بلال 2")
+        wa2, out2 = await send(roundtrip(out), lia.DUP_RENAME_ID, "button_reply")
+        check("«عدّل الاسم» وسطرٌ واحد يحمل الاسم ⇒ بيسأل عن الاسم مباشرةً",
+              wa2.joined() == lia._REPLIES["daily_log_dup_ask_name"]
+              and lia._load_draft(out2)["asking"] == "duplicate_name", wa2.joined())
+        wa3, out3 = await send(roundtrip(out2), "بلال حيدر", "text")
+        check("   اسم المسودّة وحده تغيّر، والمعاينة رجعت",
+              [i["customer_name"] for i in lia._load_draft(out3)["items"]] == ["بلال حيدر"]
+              and "*2.* بلال حيدر · 2 USD" in wa3.joined(), wa3.joined()[:160])
+        check("   🔴 والصفّ المسجَّل كما هو حرفيّاً — ولا نداء تعديل",
+              WRITTEN[0].customerName == "بلال" and WRITTEN[0].metadata["daily_log"]["amount"] == "8")
+        wa4, _ = await send(roundtrip(out3), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ كتبت الاسم المصحَّح، صفّاً واحداً",
+              [c["customer_name"] for c in env.calls] == ["بلال حيدر"], str(env.calls and 1))
+
+    # الترتيب: مسودّة ↔ مسودّة أوّلاً، وسجلّا الإقرار منفصلان
+    two_same = lambda t: log(("بلال", 2, None), ("بلال", 3, None))
+    async with Env(extract=two_same, report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "بلال 2، بلال 3")
+        check("§9-د: التعارض داخل المسودّة يُسأل عنه أوّلاً (بثلاثة أزرار)",
+              titles(wa)[-1] == ("اجمعهم", "عدّل الاسم", "اتركهم هيك")
+              and lia._load_draft(out).get("dup_kind") != "recorded", str(titles(wa)))
+        wa2, out2 = await send(roundtrip(out), lia.DUP_KEEP_ID, "button_reply")
+        check("   وبعد «اتركهم هيك» يُسأل سؤال المكتوب — الإقرار لا يُسكِته",
+              titles(wa2) and titles(wa2)[-1] == ("سطر جديد", "عدّل الاسم")
+              and lia._load_draft(out2)["duplicates_ack"] == ["بلال"]
+              and lia._load_draft(out2).get("recorded_ack") in (None, []), str(titles(wa2)))
+        wa3, out3 = await send(roundtrip(out2), lia.DUP_NEWLINE_ID, "button_reply")
+        check("   وبعد «سطر جديد» تُعرَض المعاينة: ثلاثة أسطر باسم واحد بقرارٍ منه",
+              lia._REPLIES["daily_log_preview"] in wa3.joined()
+              and lia._load_draft(out3)["recorded_ack"] == ["بلال"]
+              and len(lia._load_draft(out3)["items"]) == 2, wa3.joined()[:160])
+        wa4, _ = await send(roundtrip(out3), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ صفّان جديدان لا ثلاثة", len(env.calls) == 2, str(len(env.calls)))
+
+    # اسم مختلف عن المسجَّل ⇒ ولا سؤال
+    async with Env(extract=lambda t: log(("سامر", 5, None)), report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "سامر 5")
+        check("اسمٌ لا يطابق أيّ مسجَّل ⇒ معاينة مباشرة، بلا سؤال",
+              lia._REPLIES["daily_log_preview"] in wa.joined()
+              and out.state == lia.LIA_AWAITING_CONFIRM, wa.joined()[:100])
+
+    # ❌ وزرّ قديم أثناء سؤال المكتوب
+    async with Env(extract=one, report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "بلال 2")
+        wa2, out2 = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("✅ من فقاعة أقدم أثناء سؤال المكتوب ⇒ لا كتابة، ويُعاد السؤال",
+              not env.calls and titles(wa2)[-1] == ("سطر جديد", "عدّل الاسم"), str(titles(wa2)))
+        wa3, out3 = await send(roundtrip(out2), lia.CANCEL_ID, "button_reply")
+        check("   ❌ ⇒ إلغاء فوريّ، صفر كتابة",
+              wa3.joined() == lia._REPLIES["daily_log_cancelled"] and not env.calls
+              and lia._load_draft(out3) is None)
+
+    # 🔴 فحصٌ على الكود: لا UPDATE ولا DELETE في هذه الوحدة إطلاقاً
+    tree20 = ast.parse(src)
+    writes = []
+    for node in ast.walk(tree20):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        chain, cur = [], node.func
+        while isinstance(cur, ast.Attribute):
+            chain.append(cur.attr); cur = cur.value
+        if isinstance(cur, ast.Name) and cur.id in ("prisma_client", "repo", "_repo"):
+            if chain and chain[0] not in ("find_many", "find_first", "find_unique", "count",
+                                          "group_by", "query_raw"):
+                writes.append((node.lineno, ".".join(reversed(chain))))
+    check("🔴 صفر نداء كتابة على قاعدة البيانات في وحدة ليا (AST لا نصّ)",
+          not writes, str(writes))
+    dbcalls = [n.func.attr for n in ast.walk(tree20)
+               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr in ("update", "delete", "update_many", "delete_many", "upsert")
+               and not (isinstance(n.func.value, ast.Subscript)
+                        or (isinstance(n.func.value, ast.Name) and n.func.value.id in ("merged", "one", "draft", "data", "row")))]
+    check("   ولا update/delete على أيّ كائن غير قواميس بايثون", not dbcalls, str(dbcalls))
+
     print("\n── nothing left this process ──")
     check("the real functions are restored",
           reservation_service.create_reservation is REAL_CREATE

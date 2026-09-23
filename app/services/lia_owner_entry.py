@@ -824,7 +824,8 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # the whole branch specified first in
                      # `.claudedocs/plans/lia-daily-log-duplicate-contract.md`.
                      "daily_log_dup_header", "daily_log_dup_line", "daily_log_dup_question",
-                     "daily_log_dup_merge_refused", "daily_log_dup_pick",
+                     "daily_log_dup_merge_refused", "daily_log_dup_recorded",
+                     "daily_log_dup_pick",
                      "daily_log_dup_ask_name",
                      "daily_log_created",
                      "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
@@ -1121,6 +1122,9 @@ DUP_MERGE_ID  = "__LIA_DUP_MERGE__"
 DUP_RENAME_ID = "__LIA_DUP_RENAME__"
 DUP_KEEP_ID   = "__LIA_DUP_KEEP__"
 DUP_PICK_PREFIX = "lia_dup_pick:"
+# «مكتوب ↔ مسودّة» has its own two buttons: there is no merge there, because merging with a row
+# that is already in the database would mean editing it (contract §9-ج).
+DUP_NEWLINE_ID = "__LIA_DUP_NEWLINE__"
 
 
 def _take_greeting(draft: dict) -> str:
@@ -2950,13 +2954,17 @@ async def _send_daily_confirm(wa, phone: str, draft: dict) -> None:
     )
 
 
-async def _send_daily_preview(wa, phone: str, draft: dict, greeting: str = "") -> None:
+async def _send_daily_preview(wa, phone: str, draft: dict, greeting: str = "",
+                              recorded: Optional[list] = None) -> None:
     """DL-1, one DL-2 per name in his order, DL-4, DL-5 -- then DL-6 with the two buttons."""
     currency = draft.get("currency") or ""
     items = draft.get("items") or []
     # THE DAY AS IT STANDS: what is already written, marked, then what he just said. The numbering
     # runs through both, so a name he adds appears at the END of one list -- his own words.
-    recorded = await _todays_recorded(draft)
+    # Passed in by `_advance_daily_log`, which has just read them for the detector; read here only
+    # when the preview is reached by another path. One preview, one read.
+    if recorded is None:
+        recorded = await _todays_recorded(draft)
     lines, total, n = [], Decimal(0), 0
     for done in recorded:
         n += 1
@@ -3048,6 +3056,29 @@ def _duplicate_group(draft: dict) -> Optional[tuple]:
     for key, idxs in groups.items():
         if len(idxs) > 1 and key not in ack:
             return key, idxs
+    return None
+
+
+def _recorded_conflict(draft: dict, recorded: list) -> Optional[tuple]:
+    """(folded name, [draft indices], [recorded rows]) for the first draft name already written
+    TODAY -- or None. Contract §9-ب.
+
+    The recorded side is READ ONLY and stays that way: it is compared against, never touched. The
+    two acknowledgement sets are deliberately separate (§9-د) -- «اتركهم هيك» inside the draft
+    must not silence this question, and «سطر جديد» here must not silence that one.
+    """
+    ack = set(draft.get("recorded_ack") or [])
+    by_name: dict = {}
+    for row in recorded or []:
+        key = _fold_ar(row.get("customer_name") or "")
+        if key:
+            by_name.setdefault(key, []).append(row)
+    for item in draft.get("items") or []:
+        key = _fold_ar(item.get("customer_name") or "")
+        if key and key in by_name and key not in ack:
+            idxs = [i for i, it in enumerate(draft["items"])
+                    if _fold_ar(it.get("customer_name") or "") == key]
+            return key, idxs, by_name[key]
     return None
 
 
@@ -3291,26 +3322,60 @@ async def _ask_duplicate(wa, phone: str, session, draft: dict, group: tuple,
         amount=_money(items[i]["amount"], currency), at=items[i].get("arrived_at") or "")
         for i in idxs]
     blocked = _merge_blocked_by_service(draft, idxs)
-    if blocked:
-        # Option (أ), approved: a forbidden action is not offered. The refusal text IS the
-        # question here -- it says why merging is off the table and names the two ways left, so
-        # no second wording had to be invented for this case.
-        tail = _REPLIES["daily_log_dup_merge_refused"].format(
-            name=items[idxs[0]]["customer_name"], first=blocked[0], second=blocked[1])
-        buttons = [{"type": "reply", "reply": {"id": DUP_RENAME_ID, "title": "عدّل الاسم"}},
-                   {"type": "reply", "reply": {"id": DUP_KEEP_ID,   "title": "اتركهم هيك"}}]
-    else:
-        tail = _REPLIES["daily_log_dup_question"]
-        buttons = [{"type": "reply", "reply": {"id": DUP_MERGE_ID,  "title": "اجمعهم"}},
-                   {"type": "reply", "reply": {"id": DUP_RENAME_ID, "title": "عدّل الاسم"}},
-                   {"type": "reply", "reply": {"id": DUP_KEEP_ID,   "title": "اتركهم هيك"}}]
     draft["asking"] = "duplicate"
+    draft["dup_kind"] = "draft"
     draft["dup_key"] = key
     _save_draft(session, draft)
     session.state = LIA_AWAITING_FIELD
-    body = "\n".join([lead + _REPLIES["daily_log_dup_header"].format(
-        name=items[idxs[0]]["customer_name"]), *lines, tail])
-    await wa.send_interactive_buttons(to=phone, text=body, buttons=buttons)
+    head = lead + _REPLIES["daily_log_dup_header"].format(name=items[idxs[0]]["customer_name"])
+    # THE TWO SENDS ARE WRITTEN OUT, and the titles sit INSIDE them on purpose: test_lia_s7
+    # counts owner-facing literals inside `send_*` calls, and a list built in a variable above
+    # hides them from that count -- the exact mistake that dropped it to 29 on 2026-09-21.
+    if blocked:
+        # Option (أ), approved: a forbidden action is not offered. The refusal text IS the
+        # question here -- it says why merging is off the table and names the two ways left.
+        await wa.send_interactive_buttons(
+            to=phone,
+            text="\n".join([head, *lines, _REPLIES["daily_log_dup_merge_refused"].format(
+                name=items[idxs[0]]["customer_name"], first=blocked[0], second=blocked[1])]),
+            buttons=[{"type": "reply", "reply": {"id": DUP_RENAME_ID, "title": "عدّل الاسم"}},
+                     {"type": "reply", "reply": {"id": DUP_KEEP_ID,   "title": "اتركهم هيك"}}])
+        return
+    await wa.send_interactive_buttons(
+        to=phone,
+        text="\n".join([head, *lines, _REPLIES["daily_log_dup_question"]]),
+        buttons=[{"type": "reply", "reply": {"id": DUP_MERGE_ID,  "title": "اجمعهم"}},
+                 {"type": "reply", "reply": {"id": DUP_RENAME_ID, "title": "عدّل الاسم"}},
+                 {"type": "reply", "reply": {"id": DUP_KEEP_ID,   "title": "اتركهم هيك"}}])
+
+
+async def _ask_recorded_dup(wa, phone: str, session, draft: dict, conflict: tuple,
+                            lead: str = "") -> None:
+    """«بلال» مسجّل اليوم بـ8 USD، والسطر الجديد بـ2 USD. — contract §9-ج, Salman's own wording.
+
+    TWO buttons, never three: merging with a written row would edit it, and that capability is
+    closed in this phase. What is offered is what is actually possible — leave both, or rename
+    the DRAFT line.
+    """
+    key, idxs, rows = conflict
+    items = draft["items"]
+    currency = draft.get("currency") or ""
+    draft["asking"] = "recorded_dup"
+    draft["dup_kind"] = "recorded"
+    draft["dup_key"] = key
+    draft["dup_indices"] = idxs
+    _save_draft(session, draft)
+    session.state = LIA_AWAITING_FIELD
+    body = lead + _REPLIES["daily_log_dup_recorded"].format(
+        name=items[idxs[0]]["customer_name"],
+        # The most recent written row of that name: rows come back ordered by `reservedAt asc`,
+        # so the last one is today's latest. BEHAVIOUR NOT IN THE CONTRACT -- reported, not hidden.
+        amount=_money(rows[-1]["amount"], currency),
+        new=_money(items[idxs[0]]["amount"], currency))
+    await wa.send_interactive_buttons(
+        to=phone, text=body,
+        buttons=[{"type": "reply", "reply": {"id": DUP_NEWLINE_ID, "title": "سطر جديد"}},
+                 {"type": "reply", "reply": {"id": DUP_RENAME_ID,  "title": "عدّل الاسم"}}])
 
 
 async def _ask_dup_pick(wa, phone: str, session, draft: dict, group: tuple) -> None:
@@ -3320,11 +3385,30 @@ async def _ask_dup_pick(wa, phone: str, session, draft: dict, group: tuple) -> N
     draft["asking"] = "duplicate_pick"
     _save_draft(session, draft)
     session.state = LIA_AWAITING_FIELD
-    titles = ["الأوّل", "التاني", "التالت"]
-    buttons = [{"type": "reply", "reply": {"id": f"{DUP_PICK_PREFIX}{i + 1}", "title": t}}
-               for i, t in zip(idxs[:3], titles)]
-    await wa.send_interactive_buttons(to=phone, text=_REPLIES["daily_log_dup_pick"],
-                                      buttons=buttons)
+    await wa.send_interactive_buttons(
+        to=phone, text=_REPLIES["daily_log_dup_pick"],
+        # Same reason as `_ask_duplicate`: the titles stay inside the call so the literal count
+        # in test_lia_s7 can see them.
+        buttons=[{"type": "reply", "reply": {"id": f"{DUP_PICK_PREFIX}{n}", "title": t}}
+                 for n, t in list(enumerate(["الأوّل", "التاني", "التالت"], 1))[:len(idxs)]])
+
+
+async def _reask_duplicate(wa, phone: str, session, draft: dict) -> None:
+    """Show the SAME question that is open, whichever kind it is. Never a guess, never silence."""
+    if draft.get("dup_kind") == "recorded":
+        key, idxs = draft.get("dup_key"), draft.get("dup_indices") or []
+        recorded = await _todays_recorded(draft)
+        rows = [r for r in recorded if _fold_ar(r.get("customer_name") or "") == key]
+        if idxs and rows:
+            await _ask_recorded_dup(wa, phone, session, draft, (key, idxs, rows))
+            return
+        await _advance(wa, phone, session, draft)
+        return
+    group = _duplicate_group(draft)
+    if group is not None:
+        await _ask_duplicate(wa, phone, session, draft, group)
+        return
+    await _advance(wa, phone, session, draft)
 
 
 async def _dup_decide(wa, phone: str, session, draft: dict, kind: str, payload=None) -> None:
@@ -3334,6 +3418,28 @@ async def _dup_decide(wa, phone: str, session, draft: dict, kind: str, payload=N
     differ -- a typed «اجمعهم» and an older bubble's button must meet the same wall as the button
     that was never shown.
     """
+    # A recorded conflict keeps its own group in the draft: recomputing it would need a second
+    # read, and the question blocks every other change while it is open.
+    if draft.get("dup_kind") == "recorded":
+        key, idxs = draft.get("dup_key"), draft.get("dup_indices") or []
+        if not key or not idxs:
+            await _advance(wa, phone, session, draft)
+            return
+        if kind == "NEWLINE":
+            # N-record-1: both stay. The name is acknowledged for THIS draft, on the recorded
+            # side only -- the draft-side question keeps its own set (§9-د).
+            draft.setdefault("recorded_ack", []).append(key)
+        elif kind == "RENAME":
+            for pos, name in (payload or {}).items():
+                if 1 <= pos <= len(idxs):
+                    draft["items"][idxs[pos - 1]]["customer_name"] = name
+        draft["asking"] = None
+        for gone in ("dup_key", "dup_target", "dup_kind", "dup_indices"):
+            draft.pop(gone, None)
+        _save_draft(session, draft)
+        await _advance(wa, phone, session, draft)       # the invariant, both kinds
+        return
+
     group = _duplicate_group(draft)
     if group is None:                                  # answered after it was already resolved
         await _advance(wa, phone, session, draft)
@@ -3414,15 +3520,27 @@ async def _advance_daily_log(wa, phone: str, session, draft: dict) -> None:
 
     # EVERY road to the preview passes here, which is what makes the invariant real: open,
     # append, correct, merge, rename -- all of them come back through `_advance`.
+    # ORDER (contract §9-د): draft ↔ draft first, because that one can be solved completely
+    # inside the draft and is the only one where merging is possible at all.
     group = _duplicate_group(draft)
     if group is not None:
         await _ask_duplicate(wa, phone, session, draft, group, lead=greeting)
         return
 
+    # Then the written side. The rows are read ONCE here and handed to the preview, so a preview
+    # still costs exactly one read -- the same read that was already happening.
+    recorded = await _todays_recorded(draft)
+    conflict = _recorded_conflict(draft, recorded)
+    if conflict is not None:
+        await _ask_recorded_dup(wa, phone, session, draft, conflict, lead=greeting)
+        return
+
     draft["asking"] = None
+    draft.pop("dup_kind", None)
+    draft.pop("dup_indices", None)
     _save_draft(session, draft)
     session.state = LIA_AWAITING_CONFIRM
-    await _send_daily_preview(wa, phone, draft, greeting)
+    await _send_daily_preview(wa, phone, draft, greeting, recorded=recorded)
 
 
 async def _place_daily_items(client_id: str, barber_id: str, draft: dict) -> list:
@@ -3953,7 +4071,8 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
     if (draft and session is not None and session.state == LIA_AWAITING_FIELD
             and msg_type in ("button_reply", "list_reply")
             and _draft_operation(draft) == DAILY_LOG_OP
-            and draft.get("asking") in ("duplicate", "duplicate_pick", "duplicate_name")):
+            and draft.get("asking") in ("duplicate", "duplicate_pick", "duplicate_name",
+                                        "recorded_dup")):
         picked = str(value or "")
         if picked == CANCEL_ID:
             # ❌ is unambiguous at every moment of this branch: stop, write nothing.
@@ -3966,6 +4085,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             )
             await wa.send_text(sender_phone, _REPLIES["daily_log_cancelled"])
             return session
+        if picked == DUP_NEWLINE_ID and draft.get("dup_kind") == "recorded":
+            await _dup_decide(wa, sender_phone, session, draft, "NEWLINE")
+            return session
         if picked == DUP_KEEP_ID:
             await _dup_decide(wa, sender_phone, session, draft, "KEEP")
             return session
@@ -3973,6 +4095,21 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             await _dup_decide(wa, sender_phone, session, draft, "MERGE")
             return session
         if picked == DUP_RENAME_ID:
+            if draft.get("dup_kind") == "recorded":
+                idxs = draft.get("dup_indices") or []
+                if not idxs:
+                    await _advance(wa, sender_phone, session, draft)
+                    return session
+                if len(idxs) == 1:
+                    # One draft line carries the name: there is nothing to pick between.
+                    draft["dup_target"] = 1
+                    draft["asking"] = "duplicate_name"
+                    _save_draft(session, draft)
+                    session.state = LIA_AWAITING_FIELD
+                    await wa.send_text(sender_phone, _REPLIES["daily_log_dup_ask_name"])
+                    return session
+                await _ask_dup_pick(wa, sender_phone, session, draft, (draft["dup_key"], idxs))
+                return session
             group = _duplicate_group(draft)
             if group is None:
                 await _advance(wa, sender_phone, session, draft)
@@ -3984,8 +4121,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 pos = int(picked[len(DUP_PICK_PREFIX):])
             except ValueError:
                 pos = 0
-            group = _duplicate_group(draft)
-            if group is None or not 1 <= pos <= len(group[1]):
+            idxs = (draft.get("dup_indices") if draft.get("dup_kind") == "recorded"
+                    else (_duplicate_group(draft) or (None, None))[1])
+            if not idxs or not 1 <= pos <= len(idxs):
                 await _advance(wa, sender_phone, session, draft)
                 return session
             # He already typed the name and was only asked WHICH one: apply it, do not ask twice.
@@ -4000,17 +4138,18 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             await wa.send_text(sender_phone, _REPLIES["daily_log_dup_ask_name"])
             return session
         # Any other button here (an id from an older bubble) is not an answer to this question.
-        group = _duplicate_group(draft)
-        if group is not None:
-            await _ask_duplicate(wa, sender_phone, session, draft, group)
-            return session
+        await _reask_duplicate(wa, sender_phone, session, draft)
+        return session
 
     # ── 2. An answer to one asked field. ──
     if (draft and session is not None and session.state == LIA_AWAITING_FIELD
             and msg_type == "text" and _draft_operation(draft) == DAILY_LOG_OP):
-        if draft.get("asking") in ("duplicate", "duplicate_pick", "duplicate_name"):
-            group = _duplicate_group(draft)
-            if group is None:
+        if draft.get("asking") in ("duplicate", "duplicate_pick", "duplicate_name",
+                                   "recorded_dup"):
+            recorded_kind = draft.get("dup_kind") == "recorded"
+            group = ((draft.get("dup_key"), draft.get("dup_indices") or []) if recorded_kind
+                     else _duplicate_group(draft))
+            if not group or not group[1]:
                 await _advance(wa, sender_phone, session, draft)
                 return session
             # He was asked WHICH one, and is now naming it: that answer is the new name.
@@ -4019,6 +4158,14 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                                   {int(draft["dup_target"]): " ".join((value or "").split())})
                 return session
             kind, payload = _parse_dup_decision(value, len(group[1]))
+            if recorded_kind:
+                # Only two decisions exist on this side (§9-ج). «اتركهم/سطر جديد» is one of them;
+                # a typed «اجمعهم» has no meaning here, so the question is asked again rather than
+                # answered with a wording nobody approved.
+                if kind == "KEEP":
+                    kind = "NEWLINE"
+                elif kind == "MERGE":
+                    kind = "UNKNOWN"
             if kind == "CANCEL":
                 _save_draft(session, None)
                 session.state = "IDLE"
@@ -4029,15 +4176,19 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 )
                 await wa.send_text(sender_phone, _REPLIES["daily_log_cancelled"])
                 return session
-            if kind in ("KEEP", "MERGE", "RENAME"):
+            if kind in ("KEEP", "MERGE", "RENAME", "NEWLINE"):
                 await _dup_decide(wa, sender_phone, session, draft, kind, payload)
                 return session
             if kind == "AMBIGUOUS":
-                # A name with no position, and more than one line carries it: ASK, never guess.
+                # A name with no position: ask which one when several carry it, apply it when
+                # only one does -- there is nothing to disambiguate then.
+                if len(group[1]) == 1:
+                    await _dup_decide(wa, sender_phone, session, draft, "RENAME", {1: payload})
+                    return session
                 draft["dup_pending_name"] = payload
                 await _ask_dup_pick(wa, sender_phone, session, draft, group)
                 return session
-            await _ask_duplicate(wa, sender_phone, session, draft, group)    # UNKNOWN
+            await _reask_duplicate(wa, sender_phone, session, draft)          # UNKNOWN
             return session
         if draft.get("asking") == "amount":
             if not _apply_amount_answer(draft, value):
