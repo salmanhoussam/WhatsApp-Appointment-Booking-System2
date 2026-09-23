@@ -817,7 +817,10 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      # renamed: Salman, seeing it live, asked for «هاي قصة جدول تلقائي شيلها».
                      # `daily_log_weekdays` replaces it — the seven day names the success text
                      # needs, kept in the prompt file with every other owner-facing word.
-                     "daily_log_total", "daily_log_weekdays", "daily_log_created",
+                     # 2026-09-23, approved verbatim: the marker on a line that is ALREADY in
+                     # the database. It is what makes a growing list safe to show.
+                     "daily_log_total", "daily_log_weekdays", "daily_log_recorded",
+                     "daily_log_created",
                      "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
                      "daily_log_expired", "daily_report_header", "daily_report_total",
                      "daily_report_empty")
@@ -2760,16 +2763,20 @@ async def _tenant_currency(client_id: str) -> str:
     return (getattr(client, "currency", None) or "") if client else ""
 
 
-async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, actor, actor_id,
-                          user) -> bool:
-    """Read the message, enforce the cap, and open the draft. False means "nothing readable".
+async def _read_daily_items(text: str) -> tuple:
+    """(raw items, period, confidence) out of one message -- the model first, the shape as fallback.
 
-    THE CAP IS CHECKED ON EVERYTHING READ, BEFORE A DRAFT EXISTS. Sixteen names are refused as
-    sixteen, so nothing downstream ever sees a list it would have to cut.
+    Its own function since 2026-09-23 because TWO callers must read a message identically: the one
+    that OPENS a daily log, and the one that ADDS to an open one. A second copy would be a second
+    place for the anti-invention rule to drift out of.
     """
     extraction = await _extract_daily_log(text)
     raw, period, confidence = [], None, None
-    if extraction is not None and extraction is not _UNAVAILABLE:
+    if extraction is _UNAVAILABLE:
+        # Carried out so the caller can say WHICH silence this was -- our model down, or his
+        # message unreadable. The two are different facts and the log must not merge them.
+        confidence = "unavailable"
+    elif extraction is not None:
         raw = [i.model_dump() for i in extraction.items]
         period, confidence = extraction.period, extraction.confidence
     if not raw and _looks_like_daily_log(" ".join((text or "").split()).lower()):
@@ -2777,9 +2784,30 @@ async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, ac
         # without the model. A visit sentence has no such fallback -- its names are not a shape.
         raw = _daily_items_from_shape(text)
         confidence = confidence or "fallback"
+    return raw, period, confidence
+
+
+def _clean_daily_items(raw: list, text: str) -> list:
+    """Model rows -> draft items, with every amount checked against HIS OWN text (anti-invention)."""
+    said = _amounts_in(text)
+    items = [{"customer_name": " ".join(str(r.get("customer_name") or "").split()),
+              "amount": _said_amount(r.get("amount"), said),
+              "service_said": (" ".join(str(r.get("service_said") or "").split()) or None)}
+             for r in raw]
+    return [i for i in items if i["customer_name"]]
+
+
+async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, actor, actor_id,
+                          user) -> bool:
+    """Read the message, enforce the cap, and open the draft. False means "nothing readable".
+
+    THE CAP IS CHECKED ON EVERYTHING READ, BEFORE A DRAFT EXISTS. Sixteen names are refused as
+    sixteen, so nothing downstream ever sees a list it would have to cut.
+    """
+    raw, period, confidence = await _read_daily_items(text)
     if not raw:
         logger.info("🤷 Lia: daily log unreadable for %s (%s) — not handled here", phone,
-                    "unavailable" if extraction is _UNAVAILABLE else "no items")
+                    "unavailable" if confidence == "unavailable" else "no items")
         return False
 
     if len(raw) > MAX_DAILY_LOG_ITEMS:
@@ -2793,12 +2821,7 @@ async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, ac
             count=len(raw), max=MAX_DAILY_LOG_ITEMS))
         return True
 
-    said = _amounts_in(text)
-    items = [{"customer_name": " ".join(str(r.get("customer_name") or "").split()),
-              "amount": _said_amount(r.get("amount"), said),
-              "service_said": (" ".join(str(r.get("service_said") or "").split()) or None)}
-             for r in raw]
-    items = [i for i in items if i["customer_name"]]
+    items = _clean_daily_items(raw, text)
     if not items:
         return False
 
@@ -2853,6 +2876,45 @@ def _service_label(service_name: Optional[str], service_said: Optional[str]) -> 
     return None
 
 
+async def _todays_recorded(draft: dict) -> list:
+    """Today's daily-log rows ALREADY in the database, for display above the new ones.
+
+    Salman, 2026-09-23: «كل ما يزيد واحد يشوفه بآخر الليستة والتوتال». So the preview shows the
+    day as it really stands -- but THESE LINES NEVER ENTER `draft["items"]`. That is the whole
+    double-write guard, and it is structural rather than a flag: `_commit_daily_log` writes the
+    draft's items, and a row that is already in the database is not one of them.
+
+    Scoped exactly like «تقرير اليوم», so the two always agree: a self-scoped account sees its own
+    barber's rows, an owner sees the tenant's.
+    """
+    from app.repositories.reservation_repo import ReservationRepository
+    barber_id = draft.get("actor_barber_id") if draft.get("self_scoped") else None
+    now = datetime.now()
+    day0 = datetime(now.year, now.month, now.day)
+    try:
+        rows = await ReservationRepository(prisma_client).list_by_client(
+            draft["client_id"], None, "arrived", day0.replace(tzinfo=timezone.utc),
+            (day0 + timedelta(days=1)).replace(tzinfo=timezone.utc), 500, barber_id)
+    except Exception as exc:
+        # A preview that cannot reach the day's rows still shows the NEW ones correctly; it must
+        # not die on the read. The only cost is that the marked lines are missing from it.
+        logger.error("🔥 Lia: could not read today's recorded lines for %s: %s",
+                     draft.get("client_id"), type(exc).__name__)
+        return []
+    mine = [r for r in rows or [] if _is_daily_log_row(r)]
+    if not mine:
+        return []
+    names = {str(getattr(sv, "id", "")): getattr(sv, "nameAr", None)
+             for sv in await _list_services(draft["client_id"])}
+    out = []
+    for r in mine:
+        entry = r.metadata[DAILY_LOG_KEY]
+        out.append({"customer_name": r.customerName, "amount": Decimal(str(entry["amount"])),
+                    "service_name": names.get(str(getattr(r, "serviceId", None) or "")),
+                    "service_said": entry.get("service_said")})
+    return out
+
+
 async def _send_daily_confirm(wa, phone: str, draft: dict) -> None:
     many = len(draft.get("items") or []) > 1
     await wa.send_interactive_buttons(
@@ -2873,9 +2935,21 @@ async def _send_daily_preview(wa, phone: str, draft: dict, greeting: str = "") -
     """DL-1, one DL-2 per name in his order, DL-4, DL-5 -- then DL-6 with the two buttons."""
     currency = draft.get("currency") or ""
     items = draft.get("items") or []
-    lines = [_daily_line(i, n, currency, _service_label(i.get("service_name"), i.get("service_said")))
-             for n, i in enumerate(items, 1)]
-    total = sum((Decimal(i["amount"]) for i in items), Decimal(0))
+    # THE DAY AS IT STANDS: what is already written, marked, then what he just said. The numbering
+    # runs through both, so a name he adds appears at the END of one list -- his own words.
+    recorded = await _todays_recorded(draft)
+    lines, total, n = [], Decimal(0), 0
+    for done in recorded:
+        n += 1
+        total += done["amount"]
+        lines.append(_daily_line(done, n, currency,
+                                 _service_label(done.get("service_name"), done.get("service_said")))
+                     + " " + _REPLIES["daily_log_recorded"])
+    for item in items:
+        n += 1
+        total += Decimal(item["amount"])
+        lines.append(_daily_line(item, n, currency,
+                                 _service_label(item.get("service_name"), item.get("service_said"))))
     # No «الساعات بالتقويم تقريبيّة» line since 2026-09-23 (Salman, on seeing it live): the hour
     # is an implementation detail of a NOT NULL column, and naming it invited a conversation about
     # a schedule he is not keeping. The placement itself is unchanged.
@@ -2915,6 +2989,48 @@ def _apply_amount_answer(draft: dict, text: str) -> bool:
             item["amount"] = _fmt_amount(d)
         changed = True
     return changed
+
+
+_APPEND_REFUSED = object()
+
+
+async def _append_daily_items(wa, phone: str, draft: dict, text: str):
+    """«حسين 17» while the preview is up: ADD it to the same list. Salman, 2026-09-23.
+
+    Returns True when something was added, `_APPEND_REFUSED` when the cap answered instead (he was
+    told, nothing changed), or None when the message is not a list at all -- and None is what
+    leaves the older behaviours (a name correction, then the two buttons) their turn.
+
+    This reverses q3 of 2026-09-22 ("a message carrying a number is out of scope") ON PURPOSE: it
+    was decided before he asked for a growing list, and he asked for exactly this case.
+    """
+    # A NUMBER IS THE ADMISSION TICKET, and it is a guard against the model, not against him:
+    # asked to read «ما بعرف» with the daily-log prompt, a model can still answer with names. So an
+    # append is considered only when HIS OWN message carries an amount -- which is also what keeps
+    # «حسين» (a correction) and «حسين 17» (a new line) from ever meaning the same thing.
+    if not _amounts_in(text):
+        return None
+    raw, period, _ = await _read_daily_items(text)
+    more = _clean_daily_items(raw, text) if raw else []
+    if not more:
+        return None
+    # The cap counts the WHOLE unwritten batch, not this message alone: fifteen is the number of
+    # rows one ✅ may write, and adding in two messages must not buy a sixteenth.
+    if len(draft.get("items") or []) + len(more) > MAX_DAILY_LOG_ITEMS:
+        await log_security_event(
+            event_type="lia_daily_log_refused", client_id=draft.get("client_id"),
+            endpoint=_ENDPOINT,
+            detail={"reason": "too_many_items", "items": len(draft.get("items") or []) + len(more),
+                    "max": MAX_DAILY_LOG_ITEMS, "sender_phone": phone, "while": "appending"},
+            actor=draft.get("actor_id"),
+        )
+        await wa.send_text(phone, _REPLIES["daily_log_too_many"].format(
+            count=len(draft.get("items") or []) + len(more), max=MAX_DAILY_LOG_ITEMS))
+        return _APPEND_REFUSED
+    draft.setdefault("items", []).extend(more)
+    if period in _PERIOD_START and not draft.get("period"):
+        draft["period"] = period
+    return True
 
 
 def _daily_correction_target(draft: dict, text: str) -> Optional[int]:
@@ -3419,6 +3535,17 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 _save_draft(session, draft)
                 session.state = LIA_AWAITING_CONFIRM
                 await _send_daily_preview(wa, sender_phone, draft)
+                return session
+            # AND A LIST ADDS TO THE LIST (2026-09-23). `_advance` re-runs the whole draft -- the
+            # new line's service is resolved, a missing amount becomes DL-9, and the preview comes
+            # back with the day's total. Still nothing written: ✅ remains the only writer.
+            added = await _append_daily_items(wa, sender_phone, draft, value)
+            if added is _APPEND_REFUSED:
+                return session
+            if added:
+                logger.info("➕ Lia: daily-log line(s) appended for %s", draft.get("client_id"))
+                _save_draft(session, draft)
+                await _advance(wa, sender_phone, session, draft)
                 return session
             await _send_daily_confirm(wa, sender_phone, draft)
             return session

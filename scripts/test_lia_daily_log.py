@@ -621,11 +621,21 @@ async def main():
         check("   and the list is untouched",
               [i["customer_name"] for i in lia._load_draft(out2)["items"]]
               == ["أحمد حيدر", "أم وهاب"], str(lia._load_draft(out2)["items"]))
-        wa3, out3 = await send(roundtrip(out2), "كريم 8")
-        check("q3 — a message carrying a NUMBER is out of this contract's scope: buttons, no edit",
-              wa3.joined() == lia._REPLIES["reservation_confirm_multi"]
-              and [i["customer_name"] for i in lia._load_draft(out3)["items"]]
-              == ["أحمد حيدر", "أم وهاب"], wa3.joined())
+    # TRANSITION 2026-09-23. Until today q3 said a message carrying a NUMBER was out of scope, and
+    # this asserted «كريم 8» produced `reservation_confirm_multi` + the buttons with the list
+    # unchanged at ["أحمد حيدر", "أم وهاب"]. Salman reversed it the same day, from his own round:
+    # a list ADDS to the list. The correction contract itself is untouched — a message with no
+    # number is still a name fix, which is what keeps «حسين» and «حسين 17» different things.
+    async with Env(extract=lambda t: (log(("كريم", 8, None)) if "كريم" in t
+                                      else log(("أحمد حيدر", 10, None), ("أم وهاب", 15, None)))) as env:
+        wa, out = await send(session_idle(), "احمد حيدر 10 وأم وهاب 15")
+        wa3, out3 = await send(roundtrip(out), "كريم 8")
+        check("q3 REVERSED — «كريم 8» at the preview now ADDS a third line",
+              [i["customer_name"] for i in lia._load_draft(out3)["items"]]
+              == ["أحمد حيدر", "أم وهاب", "كريم"]
+              and "*3.* كريم · 8 USD" in wa3.joined(), wa3.joined()[:200])
+        check("   the total grows with it, and still nothing is written",
+              "المجموع: 33 USD" in wa3.joined() and not env.calls, wa3.joined()[-60:])
 
     two_wahab = {"items": [{"customer_name": "أم وهاب", "amount": "15"},
                            {"customer_name": "علي وهاب", "amount": "10"}]}
@@ -635,6 +645,67 @@ async def main():
           lia._daily_correction_target({"items": [{"customer_name": "احمد"}]}, "احمر") == 0)
     check("   and a message longer than the name column is refused",
           lia._daily_correction_target(two_wahab, "وهاب " * 30) is None)
+
+    # ── 17 · the list grows, and what is already written is never written twice ──
+    print("\n── 17. the list accumulates — «(مسجّل)» above, the new line below, one total ──")
+    pair2 = lambda t: (log(("حسين", 17, None)) if "حسين" in t
+                       else log(("علي", 10, None), ("محمد", 7, None)))
+
+    # (أ) before ✅ — the same draft grows
+    async with Env(extract=pair2) as env:
+        wa, out = await send(session_idle(), "علي 10، محمد 7")
+        wa2, out2 = await send(roundtrip(out), "حسين 17")
+        body = wa2.joined()
+        check("«حسين 17» at the preview lands at the END of the same list",
+              "*1.* علي · 10 USD" in body and "*2.* محمد · 7 USD" in body
+              and "*3.* حسين · 17 USD" in body, body[:200])
+        check("   and the total grows to 34 — still nothing written",
+              "المجموع: 34 USD" in body and not env.calls, body[-60:])
+        check("   same draft, same operation — not a second one",
+              lia._load_draft(out2)["started_at"] == lia._load_draft(out)["started_at"]
+              and out2.state == lia.LIA_AWAITING_CONFIRM)
+        wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ writes the three, in his order",
+              [c["customer_name"] for c in env.calls] == ["علي", "محمد", "حسين"],
+              str([c["customer_name"] for c in env.calls]))
+
+    # (ب) after ✅ — today's rows come back marked, and are NOT rewritten
+    dl2 = lambda amount: {"barber_id": "brb-1",
+                          "daily_log": {"v": 1, "amount": amount, "currency": "USD",
+                                        "service_said": None}}
+    written = [Row(source="lia", status="arrived", customerName="علي", serviceId=None,
+                   metadata=dl2("10")),
+               Row(source="lia", status="arrived", customerName="محمد", serviceId=None,
+                   metadata=dl2("7"))]
+    async with Env(extract=pair2, report_rows=written) as env:
+        wa, out = await send(session_idle(), "حسين 17")
+        body = wa.joined()
+        mark = lia._REPLIES["daily_log_recorded"]
+        check("today's written rows come back MARKED, above the new line",
+              f"*1.* علي · 10 USD {mark}" in body and f"*2.* محمد · 7 USD {mark}" in body
+              and "*3.* حسين · 17 USD" in body and mark not in body.split("*3.*")[1], body[:240])
+        check("   one total for the day: 10 + 7 + 17", "المجموع: 34 USD" in body, body[-60:])
+        check("🔴 a marked line NEVER enters the draft — the double-write guard is structural",
+              [i["customer_name"] for i in lia._load_draft(out)["items"]] == ["حسين"],
+              str(lia._load_draft(out)["items"]))
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("🔴 ✅ writes ONE row — علي and محمد are not written a second time",
+              len(env.calls) == 1 and env.calls[0]["customer_name"] == "حسين",
+              str([c["customer_name"] for c in env.calls]))
+        check("   and a correction can only reach the draft's own line",
+              lia._daily_correction_target({"items": [{"customer_name": "حسين"}]}, "علي") is None)
+
+    # the cap counts the whole unwritten batch, not one message
+    async with Env(extract=lambda t: (log(("زياد", 1, None)) if "زياد" in t
+                                      else log(*[(f"زبون {i}", 1, None) for i in range(1, 16)]))) as env:
+        # The entry text must itself READ as a list — the stub decides what comes back, the shape
+        # decides whether we are in the daily log at all.
+        wa, out = await send(session_idle(), "علي 1، محمد 1")
+        check("fifteen open the draft", len(lia._load_draft(out)["items"]) == 15)
+        wa2, out2 = await send(roundtrip(out), "زياد 1")
+        check("the sixteenth is refused by DL-10 — the batch is the unit, not the message",
+              lia._REPLIES["daily_log_too_many"].format(count=16, max=15) in wa2.joined()
+              and len(lia._load_draft(out2)["items"]) == 15 and not env.calls, wa2.joined())
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",
