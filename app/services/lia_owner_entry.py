@@ -829,7 +829,11 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "daily_log_dup_ask_name",
                      "daily_log_created",
                      "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
-                     "daily_log_expired", "daily_report_header", "daily_report_total",
+                     "daily_log_expired", "daily_report_header",
+                     # 2026-09-23, approved: one line per PERSON in the report, with how many
+                     # invoices it adds up. Two forms because Arabic counts two and three apart.
+                     "daily_report_invoices_two", "daily_report_invoices_many",
+                     "daily_report_total",
                      "daily_report_empty")
 
 
@@ -1124,7 +1128,12 @@ DUP_KEEP_ID   = "__LIA_DUP_KEEP__"
 DUP_PICK_PREFIX = "lia_dup_pick:"
 # «مكتوب ↔ مسودّة» has its own two buttons: there is no merge there, because merging with a row
 # that is already in the database would mean editing it (contract §9-ج).
-DUP_NEWLINE_ID = "__LIA_DUP_NEWLINE__"
+# «سطر جديد» was one button until 2026-09-23 and is now TWO, because it was answering two
+# different questions with one word: بلال's three invoices are one person, علي's two rows are two
+# people, and both were pressing the same button. The report cannot tell them apart unless the
+# owner's answer is kept with the row.
+DUP_SAME_ID  = "__LIA_DUP_SAME__"
+DUP_OTHER_ID = "__LIA_DUP_OTHER__"
 
 
 def _take_greeting(draft: dict) -> str:
@@ -3374,8 +3383,9 @@ async def _ask_recorded_dup(wa, phone: str, session, draft: dict, conflict: tupl
         new=_money(items[idxs[0]]["amount"], currency))
     await wa.send_interactive_buttons(
         to=phone, text=body,
-        buttons=[{"type": "reply", "reply": {"id": DUP_NEWLINE_ID, "title": "سطر جديد"}},
-                 {"type": "reply", "reply": {"id": DUP_RENAME_ID,  "title": "عدّل الاسم"}}])
+        buttons=[{"type": "reply", "reply": {"id": DUP_SAME_ID,   "title": "نفس الشخص"}},
+                 {"type": "reply", "reply": {"id": DUP_OTHER_ID,  "title": "شخص تاني"}},
+                 {"type": "reply", "reply": {"id": DUP_RENAME_ID, "title": "عدّل الاسم"}}])
 
 
 async def _ask_dup_pick(wa, phone: str, session, draft: dict, group: tuple) -> None:
@@ -3425,10 +3435,13 @@ async def _dup_decide(wa, phone: str, session, draft: dict, kind: str, payload=N
         if not key or not idxs:
             await _advance(wa, phone, session, draft)
             return
-        if kind == "NEWLINE":
-            # N-record-1: both stay. The name is acknowledged for THIS draft, on the recorded
-            # side only -- the draft-side question keeps its own set (§9-د).
+        if kind in ("SAME", "OTHER"):
+            # Both leave the two rows exactly as they are -- nothing is written, merged or
+            # deleted. They differ in ONE thing: whether the owner said it is the same person,
+            # which is the only fact the report needs and cannot infer.
             draft.setdefault("recorded_ack", []).append(key)
+            if kind == "SAME":
+                draft.setdefault("same_person", []).append(key)
         elif kind == "RENAME":
             for pos, name in (payload or {}).items():
                 if 1 <= pos <= len(idxs):
@@ -3594,9 +3607,15 @@ async def _commit_daily_log(wa, phone: str, draft: dict, op, actor, actor_id) ->
     placements = await _place_daily_items(client_id, barber_id, draft)
     done, failed = [], []
     for item, (start, minutes) in zip(items, placements):
+        # His answer to «نفس الشخص؟», kept with the row because the report cannot infer it: two
+        # people may share a name (علي, 2026-09-23) and one person may pay three times (بلال, the
+        # same day). Optional key, `v` unchanged -- every existing reader ignores what it does not
+        # look for, and `_is_daily_log_row` checks only `v` and `amount`.
+        same = _fold_ar(item["customer_name"]) in set(draft.get("same_person") or [])
         metadata = {"barber_id": barber_id,
                     DAILY_LOG_KEY: {"v": DAILY_LOG_VERSION, "amount": item["amount"],
                                     "currency": currency,
+                                    **({"same_person": True} if same else {}),
                                     # What he SAID, kept only when it matched nothing; a matched
                                     # service is already the row's real `serviceId`.
                                     "service_said": (None if item.get("service_id")
@@ -3696,20 +3715,56 @@ async def _send_daily_report(wa, phone: str, client_id: str, user, actor_id) -> 
         return
     names = {str(getattr(s, "id", "")): getattr(s, "nameAr", None)
              for s in await _list_services(client_id)}
-    lines, total, currency = [], Decimal(0), ""
-    for n, r in enumerate(mine, 1):
+    # ONE LINE PER PERSON, and only where he SAID it is one person (2026-09-23). A name is not an
+    # identity: «علي» twice today was two customers and «بلال» three times was one, on the same
+    # day. The only thing that tells them apart is his own answer, kept on the row as
+    # `daily_log.same_person`. Rows without it stay separate lines -- including every row written
+    # before this key existed, so nothing is regrouped retroactively.
+    index = {}
+    seq = []
+    for r in mine:
         entry = r.metadata[DAILY_LOG_KEY]
-        currency = currency or entry.get("currency") or ""
-        amount = Decimal(str(entry["amount"]))
-        total += amount
-        service = _service_label(names.get(str(getattr(r, "serviceId", None) or "")),
-                                 entry.get("service_said"))
-        lines.append(_daily_line({"customer_name": r.customerName, "amount": amount}, n,
-                                 entry.get("currency") or "", service))
+        key = _fold_ar(r.customerName or "")
+        row = {"name": r.customerName, "amount": Decimal(str(entry["amount"])),
+               "service": _service_label(names.get(str(getattr(r, "serviceId", None) or "")),
+                                         entry.get("service_said")),
+               "same": bool(entry.get("same_person")), "currency": entry.get("currency") or ""}
+        index.setdefault(key, []).append(row)
+        seq.append((key, row))
+    # THE DAY'S ORDER IS KEPT. Only a grouped name collapses, and it collapses onto the position
+    # of its FIRST invoice -- nothing else moves. One «نفس الشخص» anywhere in the day is enough
+    # for that name: he answered the question once, about that person, and the earlier rows are
+    # what he answered it against.
+    lines, total, currency, n = [], Decimal(0), "", 0
+    done = set()
+    for key, row in seq:
+        grouped = len(index[key]) > 1 and any(x["same"] for x in index[key])
+        if grouped and key in done:
+            continue
+        if grouped:
+            done.add(key)
+        parts = [index[key]] if grouped else [[row]]
+        for part in parts:
+            n += 1
+            amount = sum((x["amount"] for x in part), Decimal(0))
+            total += amount
+            currency = currency or part[0]["currency"]
+            # The service shows only when every invoice on the line carries the same one --
+            # otherwise it is dropped rather than picked, and the total is the point of the line.
+            service = part[0]["service"] if len({x["service"] for x in part}) == 1 else None
+            line = _daily_line({"customer_name": part[0]["name"], "amount": amount}, n,
+                               part[0]["currency"], service)
+            if len(part) == 2:
+                line += " " + _REPLIES["daily_report_invoices_two"]
+            elif len(part) > 2:
+                line += " " + _REPLIES["daily_report_invoices_many"].format(count=len(part))
+            lines.append(line)
     body = "\n".join([_REPLIES["daily_report_header"].format(date=f"{day0.day}/{day0.month}"),
                       *lines,
+                      # `count` is the number of LINES now — people, not invoices. The approved
+                      # text says «زبون», and it should mean what it says (2026-09-23).
                       _REPLIES["daily_report_total"].format(total=_money(total, currency),
-                                                            count=len(mine))])
+                                                            count=len(lines))])
     await wa.send_text(phone, body)
 
 
@@ -4085,8 +4140,9 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             )
             await wa.send_text(sender_phone, _REPLIES["daily_log_cancelled"])
             return session
-        if picked == DUP_NEWLINE_ID and draft.get("dup_kind") == "recorded":
-            await _dup_decide(wa, sender_phone, session, draft, "NEWLINE")
+        if picked in (DUP_SAME_ID, DUP_OTHER_ID) and draft.get("dup_kind") == "recorded":
+            await _dup_decide(wa, sender_phone, session, draft,
+                              "SAME" if picked == DUP_SAME_ID else "OTHER")
             return session
         if picked == DUP_KEEP_ID:
             await _dup_decide(wa, sender_phone, session, draft, "KEEP")
@@ -4162,10 +4218,13 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 # Only two decisions exist on this side (§9-ج). «اتركهم/سطر جديد» is one of them;
                 # a typed «اجمعهم» has no meaning here, so the question is asked again rather than
                 # answered with a wording nobody approved.
+                # «اتركهم» typed here keeps both rows and claims nothing about who they are —
+                # exactly «شخص تاني». And «اجمعهم» cannot edit a written row, but «نفس الشخص» is
+                # what those words really mean on this side, so that is where they land.
                 if kind == "KEEP":
-                    kind = "NEWLINE"
+                    kind = "OTHER"
                 elif kind == "MERGE":
-                    kind = "UNKNOWN"
+                    kind = "SAME"
             if kind == "CANCEL":
                 _save_draft(session, None)
                 session.state = "IDLE"
@@ -4176,7 +4235,7 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                 )
                 await wa.send_text(sender_phone, _REPLIES["daily_log_cancelled"])
                 return session
-            if kind in ("KEEP", "MERGE", "RENAME", "NEWLINE"):
+            if kind in ("KEEP", "MERGE", "RENAME", "SAME", "OTHER"):
                 await _dup_decide(wa, sender_phone, session, draft, kind, payload)
                 return session
             if kind == "AMBIGUOUS":

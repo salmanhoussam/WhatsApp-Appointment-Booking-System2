@@ -910,16 +910,21 @@ async def main():
     async with Env(extract=one, report_rows=WRITTEN) as env:
         wa, out = await send(session_idle(), "بلال 2")
         body, d = wa.joined(), lia._load_draft(out)
-        check("§9-ج: سؤال بزرّين — «سطر جديد» و«عدّل الاسم»، بلا «اجمعهم»",
-              titles(wa) and titles(wa)[-1] == ("سطر جديد", "عدّل الاسم"), str(titles(wa)))
+        # TRANSITION 2026-09-23 (same day): the question had TWO buttons, «سطر جديد» and
+        # «عدّل الاسم». «سطر جديد» was answering two different questions with one word — بلال's
+        # three invoices are one person, علي's two rows are two people — and the report cannot
+        # tell them apart unless the owner's answer is kept. It is now «نفس الشخص» / «شخص تاني».
+        check("§9-ج: ثلاثة أزرار — «نفس الشخص» · «شخص تاني» · «عدّل الاسم»، وبلا «اجمعهم»",
+              titles(wa) and titles(wa)[-1] == ("نفس الشخص", "شخص تاني", "عدّل الاسم"),
+              str(titles(wa)))
         check("   بنصّ سلمان: المسجَّل بمبلغه، والسطر الجديد بمبلغه",
               lia._REPLIES["daily_log_dup_recorded"].format(
                   name="بلال", amount="8 USD", new="2 USD") in body, body)
         check("   ولا معاينة ولا كتابة قبل القرار",
               lia._REPLIES["daily_log_preview"] not in body and not env.calls
               and d["asking"] == "recorded_dup" and out.state == lia.LIA_AWAITING_FIELD)
-        wa2, out2 = await send(roundtrip(out), lia.DUP_NEWLINE_ID, "button_reply")
-        check("«سطر جديد» ⇒ المعاينة بترجع، والاثنان بمكانهما",
+        wa2, out2 = await send(roundtrip(out), lia.DUP_OTHER_ID, "button_reply")
+        check("«شخص تاني» ⇒ المعاينة بترجع، والاثنان بمكانهما",
               lia._REPLIES["daily_log_preview"] in wa2.joined()
               and f"*1.* بلال · 8 USD {lia._REPLIES['daily_log_recorded']}" in wa2.joined()
               and "*2.* بلال · 2 USD" in wa2.joined(), wa2.joined()[:160])
@@ -931,6 +936,24 @@ async def main():
               len(env.calls) == 1 and env.calls[0]["customer_name"] == "بلال"
               and env.calls[0]["metadata"]["daily_log"]["amount"] == "2",
               str([c["customer_name"] for c in env.calls]))
+        check("   🔴 و«شخص تاني» ما بتترك علامة — الصفّ بيضلّ مستقلّاً بالتقرير",
+              "same_person" not in env.calls[0]["metadata"]["daily_log"],
+              str(env.calls[0]["metadata"]["daily_log"]))
+
+    # «نفس الشخص» — نفس المسار، والفرق الوحيد علامةٌ على الصفّ الجديد
+    async with Env(extract=one, report_rows=WRITTEN) as env:
+        wa, out = await send(session_idle(), "بلال 2")
+        wa2, out2 = await send(roundtrip(out), lia.DUP_SAME_ID, "button_reply")
+        check("«نفس الشخص» ⇒ المعاينة كمان، وصفر كتابة قبل ✅",
+              lia._REPLIES["daily_log_preview"] in wa2.joined() and not env.calls
+              and lia._load_draft(out2)["same_person"] == ["بلال"])
+        wa3, _ = await send(roundtrip(out2), lia.CONFIRM_ID, "button_reply")
+        check("   ✅ بتكتب صفّاً واحداً يحمل `same_person: True` — ولا صفّ قديم انلمس",
+              len(env.calls) == 1
+              and env.calls[0]["metadata"]["daily_log"] == {
+                  "v": 1, "amount": "2", "currency": "USD", "same_person": True,
+                  "service_said": None},
+              str(env.calls[0]["metadata"]["daily_log"]))
 
     async with Env(extract=one, report_rows=WRITTEN) as env:
         wa, out = await send(session_idle(), "بلال 2")
@@ -957,11 +980,11 @@ async def main():
               and lia._load_draft(out).get("dup_kind") != "recorded", str(titles(wa)))
         wa2, out2 = await send(roundtrip(out), lia.DUP_KEEP_ID, "button_reply")
         check("   وبعد «اتركهم هيك» يُسأل سؤال المكتوب — الإقرار لا يُسكِته",
-              titles(wa2) and titles(wa2)[-1] == ("سطر جديد", "عدّل الاسم")
+              titles(wa2) and titles(wa2)[-1] == ("نفس الشخص", "شخص تاني", "عدّل الاسم")
               and lia._load_draft(out2)["duplicates_ack"] == ["بلال"]
               and lia._load_draft(out2).get("recorded_ack") in (None, []), str(titles(wa2)))
-        wa3, out3 = await send(roundtrip(out2), lia.DUP_NEWLINE_ID, "button_reply")
-        check("   وبعد «سطر جديد» تُعرَض المعاينة: ثلاثة أسطر باسم واحد بقرارٍ منه",
+        wa3, out3 = await send(roundtrip(out2), lia.DUP_OTHER_ID, "button_reply")
+        check("   وبعد «شخص تاني» تُعرَض المعاينة: ثلاثة أسطر باسم واحد بقرارٍ منه",
               lia._REPLIES["daily_log_preview"] in wa3.joined()
               and lia._load_draft(out3)["recorded_ack"] == ["بلال"]
               and len(lia._load_draft(out3)["items"]) == 2, wa3.joined()[:160])
@@ -980,7 +1003,8 @@ async def main():
         wa, out = await send(session_idle(), "بلال 2")
         wa2, out2 = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
         check("✅ من فقاعة أقدم أثناء سؤال المكتوب ⇒ لا كتابة، ويُعاد السؤال",
-              not env.calls and titles(wa2)[-1] == ("سطر جديد", "عدّل الاسم"), str(titles(wa2)))
+              not env.calls and titles(wa2)[-1] == ("نفس الشخص", "شخص تاني", "عدّل الاسم"),
+              str(titles(wa2)))
         wa3, out3 = await send(roundtrip(out2), lia.CANCEL_ID, "button_reply")
         check("   ❌ ⇒ إلغاء فوريّ، صفر كتابة",
               wa3.joined() == lia._REPLIES["daily_log_cancelled"] and not env.calls
@@ -1007,6 +1031,64 @@ async def main():
                and not (isinstance(n.func.value, ast.Subscript)
                         or (isinstance(n.func.value, ast.Name) and n.func.value.id in ("merged", "one", "draft", "data", "row")))]
     check("   ولا update/delete على أيّ كائن غير قواميس بايثون", not dbcalls, str(dbcalls))
+
+    # ── 21 · التقرير: سطر لكلّ شخص، بقرار المالك لا بالاسم ───────────────────
+    print("\n── 21. «تقرير اليوم» يجمع فواتير الشخص الواحد — واللي قال عنهن «شخص تاني» لأ ──")
+    # يومه الحقيقيّ، ٢٠٢٦-٠٩-٢٣: «علي» مرّتين وهنّ شخصان · «بلال» ثلاث مرّات وهو شخص واحد.
+    dlp = lambda amount, same=False, said=None: {
+        "barber_id": "brb-1",
+        "daily_log": {"v": 1, "amount": amount, "currency": "USD", "service_said": said,
+                      **({"same_person": True} if same else {})}}
+    day = [Row(source="lia", status="arrived", customerName="علي", serviceId=None, metadata=dlp("10")),
+           Row(source="lia", status="arrived", customerName="محمد", serviceId=None, metadata=dlp("7")),
+           Row(source="lia", status="arrived", customerName="علي", serviceId=None, metadata=dlp("7")),
+           Row(source="lia", status="arrived", customerName="بلال", serviceId=None, metadata=dlp("8")),
+           Row(source="lia", status="arrived", customerName="بلال", serviceId=None, metadata=dlp("12")),
+           Row(source="lia", status="arrived", customerName="بلال", serviceId=None,
+               metadata=dlp("5", same=True))]
+    async with Env(report_rows=day) as env:
+        wa, _ = await send(session_idle(), "تقرير اليوم")
+        body = wa.joined()
+        check("بلال: فاتورة وحدة بالمجموع، مع عدد الفواتير",
+              f"*4.* بلال · 25 USD {lia._REPLIES['daily_report_invoices_many'].format(count=3)}"
+              in body, body)
+        check("🔴 علي: بيضلّ سطرين — ما في ولا علامة «نفس الشخص»، فما منخمّن",
+              "*1.* علي · 10 USD" in body and "*3.* علي · 7 USD" in body
+              and "17 USD" not in body, body)
+        check("   وترتيب النهار محفوظ: محمد بمكانه بين العليَّين، والمجمَّع نزل بمكان أوّل فاتورة",
+              body.index("*2.* محمد") < body.index("*3.* علي") < body.index("*4.* بلال"), body)
+        check("   والمجموع للنهار كلّه، والعدد صار أشخاصاً لا فواتير",
+              "المجموع: 49 USD · 4 زبون" in body, body[-40:])
+        check("   وصفر كتابة — التقرير قراءة", not env.calls)
+
+    two_same = [Row(source="lia", status="arrived", customerName="سامر", serviceId=None,
+                    metadata=dlp("5")),
+                Row(source="lia", status="arrived", customerName="سامر", serviceId=None,
+                    metadata=dlp("6", same=True))]
+    async with Env(report_rows=two_same) as env:
+        wa, _ = await send(session_idle(), "تقرير اليوم")
+        check("فاتورتان لشخص واحد ⇒ صيغة المثنّى",
+              f"*1.* سامر · 11 USD {lia._REPLIES['daily_report_invoices_two']}" in wa.joined()
+              and "1 زبون" in wa.joined(), wa.joined())
+
+    mixed = [Row(source="lia", status="arrived", customerName="سامر", serviceId="svc-hair",
+                 metadata=dlp("5")),
+             Row(source="lia", status="arrived", customerName="سامر", serviceId="svc-beard",
+                 metadata=dlp("6", same=True))]
+    async with Env(report_rows=mixed) as env:
+        wa, _ = await send(session_idle(), "تقرير اليوم")
+        check("خدمتان مختلفتان على السطر المجمَّع ⇒ تُشال الخدمة، ولا تُنتقى وحدة",
+              "*1.* سامر · 11 USD" in wa.joined() and "شعر" not in wa.joined()
+              and "دقن" not in wa.joined(), wa.joined())
+
+    same_svc = [Row(source="lia", status="arrived", customerName="سامر", serviceId="svc-hair",
+                    metadata=dlp("5")),
+                Row(source="lia", status="arrived", customerName="سامر", serviceId="svc-hair",
+                    metadata=dlp("6", same=True))]
+    async with Env(report_rows=same_svc) as env:
+        wa, _ = await send(session_idle(), "تقرير اليوم")
+        check("   وإذا كانتا نفس الخدمة ⇒ بتظهر",
+              "*1.* سامر · شعر · 11 USD" in wa.joined(), wa.joined())
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",

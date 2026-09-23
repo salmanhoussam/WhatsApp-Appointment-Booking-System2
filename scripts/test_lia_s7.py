@@ -546,8 +546,12 @@ async def main():
     # invisible to it while the pin still read 35 and passed. Same class of miss as the helper
     # that dropped it to 29 on 2026-09-21. The sends are now written out with their titles
     # inline, so every one of them is counted here.
-    check("the un-migrated owner-facing literals are pinned at 45 (was 35; duplicate buttons)",
-          len(_sent_literals) == 45, str(len(_sent_literals)))
+    # TRANSITION (2026-09-23, later the same day): 45 -> 46. «سطر جديد» became TWO buttons,
+    # «نفس الشخص» and «شخص تاني», because one word was answering two different questions —
+    # three invoices for one person, or two people with one name — and the report cannot tell
+    # them apart unless the owner's own answer is kept with the row.
+    check("the un-migrated owner-facing literals are pinned at 46 (was 45; same/other person)",
+          len(_sent_literals) == 46, str(len(_sent_literals)))
     # TRANSITION (2026-09-18). WAS `is None` — see the same flip in test_lia_product_s3.py.
     check("a RECORD verb now opens a reservation — T4 is built, so the promise is real",
           lia._entry_family("سجل إنه أحمد إجا مبارح") == "create_reservation")

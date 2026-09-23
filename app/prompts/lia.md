@@ -599,6 +599,12 @@ Lia — قواعدها التشغيلية. هذا الملفّ prompt، لا و�
 [[daily_report_header]]
 تقرير اليوم، {date}:
 
+[[daily_report_invoices_two]]
+(فاتورتين)
+
+[[daily_report_invoices_many]]
+({count} فواتير)
+
 [[daily_report_total]]
 المجموع: {total} · {count} زبون
 
