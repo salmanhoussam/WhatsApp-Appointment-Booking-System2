@@ -320,3 +320,20 @@ second message that matches no line is answered by re-showing the approved quest
 buttons. That is safe — nothing is written and nothing is guessed — but it does not TELL him the
 message was not understood; it looks like the preview simply repeated itself. Out of R1/R2's
 scope by his explicit decision. Revisit only if it shows up in a real round.
+
+---
+
+## Addendum 2 — 2026-09-23 (صباحاً): الليستة تتراكم
+
+من جولة الـGate نفسِها: بعد ✅ بعث «حسين 17» فانفتحت مسودّة جديدة بمجموع 17. طلبه: «كل ما يزيد
+واحد يشوفه بآخر الليستة والتوتال». قراراته: (أ) التراكم قبل التأكيد · «(مسجّل)» مُقَرّة ·
+المجموع = المكتوب + الجديد · وبعد ✅ تُعرَض صفوف اليوم مُعلَّمة ويُكتَب الجديد وحده.
+
+- `_todays_recorded(draft)` يقرأ صفوف اليوم (نفس نطاق «تقرير اليوم») **للعرض فقط**. هذه الأسطر
+  **لا تدخل `draft["items"]`** — وهذا هو حارس الكتابة المزدوجة: بنيويّ، لا علَم يمكن نسيانه.
+- `_append_daily_items` يُلحق أسطراً جديدة بمسودّةٍ مفتوحة. شرطُه أنّ **رسالته تحمل مبلغاً**:
+  حارسٌ ضدّ نموذجٍ قد يقرأ أسماءً في كلامٍ ليس قائمة، وفاصلٌ بين «حسين» (تصحيح) و«حسين 17» (سطر).
+- الحدّ ١٥ صار على **الدفعة غير المكتوبة** كلّها، لا على الرسالة الواحدة.
+- `_read_daily_items` / `_clean_daily_items`: قراءةُ الرسالة استُخرجت لدالّتين يستعملهما الفاتحُ
+  والمُلحِق معاً، فلا تنشأ نسخةٌ ثانية من قاعدة منع الاختراع.
+- **ق٣ معكوسة** (كانت: رسالةٌ فيها رقم خارج النطاق) — بطلبه الصريح، ومسجَّلة كـTRANSITION في الفحص.
