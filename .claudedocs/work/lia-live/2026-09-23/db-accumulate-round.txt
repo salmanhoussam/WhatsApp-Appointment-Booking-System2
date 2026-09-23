@@ -1,0 +1,50 @@
+sealed 275 write methods · seal proven by a real attempt
+window: since 2026-09-23T07:40:00+00:00 (UTC)   ·   target: barberlab-test
+
+── RESERVATIONS created in the window ──────────────────────────────────
+   2 row(s)
+   · id=e64712e3-01fc-4ace-b23d-9f7a7ea586f5
+     customer='علي' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 10:00:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '7', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=f20e3089-7fc2-4086-879d-5aa13552c4cd
+     customer='زياد' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-23 10:30:00+00:00  duration=30  status=arrived
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=None
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'daily_log': {'v': 1, 'amount': '10', 'currency': 'USD', 'service_said': None}}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+
+── CUSTOMERS created in the window  (the walk-in merge is measured here) 
+   0 row(s)
+   🟡 WALK_IN row dade1bdd-9091-4f44-b4ca-87fef91014e4 name='أحمد' — 5 reservation(s) point at it
+   ⇒ record as 'Confirmed behavior / Product risk', never PASS
+
+── CATALOG rows created in the window ──────────────────────────────────
+   CatalogItem (product): 0
+   CatalogService (bookable): 0
+
+── DUPLICATE CHECK — the whole active catalogue, folded (D1's own question) 
+   active items: 10   ·   duplicate names: 1
+   🔴 'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=['5', '5']
+
+── AUDIT TRAIL — every Lia decision in the window, refusals included ───
+   5 row(s)
+   · 08:05:48  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 08:05:58  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 1, 'amount': '7', 'row_id': 'e64712e3-01fc-4ace-b23d-9f7a7ea586f5', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 08:06:13  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+   · 08:06:38  lia_owner_log_daily_visits   tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 1, 'amount': '10', 'row_id': 'f20e3089-7fc2-4086-879d-5aa13552c4cd', 'source': 'whatsapp_text', 'status': 'arrived', 'currency': 'USD', 'operation': 'log_daily_visits', 'permission': 'reservations.write', 'service_key': 'reservations', 'sender_phone': '96178727986', 'service_matched': False}
+   · 08:06:53  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'log_daily_visits', 'operation': 'log_daily_visits', 'confidence': 'high', 'sender_phone': '96178727986', 'amounts_missing': 0}
+
+── NEGATIVE BOUNDARY — the deployment reaches these, the test does not ─
+   ✅ rk: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ✅ mr-h: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ⚠️  zero rows is NECESSARY, not SUFFICIENT — pair it with a refusal in the audit
+
+── what left this process ──────────────────────────────────────────────
+   production writes attempted: 0  
+   WhatsApp sends: 0 — this script has no send boundary at all
