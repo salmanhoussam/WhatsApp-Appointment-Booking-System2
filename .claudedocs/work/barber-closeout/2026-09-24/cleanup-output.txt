@@ -1,0 +1,7 @@
+BEFORE  keep 8ec69af2 active=True  ·  drop c88fc1c4 active=True
+AFTER   keep 8ec69af2 active=True  ·  drop c88fc1c4 active=False
+RESULT: ✅ one active «مشط خشب» left, nothing deleted
+
+--- تحقّق مستقلّ بعد الكتابة (قراءة مختومة) ---
+sealed 275 write methods · seal proven by a real attempt
+   active items: 9   ·   duplicate names: 0
