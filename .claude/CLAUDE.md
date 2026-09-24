@@ -68,6 +68,10 @@ rules/team-roles.md              -- Always: internal Architecture Guardian/Docum
 rules/documentation-policy.md    -- Always: ADR → Evolution Log → Architecture Plan → Implementation Contract → Implementation → Verification → Architecture Review → Post-Implementation Review → Archive; folder structure per ADR-0003 (adr/, evolution/, maturity/, architecture/ — itself six layers: README/INDEX/TENANT_OS.md, principles/, capabilities/, plus other domain plans — implementation/, verification/, reviews/, decisions/, sessions/, archive/)
 rules/service-execution-constitution.md -- Always: how every independent Service investigates context, leaves evidence, and handles missing input, before any Service Contract
 rules/repository-hygiene.md      -- Always: Drift Categories (Forgotten/Deferred/Experimental/External), Reference Validation Rule, repo audit evidence convention; Bo Hussein's repo-trustworthiness AND architecture-review-due checks
+rules/text-context-rule.md       -- Always: every message belongs to the operation the user is in
+                           NOW; a text written for another one is never reused because it is "close",
+                           silence is a missing text (not neutral behaviour), and a key's NAME is part
+                           of the contract. Ratified 2026-09-24 after 13 real, dated instances
 rules/investigation-protocol.md  -- Always: bug/root-cause investigations write evidence files, report in Confirmed/Side Findings/Unknowns, separate Recommendation from Decision from Execution
 rules/architecture-review-loop.md -- Always: recurring maturity review per Capability/Interface/System (.claudedocs/maturity/<topic>.md), distinct from the one-shot Post-Implementation Review; pattern-escalation rule (2nd independent finding → ADR/Review candidate)
 rules/context-recovery-protocol.md -- Always: after a Compact/"Continue"/new session/long pause, run

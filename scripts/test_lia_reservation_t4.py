@@ -749,12 +749,13 @@ async def main():
         check("INVARIANT — a walk-in phrase still means WALK_IN, not a question",
               (lia._load_draft(out) or {}).get("data", {}).get("customer_phone") == WALK_IN_PHONE,
               repr((lia._load_draft(out) or {}).get("data", {}).get("customer_phone")))
-    # SIDE FINDING, reported not fixed (2026-09-20): «ما معي رقمه» -- Lebanese for the same thing,
-    # and what an owner is at least as likely to type -- is NOT in `_WALKIN_WORDS`; only «ما عندي
-    # رقمه» is. It falls through to the question instead, which is safe but repetitive. Widening
-    # that list changes what Lia RECOGNISES from an owner, so it waits for Salman's word.
-    check("   and «ما معي رقمه» is NOT recognised today — the known gap, asserted so it is visible",
-          lia._parse_field_answer("customer_phone", "ما معي رقمه") is None)
+    # TRANSITION 2026-09-24 (Finding 10 closed). This asserted the OPPOSITE — that «ما معي رقمه»
+    # returns None — and said so deliberately: widening what Lia RECOGNISES from an owner needed
+    # Salman's word. He gave it while closing the barber vertical, so the same sentence with one
+    # letter changed is now the same answer.
+    check("   «ما معي رقمه» is recognised as a walk-in — Finding 10 closed",
+          lia._parse_field_answer("customer_phone", "ما معي رقمه") == WALK_IN_PHONE,
+          repr(lia._parse_field_answer("customer_phone", "ما معي رقمه")))
 
     # ── 13 · T5 slice 1 — the queue is built, and the clock rule (2026-09-20) ──
     print("\n── 13. T5-1: more than one customer arrives, in order — nothing visible yet ──")

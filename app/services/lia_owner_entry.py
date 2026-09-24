@@ -199,6 +199,18 @@ def _norm_digits(text: str) -> str:
     return (text or "").translate(_DIGITS)
 
 
+# A day he NAMES as past. Deliberately tiny and literal: these are the words a Lebanese owner
+# actually types, and anything subtler belongs to a date-reading capability that does not exist.
+_PAST_DAY_WORDS = ("مبارح", "امبارح", "البارحة", "البارحه", "اول مبارح", "أوّل مبارح",
+                   "من يومين", "الاسبوع الماضي", "الأسبوع الماضي", "mbere7", "mberi7")
+
+
+def _names_a_past_day(text: str) -> bool:
+    """True when his own message names a day that is not today (A1, 2026-09-24)."""
+    low = _fold_ar(" ".join((text or "").split()).lower())
+    return any(_fold_ar(w) in low for w in _PAST_DAY_WORDS)
+
+
 def _is_report_request(low: str) -> bool:
     """«تقرير اليوم» / «تقرير» -- a short message that is only the request. Nothing longer: a
     sentence that merely mentions a report is not asking for one."""
@@ -834,7 +846,12 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "daily_log_dup_pick",
                      "daily_log_dup_ask_name",
                      "daily_log_created",
-                     "daily_log_ask_amount", "daily_log_too_many", "daily_log_cancelled",
+                     "daily_log_ask_amount", "daily_log_too_many",
+                     # A1 · A2 · A3, approved 2026-09-24 while closing the barber vertical: a
+                     # dated log, an unreadable one, and one where every line failed. All three
+                     # were silences or borrowed sentences until today.
+                     "daily_log_past_date", "daily_log_unreadable", "daily_log_none_written",
+                     "daily_log_cancelled",
                      "daily_log_expired", "daily_report_header",
                      # 2026-09-23, approved: one line per PERSON in the report, with how many
                      # invoices it adds up. Two forms because Arabic counts two and three apart.
@@ -1555,7 +1572,10 @@ _RESERVATION_FIELD_QUESTIONS = {
 
 # What the owner says when the customer has no number (R-1's escape, Salman 2026-09-18).
 _WALKIN_WORDS = ("طيار", "عابر", "ما عندي رقمه", "ما عندي رقم", "بدون رقم", "بلا رقم",
-                 "ما بعرف رقمه", "walk in", "walkin", "tayyar", "tayar")
+                 # Finding 10, closed 2026-09-24: «ما معي رقمه» is the same sentence with one
+                 # letter changed, and it used to fall through to the question.
+                 "ما معي رقمه", "ما معي رقم", "ما بعرف رقمه", "walk in", "walkin",
+                 "tayyar", "tayar")
 
 
 def _op_spec(op_name: str):
@@ -2974,6 +2994,18 @@ async def _open_daily_log(wa, phone: str, session, text: str, client_id: str, ac
     THE CAP IS CHECKED ON EVERYTHING READ, BEFORE A DRAFT EXISTS. Sixteen names are refused as
     sixteen, so nothing downstream ever sees a list it would have to cut.
     """
+    # A1 (2026-09-24). The daily log reads no date, so «مبارح حلقت لعلي بـ10» was written onto
+    # TODAY, silently and wrongly. It now says so instead. Deterministic, by his own words -- no
+    # model, no date parsing: reading a date correctly is a separate capability, and refusing is
+    # the honest half of it.
+    if _names_a_past_day(text):
+        await log_security_event(
+            event_type="lia_daily_log_refused", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"reason": "past_date_named", "sender_phone": phone}, actor=actor_id,
+        )
+        await wa.send_text(phone, _REPLIES["daily_log_past_date"])
+        return True
+
     raw, period, confidence = await _read_daily_items(text)
     if not raw:
         logger.info("🤷 Lia: daily log unreadable for %s (%s) — not handled here", phone,
@@ -3334,6 +3366,8 @@ def _parse_dup_decision(text: str, group_size: int) -> tuple:
     return "UNKNOWN", None
 
 
+# The words that mean "stop" when he types them instead of pressing ❌ (A6, 2026-09-24).
+_CANCEL_WORDS = frozenset(("الغاء", "الغي", "الغيه", "بطل", "بطلنا", "cancel"))
 _NOT_A_NAME = frozenset(("الغاء", "إلغاء", "الغي", "بطل", "وقف", "لا", "نعم", "ok", "cancel"))
 
 
@@ -3805,8 +3839,13 @@ async def _commit_daily_log(wa, phone: str, draft: dict, op, actor, actor_id) ->
             weekday=_WEEKDAYS[day.weekday()], date=f"{day.day:02d}/{day.month:02d}/{day.year}"))
         return
     _sep = "، "
+    if not done:
+        # A3 / G3, closed 2026-09-24. «سجّلت: —.» was a sentence about a success that did not
+        # happen, with an empty reason after it. Total failure now has its own words.
+        await wa.send_text(phone, _REPLIES["daily_log_none_written"].format(reason="").strip())
+        return
     await wa.send_text(phone, _REPLIES["reservation_created_partial"].format(
-        done=_sep.join(done) or "—", failed=_sep.join(failed), reason="").strip())
+        done=_sep.join(done), failed=_sep.join(failed), reason="").strip())
 
 
 def _is_daily_log_row(row) -> bool:
@@ -4090,6 +4129,22 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                                    _REPLIES[_per_operation(_draft_operation(draft), "cancelled",
                                                            len(_all_items(draft)) > 1)])
                 return session
+
+        # ── A6 (2026-09-24): «إلغاء» TYPED is a cancel, not a word to re-show buttons at. ──
+        # He types it meaning to stop; answering with the same two buttons made him press one of
+        # them anyway. The button path is untouched — this only gives the word the same meaning.
+        if msg_type == "text" and set(_fold_ar(value or "").split()) & _CANCEL_WORDS:
+            _save_draft(session, None)
+            session.state = "IDLE"
+            await log_security_event(
+                event_type="lia_draft_cancelled", client_id=draft.get("client_id"),
+                endpoint=_ENDPOINT, detail={"sender_phone": sender_phone, "typed": True},
+                actor=draft.get("actor_id"),
+            )
+            await wa.send_text(sender_phone,
+                               _REPLIES[_per_operation(_draft_operation(draft), "cancelled",
+                                                       len(_all_items(draft)) > 1)])
+            return session
 
         # ── RD-3: «عدّل الاسم» at a reservation preview ──
         # It touches the DRAFT only, and the existing appointment is never read for writing. One
@@ -4725,9 +4780,11 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         if await _open_daily_log(wa, sender_phone, session, entry_text, client_id, actor,
                                  actor_id, user):
             return session
-        # Nothing readable, and no approved sentence exists for that yet: not handled here,
-        # rather than answered with a text written for another operation.
-        return None
+        # A2 / G1, closed 2026-09-24. This used to `return None`, and the message fell through to
+        # the CUSTOMER flow -- an owner's unreadable «حلقت لـ...» answered as if he were booking
+        # for himself. It now gets its own approved sentence, and stops here.
+        await wa.send_text(sender_phone, _REPLIES["daily_log_unreadable"])
+        return session
 
     # The PROMPT follows the operation, and so does the contract that validates the answer. A
     # product prompt whose answer claims `create_service` fails `LiaProductExtraction` and lands

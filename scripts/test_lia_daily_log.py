@@ -548,8 +548,14 @@ async def main():
               wa.joined()[:120])
     async with Env(extract=lambda t: lia._UNAVAILABLE) as env:
         wa, out = await send(session_idle(), "اليوم حلقت لعلي ومحمد")
-        check("a visit SENTENCE has no shape to fall back on → not handled here (open item G1)",
-              out is None and not wa.out, f"out={out!r}")
+        # TRANSITION 2026-09-24 (G1 closed). This asserted `out is None and not wa.out` — the
+        # message fell through to the CUSTOMER flow in silence, because no approved sentence
+        # existed for "a visit sentence I could not read". One now does (`daily_log_unreadable`),
+        # so the owner gets an answer and the message stops here.
+        check("a visit SENTENCE Lia cannot read now gets its own sentence — G1 closed",
+              out is not None and wa.joined() == lia._REPLIES["daily_log_unreadable"],
+              f"out={out!r} said={wa.joined()!r}")
+        check("   and it does NOT fall through to the customer flow", not env.calls)
 
     # ── 15 · D-C and persistence ─────────────────────────────────────────────
     print("\n── 15. one duration default, and a draft that survives JSON ──")
@@ -1089,6 +1095,50 @@ async def main():
         wa, _ = await send(session_idle(), "تقرير اليوم")
         check("   وإذا كانتا نفس الخدمة ⇒ بتظهر",
               "*1.* سامر · شعر · 11 USD" in wa.joined(), wa.joined())
+
+    # ── 22 · إغلاق vertical الحلاقين: A1 · A3 · A5 · A6 (٢٠٢٦-٠٩-٢٤) ────────
+    print("\n── 22. قرارات الإغلاق: يومٌ ماضٍ · فشلٌ كامل · «إلغاء» مكتوبة ──")
+    async with Env(extract=three) as env:
+        wa, out = await send(session_idle(), "مبارح حلقت لعلي بـ10")
+        check("A1: سجلٌّ يسمّي يوماً ماضياً ⇒ يُرفَض بنصّه، ولا يُكتَب على اليوم",
+              wa.joined() == lia._REPLIES["daily_log_past_date"] and not env.calls
+              and lia._load_draft(out) is None, wa.joined())
+        wa2, out2 = await send(session_idle(), "اليوم حلقت لعلي ومحمد وأحمد")
+        # لا مبالغ في جملته، فـDL-9 يسأل — والمهمّ هنا أنّ المسودّة فُتحت ولم تُرفَض.
+        check("   و«اليوم» ما بتتأثّر — المسودّة بتنفتح وبيسأل عن المبالغ",
+              lia._load_draft(out2) is not None
+              and lia._REPLIES["daily_log_past_date"] not in wa2.joined(), wa2.joined()[:80])
+
+    async with Env(extract=three, fail_on={"علي", "محمد", "أحمد"}) as env:
+        wa, out = await send(session_idle(), "علي 10، محمد 7، أحمد 5")
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("A3: فشلُ كلّ الأسطر ⇒ «ما سجّلت ولا واحد» — مش «سجّلت: —.»",
+              wa2.joined() == lia._REPLIES["daily_log_none_written"].format(reason="").strip()
+              and "سجّلت:" not in wa2.joined(), wa2.joined())
+        check("   وثلاث محاولات كتابة جرت فعلاً — لا تراجع صامت", len(env.calls) == 3)
+
+    async with Env(extract=three, fail_on={"محمد"}) as env:
+        wa, out = await send(session_idle(), "علي 10، محمد 7، أحمد 5")
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("   وفشلٌ جزئيّ بيبقى على نصّه القديم",
+              wa2.joined().startswith("سجّلت: علي، أحمد."), wa2.joined())
+
+    check("A5: نصّ الحدّ ما عاد يقول «بالرسالة الوحدة» — الحدّ على الدفعة",
+          "بالرسالة الوحدة" not in lia._REPLIES["daily_log_too_many"]
+          and "بالمرّة الوحدة" in lia._REPLIES["daily_log_too_many"],
+          lia._REPLIES["daily_log_too_many"])
+
+    async with Env(extract=three) as env:
+        wa, out = await send(session_idle(), "علي 10، محمد 7، أحمد 5")
+        wa2, out2 = await send(roundtrip(out), "إلغاء", "text")
+        check("A6: «إلغاء» مكتوبة بتلغي فعلاً — مش بترجّع الأزرار",
+              wa2.joined() == lia._REPLIES["daily_log_cancelled"] and not env.calls
+              and lia._load_draft(out2) is None and out2.state == "IDLE", wa2.joined())
+
+    async with Env(extract=three) as env:
+        wa, out = await send(session_idle(), "علي 10، محمد 7، أحمد 5")
+        wa2, out2 = await send(roundtrip(out), "بطل", "text")
+        check("   و«بطل» كمان", lia._load_draft(out2) is None, wa2.joined())
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",
