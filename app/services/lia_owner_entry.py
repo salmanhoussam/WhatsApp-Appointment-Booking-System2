@@ -780,6 +780,12 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "reservation_no_barbers", "reservation_no_services",
                      "reservation_preview", "reservation_preview_past", "reservation_confirm",
                      "reservation_created", "reservation_conflict", "reservation_unclear",
+                     # RD-1…RD-4, 2026-09-24, approved verbatim. From a live round: «علي زيان»
+                     # was refused with «سامي عنده موعد تاني بنفس الوقت» when the row he collided
+                     # with was HIS OWN booking, made two minutes earlier. Contract:
+                     # `.claudedocs/plans/lia-reservation-duplicate-contract.md`.
+                     "reservation_dup_notice", "reservation_dup_conflict",
+                     "reservation_dup_ask_name",
                      "reservations_inactive", "walkin_label",
                      # 2026-09-19. Cancel and expiry, PER OPERATION. The single `cancel` text was
                      # written for a service («الاسم والسعر والمدة») and reached an owner who had
@@ -1132,6 +1138,9 @@ DUP_PICK_PREFIX = "lia_dup_pick:"
 # different questions with one word: بلال's three invoices are one person, علي's two rows are two
 # people, and both were pressing the same button. The report cannot tell them apart unless the
 # owner's answer is kept with the row.
+# The reservation path's own rename button (RD-3). Its id is separate from the daily log's so a
+# stale tap from one flow can never be read as an answer in the other.
+RES_RENAME_ID = "__LIA_RES_RENAME__"
 DUP_SAME_ID  = "__LIA_DUP_SAME__"
 DUP_OTHER_ID = "__LIA_DUP_OTHER__"
 
@@ -2181,23 +2190,114 @@ def _reservation_preview_text(draft: dict) -> str:
     return text
 
 
+async def _reservation_dup_matches(draft: dict) -> list:
+    """For each draft item: the CLOSEST existing appointment that day carrying the same name.
+
+    Returns [(item_index, item, row_dict)] -- empty when nothing matches, which is the normal
+    case and costs one read of that day's reservations.
+
+    The window is the day of the APPOINTMENT, not today: a booking for tomorrow is compared with
+    tomorrow's. Cancelled rows do not count. The tenant's whole day is read, not one barber's,
+    because the line names the barber and that is half of what makes it useful.
+    """
+    from app.services import reservation_service
+    items = _all_items(draft)
+    by_day: dict = {}
+    for idx, item in enumerate(items):
+        when = (item.get("data") or {}).get("reserved_at")
+        name = (item.get("data") or {}).get("customer_name")
+        if not when or not name:
+            continue
+        if isinstance(when, str):
+            try:
+                when = datetime.fromisoformat(when)
+            except ValueError:
+                continue
+        by_day.setdefault(when.date(), []).append((idx, item, when, name))
+    out: list = []
+    for day, wanted in by_day.items():
+        day0 = datetime(day.year, day.month, day.day)
+        try:
+            rows = await reservation_service.list_reservations(
+                client_id=draft["client_id"], date_from=day0.replace(tzinfo=timezone.utc),
+                date_to=(day0 + timedelta(days=1)).replace(tzinfo=timezone.utc), limit=500)
+        except Exception as exc:
+            # A preview that cannot reach the day's rows still shows everything else correctly.
+            logger.error("🔥 Lia: could not read %s for the duplicate notice: %s",
+                         draft.get("client_id"), type(exc).__name__)
+            continue
+        live = [r for r in rows or [] if (r.get("status") in ("pending", "confirmed", "arrived"))]
+        for idx, item, when, name in wanted:
+            folded = _fold_ar(name)
+            same = [r for r in live if _fold_ar(r.get("customer_name") or "") == folded]
+            if not same:
+                continue
+            # The closest in time to the one he is adding -- one line, never a list (case ③).
+            def _gap(r):
+                try:
+                    return abs((datetime.fromisoformat(r["reserved_at"]) - when).total_seconds())
+                except Exception:
+                    return float("inf")
+            out.append((idx, item, sorted(same, key=_gap)[0]))
+    return out
+
+
+def _reservation_dup_lines(matches: list) -> list:
+    """RD-1, one line per matching item, in the order he said them."""
+    from app.services.whatsapp_notifications import fmt_reserved_at
+    lines = []
+    for _, item, row in matches:
+        when = row.get("reserved_at")
+        try:
+            when = datetime.fromisoformat(when)
+        except Exception:
+            when = None
+        stamp = fmt_reserved_at(when) if when else "—"
+        lines.append(_REPLIES["reservation_dup_notice"].format(
+            name=(item.get("data") or {}).get("customer_name"),
+            day=stamp.split(" · ")[0], time=stamp.split(" · ")[-1],
+            barber=row.get("barber_name") or _barber_name_of(row) or "الحلاق"))
+    return lines
+
+
+def _barber_name_of(row: dict) -> Optional[str]:
+    """The barber's name off a formatted reservation row, if it carries one."""
+    meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    return meta.get("barber_name")
+
+
 async def _send_preview(wa, phone: str, draft: dict, greeting: str = "") -> None:
     if _draft_operation(draft) == "create_reservation":
         many = len(_all_items(draft)) > 1
-        await wa.send_text(phone, greeting + (_reservation_preview_multi_text(draft) if many
-                                              else _reservation_preview_text(draft)))
+        body = greeting + (_reservation_preview_multi_text(draft) if many
+                           else _reservation_preview_text(draft))
+        # RD-1: it TELLS him, it does not ask. The decision stays on the buttons he already has —
+        # «نفس الشخص؟» would be a question whose two answers write the identical row (contract §0).
+        matches = await _reservation_dup_matches(draft)
+        if matches:
+            draft["dup_res"] = [m[0] for m in matches]
+            body += "\n" + "\n".join(_reservation_dup_lines(matches))
+        else:
+            draft.pop("dup_res", None)
+        await wa.send_text(phone, body)
+        buttons = [
+            # T5-9, approved 2026-09-20. The message and the button had to move together --
+            # «سجّلهن هلق؟» above a button reading «سجّله» is the same class of mismatch this
+            # file has already paid for five times. Still an inline literal here, like every
+            # other button title, and that remains a known F-C2 gap rather than a new one.
+            {"type": "reply", "reply": {"id": CONFIRM_ID,
+                                        "title": "✅ سجّلهم" if many else "✅ سجّله"}},
+            {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
+        ]
+        if matches:
+            # RD-3, and the ONLY option here that changes anything real: it lets him tell two
+            # people with one name apart on the calendar.
+            buttons.append({"type": "reply", "reply": {"id": RES_RENAME_ID,
+                                                       "title": "عدّل الاسم"}})
         await wa.send_interactive_buttons(
             to=phone,
             text=_REPLIES["reservation_confirm_multi"] if many else _REPLIES["reservation_confirm"],
-            buttons=[
-                # T5-9, approved 2026-09-20. The message and the button had to move together --
-                # «سجّلهن هلق؟» above a button reading «سجّله» is the same class of mismatch this
-                # file has already paid for five times. Still an inline literal here, like every
-                # other button title, and that remains a known F-C2 gap rather than a new one.
-                {"type": "reply", "reply": {"id": CONFIRM_ID,
-                                            "title": "✅ سجّلهم" if many else "✅ سجّله"}},
-                {"type": "reply", "reply": {"id": CANCEL_ID,  "title": "❌ إلغاء"}},
-            ],
+            buttons=buttons,
         )
         return
     await wa.send_text(phone, _preview_text(draft["data"], draft.get("category_name", "—"),
@@ -2589,6 +2689,35 @@ async def _write_reservation(wa, phone: str, client_id: str, validated, item: di
     return row
 
 
+async def _same_customer_clash(client_id: str, validated) -> Optional[tuple]:
+    """(time, barber name) when the appointment he is adding clashes with a row carrying the SAME
+    customer name -- else None, and the old barber-is-busy wording stands unchanged."""
+    from app.services import reservation_service
+    when = validated.reserved_at
+    if not isinstance(when, datetime) or not validated.customer_name:
+        return None
+    day0 = datetime(when.year, when.month, when.day)
+    try:
+        rows = await reservation_service.list_reservations(
+            client_id=client_id, date_from=day0.replace(tzinfo=timezone.utc),
+            date_to=(day0 + timedelta(days=1)).replace(tzinfo=timezone.utc), limit=500)
+    except Exception:
+        return None
+    folded = _fold_ar(validated.customer_name)
+    for r in rows or []:
+        if r.get("status") not in ("pending", "confirmed", "arrived"):
+            continue
+        if _fold_ar(r.get("customer_name") or "") != folded:
+            continue
+        try:
+            at = datetime.fromisoformat(r["reserved_at"])
+        except Exception:
+            continue
+        if at == when.replace(tzinfo=at.tzinfo):
+            return f"{at:%H:%M}", _barber_name_of(r)
+    return None
+
+
 async def _try_write_reservation(client_id: str, validated, item: dict, status: str):
     """(row, None) or (None, the owner-facing reason). T5, 2026-09-20.
 
@@ -2626,6 +2755,15 @@ async def _try_write_reservation(client_id: str, validated, item: dict, status: 
         # The service says why in a sentence meant for a developer. The owner gets the one case he
         # can act on -- a clash -- and anything else is logged rather than pasted at him.
         if "already booked" in str(exc):
+            # RD-2. «سامي عنده موعد تاني بنفس الوقت» is true and useless when the row he collided
+            # with is HIS OWN customer's, booked minutes earlier — measured live 2026-09-24
+            # 09:52. Naming the customer is the whole difference between "change the hour" and
+            # "you already recorded him".
+            clash = await _same_customer_clash(client_id, validated)
+            if clash is not None:
+                return None, _REPLIES["reservation_dup_conflict"].format(
+                    name=validated.customer_name, time=clash[0],
+                    barber=clash[1] or validated.barber_name or "الحلاق")
             return None, _REPLIES["reservation_conflict"].format(
                 barber=validated.barber_name or "الحلاق")
         logger.error("🔥 Lia: reservation refused for %s: %s", client_id, exc)
@@ -3953,6 +4091,32 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
                                                            len(_all_items(draft)) > 1)])
                 return session
 
+        # ── RD-3: «عدّل الاسم» at a reservation preview ──
+        # It touches the DRAFT only, and the existing appointment is never read for writing. One
+        # matching item renames straight away; several ask which, by the numbers already shown.
+        if (msg_type in ("button_reply", "list_reply") and str(value or "") == RES_RENAME_ID
+                and _draft_operation(draft) == "create_reservation"):
+            targets = draft.get("dup_res") or []
+            if not targets:
+                await _send_preview(wa, sender_phone, draft)
+                return session
+            if len(targets) == 1:
+                draft["res_rename_pos"] = targets[0]
+                _save_draft(session, draft)
+                session.state = LIA_AWAITING_FIELD
+                draft["asking"] = "res_dup_name"
+                _save_draft(session, draft)
+                await wa.send_text(sender_phone, _REPLIES["reservation_dup_ask_name"])
+                return session
+            draft["asking"] = "res_dup_pick"
+            _save_draft(session, draft)
+            session.state = LIA_AWAITING_FIELD
+            await wa.send_interactive_buttons(
+                to=sender_phone, text=_REPLIES["daily_log_dup_pick"],
+                buttons=[{"type": "reply", "reply": {"id": f"{DUP_PICK_PREFIX}{i}", "title": t}}
+                         for i, t in list(enumerate(["الأوّل", "التاني", "التالت"], 1))[:len(targets)]])
+            return session
+
         # ── A TYPED MESSAGE HERE IS AN EDIT, not a failure to press a button. ──
         #
         # Measured 2026-09-13 17:43: Salman asked twice, in plain words, to change the service
@@ -4195,6 +4359,45 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
             return session
         # Any other button here (an id from an older bubble) is not an answer to this question.
         await _reask_duplicate(wa, sender_phone, session, draft)
+        return session
+
+    # ── 1.96 RD-3's two follow-ups: which item, then the new name. ──
+    if (draft and session is not None and session.state == LIA_AWAITING_FIELD
+            and _draft_operation(draft) == "create_reservation"
+            and draft.get("asking") in ("res_dup_pick", "res_dup_name")):
+        targets = draft.get("dup_res") or []
+        if msg_type in ("button_reply", "list_reply") and str(value or "").startswith(DUP_PICK_PREFIX):
+            try:
+                pos = int(str(value)[len(DUP_PICK_PREFIX):])
+            except ValueError:
+                pos = 0
+            if not 1 <= pos <= len(targets):
+                await _send_preview(wa, sender_phone, draft)
+                return session
+            draft["res_rename_pos"] = targets[pos - 1]
+            draft["asking"] = "res_dup_name"
+            _save_draft(session, draft)
+            await wa.send_text(sender_phone, _REPLIES["reservation_dup_ask_name"])
+            return session
+        if msg_type == "text" and (value or "").strip() and draft.get("asking") == "res_dup_name":
+            fixed = " ".join((value or "").split())
+            idx = draft.get("res_rename_pos")
+            items = _all_items(draft)
+            if fixed and idx is not None and 0 <= idx < len(items):
+                # VERBATIM, and only in the draft: the existing appointment is not touched.
+                if idx == len(items) - 1:
+                    draft.setdefault("data", {})["customer_name"] = fixed
+                else:
+                    draft["done"][idx]["data"]["customer_name"] = fixed
+                logger.info("✏️  Lia: reservation name distinguished for %s", draft.get("client_id"))
+            for gone in ("asking", "res_rename_pos"):
+                draft.pop(gone, None)
+            _save_draft(session, draft)
+            session.state = LIA_AWAITING_CONFIRM
+            await _send_preview(wa, sender_phone, draft)
+            return session
+        # Anything else while this is open: show the preview again, never a guess.
+        await _send_preview(wa, sender_phone, draft)
         return session
 
     # ── 2. An answer to one asked field. ──

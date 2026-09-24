@@ -92,6 +92,11 @@ class Wa:
         return [o[2] for o in self.out if o[0] == "buttons"]
 
 
+def titles(wa):
+    """The button TITLES of each interactive message — element 3 of the recorded tuple."""
+    return [o[3] for o in wa.out if o[0] == "buttons"]
+
+
 def session_idle():
     return ConversationSession(state="IDLE")
 
@@ -145,7 +150,7 @@ def _known_from(rows, name):
 
 class Env:
     def __init__(self, extract=None, raises=None, barbers=None, services=None, users=None,
-                 edit=None, customers=None):
+                 edit=None, customers=None, day_rows=None):
         self.extract, self.raises, self.edit = extract, raises, edit
         self.users = users
         self.barbers = BARBERS if barbers is None else barbers
@@ -153,16 +158,21 @@ class Env:
         # The shop's own customer table (T5, 2026-09-20). Empty by default, which is exactly the
         # state every test written before this one assumed: Lia finds nothing and asks.
         self.customers = customers or []
+        # The day's existing appointments, as `reservation_service.list_reservations` returns them
+        # (RD, 2026-09-24). Empty by default — which is what every earlier test assumed.
+        self.day_rows = day_rows or []
         self.calls = []
 
     async def __aenter__(self):
         self._orig = (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
                       reservation_service.create_reservation, lia._extract_reservation,
-                      lia._extract_reservation_edit, lia._known_customer_phone)
+                      lia._extract_reservation_edit, lia._known_customer_phone,
+                      reservation_service.list_reservations)
         self._restore_auth = install(users=self.users or [OWNER_BL])
         barber_repo.list_barbers = lambda *a, **kw: _done(list(self.barbers))
         catalog_service_repo.list_catalog_services = lambda *a, **kw: _done(list(self.services))
         reservation_service.create_reservation = self._create
+        reservation_service.list_reservations = lambda **kw: _done(list(self.day_rows))
         if self.extract is not None:
             lia._extract_reservation = lambda text: _done(self.extract(text))
         if self.edit is not None:
@@ -177,7 +187,8 @@ class Env:
         self._restore_auth()
         (barber_repo.list_barbers, catalog_service_repo.list_catalog_services,
          reservation_service.create_reservation, lia._extract_reservation,
-         lia._extract_reservation_edit, lia._known_customer_phone) = self._orig
+         lia._extract_reservation_edit, lia._known_customer_phone,
+         reservation_service.list_reservations) = self._orig
         return False
 
 
@@ -952,9 +963,9 @@ async def main():
         check("   the button asks about all of them",
               lia._REPLIES["reservation_confirm_multi"] in body
               and lia._REPLIES["reservation_confirm"] not in body)
-        titles = [o[3] for o in wa1.out if o[0] == "buttons"]
+        btn_titles = [o[3] for o in wa1.out if o[0] == "buttons"]
         check("   T5-9 — and the BUTTON says «سجّلهم», not «سجّله»",
-              titles and "✅ سجّلهم" in titles[0] and "❌ إلغاء" in titles[0], str(titles))
+              titles and "✅ سجّلهم" in btn_titles[0] and "❌ إلغاء" in btn_titles[0], str(btn_titles))
         check("   nothing written before ✅", len(env.calls) == 0)
         wa2, out2 = await send(roundtrip(out1), lia.CONFIRM_ID, "button_reply")
         check("✅ writes THREE reservations, one per name, in order",
@@ -1323,6 +1334,105 @@ async def main():
         check("INVARIANT — a number HE gave wins over the stored one, always",
               (lia._load_draft(out) or {})["data"]["customer_phone"] == "96170999888",
               str((lia._load_draft(out) or {})["data"]["customer_phone"]))
+
+    # ── 21 · RD — الاسم المكرّر في مسار الحجز (عقد ٢٠٢٦-٠٩-٢٤) ─────────────
+    print("\n── 21. «ما انتبه إنّه الزبون نفسه» — إخبارٌ لا سؤال ──")
+    # جولته الحيّة ٠٩:٥٢: سجّل «علي زيان 9:30»، ثمّ حاول تسجيله ثانيةً، فقيل له إنّ سامي مشغول.
+    def day_row(name, when, barber="سامي", status="pending"):
+        return {"id": f"r-{name}-{when:%H%M}", "customer_name": name,
+                "reserved_at": when.isoformat(), "status": status,
+                "metadata": {"barber_name": barber}}
+
+    ZIAN = PAST.replace(hour=9, minute=30)
+    LATER = PAST.replace(hour=11, minute=0)
+    same = lambda t: extraction(customer_name="علي زيان", customer_phone="ما عندي رقمه",
+                                reserved_at=LATER.isoformat(), service_name="قص شعر",
+                                barber_name="جعفر")
+
+    async with Env(extract=same, day_rows=[day_row("علي زيان", ZIAN)]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان الساعة 11")
+        body = wa.joined()
+        check("RD-1: المعاينة بتخبره إنّ الاسم عنده موعد بنفس اليوم، وبتسمّي الساعة والحلاق",
+              "علي زيان عندك موعد" in body and "09:30" in body and "سامي" in body, body[:220])
+        check("   وبثلاثة أزرار — التالت «عدّل الاسم»، وهو الوحيد اللي بيغيّر شي",
+              titles(wa) and titles(wa)[-1] == ("✅ سجّله", "❌ إلغاء", "عدّل الاسم"),
+              str(titles(wa)))
+        check("   ولا كتابة قبل ✅", not env.calls)
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("   و✅ بتكتب عاديّ — الإخبار ما بيمنع شي",
+              len(env.calls) == 1 and env.calls[0]["customer_name"] == "علي زيان",
+              str(len(env.calls)))
+
+    async with Env(extract=same, day_rows=[]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان الساعة 11")
+        check("بلا تطابق ⇒ المعاينة بزرّين، حرفيّاً متل قبل",
+              titles(wa)[-1] == ("✅ سجّله", "❌ إلغاء")
+              and "عندك موعد" not in wa.joined(), str(titles(wa)))
+
+    other_day = lambda t: extraction(customer_name="علي زيان", customer_phone="ما عندي رقمه",
+                                     reserved_at=FUTURE.isoformat(), service_name="قص شعر",
+                                     barber_name="جعفر")
+    async with Env(extract=other_day, day_rows=[]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان بكرا الساعة 4")
+        check("يومٌ مختلف ⇒ ولا سطر إخبار (المدى هو يوم الموعد، لا اليوم)",
+              "عندك موعد" not in wa.joined(), wa.joined()[:100])
+
+    # التعارض: نفس الاسم بنفس الساعة ⇒ نصّ بيسمّي الزبون، مش «الحلاق مشغول»
+    clash = lambda t: extraction(customer_name="علي زيان", customer_phone="ما عندي رقمه",
+                                 reserved_at=ZIAN.isoformat(), service_name="قص شعر",
+                                 barber_name="جعفر")
+    async with Env(extract=clash, raises="This barber is already booked for that time.",
+                   day_rows=[day_row("علي زيان", ZIAN, barber="جعفر")]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان الساعة 9:30")
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("RD-2: تعارضٌ مع حجز نفس الزبون ⇒ «علي زيان مسجَّل عندك الساعة 09:30 مع جعفر»",
+              lia._REPLIES["reservation_dup_conflict"].format(
+                  name="علي زيان", time="09:30", barber="جعفر") in wa2.joined(), wa2.joined())
+        check("   ومش نصّ «الحلاق عنده موعد تاني»",
+              lia._REPLIES["reservation_conflict"].format(barber="جعفر") not in wa2.joined())
+
+    other_name = lambda t: extraction(customer_name="محمد الحسن", customer_phone="ما عندي رقمه",
+                                      reserved_at=ZIAN.isoformat(), service_name="قص شعر",
+                                      barber_name="جعفر")
+    async with Env(extract=other_name, raises="This barber is already booked for that time.",
+                   day_rows=[day_row("علي زيان", ZIAN, barber="جعفر")]) as env:
+        wa, out = await send(session_idle(), "سجل محمد الحسن الساعة 9:30")
+        wa2, _ = await send(roundtrip(out), lia.CONFIRM_ID, "button_reply")
+        check("🔴 اسمٌ مختلف بنفس الساعة ⇒ نصّ الحلاق المشغول **كما هو**، ما تغيّر شي",
+              lia._REPLIES["reservation_conflict"].format(barber="جعفر") in wa2.joined(),
+              wa2.joined())
+
+    # الأقرب زمنيّاً وحده (الحالة ٣)
+    async with Env(extract=same, day_rows=[day_row("علي زيان", PAST.replace(hour=8, minute=0)),
+                                           day_row("علي زيان", PAST.replace(hour=10, minute=30),
+                                                   barber="جعفر")]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان الساعة 11")
+        check("حجزان للاسم نفسه ⇒ السطر بيسمّي الأقرب زمنيّاً وحده (10:30 مع جعفر)",
+              "10:30" in wa.joined() and "جعفر" in wa.joined()
+              and "08:00" not in wa.joined(), wa.joined()[:200])
+
+    # RD-3: «عدّل الاسم» بيغيّر المسودّة وحدها
+    async with Env(extract=same, day_rows=[day_row("علي زيان", ZIAN)]) as env:
+        wa, out = await send(session_idle(), "سجل علي زيان الساعة 11")
+        wa2, out2 = await send(roundtrip(out), lia.RES_RENAME_ID, "button_reply")
+        check("RD-3 ⇒ «شو الاسم الصحيح؟»",
+              wa2.joined() == lia._REPLIES["reservation_dup_ask_name"], wa2.joined())
+        wa3, out3 = await send(roundtrip(out2), "علي زيان ٢", "text")
+        d3 = lia._load_draft(out3) or {}
+        check("   الاسم بينتبدل بالمسودّة حرفيّاً، والمعاينة بترجع",
+              d3["data"]["customer_name"] == "علي زيان ٢"
+              and "علي زيان ٢" in wa3.joined() and not env.calls, str(d3["data"]["customer_name"]))
+        check("   وما عاد في سطر إخبار — الاسم ما عاد يطابق",
+              "عندك موعد" not in wa3.joined()
+              and titles(wa3)[-1] == ("✅ سجّله", "❌ إلغاء"), str(titles(wa3)))
+        wa4, _ = await send(roundtrip(out3), lia.CONFIRM_ID, "button_reply")
+        check("   و✅ بتكتب الاسم المميَّز",
+              [c["customer_name"] for c in env.calls] == ["علي زيان ٢"], str(env.calls and 1))
+
+    check("🔴 الحجز القائم ما بينقرا إلا للقراءة — ولا نداء تعديل أو حذف بالوحدة كلّها",
+          not [n.func.attr for n in ast.walk(ast.parse(open(lia.__file__, encoding="utf-8").read()))
+               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr in ("update_many", "delete_many", "upsert")])
 
     print("\n── nothing left this process ──")
     check("the real functions are restored",

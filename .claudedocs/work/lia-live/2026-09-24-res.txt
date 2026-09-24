@@ -1,0 +1,58 @@
+sealed 275 write methods · seal proven by a real attempt
+window: since 2026-09-24T06:40:00+00:00 (UTC)   ·   target: barberlab-test
+
+── RESERVATIONS created in the window ──────────────────────────────────
+   3 row(s)
+   · id=f12cc945-cf7d-4c68-9a5c-a1eff9191731
+     customer='حسين' phone='96176985477' customerId=0b0cd6c1-8d29-4d63-9b8b-60d8d28c6af8
+     reservedAt(RAW)=2026-09-24 10:00:00+00:00  duration=30  status=confirmed
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=8f0a01aa-5445-4fe7-89f5-c3915908a5b8
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'service_id': '8f0a01aa-5445-4fe7-89f5-c3915908a5b8'}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=e64c62c9-bc5e-49a1-8860-79a5089096b8
+     customer='محمد الحسن' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-24 09:00:00+00:00  duration=30  status=pending
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=8946df5c-03ac-448f-b1ce-e8e6243b9f83
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'service_id': '8946df5c-03ac-448f-b1ce-e8e6243b9f83'}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+   · id=4a2a02d7-3e65-4038-9146-1baa9bb5dbac
+     customer='علي زيان' phone='WALK_IN' customerId=dade1bdd-9091-4f44-b4ca-87fef91014e4
+     reservedAt(RAW)=2026-09-24 09:30:00+00:00  duration=30  status=pending
+     source='lia'  module='barber'  barberId=7a702d87-cf60-45f8-a1b9-71766df9fd6f  serviceId=8946df5c-03ac-448f-b1ce-e8e6243b9f83
+     metadata={'barber_id': '7a702d87-cf60-45f8-a1b9-71766df9fd6f', 'service_id': '8946df5c-03ac-448f-b1ce-e8e6243b9f83'}  clientId=b9034129-d4ab-49c2-a8f6-2bd3b9ed922a
+
+── CUSTOMERS created in the window  (the walk-in merge is measured here) 
+   1 row(s)
+   · id=0b0cd6c1-8d29-4d63-9b8b-60d8d28c6af8  phone='96176985477'  name='حسين'
+   🟡 WALK_IN row dade1bdd-9091-4f44-b4ca-87fef91014e4 name='أحمد' — 11 reservation(s) point at it
+   ⇒ record as 'Confirmed behavior / Product risk', never PASS
+
+── CATALOG rows created in the window ──────────────────────────────────
+   CatalogItem (product): 0
+   CatalogService (bookable): 0
+
+── DUPLICATE CHECK — the whole active catalogue, folded (D1's own question) 
+   active items: 10   ·   duplicate names: 1
+   🔴 'مشط خشب' ×2  ids=['8ec69af2-9b34-4adb-92fe-163c7a53f91d', 'c88fc1c4-8847-4cfb-b1fa-9576cf4bd240']  prices=['5', '5']
+
+── AUDIT TRAIL — every Lia decision in the window, refusals included ───
+   6 row(s)
+   · 06:41:38  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'create_reservation', 'operation': 'create_reservation', 'confidence': 'high', 'unresolved': ['customer_phone'], 'sender_phone': '96178727986'}
+   · 06:43:46  lia_owner_create_reservation tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'price': None, 'row_id': 'f12cc945-cf7d-4c68-9a5c-a1eff9191731', 'source': 'whatsapp_text', 'name_ar': None, 'operation': 'create_reservation', 'historical': False, 'permission': 'reservations.write', 'reserved_at': '2026-09-24T10:00:00', 'service_key': 'reservations', 'duration_min': 30, 'sender_phone': '96178727986'}
+   · 06:45:40  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 2, 'intent': 'create_reservation', 'operation': 'create_reservation', 'confidence': 'high', 'unresolved': [], 'sender_phone': '96178727986'}
+   · 06:49:03  lia_owner_create_reservation tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'row_id': 'e64c62c9-bc5e-49a1-8860-79a5089096b8', 'source': 'whatsapp_text', 'status': 'pending', 'operation': 'create_reservation', 'historical': True, 'permission': 'reservations.write', 'reserved_at': '2026-09-24T09:00:00', 'service_key': 'reservations', 'duration_min': 30, 'sender_phone': '96178727986'}
+   · 06:49:03  lia_owner_create_reservation tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'batch': 2, 'row_id': '4a2a02d7-3e65-4038-9146-1baa9bb5dbac', 'source': 'whatsapp_text', 'status': 'pending', 'operation': 'create_reservation', 'historical': True, 'permission': 'reservations.write', 'reserved_at': '2026-09-24T09:30:00', 'service_key': 'reservations', 'duration_min': 30, 'sender_phone': '96178727986'}
+   · 06:50:04  lia_draft_opened             tenant=barberlab-test  actor=e0d016c7-5173-40d1-a544-5fc48f3cf6fd
+     {'items': 1, 'intent': 'create_reservation', 'operation': 'create_reservation', 'confidence': 'low', 'unresolved': ['service_name', 'customer_phone'], 'sender_phone': '96178727986'}
+
+── NEGATIVE BOUNDARY — the deployment reaches these, the test does not ─
+   ✅ rk: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ✅ mr-h: {'reservations': 0, 'items': 0, 'services': 0, 'customers': 0}
+   ⚠️  zero rows is NECESSARY, not SUFFICIENT — pair it with a refusal in the audit
+
+── what left this process ──────────────────────────────────────────────
+   production writes attempted: 0  
+   WhatsApp sends: 0 — this script has no send boundary at all
