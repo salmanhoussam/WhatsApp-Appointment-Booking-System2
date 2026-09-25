@@ -1,0 +1,33 @@
+14 statement(s), every one additive and reviewed:
+  · ALTER TABLE "public"."reservations" ADD COLUMN     "patient_id" UUID
+  · CREATE TABLE "public"."patients" (
+  · CREATE TABLE "public"."patient_contacts" (
+  · CREATE INDEX "patients_client_id_idx" ON "public"."patients"("client_id")
+  · CREATE INDEX "patients_client_id_is_active_idx" ON "public"."patients"("client_id", "is_active")
+  · CREATE INDEX "patient_contacts_client_id_idx" ON "public"."patient_contacts"("client_id")
+  · CREATE INDEX "patient_contacts_customer_id_idx" ON "public"."patient_contacts"("customer_id")
+  · CREATE UNIQUE INDEX "patient_contacts_patient_id_customer_id_key" ON "public"."patient_contacts"("pa
+  · CREATE INDEX "reservations_client_id_patient_id_idx" ON "public"."reservations"("client_id", "patien
+  · ALTER TABLE "public"."reservations" ADD CONSTRAINT "reservations_patient_id_fkey" FOREIGN KEY ("pati
+  · ALTER TABLE "public"."patients" ADD CONSTRAINT "patients_client_id_fkey" FOREIGN KEY ("client_id") R
+  · ALTER TABLE "public"."patient_contacts" ADD CONSTRAINT "patient_contacts_client_id_fkey" FOREIGN KEY
+  · ALTER TABLE "public"."patient_contacts" ADD CONSTRAINT "patient_contacts_patient_id_fkey" FOREIGN KE
+  · ALTER TABLE "public"."patient_contacts" ADD CONSTRAINT "patient_contacts_customer_id_fkey" FOREIGN K
+
+BEFORE · customers=10 · reservations=66 · new tables present=[]
+         customers unique index: CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+
+APPLYING …
+   14 statement(s) applied
+
+AFTER  · customers=10 · reservations=66 · new tables present=['patient_contacts', 'patients']
+
+── EVIDENCE ──
+🔒 CUSTOMER untouched · rows 10 -> 10 : True
+🔒 CUSTOMER unique index identical                    : True
+   reservations rows 66 -> 66          : True
+   patient_id IS NULL on 66/66 rows (NO backfill)  : True
+   patients / patient_contacts created and EMPTY (0/0)   : True
+   both tables exist                                  : True
+
+✅ P2 MIGRATION APPLIED — ADDITIVE, CUSTOMER UNTOUCHED, ZERO BACKFILL
