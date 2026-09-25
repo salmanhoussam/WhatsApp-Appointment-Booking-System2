@@ -564,6 +564,24 @@ model CatalogService {
   // Promoted to a real column (not buried in metadata like CatalogItem's duration_min was) --
   // reservation_service.py's slot-generation math needs a hard int, not a JSON dig.
   durationMin   Int      @default(30) @map("duration_min")
+  // -- Clinic P3 · the Booking Contract (2026-09-25) -----------------------------------------
+  // A service is WHAT is booked. These two are the CONDITIONS under which it may be booked --
+  // and keeping them on this model rather than inventing a second "Motif" entity is deliberate:
+  // `Reservation.serviceId` is already the write path, and a second nullable FK beside it would
+  // be two ways to name the same thing, which rules/backend/architecture.md §9 forbids.
+  //
+  // Both are inert for a barber service, exactly like the three stay add-on columns above, and
+  // every one of the 38 rows that existed when they were added is already correct: NULL means
+  // "no instructions", and 'patients' means "anyone may book it", which is what all 38 were.
+  //
+  // instructions: shown to the patient at booking time -- "bring your previous reports",
+  //   "come fasting". Data only; WHO renders it and when is P5/P6's decision, not this column's.
+  // bookableBy:  "patients" | "staff_only". A String with documented values, NOT a database
+  //   enum -- this schema's own convention on Reservation.source, Resource.type and
+  //   Client.vertical. Doctolib's third value ("by referral") is deliberately NOT carried: we
+  //   have no concept of a referral at all, and a value nothing can reach is a dead branch.
+  instructions  String?  @map("instructions")
+  bookableBy    String   @default("patients") @map("bookable_by")
   // -- Stay add-on fields (Data Model Consolidation Phase 2a, 2026-09-07) -------------------
   // The three things the legacy `services` table carried and this model did not, added so smar's
   // real hotel add-ons (إفطار / مساج / دخول المسبح / سرير أطفال) could move here instead of

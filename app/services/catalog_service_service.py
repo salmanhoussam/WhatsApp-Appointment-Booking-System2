@@ -39,6 +39,11 @@ def _fmt(s) -> dict:
         "price":         float(s.price) if s.price is not None else None,
         "currency":      s.currency,
         "duration_min":  s.durationMin,
+        # Clinic P3. Exposed on BOTH projections (admin and public) because the public booking
+        # page is exactly who needs to read the instructions -- P3 supplies the data, P5/P6
+        # decide how it is shown.
+        "instructions":  getattr(s, "instructions", None),
+        "bookable_by":   getattr(s, "bookableBy", "patients"),
         "is_active":     s.isActive,
         "is_featured":   s.isFeatured,
         "sort_order":    s.sortOrder,
@@ -69,6 +74,10 @@ async def admin_create_service(
     duration_min:   int,
     is_featured:    bool,
     sort_order:     int,
+    # Clinic P3. Defaults reproduce the pre-P3 row exactly, so every existing caller -- the admin
+    # route and Lia's `create_service` operation alike -- writes the same row it wrote yesterday.
+    instructions:   Optional[str] = None,
+    bookable_by:    str = "patients",
 ) -> dict:
     svc = await catalog_service_repo.create_catalog_service(data={
         "clientId":      client_id,
@@ -83,6 +92,8 @@ async def admin_create_service(
         "durationMin":   duration_min,
         "isFeatured":    is_featured,
         "sortOrder":     sort_order,
+        "instructions":  instructions,
+        "bookableBy":    bookable_by,
         "isActive":      True,
     })
     return {"id": svc.id}
@@ -102,6 +113,8 @@ async def admin_update_service(
     is_featured:    Optional[bool],
     is_active:      Optional[bool],
     sort_order:     Optional[int],
+    instructions:   Optional[str] = None,
+    bookable_by:    Optional[str] = None,
 ) -> dict:
     existing = await catalog_service_repo.find_catalog_service(client_id, service_id)
     if not existing:
@@ -118,6 +131,8 @@ async def admin_update_service(
         "isFeatured":    is_featured,
         "isActive":      is_active,
         "sortOrder":     sort_order,
+        "instructions":  instructions,
+        "bookableBy":    bookable_by,
     }.items() if v is not None}
     if not patch:
         raise HTTPException(400, "No fields to update.")

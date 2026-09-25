@@ -40,6 +40,10 @@ class CatalogServiceCreate(BaseModel):
     duration_min:   int = 30
     is_featured:    bool = False
     sort_order:     int = 0
+    # Clinic P3 -- the Booking Contract. Optional on the way in, so a client that has never heard
+    # of them sends exactly the body it sent yesterday.
+    instructions:   Optional[str] = None
+    bookable_by:    str = "patients"
 
 
 class CatalogServiceUpdate(BaseModel):
@@ -54,6 +58,8 @@ class CatalogServiceUpdate(BaseModel):
     is_featured:    Optional[bool] = None
     is_active:      Optional[bool] = None
     sort_order:     Optional[int] = None
+    instructions:   Optional[str] = None
+    bookable_by:    Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -85,6 +91,7 @@ async def create_catalog_service(
         name_en=body.name_en, description_ar=body.description_ar, description_en=body.description_en,
         image_url=body.image_url, price=body.price, currency=body.currency,
         duration_min=body.duration_min, is_featured=body.is_featured, sort_order=body.sort_order,
+        instructions=body.instructions, bookable_by=body.bookable_by,
     )
     return {"success": True, "data": data}
 
@@ -102,6 +109,7 @@ async def update_catalog_service(
         description_ar=body.description_ar, description_en=body.description_en,
         image_url=body.image_url, price=body.price, currency=body.currency,
         duration_min=body.duration_min, is_featured=body.is_featured, is_active=body.is_active,
-        sort_order=body.sort_order,
+        sort_order=body.sort_order, instructions=body.instructions,
+        bookable_by=body.bookable_by,
     )
     return {"success": True, "data": data}

@@ -71,6 +71,17 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "barber":      {"duration_min": 30},
 }
 
+# Clinic P3 (2026-09-25) -- which CHANNELS are subject to a service's `bookable_by`.
+#
+# AN ALLOW-LIST FOR BEING RESTRICTED, and that direction is the decision (Salman, 2026-09-25):
+# a channel added tomorrow is NOT silently restricted until it is named here. The safe failure
+# is "a staff member could book it", never "a patient was refused by a rule nobody wrote".
+#
+# `source=None` is therefore treated as staff. Every real caller sets it -- public/reservations.py
+# "website", whatsapp_reservation_flow.py "whatsapp", admin/reservations.py "admin", Lia "lia" --
+# so None can only come from a script or an internal integration, both of which are trusted.
+PATIENT_FACING_SOURCES = frozenset({"website", "whatsapp"})
+
 # moduleKeys whose Reservation is backed by a real Resource row (Reservation.resourceId) rather
 # than the legacy free-text metadata key (table_label/staff_id/unit_id). Only "clinic" today —
 # restaurant/services/real_estate deliberately keep the legacy path unchanged (Correction 2/§3b
@@ -477,6 +488,24 @@ async def create_reservation(
     # conflict-checking (a Service has no calendar of its own); it only sets the real serviceId FK
     # so this reservation is fully resolvable through Service without relying on metadata alone.
     catalog_service = await _resolve_catalog_service(client_id, metadata)
+
+    # -- Booking Contract (Clinic P3) ------------------------------------------------------------
+    # A service may now say WHO is allowed to book it. Enforced HERE, in the one Service every
+    # caller already goes through (§9's "One Capability, One Service"), never duplicated per route
+    # -- a second copy is how two gates drift apart.
+    #
+    # THIS IS A REAL WIDENING OF THIS FUNCTION'S CONTRACT, said plainly rather than footnoted: a
+    # service now has an opinion about who books it, which it did not have before. The default
+    # `bookable_by='patients'` makes the measured effect on all 38 existing production services
+    # exactly zero -- but the contract itself grew, the same way `allow_past` and `status` grew it.
+    #
+    # An unrecognised value is treated as `patients`. The column is NOT NULL with a default, so a
+    # bad value can only arrive by a hand-written UPDATE -- and silently closing a clinic's
+    # bookings because someone typed "patiints" is a worse outcome than letting the booking
+    # through (Salman's decision, 2026-09-25).
+    if catalog_service and source in PATIENT_FACING_SOURCES:
+        if getattr(catalog_service, "bookableBy", "patients") == "staff_only":
+            raise ValueError("This service can only be booked by the clinic. Please contact us directly.")
 
     # -- Working Hours ---------------------------------------------------------------------------
     # Resource's own working_hours takes priority when set; falls back to the tenant-wide

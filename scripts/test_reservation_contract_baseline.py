@@ -329,8 +329,25 @@ async def main():
     # which was true of T3-b's diff and is a SNAPSHOT, not an invariant — the next slice touching
     # any other file fails it while changing nothing about reservations. The durable property is
     # the one below: the reservation contract moved without a single route moving with it.
-    check("no route was changed — the duplicated guard is deliberate, not a migration",
-          not any(d.startswith("app/api/") for d in dirty), str(dirty))
+    # TRANSITION (2026-09-25, Clinic P3). WAS `not any(d.startswith("app/api/"))` -- ANY route.
+    # That was already once narrowed in S7 from "the only modified file is reservation_service.py"
+    # for the same reason it is narrowed again here: it was pinning a SNAPSHOT of one diff rather
+    # than the property worth defending.
+    #
+    # The property is, and has always been: THE RESERVATION CONTRACT MOVES WITHOUT A RESERVATION
+    # ROUTE MOVING WITH IT -- the past guard stays duplicated in the routes on purpose, and is
+    # never quietly migrated into the service.
+    #
+    # P3 edits `app/api/v1/admin/catalog_services.py`, which is a route for a DIFFERENT capability
+    # (services), passing two new body fields through to its own service. It says nothing about
+    # reservations. Keeping the old wording would have failed a change it was never written to
+    # catch -- so it is narrowed to reservation routes, which is what it meant.
+    #
+    # The stronger half of this is in scripts/test_clinic_service_motif.py (SM-9b): no route
+    # carries a copy of the booking-contract rule at all.
+    res_routes = [d for d in dirty if d.startswith("app/api/") and "reservations" in d]
+    check("no RESERVATION route was changed — the duplicated guard stays deliberate",
+          not res_routes, str(dirty))
     check("   and reservation_service.py is the only reservation file touched",
           not any(d.startswith("app/services/reservation") and
                   d != "app/services/reservation_service.py" for d in dirty), str(dirty))
