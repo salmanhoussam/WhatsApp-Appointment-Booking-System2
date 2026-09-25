@@ -1,0 +1,17 @@
+sealed 290 write methods · both guards proven
+
+── P3 · catalog_services ──
+  rows 38  (active 37)
+  bookable_by distribution : [('patients', 38)]
+  rows with instructions   : 0
+  column bookable_by   text  nullable=NO default='patients'::text
+  column instructions  text  nullable=YES default=None
+
+── P1 / P2 · untouched by P3 ──
+  customers rows           : 10
+  customers unique index   : PRESENT
+  reservations rows        : 66   (patient_id NULL on 66)
+  patients / patient_contacts : 0 / 0
+  indexes on reservations  : 9
+
+✅ PRODUCTION MATCHES THE GATE REPORT, read independently

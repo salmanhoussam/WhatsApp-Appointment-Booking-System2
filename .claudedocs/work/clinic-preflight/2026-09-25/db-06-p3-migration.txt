@@ -1,0 +1,22 @@
+1 statement(s), every one additive and reviewed:
+  · ALTER TABLE "public"."catalog_services" ADD COLUMN     "bookable_by" TEXT NOT NULL DEFAULT 'patients
+
+BEFORE · customers=10 · reservations=66 · catalog_services=38 · new columns=[]
+         customers unique index: CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+
+APPLYING …
+   1 statement(s) applied
+
+AFTER  · customers=10 · reservations=66 · catalog_services=38
+
+── EVIDENCE ──
+🔒 CUSTOMER untouched · rows 10 -> 10 : True
+🔒 CUSTOMER unique index identical                    : True
+   reservations rows 66 -> 66          : True
+   catalog_services rows 38 -> 38      : True
+   column bookable_by   text   nullable=NO default='patients'::text
+   column instructions  text   nullable=YES default=None
+   columns have the contracted shape                  : True
+   rows carrying anything but the default (0)        : True  (ZERO backfill)
+
+✅ P3 MIGRATION APPLIED — ADDITIVE, ZERO BEHAVIOURAL CHANGE, ZERO BACKFILL
