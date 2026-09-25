@@ -58,8 +58,11 @@ def _real_session(state="IDLE"):
 
 
 class FakeClient:
-    def __init__(self, slug="barberlab-test", name="Barber Lab"):
+    # `vertical` added 2026-09-25 (Clinic P1-A): `_vertical_allows_lia` reads it. "barber" is the
+    # MEASURED value of barberlab-test in production, not a convenient default.
+    def __init__(self, slug="barberlab-test", name="Barber Lab", vertical="barber"):
         self.id, self.slug, self.name = "client-1", slug, name
+        self.vertical = vertical
 
 
 def _svc(i, ar, en, dur=30):
@@ -202,8 +205,15 @@ async def main():
     # on ① Lia access as well as identity. `_tenant_has_lia` is stubbed True for every case that
     # expects a welcome, so these cases keep testing the greeting gate rather than the new
     # capability gate -- the capability gate has its own cases in `test_lia_foundation.py`.
+    # TRANSITION (2026-09-25, Clinic P1-A). WAS one stubbed gate; there are now two, and
+    # ①-a runs FIRST. Stubbed True here for the same stated reason ①-b already was: these cases
+    # test the GREETING gate, and the vertical fence has its own cases in test_lia_foundation.py
+    # (FG-1…FG-11). Without this stub the unstubbed fence reaches the real prisma client — which
+    # is exactly how this file found the change, and is the correct failure rather than a bug.
     orig_lia_access = lia._tenant_has_lia
+    orig_vertical = lia._vertical_allows_lia
     lia._tenant_has_lia = lambda cid: _done(True)
+    lia._vertical_allows_lia = lambda cid: _done(True)
     rec = Recorder()
     orig_resolve = lia._resolve_actor      # ONE seam: _resolve_owner delegates to it
     lia._resolve_actor = lambda p: _done(("client-1", "owner", "user-1", object(), "ok"))
@@ -268,6 +278,7 @@ async def main():
     finally:
         lia._resolve_actor = orig_resolve
         lia._tenant_has_lia = orig_lia_access
+        lia._vertical_allows_lia = orig_vertical
     check("owner «مرحبا» with NO Lia access -> no welcome, falls through",
           out is None and not rec.sent, f"out={out!r} sent={rec.sent}")
 

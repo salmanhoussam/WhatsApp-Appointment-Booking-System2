@@ -121,8 +121,14 @@ class FakeUser:
 
 
 class FakeClient:
-    def __init__(self, cid, phone=None, wa=None):
+    # TRANSITION (2026-09-25, Clinic P1-A). WAS three attributes. `vertical` was added because
+    # `_vertical_allows_lia` reads it, and a fake that lacks an attribute the real code reads is
+    # the "fake poorer than reality" failure that gives false negatives. The default is "barber"
+    # because that is the MEASURED value of every tenant these fixtures stand for (P0.5,
+    # 2026-09-25) -- not a convenient one.
+    def __init__(self, cid, phone=None, wa=None, vertical="barber"):
         self.id, self.phone, self.whatsapp_number = cid, phone, wa
+        self.vertical = vertical
 
 
 class FakeClientService:
@@ -148,6 +154,12 @@ class FakePrisma:
     class _ClientTable:
         def __init__(self, clients): self._c = clients
         async def find_many(self): return self._c
+
+        # Added 2026-09-25 (Clinic P1-A): `_vertical_allows_lia` reads one client by id.
+        # Returns None for an unknown id, exactly as Prisma does -- the fake must be able to
+        # express "no such tenant", or the None branch is untestable.
+        async def find_unique(self, where):
+            return next((c for c in self._c if c.id == where.get("id")), None)
 
     @property
     def client(self):
@@ -286,6 +298,56 @@ async def main():
     try:
         check("① fails when neither lia nor reservations is active",
               await lia._tenant_has_lia("no-keys") is False)
+    finally:
+        r()
+
+    # ── Clinic P1-A · ①-a, the vertical fence ────────────────────────────────
+    print("\n── P1-A. \u2460-a the vertical fence (Clinic Safety Fences, 2026-09-25) ──")
+    CLINIC, NOVERT, RESTO, GHOST = "clinic-x", "novert-x", "resto-x", "ghost-x"
+    # Every one of these four holds `reservations` ACTIVE. That is the point: the fence must
+    # refuse on the vertical ALONE, with the capability half satisfied, or it proves nothing.
+    FENCE_CLIENTS = [FakeClient(RK, "96176985477", "96176985477", vertical="barber"),
+                     FakeClient(CLINIC, vertical="clinic"),
+                     FakeClient(NOVERT, vertical=None),
+                     FakeClient(RESTO, vertical="restaurant")]
+    FENCE_ROWS = {RK: {"reservations": True}, CLINIC: {"reservations": True},
+                  NOVERT: {"reservations": True}, RESTO: {"reservations": True}}
+    r = install(rows=FENCE_ROWS, clients=FENCE_CLIENTS)
+    try:
+        check("FG-1  barber passes \u2460-a", await lia._vertical_allows_lia(RK) is True)
+        check("FG-2  clinic is REFUSED — with `reservations` active, so only the vertical decides",
+              await lia._vertical_allows_lia(CLINIC) is False)
+        check("FG-3  vertical IS NULL is refused (the state of 5 live tenants, measured 2026-09-25)",
+              await lia._vertical_allows_lia(NOVERT) is False)
+        check("FG-4  an unknown vertical is refused — allow-list, never deny-list",
+              await lia._vertical_allows_lia(RESTO) is False)
+        check("FG-4b a tenant that does not exist at all is refused, not crashed",
+              await lia._vertical_allows_lia(GHOST) is False)
+        check("FG-4c the allow-list itself holds exactly one member today",
+              lia._LIA_VERTICALS == frozenset({"barber"}), str(sorted(lia._LIA_VERTICALS)))
+        # \u2460-b must be INDIFFERENT to all of this, or the bridge was disturbed.
+        check("FG-5  \u2460-b still passes on every one of the four — the two gates are independent",
+              all([await lia._tenant_has_lia(c) for c in (RK, CLINIC, NOVERT, RESTO)]))
+        check("FG-5b and \u2460-b alone would have let the clinic through — which is why \u2460-a exists",
+              await lia._tenant_has_lia(CLINIC) is True
+              and await lia._vertical_allows_lia(CLINIC) is False)
+        # FG-10 — the WRITE-time re-check. `_resolve_actor` is patched the same way AC-4 does it.
+        o_resolve = lia._resolve_actor
+        lia._resolve_actor = lambda p: _done((CLINIC, "owner", "u-c", OWNER_BL, lia._R_OK))
+        try:
+            check("FG-10 _still_authorised refuses a clinic at WRITE time, by its own name",
+                  (await lia._still_authorised("961700", CLINIC)) == (False, "vertical_not_allowed"))
+        finally:
+            lia._resolve_actor = o_resolve
+        # And the backstop raises rather than returning, because reaching it means a bypass.
+        raised = False
+        try:
+            await lia._assert_lia_vertical(CLINIC)
+        except RuntimeError:
+            raised = True
+        check("FG-10b the write-site backstop RAISES on a clinic (a bypass is a bug, not a state)",
+              raised)
+        check("FG-10c and passes silently on a barber", await lia._assert_lia_vertical(RK) is None)
     finally:
         r()
 
@@ -582,6 +644,58 @@ async def main():
           entry.index("_resolve_actor") < entry.rindex("_tenant_has_lia"))
     check("_tenant_has_lia reads BOTH keys (the tolerant bridge, F0.3)",
           '"serviceKey": {"in": ["lia", "reservations"]}' in lia_src)
+
+    # ── Clinic P1-A · FG-6 / FG-7 / RG-e — the structural half ───────────────
+    #
+    # FG-6 is the ONE check that pays for Option B. Two separate functions mean a future fourth
+    # call site can add one and forget the other; this asserts the pairing and the order at every
+    # site that exists, by parsing the source rather than grepping it.
+    print("\n── P1-A. FG-6 pairing guard · FG-7 no fallback · RG-e bridge untouched ──")
+    _tree = ast.parse(lia_src)
+    _sites = {}
+    for _n in ast.walk(_tree):
+        if isinstance(_n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _src = ast.unparse(_n)
+            if "_tenant_has_lia(" in _src and _n.name != "_tenant_has_lia":
+                _sites[_n.name] = _src
+    check("FG-6  \u2460-b is called from exactly three places",
+          sorted(_sites) == ["_still_authorised", "try_handle"] or len(_sites) == 2,
+          str(sorted(_sites)))
+    check("FG-6  every one of them also calls \u2460-a",
+          all("_vertical_allows_lia(" in v for v in _sites.values()), str(sorted(_sites)))
+    # try_handle holds two of the three sites (welcome, data-entry); each is checked on its own
+    # branch, because a whole-function index would prove nothing about either.
+    _welcome = code_of_branch(P, "try_handle", "_looks_like_greeting")
+    _still = code_of_function(P, "_still_authorised")
+    check("FG-6  welcome: \u2460-a precedes \u2460-b",
+          _welcome.index("_vertical_allows_lia") < _welcome.index("_tenant_has_lia"))
+    check("FG-6  data-entry: \u2460-a precedes \u2460-b",
+          entry.rindex("_vertical_allows_lia") < entry.rindex("_tenant_has_lia"))
+    check("FG-6  _still_authorised: \u2460-a precedes \u2460-b",
+          _still.index("_vertical_allows_lia") < _still.index("_tenant_has_lia"))
+    check("FG-7  no fallback anywhere: the fence never resolves to barber when it refuses",
+          "_LIA_VERTICALS" in lia_src
+          and 'vertical", None) in _LIA_VERTICALS' in lia_src
+          and "or \"barber\"" not in lia_src and "else \"barber\"" not in lia_src)
+    check("FG-7  the allow-list is a frozenset literal in code, not a DB read or a config value",
+          "_LIA_VERTICALS = frozenset({\"barber\"})" in lia_src)
+    check("FG-8  the refusal has its OWN key and is sent on the data-entry path only",
+          "lia_vertical_unavailable" in lia._REQUIRED_REPLIES
+          # ast.unparse normalises string quotes, so the needle is the SINGLE-quoted form.
+          and "_REPLIES['lia_vertical_unavailable']" in entry
+          and "lia_vertical_unavailable" not in _welcome)
+    check("FG-9  the welcome stays SILENT on a refused vertical (falls through, sends nothing)",
+          _welcome.count("send_text") == 0 and "_vertical_allows_lia" in _welcome)
+    check("FG-11 the data-entry refusal is audited under its own event type",
+          "lia_vertical_not_allowed" in entry)
+    # RG-e — the whole reason Option B was chosen over renaming.
+    # Read from the RAW source for the bridge literal (lia_src), and from the unparsed body for
+    # the absence check -- the raw file is where the exact characters live.
+    check("RG-e  _tenant_has_lia is untouched: the bridge literal is intact and ①-a is absent",
+          code_of_function(P, "_tenant_has_lia").count("_vertical_allows_lia") == 0
+          and '"serviceKey": {"in": ["lia", "reservations"]}' in lia_src)
+    check("RG-e  and \u2460-a knows nothing about capabilities — the separation is real",
+          "clientservice" not in code_of_function(P, "_vertical_allows_lia"))
 
     # ── AC-10 · no regression ────────────────────────────────────────────────
     print("\n── AC-10. no regression ──")

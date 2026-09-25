@@ -566,6 +566,56 @@ async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str
 
 # ── ① Lia access, and ② operation capability — two checks, never one ─────────
 
+# Clinic P1-A (2026-09-25). ALLOW-LIST, never a deny-list, and Salman's reason is the one that
+# matters: a deny-list "falls silently open" for every vertical added after it, so the defect
+# would only surface AFTER the first real tenant of that vertical existed — with rows already
+# written under the wrong moduleKey. An allow-list fails closed for anything it has not heard of.
+#
+# `barber` is the only member because it is the only vertical Lia is BUILT for: every write she
+# performs is hardcoded `module_key="barber"` (_try_write_reservation, _commit_daily_log below).
+# A clinic tenant reaching Lia today would silently receive barber reservations inside a clinic.
+#
+# Adding a member is a CODE change with a stated Intent in the commit body
+# (rules/repository-hygiene.md, Persona & Prompt Drift) — never a tenant-side toggle, never a
+# runtime value. Measured 2026-09-25 before this shipped: all six active `lia`/`reservations`
+# rows in production belong to `vertical='barber'` tenants, so this fence removes access from
+# nobody (.claudedocs/work/clinic-preflight/2026-09-25/evidence.md, appendix P1-G).
+_LIA_VERTICALS = frozenset({"barber"})
+
+
+async def _vertical_allows_lia(client_id: str) -> bool:
+    ''' ①-a — is this tenant's vertical one Lia is built for?
+
+    DELIBERATELY SEPARATE FROM `_tenant_has_lia`, and the separation is the whole design
+    (Salman's decision, 2026-09-25, Option B). That function carries the live `lia OR
+    reservations` migration bridge, and production proves the bridge is load-bearing: `mr-h` and
+    `alzabt-demo` hold `reservations` with NO `lia` row. Folding the vertical into it would mean
+    opening it — and the cleanest guarantee that the bridge is not disturbed is that this change
+    never touches it at all.
+
+    Reads only `Client.vertical`. Knows nothing about capabilities, by design.
+
+    `vertical IS NULL` returns False, and that is correct rather than incidental: an unassigned
+    vertical is not a barbershop, and Lia's every write assumes one.
+    '''
+    client = await prisma_client.client.find_unique(where={"id": client_id})
+    return bool(client) and (getattr(client, "vertical", None) in _LIA_VERTICALS)
+
+
+async def _assert_lia_vertical(client_id: str) -> None:
+    ''' Structural backstop at a Lia WRITE site. Never the primary gate.
+
+    The primary gate is ①-a at the three entry points; `_still_authorised` re-asks it at write
+    time. This exists for a FOURTH path that does not exist yet: the same shape
+    `create_reservation` documents for itself — "provisioning prevents the state and the runtime
+    detects it anyway". Raising (not returning) is deliberate: reaching here means a gate was
+    bypassed, which is a bug, not a user-facing condition.
+    '''
+    if not await _vertical_allows_lia(client_id):
+        raise RuntimeError(
+            f"Lia write blocked: tenant {client_id} vertical is not in {sorted(_LIA_VERTICALS)}")
+
+
 async def _tenant_has_lia(client_id: str) -> bool:
     """① — may this tenant reach Lia AT ALL. F0.3, the deliberately tolerant gate.
 
@@ -799,6 +849,10 @@ _REQUIRED_REPLIES = ("cancel", "confirm_nudge", "edit_unclear", "edit_unavailabl
                      "reservation_dup_notice", "reservation_dup_conflict",
                      "reservation_dup_ask_name",
                      "reservations_inactive", "walkin_label",
+                     # Clinic P1-A, 2026-09-25, approved verbatim by Salman. ①-a's own refusal:
+                     # the vertical fence, NOT the capability one, so it must not borrow
+                     # `reservations_inactive`'s sentence.
+                     "lia_vertical_unavailable",
                      # 2026-09-19. Cancel and expiry, PER OPERATION. The single `cancel` text was
                      # written for a service («الاسم والسعر والمدة») and reached an owner who had
                      # just cancelled an APPOINTMENT -- the 5th "text written for one context
@@ -2751,6 +2805,8 @@ async def _try_write_reservation(client_id: str, validated, item: dict, status: 
     condition on T5-6 was that `{reason}` stay a controlled message and never a raw error.
     """
     from app.services import reservation_service
+    # Clinic P1-A backstop. `module_key="barber"` below is the reason it exists.
+    await _assert_lia_vertical(client_id)
     past = _is_past(validated.reserved_at)
     when = validated.reserved_at.replace(tzinfo=timezone.utc)
     try:
@@ -2816,6 +2872,10 @@ async def _still_authorised(phone: str, client_id: Optional[str], op=None) -> tu
         return False, ("not_authorised_now" if reason == _R_UNRESOLVED else reason)
     if resolved != client_id:
         return False, "tenant_changed"
+    # Clinic P1-A: ①-a BEFORE ①-b, the same order as both entry points. A write is the last
+    # place a bypassed fence would still be catchable.
+    if not await _vertical_allows_lia(client_id):
+        return False, "vertical_not_allowed"
     if not await _tenant_has_lia(client_id):
         return False, "lia_access_inactive"
     if op is None:
@@ -3774,6 +3834,8 @@ async def _commit_daily_log(wa, phone: str, draft: dict, op, actor, actor_id) ->
     from app.schemas.lia_drafts import WALK_IN_PHONE
     from app.services import reservation_service
     client_id, barber_id = draft["client_id"], draft["barber_id"]
+    # Clinic P1-A backstop, once per commit. `module_key="barber"` below is the reason it exists.
+    await _assert_lia_vertical(client_id)
     currency = draft.get("currency") or ""
     items = draft.get("items") or []
     placements = await _place_daily_items(client_id, barber_id, draft)
@@ -4616,6 +4678,14 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
         # first instruction. A greeting that cannot be honoured is a promise not kept. He now falls
         # through to the customer flow -- the same treatment any other sender gets on that tenant,
         # and no new wording is invented to say it.
+        # Clinic P1-A: ①-a first. SAME TREATMENT as ①-b below — fall through to the customer
+        # flow, silently. No new wording is invented here for exactly the reason the comment
+        # above gives: a greeting that cannot be honoured is a promise not kept, and the honest
+        # response is to hand this sender to the flow that CAN serve them.
+        if not await _vertical_allows_lia(client_id):
+            logger.info("🚪 Lia: welcome suppressed for %s — tenant %s vertical not in %s",
+                        sender_phone, client_id, sorted(_LIA_VERTICALS))
+            return None
         if not await _tenant_has_lia(client_id):
             logger.info("🚪 Lia: welcome suppressed for %s — tenant %s has no Lia access",
                         sender_phone, client_id)
@@ -4693,6 +4763,19 @@ async def try_handle(wa, sender_phone: str, session, msg_type: str, value: str,
 
     # From here on a draft will exist, so a session is needed -- and only from here on.
     session = await ensure_session()
+
+    # ①-a -- Clinic P1-A. Its own text, because ①-b's sentence would be a LIE here: a clinic
+    # may hold `reservations` perfectly active, so "خدمة الحجوزات مش مفعّلة" would name a cause
+    # that is not the cause. `rules/text-context-rule.md` in one line.
+    if not await _vertical_allows_lia(client_id):
+        await log_security_event(
+            event_type="lia_vertical_not_allowed", client_id=client_id, endpoint=_ENDPOINT,
+            detail={"sender_phone": sender_phone, "text_preview": (value or "")[:80],
+                    "allowed": sorted(_LIA_VERTICALS)},
+        )
+        logger.warning("🚫 Lia: data-entry refused — tenant %s vertical not allowed", client_id)
+        await wa.send_text(sender_phone, _REPLIES["lia_vertical_unavailable"])
+        return session
 
     # ① -- may this tenant reach Lia at all.
     if not await _tenant_has_lia(client_id):
