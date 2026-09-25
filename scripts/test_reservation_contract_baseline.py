@@ -52,7 +52,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.services import reservation_service as rs                    # noqa: E402
 from test_lia_reservation_t1 import (                                 # noqa: E402
     WORKING_HOURS, book, check as _t1_check,
+    install as _t1_install, Row as _Row, CLIENT as _CLIENT,
+    BARBER as _BARBER, SERVICE as _SERVICE,
 )
+from app.repositories import resource_repo as _resource_repo          # noqa: E402
+from prisma.errors import UniqueViolationError as _UVE                # noqa: E402
 
 ok = True
 
@@ -238,7 +242,72 @@ async def main():
     check("   status is pending for both past and future",
           prisma.reservation.created[0]["status"] == "pending")
 
-    print("\n── 5. INVARIANT — T3-b touched the SERVICE and nothing else in app/ ──")
+    # ── Clinic P1-B / F4 — the message a losing INSERT produces ─────────────
+    #
+    # WHY THIS EXISTS: P1-B adds a second partial unique index, on resource_id. From that moment
+    # the UniqueViolationError handler can no longer assume the collision came from the barber
+    # index -- and the sentence it raises is not internal. public/reservations.py turns this
+    # ValueError into a 409 whose `detail` IS this string, on a PUBLIC route, so a clinic patient
+    # would read that a BARBER is busy. The defect is CREATED by the index, so it is pinned here
+    # in the same change rather than filed as a follow-up.
+    print("\n── 5. Clinic P1-B / F4 — the conflict message follows the path that collided ──")
+
+    class _RaisingRepo:
+        """Every read the pipeline needs, and a create() that loses the race.
+
+        `UniqueViolationError` is instantiated via __new__ deliberately: its real constructor
+        takes a Prisma error payload, and inventing one would be a fake richer than the thing it
+        stands for. The handler branches on TYPE, never on the payload.
+        """
+        def __init__(self, _client): pass
+        async def find_overlapping(self, *a, **k): return []
+        async def find_overlapping_by_resource(self, *a, **k): return []
+        async def find_overlapping_by_barber(self, *a, **k): return []
+        async def create(self, data): raise _UVE.__new__(_UVE)
+
+    async def _collide(module_key, metadata, resource_active=True):
+        prisma, sends, restore = _t1_install()
+        o_repo, o_find = rs.ReservationRepository, _resource_repo.find_resource
+        rs.ReservationRepository = _RaisingRepo
+        _resource_repo.find_resource = lambda cid, rid: _done_res(rid, cid, resource_active)
+        try:
+            await rs.create_reservation(
+                client_id=_CLIENT, module_key=module_key, customer_name="أحمد",
+                customer_phone="96170123456",
+                reserved_at=(now_local + timedelta(days=2)).replace(hour=11, minute=0,
+                                                                    second=0, microsecond=0),
+                duration_min=30, notes=None, metadata=metadata, source="website",
+                enforce_working_hours=False, notify_merchant=False)
+            return None
+        except ValueError as exc:
+            return str(exc)
+        finally:
+            rs.ReservationRepository, _resource_repo.find_resource = o_repo, o_find
+            restore()
+
+    def _done_res(rid, cid, active):
+        f = asyncio.get_event_loop().create_future()
+        f.set_result(_Row(id=rid, clientId=cid, name="Dr. X", isActive=active,
+                          workingHours=None, type="doctor"))
+        return f
+
+    clinic_msg = await _collide("clinic", {"resource_id": "res-1"})
+    barber_msg = await _collide("barber", {"barber_id": _BARBER, "service_id": _SERVICE})
+    check("RX-1  a resource collision says RESOURCE, not barber",
+          clinic_msg == "This resource is already booked for that time. "
+                        "Please choose a different time.", str(clinic_msg))
+    check("RX-2  INVARIANT — a barber collision is byte-identical to today's message",
+          barber_msg == "This barber is already booked for that time. "
+                        "Please choose a different time.", str(barber_msg))
+    check("RX-3  and the two are genuinely different sentences",
+          clinic_msg != barber_msg)
+    # The pre-check above the INSERT already had both sentences; the handler now mirrors it.
+    _svc_src = open("app/services/reservation_service.py", encoding="utf-8").read()
+    check("RX-4  each sentence appears TWICE — once in the pre-check, once in the handler",
+          _svc_src.count("This resource is already booked for that time.") == 2
+          and _svc_src.count("This barber is already booked for that time.") == 2)
+
+    print("\n── 6. INVARIANT — T3-b touched the SERVICE and nothing else in app/ ──")
     import subprocess
     dirty = [ln[3:] for ln in subprocess.run(["git", "status", "--porcelain", "app/"],
                                              capture_output=True, text=True).stdout.splitlines()]

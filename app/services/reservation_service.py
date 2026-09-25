@@ -585,9 +585,24 @@ async def create_reservation(
     # closes). Scoped to the "barber" path only, matching Study 6's own finding -- the
     # resource-backed "clinic" path has the same theoretical race, deliberately left out of this
     # phase's scope (see the migration file's own comment).
+    #
+    # Clinic P1-B / F4 (2026-09-25). The resource-backed path now has its OWN partial unique index
+    # (reservations_active_resource_slot_uidx), so this handler can no longer assume the violation
+    # came from the barber one -- and the message it raises reaches a real person: public/
+    # reservations.py turns this ValueError into a 409 whose `detail` is this exact sentence, on a
+    # PUBLIC route. Without the branch below, a CLINIC patient would be told that a BARBER is
+    # busy. That is `.claude/rules/text-context-rule.md` exactly, and it is created BY the new
+    # index, so it is fixed in the same change rather than filed as a follow-up.
+    #
+    # Both sentences are copied CHARACTER FOR CHARACTER from the pre-checks above, for the reason
+    # this handler already documented for the barber case: one consistent behaviour whether the
+    # conflict was caught early (common) or only at the database (the race). No new text is
+    # invented here.
     try:
         reservation = await repo.create(create_data)
     except UniqueViolationError:
+        if resource:
+            raise ValueError("This resource is already booked for that time. Please choose a different time.")
         raise ValueError("This barber is already booked for that time. Please choose a different time.")
 
     # -- Post Actions --------------------------------------------------------------------------
