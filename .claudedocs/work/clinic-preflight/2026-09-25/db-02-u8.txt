@@ -1,0 +1,47 @@
+sealed 276 write methods · both guards proven by real attempts
+
+── THE TWO ROWS — every field ────────────────────────────────────────────
+   · id           1dcf46a5-7822-4c6f-827d-018f5cfc4d09
+     tenant       rk  (7ef5c8c9-3d47-4aa9-b5e0-43b746ee2657)
+     name         'Dr. Faisal'
+     type         'doctor'
+     specialty    'Dentist'
+     phone        None
+     isActive     False
+     sortOrder    0
+     workingHours {'open_time': '09:00', 'close_time': '17:00', 'closed_days': ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday']}
+     createdAt    2026-07-30T15:20:40.402000+00:00
+     updatedAt    2026-07-30T16:06:42.418000+00:00
+     changed after creation? YES
+
+   · id           72eb89b3-22b5-474d-8adf-37a24c162b66
+     tenant       rk  (7ef5c8c9-3d47-4aa9-b5e0-43b746ee2657)
+     name         'Dr. Sara'
+     type         'doctor'
+     specialty    'Orthodontist'
+     phone        None
+     isActive     False
+     sortOrder    0
+     workingHours {'open_time': '09:00', 'close_time': '12:00', 'closed_days': ['friday', 'saturday', 'sunday']}
+     createdAt    2026-07-30T15:20:54.490000+00:00
+     updatedAt    2026-07-30T16:06:49.059000+00:00
+     changed after creation? YES
+
+
+── ANY Reservation referencing them — ever, any status ───────────────────
+   · 'Dr. Faisal': 0 reservation(s)
+   · 'Dr. Sara': 0 reservation(s)
+
+── WHAT ELSE was created on that tenant around the same time ─────────────
+   window: 2026-07-30T03:20:40.402000+00:00 .. 2026-07-31T03:20:54.490000+00:00  (tenant of the rows)
+   · Barber: 0
+   · CatalogService: 0
+   · Reservation: 0
+   · Customer: 0
+   · User: 0
+
+── SecurityAuditLog around that window ───────────────────────────────────
+   0 row(s)
+
+── EARLIEST rows on that tenant, for reference ───────────────────────────
+   Client rk createdAt = 2026-07-23T13:42:26.451000+00:00

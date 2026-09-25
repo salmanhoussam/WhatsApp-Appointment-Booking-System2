@@ -1,0 +1,19 @@
+sealed 276 write methods · both guards proven by real attempts
+
+THE STATEMENT, verbatim:
+  SELECT c.slug, c.vertical, cs.service_key, cs.is_active
+  FROM clients c
+  JOIN client_services cs ON cs.client_id = c.id
+  WHERE cs.service_key IN ('lia','reservations')
+    AND cs.is_active = true
+
+6 row(s)
+
+  slug               vertical   service_key    is_active
+  --------------------------------------------------------
+  alzabt-demo        barber     reservations   True
+  barberlab-test     barber     lia            True
+  barberlab-test     barber     reservations   True
+  mr-h               barber     reservations   True
+  rk                 barber     lia            True
+  rk                 barber     reservations   True

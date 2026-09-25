@@ -1,0 +1,104 @@
+sealed 276 write methods · seal proven by a real write attempt
+SELECT-only guard on query_raw proven by a real non-SELECT attempt
+
+── TENANTS ───────────────────────────────────────────────────────────────
+   9 client row(s)
+   · alzabt-demo            vertical=barber   status=active
+   · arizona                vertical=None     status=active
+   · barberlab-test         vertical=barber   status=active
+   · beit-al-fakhar         vertical=None     status=active
+   · caracas                vertical=None     status=active
+   · footlab                vertical=None     status=active
+   · mr-h                   vertical=barber   status=active
+   · rk                     vertical=barber   status=active
+   · smar                   vertical=None     status=active
+
+── CUSTOMER ──────────────────────────────────────────────────────────────
+   TOTAL rows: 10
+   · barberlab-test         6
+   · rk                     4
+   rows with NO name: 0
+   rows with phone == 'WALK_IN': 2
+      · barberlab-test · id=dade1bdd-9091-4f44-b4ca-87fef91014e4 · name='أحمد'
+      · rk · id=385d4f70-e61c-41b5-b31e-d47c76409810 · name='علي'
+
+── RESERVATION ───────────────────────────────────────────────────────────
+   TOTAL rows: 66
+   module_key distribution: {'barber': 66}
+   status distribution:     {'pending': 35, 'cancelled': 15, 'confirmed': 8, 'arrived': 8}
+   source distribution:     {'None': 42, 'whatsapp': 9, 'website': 2, 'lia': 13}
+   module_key == 'clinic':  0
+   rows with resourceId set: 0
+   rows with barberId set:   66
+   rows with serviceId set:  58
+   rows with customerId set: 26
+   rows with customerId NULL:40
+   rows with customerPhone == 'WALK_IN': 12
+   · rk                     32
+   · barberlab-test         22
+   · mr-h                   11
+   · alzabt-demo            1
+
+── PATIENT MIGRATION IMPACT — one phone, how many names? ─────────────────
+   customers linked to >=1 reservation: 10
+   customers whose reservations carry MORE THAN ONE folded name: 3
+      · rk · customer=ca19e12b · stored_name='Salman Houssam' · names_used=['Adel', 'Salman Houssam', 'houssam salman']
+      · barberlab-test · customer=ba34c0df · stored_name='ks amk' · names_used=['Mark Markel', 'ks amk']
+      · barberlab-test · customer=dade1bdd · stored_name='أحمد' · names_used=['أحمد', 'بلال', 'زياد', 'علي', 'علي زيان', 'محمد', 'محمد الحسن']
+   customers with MORE THAN ONE reservation: 5
+
+── PATIENT MIGRATION IMPACT — duplicate customer names inside one tenant ─
+   (an empty list above means no tenant has two customers sharing a folded name)
+
+── RESOURCE ──────────────────────────────────────────────────────────────
+   TOTAL rows: 2
+   type values in use: {'doctor': 2}
+   · rk · 'Dr. Faisal' type=doctor active=False hours=set
+   · rk · 'Dr. Sara' type=doctor active=False hours=set
+
+── BARBER (comparison only) ──────────────────────────────────────────────
+   TOTAL rows: 8  · active: 8
+   with own workingHours: 8
+
+── CATALOG SERVICE ───────────────────────────────────────────────────────
+   TOTAL rows: 38 · active: 37
+   durationMin distribution: {15: 5, 20: 7, 25: 1, 30: 13, 40: 2, 45: 5, 60: 1, 75: 1, 90: 3}
+   BarberService link rows: 41
+
+── WHATSAPP CONVERSATION ─────────────────────────────────────────────────
+   TOTAL rows: 8
+   with customerId set:  0
+   with customerId NULL: 8
+
+── INDEXES on reservations / customers / resources / patients ────────────
+   · customers      customers_client_id_idx
+       CREATE INDEX customers_client_id_idx ON public.customers USING btree (client_id)
+   · customers      customers_client_id_phone_key
+       CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+   · customers      customers_phone_idx
+       CREATE INDEX customers_phone_idx ON public.customers USING btree (phone)
+   · customers      customers_pkey
+       CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)
+   · reservations   reservations_active_barber_slot_uidx
+       CREATE UNIQUE INDEX reservations_active_barber_slot_uidx ON public.reservations USING btree (client_id, barber_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (barber_id IS NOT NULL))
+   · reservations   reservations_client_id_barber_id_reserved_at_idx
+       CREATE INDEX reservations_client_id_barber_id_reserved_at_idx ON public.reservations USING btree (client_id, barber_id, reserved_at)
+   · reservations   reservations_client_id_customer_id_idx
+       CREATE INDEX reservations_client_id_customer_id_idx ON public.reservations USING btree (client_id, customer_id)
+   · reservations   reservations_client_id_module_key_reserved_at_idx
+       CREATE INDEX reservations_client_id_module_key_reserved_at_idx ON public.reservations USING btree (client_id, module_key, reserved_at)
+   · reservations   reservations_client_id_resource_id_reserved_at_idx
+       CREATE INDEX reservations_client_id_resource_id_reserved_at_idx ON public.reservations USING btree (client_id, resource_id, reserved_at)
+   · reservations   reservations_client_id_status_idx
+       CREATE INDEX reservations_client_id_status_idx ON public.reservations USING btree (client_id, status)
+   · reservations   reservations_pkey
+       CREATE UNIQUE INDEX reservations_pkey ON public.reservations USING btree (id)
+   · resources      resources_client_id_is_active_idx
+       CREATE INDEX resources_client_id_is_active_idx ON public.resources USING btree (client_id, is_active)
+   · resources      resources_client_id_type_idx
+       CREATE INDEX resources_client_id_type_idx ON public.resources USING btree (client_id, type)
+   · resources      resources_pkey
+       CREATE UNIQUE INDEX resources_pkey ON public.resources USING btree (id)
+
+── SEAL — final state ────────────────────────────────────────────────────
+   write attempts intercepted during the read: 0 []

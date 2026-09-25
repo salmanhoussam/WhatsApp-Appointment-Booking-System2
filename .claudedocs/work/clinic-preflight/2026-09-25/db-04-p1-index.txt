@@ -1,0 +1,39 @@
+THE STATEMENT, read from the migration file:
+  CREATE UNIQUE INDEX IF NOT EXISTS reservations_active_resource_slot_uidx
+  ON reservations (client_id, resource_id, reserved_at)
+  WHERE status IN ('pending', 'confirmed', 'arrived') AND resource_id IS NOT NULL
+
+BEFORE · 7 index(es) on reservations · reservations rows = 66
+         reservations_active_resource_slot_uidx present? False
+
+APPLYING …
+
+AFTER  · 8 index(es) · reservations rows = 66
+
+── EVIDENCE ──
+IX-1  reservations_active_resource_slot_uidx exists : True
+      def: CREATE UNIQUE INDEX reservations_active_resource_slot_uidx ON public.reservations USING btree (client_id, resource_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (resource_id IS NOT NULL))
+IX-2  reservations_active_barber_slot_uidx unchanged : True
+      def: CREATE UNIQUE INDEX reservations_active_barber_slot_uidx ON public.reservations USING btree (client_id, barber_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (barber_id IS NOT NULL))
+DATA  reservations rows before/after : 66 / 66 (UNCHANGED)
+DIFF  added=['reservations_active_resource_slot_uidx'] removed=[] changed=[]
+
+── every index on reservations, after ──
+  · reservations_active_barber_slot_uidx
+      CREATE UNIQUE INDEX reservations_active_barber_slot_uidx ON public.reservations USING btree (client_id, barber_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (barber_id IS NOT NULL))
+  · reservations_active_resource_slot_uidx
+      CREATE UNIQUE INDEX reservations_active_resource_slot_uidx ON public.reservations USING btree (client_id, resource_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (resource_id IS NOT NULL))
+  · reservations_client_id_barber_id_reserved_at_idx
+      CREATE INDEX reservations_client_id_barber_id_reserved_at_idx ON public.reservations USING btree (client_id, barber_id, reserved_at)
+  · reservations_client_id_customer_id_idx
+      CREATE INDEX reservations_client_id_customer_id_idx ON public.reservations USING btree (client_id, customer_id)
+  · reservations_client_id_module_key_reserved_at_idx
+      CREATE INDEX reservations_client_id_module_key_reserved_at_idx ON public.reservations USING btree (client_id, module_key, reserved_at)
+  · reservations_client_id_resource_id_reserved_at_idx
+      CREATE INDEX reservations_client_id_resource_id_reserved_at_idx ON public.reservations USING btree (client_id, resource_id, reserved_at)
+  · reservations_client_id_status_idx
+      CREATE INDEX reservations_client_id_status_idx ON public.reservations USING btree (client_id, status)
+  · reservations_pkey
+      CREATE UNIQUE INDEX reservations_pkey ON public.reservations USING btree (id)
+
+✅ P1-B APPLIED AND PROVEN STRUCTURALLY
