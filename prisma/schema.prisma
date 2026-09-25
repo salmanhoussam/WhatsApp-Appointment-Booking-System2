@@ -75,6 +75,9 @@ model Client {
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations          Reservation[]
   resources             Resource[]
+  // -- Clinic P2 (Patient Identity Foundation, 2026-09-25) -------------------
+  patients              Patient[]
+  patientContacts       PatientContact[]
   barbers               Barber[]
   // -- WhatsApp channel (2026-09-11, Implementation Gate 1) -------------------
   // Tenant identity on this channel lives on the CONVERSATION, never on the number.
@@ -337,6 +340,13 @@ model Customer {
   // takes -- which is what lets the Customer Registry join instead of matching phone strings.
   storeOrders          StoreOrder[]
   WhatsAppConversation WhatsAppConversation[]
+
+  // Clinic P2 (2026-09-25). A Customer is a CONTACT -- a number that can be reached. The people
+  // an appointment is FOR are Patients, linked through here. This is the ONLY change to this
+  // model, it is a back-relation with no column, and `@@unique([clientId, phone])` below is
+  // deliberately untouched: P2 builds a Patient layer ON TOP of the current reality and does not
+  // migrate it (Salman, 2026-09-25).
+  patientContacts PatientContact[]
 
   @@unique([clientId, phone])
   @@index([clientId])
@@ -804,6 +814,22 @@ model Reservation {
   customerId String?   @map("customer_id") @db.Uuid
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
+  /// WHO the appointment is FOR (Clinic P2, 2026-09-25) -- as distinct from `customerId`, which
+  /// is now understood as WHO IS CONTACTED about it. For a barber row the two are the same
+  /// person and this stays NULL forever; for a clinic row it is the patient, who may have no
+  /// phone of their own.
+  ///
+  /// Nullable, and every one of the 66 rows that existed when this column was added is correctly
+  /// NULL -- measured, not assumed (.claudedocs/work/clinic-preflight/2026-09-25/evidence.md).
+  /// There is NO backfill, by contract: a Customer row created by the barber flow must never
+  /// silently become a Patient, because one phone in production already carries reservations
+  /// under seven different names.
+  ///
+  /// onDelete: SetNull, the same convention as customerId/barberId/resourceId/serviceId on this
+  /// exact model -- deleting an entity must never erase the history of a booking.
+  patientId String?  @map("patient_id") @db.Uuid
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
   /// Which channel created this reservation: "whatsapp" | "website" | "admin".
   ///
   /// Gate 1 step 6 (2026-09-11). Until now the only trace of channel was a free-text prefix in
@@ -828,6 +854,7 @@ model Reservation {
   @@index([clientId, resourceId, reservedAt])
   @@index([clientId, barberId, reservedAt])
   @@index([clientId, customerId])
+  @@index([clientId, patientId])
   @@map("reservations")
   @@schema("public")
 }
@@ -865,6 +892,83 @@ model Resource {
   @@index([clientId, type])
   @@index([clientId, isActive])
   @@map("resources")
+  @@schema("public")
+}
+
+// ── Clinic P2 · Patient Identity Foundation (2026-09-25) ──────────────────────
+//
+// THE DEFECT THIS EXISTS TO FIX IS LIVE, NOT HYPOTHETICAL. Measured on production 2026-09-25:
+// three of ten `Customer` rows carry reservations under MORE THAN ONE name. One of them (a
+// `WALK_IN` row) holds SEVEN people; two others are REAL phone numbers holding five names
+// between them. In a barbershop that is untidy. In a clinic it is a medical history attached to
+// the wrong person.
+//
+//     Customer  =  a CONTACT. A number that can be reached. Unchanged by P2.
+//     Patient   =  the person an appointment is FOR, and the future owner of a record.
+//
+// Patient identity is NOT a demographic profile (Salman's ruling, 2026-09-25): this model
+// answers two questions only -- who is the patient, and who is contacted about them. There is
+// deliberately no date_of_birth, no gender, no national id. An empty column is not free; it is a
+// claim in the schema that the system knows something it does not.
+//
+// AND THERE IS NO CLINICAL COLUMN HERE, EVER, without its own decision. Clinic v1 stores booking
+// and operational data only (the Medical Data Boundary Contract, plan §2 C5) -- no diagnosis,
+// symptoms, treatment notes, prescriptions, lab results or assessment. That boundary is enforced
+// as a real check (MD-1 in scripts/test_clinic_patient_identity.py), not as an intention.
+model Patient {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  /// Matching two spellings of one name is done in the SERVICE layer with Arabic folding, never
+  /// in SQL -- Postgres does not fold «أحمد» and «احمد» the way this codebase does, and a half
+  /// match in the database would be worse than none.
+  name      String   @map("name")
+  /// Deactivated, never deleted -- this project's convention everywhere else, and the only safe
+  /// one for a row that will later own a medical record.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contacts     PatientContact[]
+  reservations Reservation[]
+
+  @@index([clientId])
+  @@index([clientId, isActive])
+  @@map("patients")
+  @@schema("public")
+}
+
+/// The many-to-many between a Patient and the Contacts responsible for them.
+///
+/// Both directions are real and required (Salman, 2026-09-25): one Contact may be responsible
+/// for several Patients -- a mother booking for two children -- AND one Patient may be reachable
+/// through several Contacts, such as a child with two guardians, or an adult on two numbers. A
+/// Patient with NO row here is also valid: the walk-in who arrived without a number.
+model PatientContact {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// A REAL foreign key, deliberately. `BarberService.clientId` carries no FK at all -- a known
+  /// defect in this schema that lets one tenant's id sit silently on another tenant's row. It is
+  /// not fixed here (that is Barber's, and out of P2's scope) but it is NOT inherited either.
+  clientId   String   @map("client_id") @db.Uuid
+  patientId  String   @map("patient_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  /// "self" | "guardian" | "other" -- three, because three is what real cases have shown. No
+  /// "parent"/"spouse" without a proven need. String with documented values, not a database
+  /// enum, matching this schema's own convention (Reservation.source, Resource.type, vertical).
+  role       String   @default("self") @map("role")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// Cascade on both sides, unlike Reservation's SetNull: a LINK without one of its two ends is
+  /// not history, it is a dangling row. The history lives on Reservation, which keeps its own
+  /// name/phone snapshot regardless.
+  patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, customerId])
+  @@index([clientId])
+  @@index([customerId])
+  @@map("patient_contacts")
   @@schema("public")
 }
 

@@ -116,13 +116,22 @@ async def main():
     # date alone still never implies attendance — `test_lia_reservation_t1.py:18` pins that, and
     # T5 does not touch it; only an explicit visit verb earns `arrived`, and Lia decides that,
     # not this signature.
-    check("T3-b/T3-c/T5 added exactly four, at the end (was: three, and before that ten "
-          "parameters with none)",
-          names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours", "status"],
+    # TRANSITION (2026-09-25, Clinic P2). WAS FOUR: allow_past, notify_merchant,
+    # enforce_working_hours, status. `patient_id` is the fifth, and it is a different KIND of
+    # addition from the four before it: those change how an existing reservation behaves, while
+    # this one names a person the row previously could not name at all -- WHO the appointment is
+    # FOR, as distinct from `customer_phone`, which is who gets contacted about it. Measured
+    # reason (P0.5, 2026-09-25): three of ten real Customer rows already carry reservations
+    # under more than one name, one of them seven. Default None, and no caller in app/ passes
+    # it yet, so every existing caller stays byte-for-byte identical.
+    check("T3-b/T3-c/T5/P2 added exactly five, at the end (was: four, then three, then none)",
+          names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours", "status",
+                         "patient_id"],
           str(names[10:]))
     kinds = {n: sig.parameters[n].kind
-             for n in ("allow_past", "notify_merchant", "enforce_working_hours", "status")}
-    check("   and both are KEYWORD-ONLY — no positional call can land on them by accident",
+             for n in ("allow_past", "notify_merchant", "enforce_working_hours", "status",
+                       "patient_id")}
+    check("   and all five are KEYWORD-ONLY — no positional call can land on them by accident",
           all(k is inspect.Parameter.KEYWORD_ONLY for k in kinds.values()), str(kinds))
     defaulted = {n: p.default for n, p in sig.parameters.items()
                  if p.default is not inspect.Parameter.empty}
@@ -136,7 +145,12 @@ async def main():
           # line, which is why all four existing callers stay byte-for-byte unaffected.
           defaulted == {"customer_email": None, "source": None,
                         "allow_past": False, "notify_merchant": True,
-                        "enforce_working_hours": True, "status": "pending"}, str(defaulted))
+                        # TRANSITION (2026-09-25, Clinic P2): `patient_id: None` joined. A
+                        # preservation like the two above, and NOT a placeholder for "unknown":
+                        # for a barber reservation NULL is the TRUE answer, and all 66 existing
+                        # production rows correctly hold it -- measured, not assumed.
+                        "enforce_working_hours": True, "status": "pending",
+                        "patient_id": None}, str(defaulted))
 
     print("\n── 2. INVARIANT — the three callers, and NOTHING else calls it ──")
     # COUNTED AS CALLS, NOT AS TEXT. The first version of this check used a regex and answered
@@ -320,6 +334,12 @@ async def main():
     check("   and reservation_service.py is the only reservation file touched",
           not any(d.startswith("app/services/reservation") and
                   d != "app/services/reservation_service.py" for d in dirty), str(dirty))
+    # Clinic P2: the Patient layer is ADDITIVE and lives in its OWN two files. This asserts the
+    # separation that makes P2's rollback a DROP rather than an unpick.
+    check("   and the Patient layer is its own files, never a change inside an existing one",
+          not any("patient" in d for d in dirty)
+          or {"app/repositories/patient_repo.py",
+              "app/services/patient_service.py"} <= set(dirty), str(dirty))
 
     print("\n" + ("ALL GREEN" if ok else "FAILURES ABOVE"))
     return 0 if ok else 1

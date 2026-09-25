@@ -250,6 +250,7 @@ def _fmt(r) -> dict:
         "resource_id":    getattr(r, "resourceId", None),
         "barber_id":      getattr(r, "barberId", None),
         "service_id":     getattr(r, "serviceId", None),
+        "patient_id":     getattr(r, "patientId", None),
         "created_at":     r.createdAt.isoformat(),
     }
 
@@ -404,6 +405,14 @@ async def create_reservation(
     # (TRANSITIONS above), so "create then update_status" would have to pass through `confirmed`,
     # which sends the CUSTOMER a confirmation -- a message a historical visit must never produce.
     status: str = "pending",
+    # Clinic P2 (2026-09-25). WHO the appointment is FOR, as distinct from `customer_phone`,
+    # which is who gets contacted about it. KEYWORD-ONLY like the four above, for the same stated
+    # reason: no future positional argument can land on it by accident.
+    #
+    # `None` preserves every existing caller BYTE FOR BYTE -- the three routes, the WhatsApp flow
+    # and Lia's two write sites all omit it, and a barber reservation correctly has no patient.
+    # It is not a placeholder for "unknown": for a barber row NULL is the true answer.
+    patient_id: str | None = None,
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -439,6 +448,15 @@ async def create_reservation(
     # runtime detects it anyway.
     if not allow_past and reserved_at < datetime.now().replace(tzinfo=timezone.utc):
         raise ValueError("Cannot reserve a past time slot.")
+
+    # Clinic P2 -- the patient's TENANT ownership, checked here in Validate and not later, for
+    # the same reason the past guard is first: a cross-tenant id must be refused before it costs
+    # a single write. The second half of the question (may THIS contact act for this patient)
+    # cannot be asked yet -- it needs the resolved Customer -- and is asked below, after it.
+    if patient_id:
+        from app.repositories import patient_repo
+        if await patient_repo.find_patient(client_id, patient_id) is None:
+            raise ValueError("Patient not found for this tenant.")
 
     # (Duration default resolution — a Validate-adjacent concern: what this reservation's
     # duration is, absent an explicit override.)
@@ -540,6 +558,19 @@ async def create_reservation(
             "email": customer_email,
         })
 
+    # -- Resolve [Patient] --------------------------------------------------------------------
+    # Clinic P2. The contact is known now, so the real question can be asked: may THIS contact
+    # act for THIS patient? A patient that is real in the tenant but belongs to someone else is
+    # refused -- SEC-3, and the reason this is not inferable from the patient merely existing.
+    #
+    # `PatientAccessDenied` propagates as itself rather than being flattened into ValueError,
+    # mirroring `ReservationAccessDenied` above: a route maps it to a real 403, while ValueError
+    # is this module's vocabulary for "that slot will not work". Nothing can raise it today --
+    # no caller passes `patient_id` yet -- and the first one arrives in P5.
+    if patient_id:
+        from app.services import patient_service
+        await patient_service.assert_contact_may_act(client_id, patient_id, customer.id)
+
     # -- Create ------------------------------------------------------------------------------------
     create_data = {
         "clientId":      client_id,
@@ -565,6 +596,10 @@ async def create_reservation(
         create_data["barberId"] = barber.id
     if catalog_service:
         create_data["serviceId"] = catalog_service.id
+    # Clinic P2 -- omitted entirely when absent, so a barber row's column stays NULL rather than
+    # being written as one.
+    if patient_id:
+        create_data["patientId"] = patient_id
     # Gate 1 step 6 (2026-09-11): the channel, recorded as data instead of as a prose prefix in
     # `notes` that an edit silently destroys. Set by the caller -- this Service is reached from
     # the website, the WhatsApp bot and the dashboard, and only the caller knows which it is.
