@@ -29,6 +29,7 @@ from app.repositories import resource_repo, barber_repo, catalog_service_repo
 from app.repositories.customer_repo import CustomerRepository
 from app.repositories import user_repo
 from app.services import whatsapp_notifications
+from app.services import availability_engine
 from app.core.phone import normalize_for_storage
 
 logger = logging.getLogger(__name__)
@@ -266,35 +267,14 @@ def _fmt(r) -> dict:
     }
 
 
-def _has_conflict(existing_list: list, new_start: datetime, new_duration_min: int) -> bool:
-    """Return True if any active reservation overlaps the new slot."""
-    new_end = new_start + timedelta(minutes=new_duration_min)
-    for r in existing_list:
-        r_start = r.reservedAt
-        r_end   = r_start + timedelta(minutes=r.durationMin)
-        # overlap condition: r_start < new_end AND r_end > new_start
-        if r_start < new_end and r_end > new_start:
-            return True
-    return False
-
-
-def _check_working_hours(reserved_at: datetime, working_hours: dict | None) -> None:
-    """Pipeline stage: Working Hours. Raises ValueError if reserved_at falls outside
-    working_hours. Shared regardless of whose working_hours dict is passed in (tenant-wide
-    Client.config.working_hours, or a Resource's own working_hours) — same shape either way:
-    {"closed_days": [...], "open_time": "HH:MM", "close_time": "HH:MM"}.
-    All times treated as UTC directly, matching how reservedAt is stored/compared everywhere
-    else in this codebase today (no timezone-conversion utility exists in this path)."""
-    if not working_hours:
-        return
-    day_name = reserved_at.strftime("%A").lower()
-    if day_name in (working_hours.get("closed_days") or []):
-        raise ValueError(f"This business is closed on {day_name.capitalize()}.")
-    open_t, close_t = working_hours.get("open_time"), working_hours.get("close_time")
-    if open_t and close_t:
-        slot_time = reserved_at.strftime("%H:%M")
-        if not (open_t <= slot_time < close_t):
-            raise ValueError(f"Outside working hours ({open_t}-{close_t}).")
+# Clinic P4-C (2026-09-26): these two moved to `availability_engine`, unchanged in body, and are
+# bound back to their old private names HERE so that every call site below -- the write path
+# included -- is textually and behaviourally identical to what it was. The alias is the point:
+# the availability reader and the reservation writer must not be able to drift into two different
+# overlap rules or two different working-hours rules, and sharing one function object is a
+# stronger guarantee than two copies that currently agree.
+_has_conflict        = availability_engine.has_conflict
+_check_working_hours = availability_engine.check_working_hours
 
 
 async def _resolve_resource(client_id: str, module_key: str, metadata: dict | None):
@@ -901,6 +881,13 @@ async def get_available_slots(
     verification, not a redesign.
     No buffer time between bookings for v1, per Salman's explicit scope lock in
     implementation_plan_reservation_pilot.md's "Explicitly Out of Scope for v1" section.
+
+    Clinic P4-C (2026-09-26) -- THE CALCULATION MOVED OUT, THE LOOKUP STAYED. Everything below
+    the barber lookup now lives in `availability_engine`, which the clinic path calls too. This
+    function's own contract is unchanged: same parameters, same order, same dicts, same query
+    count (the closed-day case still returns before touching the database). That is not asserted
+    by reading it -- RG-6 replays both versions against identical inputs and compares element by
+    element.
     """
     barber = await barber_repo.find_barber(client_id, barber_id)
     if not barber:
@@ -908,61 +895,118 @@ async def get_available_slots(
     if not barber.isActive:
         raise ValueError("This barber is not currently accepting reservations.")
 
+    # Barber.workingHours ONLY, with no fallback to Client.config.working_hours -- see F-P4-2.
+    # The writer DOES fall back, so the two genuinely disagree for a barber with no hours of his
+    # own. Recorded as a debt and deliberately NOT fixed here: fixing the barber inside the clinic
+    # phase is exactly what the contract forbids. The clinic path below falls back (ق-٤-د).
     working_hours = barber.workingHours or {}
-    open_time  = working_hours.get("open_time")
-    close_time = working_hours.get("close_time")
-    closed_days = working_hours.get("closed_days") or []
 
-    day_name = target_date.strftime("%A").lower()
-    if day_name in closed_days or not open_time or not close_time:
+    window = availability_engine.resolve_day_window(target_date, working_hours)
+    if window is None:
         return []
+    day_start, day_end = window
 
-    # reservedAt is stored/returned timezone-aware (UTC) -- same assumption
-    # _check_working_hours() already documents ("All times treated as UTC directly"). Every
-    # datetime built here must be tz-aware too, or comparisons against real Reservation rows
-    # raise TypeError (found and fixed during Phase 1's own verification, real evidence: a
-    # live "can't compare offset-naive and offset-aware datetimes" error).
+    # Single query for the whole day's existing bookings -- conflict checks are all in-memory
+    # against this list, not one DB round-trip per candidate.
     repo = ReservationRepository(prisma_client)
-    day_start = datetime.combine(target_date, datetime.strptime(open_time, "%H:%M").time(), tzinfo=timezone.utc)
-    day_end   = datetime.combine(target_date, datetime.strptime(close_time, "%H:%M").time(), tzinfo=timezone.utc)
-
-    # Single query for the whole day's existing bookings -- conflict checks below are all
-    # in-memory against this list, not one DB round-trip per candidate.
     existing_today = await repo.find_by_barber_on_date(
         client_id, barber_id,
         datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc),
         datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc),
     )
 
-    # Phase 1.x fix (2026-08-05, real bug found via Phase 3.3.1's Browser Verification): `day_start`/
-    # `day_end`/`candidate` are all naive-local wall-clock values labeled UTC via tzinfo=timezone.utc
-    # (no real conversion) -- the exact same convention `_check_working_hours()` already documents
-    # ("All times treated as UTC directly ... no timezone-conversion utility exists in this path").
-    # `now` must be built the same way. `datetime.now(timezone.utc)` is the TRUE UTC instant, which
-    # for any tenant with a real UTC offset made this comparison wrong by exactly that offset --
-    # confirmed live: at real local 17:37 (GMT+3), this endpoint returned slots as early as 15:00,
-    # all already in the past by local wall-clock time. `datetime.now()` (no arg) is the server's own
-    # naive local time; labeling it UTC without conversion matches every other datetime in this path.
-    now = datetime.now().replace(tzinfo=timezone.utc)
-    slots: list[dict] = []
-    candidate = day_start
-    while candidate + timedelta(minutes=duration_min) <= day_end:
-        if candidate < now:
-            candidate += timedelta(minutes=slot_step_min)
-            continue
+    return availability_engine.compute_slots(
+        day_start     = day_start,
+        day_end       = day_end,
+        working_hours = working_hours,
+        existing      = existing_today,
+        duration_min  = duration_min,
+        now           = availability_engine.wall_clock_now(),
+        slot_step_min = slot_step_min,
+    )
 
-        try:
-            _check_working_hours(candidate, working_hours)
-        except ValueError:
-            candidate += timedelta(minutes=slot_step_min)
-            continue
 
-        if not _has_conflict(existing_today, candidate, duration_min):
-            slots.append({"time": candidate.strftime("%H:%M"), "datetime": candidate.isoformat()})
+async def get_available_slots_for_resource(
+    client_id:      str,
+    resource_id:    str,
+    service_id:     str,
+    target_date:    date,
+    slot_step_min:  int = 30,
+) -> list[dict]:
+    """Free start times for one Resource on one date — the clinic's reader.
 
-        candidate += timedelta(minutes=slot_step_min)
+    Clinic P4-C, 2026-09-26. The SAME engine as `get_available_slots` above; what differs is only
+    whose calendar is found and how the duration is learned. Written as its own function rather
+    than a branch inside the barber one, because the contract's §١ splits exactly there: finding
+    the calendar's owner is per table, calculating the times is one thing.
 
-    return slots
+    🔴 NO `duration_min` PARAMETER, AND THAT IS THE DECISION (ق-٤-أ). The clinic derives it
+    server-side from `CatalogService.durationMin`. A caller cannot ask for slots of a length the
+    service does not have, and a `duration_min` it sends elsewhere in the API is a
+    backward-compatibility input, never a source of truth (ق-٤-أ٢). The barber path keeps taking
+    it from its caller — that is F-P4-1, a recorded debt, not something this phase repairs.
+
+    Working hours: the Resource's own, falling back to `Client.config.working_hours` (ق-٤-د). This
+    matches `create_reservation`'s resource branch exactly, so the clinic's reader and writer
+    answer "is this time inside working hours" the same way. The barber path above still does NOT
+    fall back, and that difference is deliberate and recorded, not an oversight.
+
+    🔴 ELIGIBILITY IS NOT ENFORCED HERE YET — P4-C-U1, named so it cannot be mistaken for done.
+    ق-٤-ب and ق-٤-ز decided that a Resource with no `ResourceService` row does not offer the
+    service and must not be offered or produce slots. That needs the `resource_services` table,
+    and schema changes are out of scope for P4-C by explicit instruction. So TODAY this function
+    will happily compute slots for a doctor who does not perform the requested service. Nothing is
+    exposed by it — there is no clinic API route and no clinic tenant — and
+    `scripts/test_clinic_availability_engine.py` pins the absence as a TRANSITION assertion that
+    is SUPPOSED to flip when the table lands.
+    """
+    resource = await resource_repo.find_resource(client_id, resource_id)
+    if not resource:
+        raise ValueError("Resource not found for this tenant.")
+    if not resource.isActive:
+        raise ValueError("This resource is not currently accepting reservations.")
+
+    # Required, unlike the write path's deliberately tolerant `_resolve_catalog_service`: there,
+    # an unknown service_id only means the serviceId FK stays null; here the duration IS the
+    # service's, so an unknown one leaves nothing to compute and must be refused rather than
+    # silently defaulted to 30 minutes.
+    service = await catalog_service_repo.find_catalog_service(client_id, service_id)
+    if not service:
+        raise ValueError("Service not found for this tenant.")
+
+    duration_min = service.durationMin
+    if not duration_min or duration_min <= 0:
+        # `durationMin` is NOT NULL with a default of 30, so this is unreachable through the
+        # schema; it is here because a non-positive duration would make every candidate "fit" and
+        # offer the whole day, which is a wrong answer rather than an error.
+        raise ValueError("This service has no usable duration.")
+
+    working_hours = resource.workingHours or None
+    if working_hours is None:
+        client = await prisma_client.client.find_unique(where={"id": client_id})
+        working_hours = (client.config or {}).get("working_hours") if client else None
+
+    window = availability_engine.resolve_day_window(target_date, working_hours)
+    if window is None:
+        return []
+    day_start, day_end = window
+
+    repo = ReservationRepository(prisma_client)
+    existing_today = await repo.find_by_resource_on_date(
+        client_id, resource_id,
+        datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc),
+        datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc),
+    )
+
+    return availability_engine.compute_slots(
+        day_start     = day_start,
+        day_end       = day_end,
+        working_hours = working_hours,
+        existing      = existing_today,
+        duration_min  = duration_min,
+        now           = availability_engine.wall_clock_now(),
+        slot_step_min = slot_step_min,
+    )
 
 
 async def get_reservation(

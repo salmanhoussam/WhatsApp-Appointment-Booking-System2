@@ -176,6 +176,32 @@ class ReservationRepository:
             "reservedAt": {"gte": day_start, "lte": day_end},
         })
 
+    async def find_by_resource_on_date(
+        self,
+        client_id: str,
+        resource_id: str,
+        day_start: datetime,
+        day_end: datetime,
+    ) -> list:
+        """One query for a Resource's whole day — the clinic's mirror of
+        find_by_barber_on_date() above, written as its own method per the standing instruction
+        that the resource and barber paths are built independently rather than merged behind a
+        shared dispatch (2026-07-31), even where the shape ends up identical.
+
+        Clinic P4-C, 2026-09-26. Scoped by the real `resourceId` FK, and indexed:
+        @@index([clientId, resourceId, reservedAt]).
+
+        The status filter is what makes `cancelled` and `no_show` FREE the time rather than block
+        it — the same three statuses the barber query counts, ratified in the P4 contract §٣. It
+        lives here, in the query, not in the engine: which rows are blocking is a repository fact.
+        """
+        return await self.db.reservation.find_many(where={
+            "clientId":   client_id,
+            "resourceId": resource_id,
+            "status":     {"in": ["pending", "confirmed", "arrived"]},
+            "reservedAt": {"gte": day_start, "lte": day_end},
+        })
+
     async def update_status(self, reservation_id: str, client_id: str, status: str):
         # update_many() returns a plain int (the row count) in this prisma-client-py version
         # (0.15.0, confirmed directly in venv/lib/.../prisma/actions.py), not an object with a
