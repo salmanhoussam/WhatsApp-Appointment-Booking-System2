@@ -1,0 +1,42 @@
+seal: 296 write methods sealed · proven by real attempts: row write refused, non-SELECT refused
+
+
+alzabt-demo
+    name                 'Alzabt Demo Salon'
+    vertical             'barber'
+    status               'active'
+    provisioning_status  None
+    page_type            'normal'
+    template_key         None
+    primary_color        '#2F4F4F'
+    services             [('booking', True), ('catalog', True), ('reservations', True), ('whatsapp_ordering', True)]
+    counts               {'barbers': 2, 'resources': 0, 'services': 6, 'categories': 1, 'users': 1, 'reservations': 1}
+    page sections        0
+
+barberlab-test
+    name                 'بربرلاب'
+    vertical             'barber'
+    status               'active'
+    provisioning_status  None
+    page_type            'normal'
+    template_key         'rk-barbershop-v3'
+    primary_color        '#2F4F4F'
+    services             [('lia', True), ('reservations', True), ('store', True), ('whatsapp_ordering', True)]
+    counts               {'barbers': 2, 'resources': 0, 'services': 11, 'categories': 2, 'users': 2, 'reservations': 22}
+    page sections        4
+
+rk
+    name                 'RK Barber Shop'
+    vertical             'barber'
+    status               'active'
+    provisioning_status  None
+    page_type            'normal'
+    template_key         None
+    primary_color        '#2F4F4F'
+    services             [('booking', False), ('catalog', False), ('lia', True), ('reservations', True), ('store', True), ('whatsapp_ordering', True)]
+    counts               {'barbers': 2, 'resources': 2, 'services': 7, 'categories': 3, 'users': 2, 'reservations': 32}
+    page sections        11
+
+── the registry, for comparison ──
+    registered verticals : ['barber']
+    'clinic' registered  : False
