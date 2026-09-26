@@ -1,0 +1,68 @@
+migration sha256 : c11bc9c2fc0607dd24dd790edb44dfc3a35095aec4602fd2d898595e812c0dfe
+
+7 statement(s), every one additive and reviewed by eye:
+  · CREATE TABLE "public"."resource_services" ( "id" UUID NOT NULL DEFAULT gen_random_uuid(), "client_id" UUID NOT
+  · CREATE INDEX "resource_services_client_id_service_id_idx" ON "public"."resource_services"("client_id", "servic
+  · CREATE INDEX "resource_services_client_id_resource_id_idx" ON "public"."resource_services"("client_id", "resou
+  · CREATE UNIQUE INDEX "resource_services_resource_id_service_id_key" ON "public"."resource_services"("resource_i
+  · ALTER TABLE "public"."resource_services" ADD CONSTRAINT "resource_services_client_id_fkey" FOREIGN KEY ("clien
+  · ALTER TABLE "public"."resource_services" ADD CONSTRAINT "resource_services_resource_id_fkey" FOREIGN KEY ("res
+  · ALTER TABLE "public"."resource_services" ADD CONSTRAINT "resource_services_service_id_fkey" FOREIGN KEY ("serv
+
+── BEFORE ──
+  resource_services exists : 0
+  customers rows           : 10
+    idx customers_client_id_idx  CREATE INDEX customers_client_id_idx ON public.customers USING btree (client_id)
+    idx customers_client_id_phone_key  CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+    idx customers_phone_idx  CREATE INDEX customers_phone_idx ON public.customers USING btree (phone)
+    idx customers_pkey  CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)
+    con customers_client_id_fkey  FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE ON DELETE RESTRICT
+    con customers_pkey  PRIMARY KEY (id)
+  barber_services rows     : 41
+    idx barber_services_barber_id_service_id_key  CREATE UNIQUE INDEX barber_services_barber_id_service_id_key ON public.barber_services USING btree (barber_id, service_id)
+    idx barber_services_client_id_idx  CREATE INDEX barber_services_client_id_idx ON public.barber_services USING btree (client_id)
+    idx barber_services_pkey  CREATE UNIQUE INDEX barber_services_pkey ON public.barber_services USING btree (id)
+  resources=2  catalog_services=38  reservations=66
+
+APPLYING …
+   7 statement(s) applied
+
+── AFTER ──
+  resource_services exists : 1
+  customers rows           : 10
+    idx customers_client_id_idx  CREATE INDEX customers_client_id_idx ON public.customers USING btree (client_id)
+    idx customers_client_id_phone_key  CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+    idx customers_phone_idx  CREATE INDEX customers_phone_idx ON public.customers USING btree (phone)
+    idx customers_pkey  CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)
+    con customers_client_id_fkey  FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE ON DELETE RESTRICT
+    con customers_pkey  PRIMARY KEY (id)
+  barber_services rows     : 41
+    idx barber_services_barber_id_service_id_key  CREATE UNIQUE INDEX barber_services_barber_id_service_id_key ON public.barber_services USING btree (barber_id, service_id)
+    idx barber_services_client_id_idx  CREATE INDEX barber_services_client_id_idx ON public.barber_services USING btree (client_id)
+    idx barber_services_pkey  CREATE UNIQUE INDEX barber_services_pkey ON public.barber_services USING btree (id)
+  resources=2  catalog_services=38  reservations=66
+
+  resource_services:
+    idx resource_services_client_id_resource_id_idx
+    idx resource_services_client_id_service_id_idx
+    idx resource_services_pkey
+    idx resource_services_resource_id_service_id_key
+    fk  resource_services_client_id_fkey  FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE ON DELETE CASCADE
+    fk  resource_services_resource_id_fkey  FOREIGN KEY (resource_id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE
+    fk  resource_services_service_id_fkey  FOREIGN KEY (service_id) REFERENCES catalog_services(id) ON UPDATE CASCADE ON DELETE CASCADE
+
+── EVIDENCE ──
+  PASS  🔒 customers rows unchanged
+  PASS  🔒 customers indexes identical
+  PASS  🔒 customers constraints identical
+  PASS  🔒 barber_services rows unchanged
+  PASS  🔒 barber_services indexes identical
+  PASS     resources rows unchanged
+  PASS     catalog_services rows unchanged
+  PASS     reservations rows unchanged
+  PASS     resource_services now exists
+  PASS     and is EMPTY (zero rows)
+  PASS     three FKs, client_id included
+  PASS     four indexes present
+
+✅ APPLIED — SCHEMA ONLY, ONE NEW EMPTY TABLE, ZERO ROW WRITTEN ANYWHERE

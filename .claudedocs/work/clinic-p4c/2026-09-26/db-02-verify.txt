@@ -1,0 +1,27 @@
+seal: 296 write methods sealed · proven by real attempts: row write refused, non-SELECT refused
+
+resource_services exists      : 1
+  columns                     : ['client_id', 'created_at', 'id', 'resource_id', 'service_id']
+  rows                        : 0
+  fk  resource_services_client_id_fkey  FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE ON DELETE CASCADE
+  fk  resource_services_resource_id_fkey  FOREIGN KEY (resource_id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE
+  fk  resource_services_service_id_fkey  FOREIGN KEY (service_id) REFERENCES catalog_services(id) ON UPDATE CASCADE ON DELETE CASCADE
+  indexes                     : ['resource_services_client_id_resource_id_idx', 'resource_services_client_id_service_id_idx', 'resource_services_pkey', 'resource_services_resource_id_service_id_key']
+customers rows                : 10
+customers unique index        : CREATE UNIQUE INDEX customers_client_id_phone_key ON public.customers USING btree (client_id, phone)
+barber_services rows          : 41 · client_id FKs on it: 0
+resources=2 catalog_services=38 reservations=66
+
+── INDEPENDENT VERDICT ──
+  PASS  resource_services exists
+  PASS  it is EMPTY — zero rows, zero provisioning
+  PASS  five columns, exactly the contracted set
+  PASS  three foreign keys, client_id among them
+  PASS  four indexes
+  PASS  🔒 customers still 10 rows
+  PASS  🔒 customers unique index unchanged
+  PASS  🔒 barber_services still 41 rows
+  PASS  🔒 barber_services STILL has no client_id FK — the defect was not 'helpfully' fixed
+  PASS  resources 2 · services 38 · reservations 66
+
+✅ VERIFIED INDEPENDENTLY
