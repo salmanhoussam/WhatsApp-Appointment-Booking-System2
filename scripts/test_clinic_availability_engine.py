@@ -149,6 +149,8 @@ class FakeRepo:
     async def find_by_resource_on_date(self, client_id, resource_id, day_start, day_end):
         FakeRepo.calls.append({"kind": "resource", "client_id": client_id,
                                "resource_id": resource_id, "from": day_start, "to": day_end})
+        # `resourceId` defaults to the asked-for id when a row does not carry one, so the
+        # single-doctor cases keep working; AV-3 below tags its rows explicitly.
         # The same filter the real SQL applies. A fake that skipped it would make `cancelled frees
         # the time` look like an engine behaviour when it is the query's.
         return [r for r in FakeRepo.rows
@@ -185,9 +187,13 @@ def install_clinic(resource_hours=FULL, rows=None, active=True, duration=30,
     FakeClientTable.seen = []
     rs.prisma_client = FakePrisma()
     rs.ReservationRepository = FakeRepo
+    # HONOURS THE TENANT, because the real `find_resource` puts client_id in its where clause.
+    # The first version ignored `cid` and returned the row to anyone -- a fake KINDER than
+    # reality, which AV-9 caught: a cross-tenant request sailed past the resource lookup and was
+    # stopped further down by eligibility, so the test would have credited the wrong guard.
     resource_repo.find_resource = lambda cid, rid: _done(
         Row(id=rid, clientId=cid, name="د. سارة", type="doctor", isActive=active,
-            workingHours=resource_hours) if resource else None)
+            workingHours=resource_hours) if (resource and cid == "c1") else None)
     catalog_service_repo.find_catalog_service = lambda cid, sid: _done(
         Row(id=sid, clientId=cid, nameAr="معاينة", durationMin=duration) if service else None)
     # The fake table records what it was ASKED, and answers from a real set rather than a constant
@@ -356,6 +362,39 @@ async def main():
     check("RP-2  it mirrors the barber query's status list exactly",
           ast.unparse(_fn(REPO, "find_by_barber_on_date")).count("'arrived'")
           == repo_code.count("'arrived'") == 1)
+
+    print("\n── AV-3 · one doctor's day never leaks into another's ──")
+    a_busy = res("10:00", 30)
+    a_busy.resourceId = "r1"
+    restore = install_clinic(rows=[a_busy])
+    ELIG.append(("c1", "r2", "s1"))      # doctor B performs the service too, so the only
+    try:                                 # difference between them is whose day is busy
+        for_a = await rs.get_available_slots_for_resource(
+            client_id="c1", resource_id="r1", service_id="s1", target_date=date(2026, 9, 30))
+        for_b = await rs.get_available_slots_for_resource(
+            client_id="c1", resource_id="r2", service_id="s1", target_date=date(2026, 9, 30))
+        check("AV-3  doctor A's 10:00 booking removes A's slot and leaves B's UNTOUCHED",
+              "10:00" not in times(for_a) and "10:00" in times(for_b)
+              and len(for_b) == len(for_a) + 1,
+              f"A={len(for_a)} B={len(for_b)}")
+    finally:
+        restore()
+
+    print("\n── AV-9 · tenant isolation, measured not assumed ──")
+    restore = install_clinic()
+    try:
+        try:
+            await rs.get_available_slots_for_resource(
+                client_id="OTHER-TENANT", resource_id="r1", service_id="s1",
+                target_date=date(2026, 9, 30))
+            check("AV-9  another tenant asking for THIS tenant's resource gets nothing", False,
+                  "it returned slots")
+        except ValueError as exc:
+            check("AV-9  another tenant asking for THIS tenant's resource is refused at the "
+                  "FIRST lookup — the id is never even resolved",
+                  "Resource not found" in str(exc), str(exc))
+    finally:
+        restore()
 
     print("\n── EL · P4-C-U1 CLOSED · eligibility, strictly (ق-٤-ب / ق-٤-ز) ──")
     check("EL-1  the clinic reader asks the eligibility question at all. "

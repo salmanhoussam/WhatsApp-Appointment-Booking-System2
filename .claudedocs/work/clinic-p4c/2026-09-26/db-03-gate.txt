@@ -1,0 +1,28 @@
+seal: 296 write methods sealed · proven by real attempts: row write refused, non-SELECT refused
+
+indexes the race rests on:
+  reservations_active_barber_slot_uidx
+    CREATE UNIQUE INDEX reservations_active_barber_slot_uidx ON public.reservations USING btree (client_id, barber_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (barber_id IS NOT NULL))
+  reservations_active_resource_slot_uidx
+    CREATE UNIQUE INDEX reservations_active_resource_slot_uidx ON public.reservations USING btree (client_id, resource_id, reserved_at) WHERE ((status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'arrived'::text])) AND (resource_id IS NOT NULL))
+
+reservations           : 66  (resource-backed: 0)
+resource_services rows : 0
+customers / services   : 10 / 38
+patients               : 0
+resources:
+  1dcf46a5-7822-4c6f-827d-018f5cfc4d09  Dr. Faisal  type=doctor  active=False
+  72eb89b3-22b5-474d-8adf-37a24c162b66  Dr. Sara  type=doctor  active=False
+
+── GATE · production, read-only ──
+  PASS  both partial unique indexes exist — barber AND resource
+  PASS  the resource index keys on (client_id, resource_id, reserved_at)
+  PASS  and is PARTIAL — the three active statuses only, so cancelled frees the slot
+  PASS  reservations still 66 — P4 wrote no row
+  PASS  no reservation references a resource — the clinic has booked nothing
+  PASS  resource_services still EMPTY — no provisioning happened
+  PASS  resources still the same 2 doctor rows, both inactive
+  PASS  customers 10 / catalog_services 38 — untouched
+  PASS  patients 0 — P2's table is still empty
+
+✅ GATE READ CLEAN
