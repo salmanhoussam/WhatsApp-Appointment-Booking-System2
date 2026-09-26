@@ -106,6 +106,15 @@ def _fn(path: str, name: str):
     return None
 
 
+def _route_calls(path: str) -> dict:
+    """How many times each availability entry point is really CALLED in a route file."""
+    out = {"get_available_slots": 0, "get_available_slots_for_resource": 0}
+    for n in ast.walk(ast.parse(_src(path))):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in out:
+            out[n.func.attr] += 1
+    return out
+
+
 def _calls(node) -> list[str]:
     return [ast.unparse(n.func) for n in ast.walk(node) if isinstance(n, ast.Call)]
 
@@ -443,8 +452,14 @@ async def main():
                             encoding="utf-8").read().splitlines()
               if l.strip() and not l.startswith("--") and not l.startswith(" ")
               and not l.startswith(")")))
-    check("RG-7  no new API route reaches the clinic reader yet",
-          "get_available_slots_for_resource" not in _src("app/api/v1/public/reservations.py"))
+    check("RG-7  the clinic reader is reached by exactly ONE route, and the barber's own route "
+          "is untouched. [FLIPPED 2026-09-26 by P4-D — OLD VALUE: no route reached it at all, "
+          "which is what made it safe to ship the eligibility query before the table existed]",
+          # Counted as CALLS, via ast — not as text. A raw count finds two of each, because one
+          # is a `label=` string and one is a docstring sentence: the third time in this session
+          # that prose about the code matched a search meant to measure the code.
+          _route_calls("app/api/v1/public/reservations.py")
+          == {"get_available_slots": 1, "get_available_slots_for_resource": 1})
 
     print("\n" + ("ALL GREEN" if ok else "FAILURES ABOVE"))
     return 0 if ok else 1

@@ -16,6 +16,7 @@ from app.core.services import require_service
 from app.core.db_resilience import with_db_resilience
 from app.services import reservation_service, catalog_service_service, whatsapp_service
 from app.repositories import resource_repo, barber_repo, barber_service_repo
+from app.repositories import resource_service_repo
 
 router = APIRouter()
 
@@ -106,16 +107,37 @@ MODULE_KEY_TO_RESOURCE_TYPE = {"clinic": "doctor"}
 @router.get("/resources")
 async def list_public_resources(
     module_key: str = Query(...),
+    service_id: Optional[UUID] = Query(None),
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("reservations")),
 ):
     """List active Resources for a moduleKey — e.g. a 'choose your doctor' picker for clinic
-    bookings. Only active resources are ever returned publicly."""
+    bookings. Only active resources are ever returned publicly.
+
+    service_id (Clinic P4-D, 2026-09-26): narrows the list to the Resources that actually perform
+    that service, via `resource_services`.
+
+    🔴 THIS FILTER IS HARD, AND THE BARBER ONE BELOW IS SOFT. That is a decision (ق-٤-ب / ق-٤-ز),
+    not an inconsistency, and copying the barber's shape here by reflex would have re-created the
+    exact divergence the decision exists to prevent -- a picker offering a doctor the availability
+    engine then refuses. The barber's softness buys backward compatibility for tenants whose
+    assignments were never filled in; the clinic has no live resources at all, so it pays nothing
+    for strictness and starts correct instead of starting compatible.
+
+    An empty result therefore means "no doctor here performs this", never "we could not tell".
+    A clinic that has not had its `resource_services` rows written shows nobody — which is the
+    correct state of a clinic nobody has provisioned, and is why provisioning must write them."""
     resource_type = MODULE_KEY_TO_RESOURCE_TYPE.get(module_key)
     if not resource_type:
         return {"success": True, "data": []}
 
     resources = await resource_repo.list_resources(tenant["id"], resource_type=resource_type, active_only=True)
+
+    if service_id is not None:
+        qualified = set(await resource_service_repo.list_resource_ids_for_service(
+            tenant["id"], str(service_id)))
+        resources = [r for r in resources if r.id in qualified]
+
     return {
         "success": True,
         "data": [
@@ -123,6 +145,52 @@ async def list_public_resources(
             for r in resources
         ],
     }
+
+
+@router.get("/resources/{resource_id}/availability")
+async def get_resource_availability(
+    resource_id: UUID,
+    service_id:  UUID = Query(...),
+    date_str:    str = Query(..., alias="date", description="YYYY-MM-DD"),
+    tenant: dict = Depends(get_current_tenant),
+    _svc=Depends(require_service("reservations")),
+):
+    """Free start times for one Resource on one date — the clinic's availability endpoint.
+
+    A SIBLING of `/availability`, not a widening of it (ق-٤-ح): the barber endpoint's contract is
+    untouched, and one shared engine sits under both. The path shape mirrors this codebase's own
+    precedent, `/units/{unit_id}/availability`, rather than inventing a new one.
+
+    🔴 NO `duration_min` PARAMETER — ق-٤-أ. The server derives it from `CatalogService.durationMin`,
+    so a caller cannot ask for slots of a length the service does not have. `service_id` is
+    REQUIRED here while it is optional on the picker above, because the duration has nowhere else
+    to come from.
+
+    Status codes, and the distinction is the point:
+      404  the resource or the service is not this tenant's, or the resource is inactive
+      409  both are real, but this resource does not perform this service -- a conflict between
+           two valid ids, not a missing thing. Caught by TYPE, never by matching the message."""
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD.")
+
+    try:
+        slots = await with_db_resilience(
+            lambda: reservation_service.get_available_slots_for_resource(
+                client_id   = tenant["id"],
+                resource_id = str(resource_id),
+                service_id  = str(service_id),
+                target_date = target_date,
+            ),
+            label="get_available_slots_for_resource",
+        )
+    except reservation_service.ResourceDoesNotProvideService as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {"success": True, "data": slots}
 
 
 @router.get("/barbers")

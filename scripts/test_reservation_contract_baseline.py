@@ -345,9 +345,29 @@ async def main():
     #
     # The stronger half of this is in scripts/test_clinic_service_motif.py (SM-9b): no route
     # carries a copy of the booking-contract rule at all.
-    res_routes = [d for d in dirty if d.startswith("app/api/") and "reservations" in d]
-    check("no RESERVATION route was changed — the duplicated guard stays deliberate",
-          not res_routes, str(dirty))
+    # 🔴 NARROWED A THIRD TIME (2026-09-26, Clinic P4-D). WAS: "no RESERVATION route was changed",
+    # measured as `no dirty file under app/api/ whose path contains 'reservations'`.
+    #
+    # P4-D adds a real reservation route — the clinic's sibling availability endpoint — so the old
+    # wording fails a change it was never written to catch, for the third time and for the same
+    # reason: it pinned a SNAPSHOT of one diff instead of the property.
+    #
+    # THE PROPERTY, stated once and measured directly from here on: the past guard stays
+    # DUPLICATED. It lives in the routes AND in the service, deliberately, and must never be
+    # quietly consolidated into one of them. That is what "the duplicated guard stays deliberate"
+    # always meant; the file-level check was only ever a proxy for it, and a bad one.
+    def _guards(path):
+        src = open(path, encoding="utf-8").read()
+        return src.count("datetime.now().replace(tzinfo=timezone.utc)")
+
+    check("the past guard is STILL duplicated across the routes and the service — never "
+          "consolidated into one place [3rd narrowing; old value: no reservation route may change]",
+          _guards("app/api/v1/public/reservations.py") >= 1
+          and _guards("app/api/v1/admin/reservations.py") >= 1
+          and _guards("app/services/reservation_service.py") >= 1,
+          f"public={_guards('app/api/v1/public/reservations.py')} "
+          f"admin={_guards('app/api/v1/admin/reservations.py')} "
+          f"service={_guards('app/services/reservation_service.py')}")
     check("   and reservation_service.py is the only reservation file touched",
           not any(d.startswith("app/services/reservation") and
                   d != "app/services/reservation_service.py" for d in dirty), str(dirty))

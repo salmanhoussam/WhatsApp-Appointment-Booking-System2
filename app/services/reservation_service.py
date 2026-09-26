@@ -81,6 +81,17 @@ MODULE_DEFAULTS: dict[str, dict] = {
 #
 # `source=None` is therefore treated as staff. Every real caller sets it -- public/reservations.py
 # "website", whatsapp_reservation_flow.py "whatsapp", admin/reservations.py "admin", Lia "lia" --
+class ResourceDoesNotProvideService(ValueError):
+    """This resource exists and is active, but performs no such service (ق-٤-ب / ق-٤-ز).
+
+    A ValueError SUBCLASS deliberately: every existing caller catches ValueError, so none of them
+    changes behaviour, while a route that wants to answer 409 instead of 404 can tell this apart
+    from "I could not find it" WITHOUT matching on the message text. Same reason
+    `PatientAccessDenied` is its own type -- an unknown id and a real one reached for wrongly are
+    different facts, and a caller must be able to audit the difference.
+    """
+
+
 # so None can only come from a script or an internal integration, both of which are trusted.
 PATIENT_FACING_SOURCES = frozenset({"website", "whatsapp"})
 
@@ -983,7 +994,8 @@ async def get_available_slots_for_resource(
     # ق-٤-ب / ق-٤-ز -- asked AFTER both parents resolve, so the caller gets the most specific
     # error, and BEFORE working hours or any day query, so a refusal costs nothing.
     if not await resource_service_repo.is_eligible(client_id, resource_id, service_id):
-        raise ValueError("This resource does not provide the requested service.")
+        raise ResourceDoesNotProvideService(
+            "This resource does not provide the requested service.")
 
     duration_min = service.durationMin
     if not duration_min or duration_min <= 0:
