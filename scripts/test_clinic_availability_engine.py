@@ -40,7 +40,9 @@ from datetime import date, datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.repositories import catalog_service_repo, resource_repo      # noqa: E402
+from app.repositories import (                                        # noqa: E402
+    catalog_service_repo, resource_repo, resource_service_repo,
+)
 from app.services import availability_engine as ae                    # noqa: E402
 from app.services import reservation_service as rs                    # noqa: E402
 
@@ -161,10 +163,14 @@ class FakePrisma:
     client = FakeClientTable()
 
 
+ELIG: list = []          # every (client_id, resource_id, service_id) the fake table holds
+
+
 def install_clinic(resource_hours=FULL, rows=None, active=True, duration=30,
-                   resource=True, service=True):
+                   resource=True, service=True, eligible=True):
     orig = (rs.prisma_client, rs.ReservationRepository,
-            resource_repo.find_resource, catalog_service_repo.find_catalog_service)
+            resource_repo.find_resource, catalog_service_repo.find_catalog_service,
+            resource_service_repo.is_eligible)
     FakeRepo.rows = rows or []
     FakeRepo.calls = []
     FakeClientTable.seen = []
@@ -175,9 +181,18 @@ def install_clinic(resource_hours=FULL, rows=None, active=True, duration=30,
             workingHours=resource_hours) if resource else None)
     catalog_service_repo.find_catalog_service = lambda cid, sid: _done(
         Row(id=sid, clientId=cid, nameAr="معاينة", durationMin=duration) if service else None)
+    # The fake table records what it was ASKED, and answers from a real set rather than a constant
+    # -- so CL-12 can prove the tenant id reaches the lookup instead of assuming it.
+    ELIG.clear()
+    if eligible:
+        ELIG.append(("c1", "r1", "s1"))
+    resource_service_repo.is_eligible = lambda cid, rid, sid: _done(
+        (cid, rid, sid) in ELIG)
+
     def restore():
         (rs.prisma_client, rs.ReservationRepository,
-         resource_repo.find_resource, catalog_service_repo.find_catalog_service) = orig
+         resource_repo.find_resource, catalog_service_repo.find_catalog_service,
+         resource_service_repo.is_eligible) = orig
     return restore
 
 
@@ -333,12 +348,76 @@ async def main():
           ast.unparse(_fn(REPO, "find_by_barber_on_date")).count("'arrived'")
           == repo_code.count("'arrived'") == 1)
 
-    print("\n── 🔴 P4-C-U1 · TRANSITION — eligibility is NOT enforced yet ──")
-    check("U1  the clinic reader performs NO ResourceService check today. "
-          "OLD VALUE: absent. This assertion IS SUPPOSED TO FLIP the moment the "
-          "`resource_services` table lands (ق-٤-ب / ق-٤-ز) — schema is out of scope for P4-C",
-          "resource_service" not in _fn_code(SERVICE, "get_available_slots_for_resource").lower()
-          and "ResourceService" not in service_code)
+    print("\n── EL · P4-C-U1 CLOSED · eligibility, strictly (ق-٤-ب / ق-٤-ز) ──")
+    check("EL-1  the clinic reader asks the eligibility question at all. "
+          "[FLIPPED 2026-09-26 — OLD VALUE: no check existed, because `resource_services` did "
+          "not exist. Now an INVARIANT, not a transition]",
+          "resource_service_repo.is_eligible"
+          in _fn_code(SERVICE, "get_available_slots_for_resource"))
+    try:
+        await clinic(eligible=False)
+        check("EL-2  an ineligible pair is REFUSED", False, "no error raised")
+    except ValueError as exc:
+        check("EL-2  an ineligible pair is REFUSED, not returned as an empty day",
+              "does not provide the requested service" in str(exc), str(exc))
+    check("EL-3  and the refusal is NOT the barber picker's soft fallback — "
+          "strictness is the decision, not an accident",
+          "fall back" not in _fn_code(SERVICE, "get_available_slots_for_resource").lower())
+    restore = install_clinic(eligible=False)
+    try:
+        try:
+            await rs.get_available_slots_for_resource(
+                client_id="c1", resource_id="r1", service_id="s1",
+                target_date=date(2026, 9, 30))
+        except ValueError:
+            pass
+        check("EL-4  it refuses BEFORE any day query — a refusal costs no database round trip",
+              FakeRepo.calls == [] and FakeClientTable.seen == [])
+    finally:
+        restore()
+    check("EL-5  an eligible pair still computes normally",
+          len(await clinic(eligible=True)) == 16)
+    restore = install_clinic()
+    asked = []
+    resource_service_repo.is_eligible = lambda cid, rid, sid: (
+        asked.append((cid, rid, sid)) or _done(True))
+    try:
+        await rs.get_available_slots_for_resource(
+            client_id="c1", resource_id="r1", service_id="s1", target_date=date(2026, 9, 30))
+        check("EL-6  the question carries the TENANT, the resource and the service (AV-9)",
+              asked == [("c1", "r1", "s1")], str(asked))
+    finally:
+        restore()
+
+    print("\n── SC · the table's SHAPE, read off the schema's FIELD LINES only ──")
+    schema = _src("prisma/schema.prisma")
+    block = schema.split("model ResourceService {", 1)[1].split("\n}", 1)[0]
+    fields = [l.strip() for l in block.splitlines()
+              if l.strip() and not l.strip().startswith("//")]
+    joined = " | ".join(fields)
+    check("SC-1  🔴 a REAL foreign key on clientId — the one `barber_services` lacks",
+          any(l.startswith("client ") and "@relation(fields: [clientId]" in l for l in fields),
+          "BarberService carries clientId with an index and no FK; not inherited")
+    check("SC-2  and foreign keys to Resource and CatalogService, all three cascading",
+          joined.count("onDelete: Cascade") == 3
+          and any("Resource " in l and "@relation" in l for l in fields)
+          and any("CatalogService" in l and "@relation" in l for l in fields))
+    check("SC-3  one assignment per pair",
+          "@@unique([resourceId, serviceId])" in joined)
+    check("SC-4  an index for each real question — by service, and by resource",
+          "@@index([clientId, serviceId])" in joined
+          and "@@index([clientId, resourceId])" in joined)
+    check("SC-5  four columns and a timestamp, and NOTHING else — no is_active, no notes, "
+          "no price override; a join table that grows opinions becomes a second service model",
+          sorted(l.split()[0] for l in fields
+                 if not l.startswith("@@") and "@relation" not in l)
+          == ["clientId", "createdAt", "id", "resourceId", "serviceId"])
+    check("SC-6  `barber_services` is untouched in the schema — still no FK on clientId, "
+          "still its own unique pair (the defect is NOT fixed inside the clinic phase)",
+          "  @@unique([barberId, serviceId])" in schema
+          and "  @@index([clientId])" in schema.split("model BarberService {", 1)[1]
+          and "@relation(fields: [clientId]"
+          not in schema.split("model BarberService {", 1)[1].split("\n}", 1)[0])
 
     print("\n── RG · nothing else moved ──")
     check("RG-1  the barber reader's signature is unchanged",
@@ -352,9 +431,18 @@ async def main():
     check("RG-4  the P1 fence, the P2 patient parameter and the P3 contract are untouched",
           '_LIA_VERTICALS = frozenset({"barber"})' in _src("app/services/lia_owner_entry.py")
           and "patient_id" in service_code and "PATIENT_FACING_SOURCES" in service_code)
-    check("RG-5  no schema change: `resource_services` is not in the schema",
-          "resource_services" not in _src("prisma/schema.prisma")
-          and "model ResourceService" not in _src("prisma/schema.prisma"))
+    check("RG-5  the schema's ONLY change is the new table — no column added anywhere. "
+          "[FLIPPED 2026-09-26 — OLD VALUE: `resource_services` absent from the schema entirely, "
+          "while schema was out of scope for P4-C]",
+          'model ResourceService {' in _src("prisma/schema.prisma")
+          and open("prisma/migrations/add_resource_service_eligibility.sql",
+                   encoding="utf-8").read().count("ALTER TABLE") == 3)
+    check("RG-5b the migration is additive by SHAPE: every statement CREATEs or ADDs a constraint",
+          all(l.split()[0] in ("CREATE", "ALTER", "BEGIN;", "COMMIT;")
+              for l in open("prisma/migrations/add_resource_service_eligibility.sql",
+                            encoding="utf-8").read().splitlines()
+              if l.strip() and not l.startswith("--") and not l.startswith(" ")
+              and not l.startswith(")")))
     check("RG-7  no new API route reaches the clinic reader yet",
           "get_available_slots_for_resource" not in _src("app/api/v1/public/reservations.py"))
 

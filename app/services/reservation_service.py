@@ -26,6 +26,7 @@ from prisma.errors import UniqueViolationError
 from app.db.client import prisma_client
 from app.repositories.reservation_repo import ReservationRepository
 from app.repositories import resource_repo, barber_repo, catalog_service_repo
+from app.repositories import resource_service_repo
 from app.repositories.customer_repo import CustomerRepository
 from app.repositories import user_repo
 from app.services import whatsapp_notifications
@@ -951,14 +952,19 @@ async def get_available_slots_for_resource(
     answer "is this time inside working hours" the same way. The barber path above still does NOT
     fall back, and that difference is deliberate and recorded, not an oversight.
 
-    🔴 ELIGIBILITY IS NOT ENFORCED HERE YET — P4-C-U1, named so it cannot be mistaken for done.
-    ق-٤-ب and ق-٤-ز decided that a Resource with no `ResourceService` row does not offer the
-    service and must not be offered or produce slots. That needs the `resource_services` table,
-    and schema changes are out of scope for P4-C by explicit instruction. So TODAY this function
-    will happily compute slots for a doctor who does not perform the requested service. Nothing is
-    exposed by it — there is no clinic API route and no clinic tenant — and
-    `scripts/test_clinic_availability_engine.py` pins the absence as a TRANSITION assertion that
-    is SUPPOSED to flip when the table lands.
+    ELIGIBILITY IS ENFORCED HERE (ق-٤-ب), and STRICTLY (ق-٤-ز): a Resource with no row in
+    `resource_services` for this service does not perform it, and is refused rather than returned
+    as an empty day. Two deliberate differences from the barber path, both decided rather than
+    inherited:
+
+      * the barber picker's `service_id` filter is SOFT -- an empty result falls back to the whole
+        list, for backward compatibility with tenants that have no assignments (Salman,
+        2026-08-08). That softness is NOT copied here, and the clinic pays nothing for strictness:
+        it has no live resources at all, so there is no compatibility debt to protect.
+      * the refusal is an ERROR, not `[]`. An empty list is indistinguishable from "fully booked",
+        so a misconfigured clinic would look permanently full with no signal anywhere -- and
+        silence is a missing message, not neutral behaviour. Reaching this function with an
+        ineligible pair means the picker was bypassed, which is worth naming out loud.
     """
     resource = await resource_repo.find_resource(client_id, resource_id)
     if not resource:
@@ -973,6 +979,11 @@ async def get_available_slots_for_resource(
     service = await catalog_service_repo.find_catalog_service(client_id, service_id)
     if not service:
         raise ValueError("Service not found for this tenant.")
+
+    # ق-٤-ب / ق-٤-ز -- asked AFTER both parents resolve, so the caller gets the most specific
+    # error, and BEFORE working hours or any day query, so a refusal costs nothing.
+    if not await resource_service_repo.is_eligible(client_id, resource_id, service_id):
+        raise ValueError("This resource does not provide the requested service.")
 
     duration_min = service.durationMin
     if not duration_min or duration_min <= 0:

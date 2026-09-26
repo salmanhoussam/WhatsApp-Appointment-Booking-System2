@@ -75,6 +75,8 @@ model Client {
   // -- Reservations module (restaurant tables, service appointments, viewings) --
   reservations          Reservation[]
   resources             Resource[]
+  // -- Clinic P4-C-U1 (eligibility, 2026-09-26) -------------------------------
+  resourceServices      ResourceService[]
   // -- Clinic P2 (Patient Identity Foundation, 2026-09-25) -------------------
   patients              Patient[]
   patientContacts       PatientContact[]
@@ -607,12 +609,13 @@ model CatalogService {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category        CatalogCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  reservations    Reservation[]
-  barberServices  BarberService[]
-  bookingServices BookingService[]
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category         CatalogCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  property         Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  reservations     Reservation[]
+  barberServices   BarberService[]
+  resourceServices ResourceService[]
+  bookingServices  BookingService[]
 
   @@index([clientId])
   @@index([categoryId])
@@ -904,8 +907,9 @@ model Resource {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   reservations Reservation[]
+  services     ResourceService[]
 
   @@index([clientId, type])
   @@index([clientId, isActive])
@@ -1056,6 +1060,44 @@ model BarberService {
   @@unique([barberId, serviceId])
   @@index([clientId])
   @@map("barber_services")
+  @@schema("public")
+}
+
+// -- Clinic P4-C-U1 · Doctor ⇄ Service eligibility (2026-09-26) -------------------
+// WHAT IT ANSWERS: "which doctors perform this service?" — unanswerable before this table, which
+// is why the clinic could compute slots for a doctor who does not do the procedure.
+//
+// A FOUNDATION, NOT A FEATURE (contract C3). And the enforcement direction is Salman's decision
+// (ق-٤-ز, 2026-09-26): NO ROW MEANS THE SERVICE IS NOT OFFERED. That is deliberately the opposite
+// of P3's `bookableBy`, where an unknown VALUE means "anyone may book". The two are not in
+// tension: an unknown value in a contract column must not close the system for a reason nobody
+// wrote, while a missing DOMAIN RELATION must not be read as a permission nobody granted.
+// Consequence, stated here because it is easy to discover the hard way: provisioning a clinic MUST
+// write these rows, or its doctors are offered nothing at all.
+//
+// 🔴 THE clientId FK IS THE POINT OF THE SHAPE. `BarberService` above carries `clientId` with only
+// an @@index and NO relation — a recorded defect that lets a row name a tenant that does not
+// exist. It is not inherited here. It is also not fixed there: repairing the barber inside the
+// clinic phase is exactly what this vertical's contract forbids.
+model ResourceService {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @map("client_id") @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  serviceId  String   @map("service_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client   Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  resource Resource       @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  service  CatalogService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // One assignment per pair. Carries the tenant implicitly: both parents are already tenant-owned
+  // and both cascade, so a pair cannot span two tenants.
+  @@unique([resourceId, serviceId])
+  // The two real questions, each with its own index: the picker asks by service, the engine asks
+  // by resource. Both scoped by clientId because every query in this codebase is.
+  @@index([clientId, serviceId])
+  @@index([clientId, resourceId])
+  @@map("resource_services")
   @@schema("public")
 }
 
