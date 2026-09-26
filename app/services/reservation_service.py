@@ -481,6 +481,35 @@ async def create_reservation(
     # so this reservation is fully resolvable through Service without relying on metadata alone.
     catalog_service = await _resolve_catalog_service(client_id, metadata)
 
+    # -- Clinic P5-A · the WRITE path owns the same two rules the READER already does ------------
+    # Found while planning P5, measured by AST rather than read: P4 implemented ق-٤-أ and ق-٤-ب in
+    # `get_available_slots_for_resource` ONLY. This function checked neither. So a direct POST to
+    # the PUBLIC route could book a doctor who does not perform the service -- bypassing both the
+    # picker and the availability endpoint -- and could book a 60-minute service as 15, which the
+    # partial unique index does NOT catch because its key is the start time, not the span.
+    #
+    # A polite UI does not protect a public route. Both are closed here, in the one Service every
+    # caller goes through, and scoped to `resource` so the barber path is byte-identical.
+    #
+    # 🔴 service_id becomes REQUIRED for a resource-backed reservation, and that is the point
+    # rather than a side effect: if the eligibility check were conditional on service_id being
+    # PRESENT, omitting it would be the bypass. A rule you can skip by leaving out a field is not
+    # a rule. Measured before changing it: production holds ZERO resource-backed reservations, and
+    # the only callers that reach this function with a module_key at all -- Lia and the WhatsApp
+    # flow -- are hardcoded to "barber", so no live path loses anything.
+    if resource:
+        if catalog_service is None:
+            raise ValueError(f"'{module_key}' reservations require a valid service_id.")
+        if not await resource_service_repo.is_eligible(client_id, resource.id, catalog_service.id):
+            raise ResourceDoesNotProvideService(
+                "This resource does not provide the requested service.")
+        # ق-٤-أ on the write side: the duration is the SERVICE's, and a `duration_min` the caller
+        # sent is a backward-compatibility input, never a source of truth (ق-٤-أ٢). Recomputed
+        # here rather than at the default above, because the service is only resolved now.
+        if not catalog_service.durationMin or catalog_service.durationMin <= 0:
+            raise ValueError("This service has no usable duration.")
+        effective_duration = catalog_service.durationMin
+
     # -- Booking Contract (Clinic P3) ------------------------------------------------------------
     # A service may now say WHO is allowed to book it. Enforced HERE, in the one Service every
     # caller already goes through (§9's "One Capability, One Service"), never duplicated per route

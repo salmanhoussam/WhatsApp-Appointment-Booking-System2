@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from prisma.errors import UniqueViolationError as _UVE                 # noqa: E402
 
-from app.repositories import resource_repo                             # noqa: E402
+from app.repositories import resource_repo, resource_service_repo     # noqa: E402
 from app.services import reservation_service as rs                     # noqa: E402
 from test_lia_reservation_t1 import install as _t1_install, CLIENT      # noqa: E402
 
@@ -151,13 +151,20 @@ async def race(n, module_key, metadatas, when):
     RacingRepo.rows, RacingRepo.prechecks = [], []
     prisma, sends, restore = _t1_install()
     o_repo, o_find = rs.ReservationRepository, resource_repo.find_resource
+    o_elig = resource_service_repo.is_eligible
     rs.ReservationRepository = RacingRepo
     resource_repo.find_resource = lambda cid, rid: _resource(rid, cid)
+    # Clinic P5-A (2026-09-26): the write path now asks about eligibility before it books.
+    # Stubbed to YES so these racers still reach the INDEX, which is what this suite measures.
+    # Without it every racer is refused earlier -- correctly, and for a different reason -- and
+    # the suite would report a green race it never ran.
+    resource_service_repo.is_eligible = lambda cid, rid, sid: _done(True)
     try:
         return await asyncio.gather(*[book(module_key, m, w)
                                       for m, w in zip(metadatas, when)])
     finally:
         rs.ReservationRepository, resource_repo.find_resource = o_repo, o_find
+        resource_service_repo.is_eligible = o_elig
         restore()
 
 

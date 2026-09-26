@@ -56,6 +56,7 @@ from test_lia_reservation_t1 import (                                 # noqa: E4
     BARBER as _BARBER, SERVICE as _SERVICE,
 )
 from app.repositories import resource_repo as _resource_repo          # noqa: E402
+from app.repositories import resource_service_repo as _rs_repo        # noqa: E402
 from prisma.errors import UniqueViolationError as _UVE                # noqa: E402
 
 ok = True
@@ -279,11 +280,22 @@ async def main():
         async def find_overlapping_by_barber(self, *a, **k): return []
         async def create(self, data): raise _UVE.__new__(_UVE)
 
+    def _done_true():
+        f = asyncio.get_event_loop().create_future()
+        f.set_result(True)
+        return f
+
     async def _collide(module_key, metadata, resource_active=True):
         prisma, sends, restore = _t1_install()
         o_repo, o_find = rs.ReservationRepository, _resource_repo.find_resource
+        o_elig = _rs_repo.is_eligible
         rs.ReservationRepository = _RaisingRepo
         _resource_repo.find_resource = lambda cid, rid: _done_res(rid, cid, resource_active)
+        # Clinic P5-A (2026-09-26): the write path now asks whether the resource performs the
+        # service. Stubbed to YES so this test still reaches the COLLISION it is about -- without
+        # it the booking is refused earlier, for a different and correct reason, and RX-1 would
+        # measure eligibility while claiming to measure the conflict message.
+        _rs_repo.is_eligible = lambda cid, rid, sid: _done_true()
         try:
             await rs.create_reservation(
                 client_id=_CLIENT, module_key=module_key, customer_name="أحمد",
@@ -297,6 +309,7 @@ async def main():
             return str(exc)
         finally:
             rs.ReservationRepository, _resource_repo.find_resource = o_repo, o_find
+            _rs_repo.is_eligible = o_elig
             restore()
 
     def _done_res(rid, cid, active):
@@ -305,7 +318,12 @@ async def main():
                           workingHours=None, type="doctor"))
         return f
 
-    clinic_msg = await _collide("clinic", {"resource_id": "res-1"})
+    # TRANSITION of the INPUT, not of the claim (2026-09-26, Clinic P5-A). WAS
+    # `{"resource_id": "res-1"}` with no service. A resource-backed reservation now REQUIRES a
+    # valid service_id -- deliberately, because a check you can skip by omitting a field is not a
+    # check. RX-1's claim is unchanged and still an invariant: the collision message must follow
+    # the path that collided.
+    clinic_msg = await _collide("clinic", {"resource_id": "res-1", "service_id": _SERVICE})
     barber_msg = await _collide("barber", {"barber_id": _BARBER, "service_id": _SERVICE})
     check("RX-1  a resource collision says RESOURCE, not barber",
           clinic_msg == "This resource is already booked for that time. "
