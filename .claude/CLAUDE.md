@@ -25,21 +25,43 @@ frontend/src/
 prisma/
   schema.prisma   -- Single source of truth — ALL modules here
 
-### Active Clients & Canonical Demo URLs (Updated 2026-07-18)
+### Tenants — measured against production, 2026-09-27
 
-*Note: The status below reflects the codebase tenant registry and build state. The manual Cloudflare DNS binding for `demo.salmansaas.com` is pending, so live resolution may vary.*
+The table this replaces was written 2026-07-18 and had drifted into a wrong shape, not just stale
+rows: it used **one** "Status" column for **two independent facts** — whether a DB `clients` row
+exists, and whether a frontend page/registry entry exists. Those two sets barely overlap today, so
+they are now separate columns. Every value below is a real read (`SELECT` on production via the
+sealed read-only reader) plus a real read of `frontend/src/router/tenants/index.js`, not a memory
+claim. It listed five slugs (`olivello`, `moments`, `anas`, `sneakers-lb`, `sneakers-beirut`) as
+"Live ✅" that have **no `clients` row at all**, and omitted every tenant that actually carries
+traffic.
 
-| Slug | Module | Status | Verification Source |
-| :--- | :--- | :--- | :--- |
-| **smar** | booking | Live ✅ | Original baseline |
-| **caracas** | restaurant | Live ✅ | `memory.md` (Phase 63: Done 2026-05-15) |
-| **footlab** | store | Live ✅ | `memory.md` (Phase 62: Done 2026-05-15) |
-| **arizona** | restaurant | Live ✅ | `memory.md` (Phase 70) + `tenantRegistry` |
-| **olivello** | store/showcase | Live ✅ | `tenantRegistry` + Canonical URLs |
-| **moments** | occasion pages | Live ✅ | `memory.md` (Commit b9448f3) |
-| **anas** | store (ceramics) | Live (Placeholder) | `memory.md` (2026-07-13/14) |
-| **sneakers-lb** | store | Registered (Unverified) | In registry, lacks standalone `pages/` |
-| **sneakers-beirut** | store | Registered (Unverified) | In registry, lacks standalone `pages/` |
+**`clients` rows in production: 9. Total.**
+
+| Slug | `vertical` | Reservations | Barbers | Services | Frontend | Note |
+| :--- | :--- | ---: | ---: | ---: | :--- | :--- |
+| **rk** | barber | 32 | 2 | 7 | generic | Real paying tenant · reference Barber template |
+| **barberlab-test** | barber | 22 | 2 | 11 | generic | The ONLY tenant for live WhatsApp/bot testing |
+| **mr-h** | barber | 11 | 2 | 7 | generic | Real tenant (Mister H) |
+| **alzabt-demo** | barber | 1 | 2 | 6 | generic | Demo · excluded from tenant-population decisions |
+| smar | — | 0 | 0 | 7 | `pages/smar/` + registry | Legacy · zero activity |
+| caracas | — | 0 | 0 | 0 | `pages/caracas/` + registry | Legacy · zero activity |
+| arizona | — | 0 | 0 | 0 | `pages/arizona/` + registry | Legacy · zero activity |
+| footlab | — | 0 | 0 | 0 | `pages/footlab/` + registry | Legacy · zero activity |
+| beit-al-fakhar | — | 0 | 0 | 0 | `pages/beit-al-fakhar/` | Legacy · never in the old table |
+
+**Frontend without a DB row** (registry entry and/or `pages/` folder, no `clients` row):
+`olivello` · `moments` · `alzabt` (`pages/alzabt/` is the platform's own site, not a tenant).
+**`anas` · `sneakers-lb` · `sneakers-beirut` exist in neither** — no row, no registry entry, no
+page folder.
+
+**The four live tenants have no `pages/{slug}/` folder by design** — they render through
+`pages/generic/` driven by `client.config.content.sections`. A missing page folder is therefore
+*not* evidence a tenant is unbuilt; for a generic tenant it is the expected state.
+
+`vertical` is set on exactly the four barber tenants; the five legacy rows carry `NULL`. The
+`clinic` vertical is code-complete through P4/P5-B but has **zero** tenants — `cliniclab-test` does
+not exist, and creating it needs its own explicit production-write authorization.
 
 Rule: `/demo/{slug}` auto-redirects to `/{slug}/{defaultRedirect}` for registry tenants. Only auto-onboarded (generic) tenants use `/demo/{slug}` directly.
 
@@ -91,8 +113,40 @@ rules/frontend/browser-verification-protocol.md -- Real Playwright MCP browser e
                            before frontend conclusions; what to always collect, what never to assume
                            from console/network/curl alone (established 2026-08-01)
 rules/smar-tenant.md                -- Smar-specific complete reference
+rules/phone-numbers.md           -- Always: storage WITH the country code, entry WITHOUT it
+                           (country selector defaulting to +961 in front of every phone field);
+                           app/core/phone.py is the one implementation; a send is not "sent" until
+                           it succeeded. Established 2026-09-08 from a real silent invite failure
+rules/backend/security.md        -- Route protection matrix, JWT token types, multi-tenancy
+                           isolation, the owner/admin/barber vocabulary (2026-09-12), rate limits,
+                           secret management, CORS
+rules/storage-tenant.md          -- Supabase Storage: one `properties` bucket, isolation by
+                           `{slug}/` prefix only, the full folder tree, upload path logic
+rules/tenant-onboarding.md       -- Mandatory per-tenant file checklist AND §7's Completion Gate:
+                           Client → User → Services → Settings → Page Content → Media → public
+                           page renders → dashboard renders. Anything less is Partially Completed
 
-## Agents (.claude/agent/) — inventory verified against filesystem 2026-08-16
+*The four rules above were auto-loading and governing the repo while absent from this list —
+found 2026-09-27 by the `code-reviewer` subagent reviewing this very file. The list under-reported
+what actually binds; that is the opposite failure mode from the stale tenant table above, in the
+same document.*
+
+## Agents (.claude/agents/) — migrated and verified 2026-09-27
+
+🔴 **Why this path changed.** Until 2026-09-27 these files lived in `.claude/agent/` — **singular** —
+and every one of them began with a bare `name:` line, with **no `---` frontmatter fences**. Claude
+Code reads `.claude/agents/` and requires the fences, so for roughly three months **not one of these
+agents was ever registered with the harness**: the available subagent types in every session were
+only the built-ins. `/bo-hussein` saying "delegating to backend-architect" meant the main session
+read that markdown file as instructions to itself and did the work alone — which is exactly why no
+agent report was ever seen, and why `documentation-policy.md` rule 6 (name the agent that executed
+each phase) had never once fired. Both defects were fixed by migration + two `---` lines per file,
+and the fix was proven by spawning `code-reviewer` in an isolated git worktree from a fresh nested
+session; it loaded its own definition and quoted it verbatim.
+
+**A new or edited agent file does not hot-load into a running session** — same as the Playwright MCP
+(`rules/frontend/browser-verification-protocol.md`). It registers when the next session starts.
+
 bo-hussein             -- CEO Orchestrator: strategic planning, web search, delegates to all agents
 memory-keeper          -- Updates the auto-memory system (~/.claude/projects/<project>/memory/)
                            without duplication (called by /session-close); .claude/memory.md is
@@ -100,17 +154,27 @@ memory-keeper          -- Updates the auto-memory system (~/.claude/projects/<pr
 system-auditor         -- Full codebase scan (called by /audit)
 code-reviewer          -- Architecture + multi-tenancy compliance
 backend-architect      -- FastAPI / Prisma / module design
-frontend-architect     -- React 19 / Framer Motion / GS MAR builder (canonical name;
-                           Frontend-Architect-Agent.md is a deprecated duplicate filename, kept
-                           only for historical reference — see its own header)
+frontend-architect     -- React 19 / Framer Motion / GS MAR builder (the deprecated duplicate
+                           `Frontend-Architect-Agent.md` was moved out of the agents folder
+                           2026-09-27 → `.claudedocs/archive/`, so it can no longer be mistaken
+                           for a second agent)
 cyber-sentinel         -- Security engineer: multi-tenancy leaks, auth, race conditions, secrets (10 threat classes)
 dashboard-builder      -- Admin dashboard v2: sidebar layout, stats, orders kanban, reservations tab
 generic-page-builder   -- Generic frontend pages (CatalogPage/CartPage/ReservePage) driven by module_key
 page-builder-polish    -- Builds a new tenant's page content, then applies visual polish for production
 tenant-seeder          -- Creates new tenants from one JSON: ordered API calls, catalog seed, demo link
 كونان (المحقق كونان.md) -- Extracts onboarding data from WhatsApp conversations into tenant-ready
-                           JSON for tenant-seeder; reads konaan-onboarding-schema.md as its own
-                           schema reference (not a separate agent — that file has no agent frontmatter)
+                           JSON for tenant-seeder; its schema reference moved 2026-09-27 to
+                           `.claude/reference/konaan-onboarding-schema.md` (it is a schema document,
+                           not an agent — no frontmatter — so it does not belong in `agents/`), and
+                           the two hard paths inside the agent file were updated to match.
+                           ✅ Its Arabic `name:` (`كونان — محقق الأونبوردينغ`) DOES register as a
+                           callable subagent type — verified 2026-09-27 when all 12 appeared in the
+                           harness's own available-agents list. Arabic names with spaces and an
+                           em-dash are accepted; no rename needed.
+                           ⚠️ Salman, 2026-09-27: "كونان is an older version of Lia" — whether any
+                           of it still serves demo creation is an OPEN question, not settled here.
+                           It predates Lia and overlaps her extraction role; see the note below.
 
 ## Skills (.claude/skills/)
 backend/  -- database-architecture, supabase-prisma, n8n-automation

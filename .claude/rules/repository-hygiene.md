@@ -39,7 +39,7 @@ classification, real decisions made — not "cleaned up" alone.
 
 Before starting significant new work (a new template, a new Service), Bo Hussein answers: "Is the
 repository state trustworthy enough to start new work? YES/NO — Evidence: ..." This is a standing
-responsibility, not a one-time favor — see `.claude/agent/bo-hussein.md`'s Team Leadership section.
+responsibility, not a one-time favor — see `.claude/agents/bo-hussein.md`'s Team Leadership section.
 
 ## Bo Hussein's Architecture Review Responsibility
 
@@ -70,12 +70,12 @@ about it.
 
 ## Persona & Prompt Drift
 
-`.claude/agent/*.md`, `.claude/rules/*.md` and `app/prompts/**` files are prompts, not ordinary
+`.claude/agents/*.md`, `.claude/rules/*.md` and `app/prompts/**` files are prompts, not ordinary
 project files — editing one changes agent behavior directly. Real research on prompt governance (see
 `.claudedocs/architecture/AGENT_DRIFT_AND_OBSERVABILITY_VISION.md`) converges on one practice
 regardless of team size: a change to one of these files needs a stated reason on the record at
 the moment of the edit — not just "what changed" but "why." In practice: any commit touching
-`.claude/agent/*.md`, `.claude/rules/*.md` or `app/prompts/**` states its Intent in the commit
+`.claude/agents/*.md`, `.claude/rules/*.md` or `app/prompts/**` states its Intent in the commit
 body — already this project's habit, made explicit here for these three paths specifically. No separate changelog file,
 no approval workflow, no version-pinning — those belong to Observability/canary-rollout tooling
 this project doesn't run yet; at this project's current scale (one owner, git as the review

@@ -23,7 +23,7 @@ CEO Orchestrator لـ SalmanSaaS — يستقبل فكرة أو هدف، يحل�
 اقرأ وطبّق كامل الـ agent file:
 
 ```
-.claude/agent/bo-hussein.md
+.claude/agents/bo-hussein.md
 ```
 
 ### Step 2 — تحميل السياق
@@ -63,7 +63,7 @@ ls .claudedocs/sessions/ | sort | tail -1
 
 ### Step 4 — التنفيذ
 
-طبّق routing logic الموجودة في `.claude/agent/bo-hussein.md` على `$ARGUMENTS`:
+طبّق routing logic الموجودة في `.claude/agents/bo-hussein.md` على `$ARGUMENTS`:
 
 1. هل يحتاج WebSearch؟ → ابحث أولاً
 2. فكّك المهمة

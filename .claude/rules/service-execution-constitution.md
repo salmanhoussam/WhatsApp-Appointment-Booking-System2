@@ -24,7 +24,7 @@ A Service's own contract (`.claudedocs/templates/SERVICE_CONTRACT_TEMPLATE.md`) 
 
 ## Service Lifecycle
 
-No Service may execute before its Contract exists. Before a Service becomes active it must have: Mission, Contract, Inputs, Outputs, Context Investigation, Evidence format, Owner, Dependencies — all present in its `.claude/agent/{service}.md` file, following `SERVICE_CONTRACT_TEMPLATE.md`. This is the same requirement `tenant-seeder` satisfies as the first real instance — stated once, generically, so it doesn't need re-justifying per future Service.
+No Service may execute before its Contract exists. Before a Service becomes active it must have: Mission, Contract, Inputs, Outputs, Context Investigation, Evidence format, Owner, Dependencies — all present in its `.claude/agents/{service}.md` file, following `SERVICE_CONTRACT_TEMPLATE.md`. This is the same requirement `tenant-seeder` satisfies as the first real instance — stated once, generically, so it doesn't need re-justifying per future Service.
 
 ## Note — separate from ADR-scoped evidence
 

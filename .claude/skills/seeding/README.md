@@ -54,7 +54,7 @@ production/04-dns-subdomain.md      ← Subdomain + deploy
 ## Agent المسؤول
 
 `tenant-seeder` — يقرأ الـ JSON ويشغّل الـ skills بالترتيب تلقائياً.
-تعريفه: `.claude/agent/tenant-seeder.md`
+تعريفه: `.claude/agents/tenant-seeder.md`
 
 ---
 

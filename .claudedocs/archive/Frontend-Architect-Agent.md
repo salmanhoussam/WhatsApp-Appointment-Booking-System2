@@ -1,4 +1,4 @@
-> ⚠️ DEPRECATED 2026-08-16 — canonical agent is `.claude/agent/frontend-architect.md`. This file
+> ⚠️ DEPRECATED 2026-08-16 — canonical agent is `.claude/agents/frontend-architect.md`. This file
 > (`Frontend-Architect-Agent.md`) is a legacy duplicate under the old filename, already reduced to
 > a redirect stub below; kept only for historical reference, per `Scaffold Tenant Command.md`'s
 > same precedent. Routing references to the old name `Frontend-Architect-Agent` in `bo-hussein.md`

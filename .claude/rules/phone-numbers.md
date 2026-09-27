@@ -70,7 +70,7 @@ normalize_for_storage()  already canonical
 This file previously named `team.py` as the incident site and **did not mention
 `admin/barbers.py` at all** — so its own audit was incomplete, which is a way this failure recurs
 even while the rule is on the record. Measured, not assumed (repo-wide search, `app/` + `scripts/`
-+ `prisma/migrations/*.sql` + `scripts/data/*.json` + `.claude/agent/*.md`):
++ `prisma/migrations/*.sql` + `scripts/data/*.json` + `.claude/agents/*.md`):
 
 | Layer | Write path | State |
 |---|---|---|

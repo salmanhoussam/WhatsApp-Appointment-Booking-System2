@@ -18,7 +18,7 @@ this file does not repeat that, it names the capability and states what it's pro
 ## Why "Capability," not "Agent"
 
 This project's own vocabulary reserves "Agent" for something with a lifecycle, a Contract, and
-independent track record (`.claude/agent/bo-hussein.md`'s "Team Evolution" section). What's real
+independent track record (`.claude/agents/bo-hussein.md`'s "Team Evolution" section). What's real
 today is a proven *method*, not yet that fuller thing. See
 `.claudedocs/architecture/ENGINEERING_ORGANIZATION.md` for where this sits on the org chart.
 
