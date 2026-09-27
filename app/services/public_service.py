@@ -8,6 +8,9 @@ from prisma import Prisma
 from fastapi import HTTPException
 from datetime import datetime, timedelta, date, timezone
 from app.services.whatsapp_service import WhatsAppService
+# ق-٥-ب (2026-09-27): the server resolves a tenant's public booking module from its vertical,
+# so no Interface ever receives the raw `Client.vertical`.
+from app.core.verticals import resolve_booking_module
 
 # ── Supabase storage client (storage-only, service key) ──────────────────────
 _SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -237,7 +240,40 @@ def _record_to_dict(record) -> Dict[str, Any]:
         "active_services": [s.serviceKey for s in client_services if s.isActive],
         "page_type":       getattr(record, "pageType",    "normal"),
         "template_key":    getattr(record, "templateKey", None),
+        # ق-٥-ب (Salman, 2026-09-27) -- the ONE key this decision adds. The page is told which
+        # booking module it is; it does not infer one. `vertical` itself is deliberately NOT in this
+        # payload and must never be added: handing an Interface the raw vertical is the half of the
+        # decision that was rejected. Contract:
+        # .claudedocs/implementation/CLINIC_Q5B_BOOKING_MODULE_CONTRACT.md
+        #
+        # null carries TWO different server-side meanings and they are separated below, not here --
+        # a legitimately unassigned vertical (5 of 9 real client rows) vs. a set-but-unregistered
+        # one, which is a provisioning defect. Collapsing them with no trace is the same mistake as
+        # an empty array that means two things, which is precisely the bug this decision exists to
+        # stop reproducing.
+        "booking_module":  _resolve_booking_module_for(record),
     }
+
+
+def _resolve_booking_module_for(record) -> Optional[str]:
+    """`resolve_booking_module`, plus the one thing a pure lookup table must not do: tell the two
+    null causes apart and make the defective one visible.
+
+    A tenant whose `vertical` is NULL is an ordinary, expected state -- 5 of the 9 real client rows
+    on 2026-09-27 -- so it is silent. A tenant whose `vertical` is SET but resolves to nothing is a
+    typo or a vertical nobody registered, and it degrades into exactly the same payload as a legacy
+    tenant; without this line it would be indistinguishable from the normal case forever.
+    """
+    vertical = getattr(record, "vertical", None)
+    resolved = resolve_booking_module(vertical)
+    if resolved is None and vertical is not None:
+        logger.warning(
+            "🔴 booking_module unresolved for slug=%r: vertical=%r is set but has no "
+            "VERTICAL_REGISTRY entry (or declares no booking_module). The public page will fall "
+            "back to its legacy path. This is a provisioning defect, not a legacy tenant.",
+            getattr(record, "slug", None), vertical,
+        )
+    return resolved
 
 
 async def _inject_page_hero_media(client_id: str, result: Dict[str, Any]) -> None:

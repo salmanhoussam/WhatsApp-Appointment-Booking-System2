@@ -17,10 +17,32 @@ repository-hygiene.md's Persona & Prompt Drift convention extended to this file)
 tenant, admin, or AI action.
 
 Ownership boundary (do not add anything outside this shape):
-  - ALLOWED:  default_services (list[str]), page_template (str | None), staff_backing_model (str | None)
+  - ALLOWED:  default_services (list[str]), page_template (str | None), staff_backing_model
+              (str | None), booking_module (str | None)
   - NEVER:    procedural logic, per-tenant overrides, Reservations engine internals, section
               content/labels (those stay in the vertical's own page_templates/{vertical}.json),
               anything that varies per-tenant.
+
+`booking_module` was added 2026-09-27 as the FOURTH allowed field, on Salman's explicit approval
+(ق-ب-٢), and the whitelist above was amended rather than quietly stretched. It is the module key a
+PUBLIC booking page must send as `ReservationIn.module_key` for a tenant of this vertical, resolved
+server-side and handed to the frontend already decided -- see
+.claudedocs/implementation/CLINIC_Q5B_BOOKING_MODULE_CONTRACT.md.
+
+Why it belongs here and not in the Reservations domain: it is a structural fact about the vertical
+that never varies per tenant, which is the same shape as `staff_backing_model` (itself already a
+name from the booking world: Barber vs Resource). It is NOT "Reservations engine internals" -- those
+are conflict detection, slot arithmetic and working hours, none of which appear here. The rejected
+alternative was a third module-key map alongside RESOURCE_BACKED_MODULE_KEYS
+(reservation_service.py) and MODULE_KEY_TO_RESOURCE_TYPE (public/reservations.py), which would have
+to be kept in manual lockstep with both.
+
+Two derivations were considered and refused, because each is right only by accident:
+  - `booking_module = vertical` -- true today only because the two names coincide, and literally the
+    "dispatched by staff_backing_model, NOT by vertical name" that
+    ALZABT_UNIFIED_PROVISIONING_CONTRACT_FINAL.md:113 forbids.
+  - deriving it from `staff_backing_model` -- "Resource" does not imply "clinic"; the mapping is not
+    injective and breaks on the second Resource-backed vertical (a lab, a wash bay).
 """
 
 VERTICAL_REGISTRY: dict[str, dict] = {
@@ -48,6 +70,24 @@ VERTICAL_REGISTRY: dict[str, dict] = {
         # explicitly None rather than pointing at a file that doesn't exist yet.
         "page_template": None,
         "staff_backing_model": "Barber",
+        # The value the public booking page already sends today -- until 2026-09-27 it was a bare
+        # literal in frontend/src/hooks/useReservationBooking.js. Declaring it here does not change
+        # what is sent; it gives the literal a source.
+        "booking_module": "barber",
+    },
+    "clinic": {
+        # ق-ب-٣ (Salman, 2026-09-27). EXACTLY what CLINIC_TEST_TENANT_CONTRACT.md §2 ratifies for
+        # cliniclab-test -- `reservations` only. Deliberately NOT barber's list: a clinic has no
+        # catalog surface and no WhatsApp number at all (that contract sets whatsapp_number and
+        # phone NULL on purpose, so a test booking cannot send a real message).
+        "default_services": ["reservations"],
+        # Not built. Left None rather than naming a file that does not exist -- same honesty as
+        # barber's own entry above.
+        "page_template": None,
+        # Clinic books a Resource (a doctor), not a Barber. resource_repo/Resource.type == "doctor";
+        # see MODULE_KEY_TO_RESOURCE_TYPE in app/api/v1/public/reservations.py.
+        "staff_backing_model": "Resource",
+        "booking_module": "clinic",
     },
 }
 
@@ -64,3 +104,35 @@ def get_vertical(vertical: str | None) -> dict | None:
     if vertical is None:
         return None
     return VERTICAL_REGISTRY.get(vertical)
+
+
+def resolve_booking_module(vertical: str | None) -> str | None:
+    """Resolve a tenant's PUBLIC booking module key from its vertical. Pure lookup, no I/O.
+
+    This is the server side of ق-٥-ب (Salman, 2026-09-27): the page is told which booking module it
+    is, it does not work it out. `Client.vertical` therefore never reaches any Interface -- the
+    resolved answer does. See .claudedocs/implementation/CLINIC_Q5B_BOOKING_MODULE_CONTRACT.md.
+
+    That split is what lets three ratified statements all stay true at once:
+      - schema.prisma:106-108  `vertical` is never read at render time (by an Interface -- the
+                               server owns it and may read it),
+      - ALZABT_VERTICAL_REGISTRY_ARCHITECTURE.md:26   Interfaces never read this Registry,
+      - ALZABT_VERTICAL_REGISTRY_ARCHITECTURE.md:255  the staff-model choice is "Derived, and stays
+                               derived ... every render" -- which is literally this question.
+
+    Returns None for BOTH of `get_vertical`'s two documented cases, exactly as that function does:
+    an unassigned vertical (5 of 9 real client rows on 2026-09-27) and a set-but-unregistered one (a
+    typo, or a vertical nobody has added here yet). They are not the same thing and a caller that
+    surfaces this value MUST tell them apart itself -- `vertical is not None and result is None` is
+    the unregistered case, and it is a provisioning defect that has to be visible rather than
+    degrade quietly into "looks like a legacy tenant". That is the caller's job by design, the same
+    way `get_vertical`'s own docstring already assigns it; keeping the decision here would mean
+    logging from a pure lookup table.
+
+    A registered vertical with no `booking_module` key also returns None rather than raising: the
+    field is optional in the shape, and a vertical that has not declared one has not decided.
+    """
+    entry = get_vertical(vertical)
+    if entry is None:
+        return None
+    return entry.get("booking_module")

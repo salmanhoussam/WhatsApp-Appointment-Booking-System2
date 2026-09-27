@@ -16,6 +16,7 @@
  *     features:        { spatial, listings, booking, payment },
  *     unit_types:      string[],
  *     payment_methods: string[],
+ *     booking_module:  'barber' | 'clinic' | null,   // server-resolved; null = not resolved
  *   }
  *
  * ─── CACHE BEHAVIOR ──────────────────────────────────────────────────────────
@@ -52,6 +53,12 @@ const DEFAULT_CONFIG = {
   payment_methods: ['cash'],
   service_type:    null,
   active_services: [],
+  // ق-5-ب (2026-09-27): explicit, because this object is what the page gets when the config
+  // request FAILS. Leaving it out would make `booking_module` undefined on the error path, and
+  // whatever the consumer treats as its default would silently become the behaviour of a network
+  // failure. null here means the same thing it means from the server: not resolved -- never
+  // "barber". Contract: .claudedocs/implementation/CLINIC_Q5B_BOOKING_MODULE_CONTRACT.md
+  booking_module:  null,
 };
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
