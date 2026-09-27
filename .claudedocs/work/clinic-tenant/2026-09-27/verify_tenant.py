@@ -124,10 +124,39 @@ async def main() -> int:
     want = dict(cs=1, us=1, ct=1, sv=3, rs=2, rsv=3)
     chk("T-1e  §2's row counts, exactly", all(int(counts[k]) == v for k, v in want.items()),
         " ".join(f"{k}={counts[k]}" for k in want))
-    chk("T-9   🔴 ZERO reservations · customers · patients · patient_contacts — those are written BY "
-        "the booking we want to test, never provisioned",
-        all(int(counts[k]) == 0 for k in ("rv", "cu", "pt", "pc")),
+    # 🔴 FLIPPED by P5-F. Its OLD assertion was that all four were ZERO — true at provisioning, and
+    # the contract's point was that these rows must be written BY a real booking, never seeded. The
+    # browser journey wrote them, so the assertion now names what it used to say.
+    chk("T-9   🔴 TRANSITION — ONE reservation, ONE customer, ONE patient, ONE patient_contact, all "
+        "created BY the real browser booking. At provisioning this asserted all four were ZERO, "
+        "which is what made them evidence rather than fixtures",
+        [int(counts[k]) for k in ("rv", "cu", "pt", "pc")] == [1, 1, 1, 1],
         " ".join(f"{k}={counts[k]}" for k in ("rv", "cu", "pt", "pc")))
+
+    # ── P5-F · what the browser actually wrote ───────────────────────────────────────────────
+    r = (await q(f"""SELECT id, module_key, source, status, barber_id, resource_id, service_id,
+                     customer_id, patient_id, reserved_at, duration_min, customer_name, customer_phone
+                     FROM reservations WHERE client_id='{cid}'"""))
+    if r:
+        r = r[0]
+        chk("F-1   🔴 the reservation took the RESOURCE path, not the barber one: resource_id is set "
+            "and barber_id is NULL — the two columns are never both used",
+            r["resource_id"] is not None and r["barber_id"] is None,
+            f"resource_id={str(r['resource_id'])[:8]} barber_id={r['barber_id']}")
+        chk("F-2   module_key='clinic' — the value the SERVER resolved and handed the page, which the "
+            "page sent straight back (ق-٥-ب's whole chain, end to end on production)",
+            r["module_key"] == "clinic", r["module_key"])
+        chk("F-3   duration came from the SERVICE (30m), not from anything the browser chose (ق-٤-أ)",
+            int(r["duration_min"]) == 30, f"{r['duration_min']}m")
+        chk("F-4   it is linked to a real customer AND a real patient row",
+            r["customer_id"] is not None and r["patient_id"] is not None)
+        pc = (await q(f"SELECT role FROM patient_contacts WHERE client_id='{cid}'"))
+        chk("F-5   the patient link carries role='self' — the visitor answered «إلي», and F-1's "
+            "ratified decision is that the site writes self/other and never 'guardian'",
+            len(pc) == 1 and pc[0]["role"] == "self",
+            pc[0]["role"] if pc else "no link")
+        chk("F-6   customer_phone is stored WITH the country code (phone-numbers.md)",
+            str(r["customer_phone"]).startswith("961"), r["customer_phone"])
 
     svc = await q(f"SELECT name_ar, duration_min, bookable_by, instructions IS NOT NULL has_instr "
                   f"FROM catalog_services WHERE client_id='{cid}' ORDER BY sort_order")
