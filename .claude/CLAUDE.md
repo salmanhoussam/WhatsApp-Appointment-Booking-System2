@@ -202,12 +202,31 @@ general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, mc
              layers, dedups, simplifies; any behavior/authorization/data-model/architecture change
              found along the way escalates to an Implementation Contract/ADR instead, never
              absorbed silently — established 2026-08-09), + more
-top-level (not yet categorized under backend/frontend/shared/general, but real and tracked in git,
-confirmed 2026-08-16): impeccable/ (craft/polish/animate — referenced directly by
-frontend-architect.md), seeding/, supabase-ref/. NOTE: ~20 other top-level `.claude/skills/*`
-folders exist on disk (animation-vocabulary, apple-design, brandkit, higgsfield-*, gpt-taste,
-etc.) but are untracked in git as of 2026-08-16 — not part of this project's committed skill set,
-intentionally not indexed here; see Track 3 cleanup report's Open Decisions.
+top-level: impeccable/ (craft/polish/animate — referenced directly by frontend-architect.md),
+seeding/, supabase-ref/, ui-ux-pro-max/.
+
+**`.claude/skills/` now holds 8 real directories and zero symlinks (2026-09-27).** The note that
+stood here was wrong on both of its claims, and how it was wrong is worth keeping: it said ~20
+top-level skill folders "exist on disk … but are untracked in git", and they were in fact **tracked**
+— all 21 of them — as *symlinks* pointing out of this repo's own skills folder into a second tree,
+`.agents/skills/`, installed by an external skills package manager (`skills-lock.json`). So
+`.claude/skills/` was not one folder with stray extras; **two thirds of it lived somewhere else.**
+
+That tree was removed on Salman's explicit instruction, after measuring that nothing in this project
+depended on any of the 21: zero references from any agent, rule, or command — the only mention of
+four of them was the stale note above, and `shared/motion-design` reaches Higgsfield through the
+`mcp__higgsfield__*` MCP tools, not through the `higgsfield-*` skill folders. `impeccable` was the
+one real dependency and it was already self-sufficient (its own `scripts/`, including an untracked
+`scripts/lib/` proven byte-identical to the copy in the deleted tree); its 19 hard paths into
+`.agents/` across `SKILL.md`, `reference/*.md` and `scripts/hook-admin.mjs` were repointed at
+`.claude/skills/impeccable/`, and it was smoke-tested before and after deletion.
+
+Everything deleted is recoverable from history (`git show <commit>^:<path>`) — it was committed, so
+this is reversible, not lost. The 21 removed were third-party design/image skills: animation-
+vocabulary, apple-design, brandkit, design-taste-frontend(+v1), emil-design-eng,
+full-output-enforcement, gpt-taste, the five higgsfield-*, high-end-visual-design,
+imagegen-frontend-mobile/web, image-to-code, improve-animations, redesign-existing-projects,
+review-animations, stitch-design-taste.
 
 ## Critical Rules (always in mind)
 1. كل DB query فيها clientId — لا استثناء

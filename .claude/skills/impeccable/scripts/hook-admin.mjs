@@ -73,7 +73,7 @@ const HOOK_MANIFEST_TARGETS = [
   },
   {
     provider: '.agents',
-    skillRel: '.agents/skills/impeccable',
+    skillRel: '.claude/skills/impeccable',
     destRel: '.codex/hooks.json',
     manifest: () => ({
       hooks: {
@@ -83,7 +83,7 @@ const HOOK_MANIFEST_TARGETS = [
             hooks: [
               {
                 type: 'command',
-                command: 'node ".agents/skills/impeccable/scripts/hook.mjs"',
+                command: 'node ".claude/skills/impeccable/scripts/hook.mjs"',
                 timeout: TIMEOUT_SECONDS,
                 statusMessage: STATUS_MESSAGE,
               },
