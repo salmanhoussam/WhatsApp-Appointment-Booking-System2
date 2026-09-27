@@ -3,6 +3,7 @@ import useTenantConfig from './useTenantConfig'
 import useTenantSlug from './useTenantSlug'
 import publicApi from '../utils/publicApi'
 import { useAppLanguage } from '../context/AppLanguageContext'
+import { deriveBookingMode } from './bookingMode'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_WEEKDAYS_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
@@ -83,9 +84,16 @@ const WHATSAPP_PLACEHOLDER_PHONE = 'عبر واتساب'
  * WhatsApp (primary) and a local name/phone form (secondary, collapsed by default). Consumes only
  * the existing backend (barbers/availability/create) -- no slot or conflict logic here.
  *
- * `mode`: 'loading' | 'booking' (real Barber rows exist) | 'legacy' (generic date/time form) |
- * 'error' (the barbers fetch itself failed -- distinct from 'legacy', which means it succeeded
- * and genuinely found zero staff; added 2026-08-10, see the barbersError bug-fix comment below).
+ * `mode`: 'loading' | 'booking' | 'clinic' | 'legacy' | 'error' -- derived by ./bookingMode.js from
+ * the SERVER-RESOLVED `config.booking_module`, not by counting rows (T-ب-٦, ق-٥-ب, 2026-09-27).
+ * It used to read "'booking' (real Barber rows exist)", and that was the inference ق-٥-ب removed:
+ * an empty barber list meant a failed request OR genuinely no staff (separated 2026-08-10) and a
+ * clinic would have made it mean a third thing. 'error' still means only "the barber list request
+ * failed", and it is now reachable ONLY for a barber tenant.
+ * 🔴 'clinic' is named and returned here but NOT yet rendered: ReservePage has no clinic branch, so
+ * it currently falls through to the legacy form. That branch is P5-E's first gate (it needs the 19
+ * approved Arabic strings, which this gate is not allowed to invent). No visitor can reach it today
+ * -- zero clinic tenants exist in production.
  */
 export default function useReservationBooking() {
   const { config, isLoading: configLoading } = useTenantConfig()
@@ -163,8 +171,21 @@ export default function useReservationBooking() {
   const [barbersRetryKey, setBarbersRetryKey] = useState(0)
   const retryBarbers = useCallback(() => setBarbersRetryKey((k) => k + 1), [])
 
+  // T-ب-٦ (ق-٥-ب, Salman 2026-09-27) -- the server's resolved answer. `useTenantConfig`'s
+  // DEFAULT_CONFIG declares this key explicitly, so a FAILED config request yields null here
+  // rather than undefined, and null can never be read as "barber".
+  const bookingModule = config?.booking_module ?? null
+
   useEffect(() => {
     if (!slug) return
+    // Gated on the resolved module now. This request used to run for EVERY tenant, because its
+    // real job was establishing `mode` (see the sibling fetch's own comment below). Two
+    // consequences, both deliberate:
+    //   1. a legacy tenant no longer makes a request it has no use for, and
+    //   2. 🔴 a legacy tenant's page can no longer be replaced by an error screen when that
+    //      request fails -- which is exactly what happened before, for a tenant that never
+    //      needed barbers at all.
+    if (bookingModule !== 'barber') { setBarbersLoading(false); return }
     setBarbersLoading(true)
     setBarbersError(false)
     publicApi.get('/reservations/barbers', { params: { client_slug: slug } })
@@ -180,13 +201,12 @@ export default function useReservationBooking() {
       // form. barbersError now keeps that distinction all the way to the UI.
       .catch(() => { if (mountedRef.current) { setBarbers([]); setBarbersError(true) } })
       .finally(() => { if (mountedRef.current) setBarbersLoading(false) })
-  }, [slug, barbersRetryKey])
+  }, [slug, bookingModule, barbersRetryKey])
 
-  const mode = barbersLoading
-    ? 'loading'
-    : barbersError
-      ? 'error'
-      : (barbers.length > 0 ? 'booking' : 'legacy')
+  // 🔴 WAS: `barbers.length > 0 ? 'booking' : 'legacy'` -- the page inferred what kind of business
+  // it was rendering by counting staff rows. Now it is told. The logic lives in ./bookingMode.js as
+  // a pure function precisely so a real test can call it; see that file's header for why.
+  const mode = deriveBookingMode({ configLoading, bookingModule, barbersLoading, barbersError })
 
   // Phase 3.7C (2026-08-08) -- was a category-walk (fetchAllCategories -> fetchItems per category
   // -> filter by metadata.requires_booking); now a single call against the real CatalogService
@@ -274,7 +294,10 @@ export default function useReservationBooking() {
     const { data } = await publicApi.post(
       '/reservations/',
       {
-        module_key:     'barber',
+        // T-ب-٦: was the literal `'barber'`. `mode === 'booking'` is only reachable when
+        // bookingModule === 'barber', so this is the same value for every tenant that can
+        // reach this line today -- what changed is that it now has a source.
+        module_key:     bookingModule,
         customer_name:  name,
         customer_phone: phone,
         reserved_at:    selectedSlot.datetime,
@@ -381,7 +404,7 @@ export default function useReservationBooking() {
   }, [canConfirm, customerName, customerPhone, createReservation])
 
   return {
-    config, configLoading, mode, lang,
+    config, configLoading, mode, bookingModule, lang,
     monthGrid, goPrevMonth, goNextMonth, monthOffset,
     weekdaysShort,
     selectedDate, chooseDate,

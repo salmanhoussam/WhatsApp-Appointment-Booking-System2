@@ -1028,5 +1028,17 @@ export default function ReservePage() {
     return <BookingPage booking={booking} config={config} accent={accent} />
   }
 
+  // 🔴 KNOWN, DECLARED GAP -- P5-E's first gate, not an oversight.
+  // `mode === 'clinic'` is now a real value the hook returns (T-ب-٦, ق-٥-ب, 2026-09-27) and there is
+  // deliberately no branch for it yet, so a clinic falls through to the legacy form below. It is not
+  // closed here for one reason: the clinic screen needs the 19 Arabic strings approved in
+  // .claudedocs/architecture/CLINIC_WEB_UX_CONTRACT.md §6, and P5-E was explicitly excluded from
+  // this batch. Reusing an existing string instead would break rules/text-context-rule.md --
+  // `reservationUnavailable` was written for "this service is not enabled", not for "the clinic
+  // screen is not built".
+  // No visitor can reach this today: it requires Client.vertical='clinic' and production holds zero
+  // clinic tenants (measured 2026-09-27). Closing it is a precondition of P5-F, and
+  // scripts/test_clinic_booking_module_contract.py asserts this interim explicitly so it cannot be
+  // forgotten silently.
   return <LegacyPage config={config} slug={slug} base={base} navigate={navigate} />
 }
