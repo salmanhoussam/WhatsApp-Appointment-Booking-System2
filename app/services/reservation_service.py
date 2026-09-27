@@ -180,6 +180,24 @@ PATIENT_FACING_SOURCES = frozenset({"website", "whatsapp"})
 # independently rather than folded into this set.
 RESOURCE_BACKED_MODULE_KEYS = {"clinic"}
 
+# 🔴 "No WhatsApp before P6" -- AS A GUARD, NOT AS A SIDE EFFECT (Salman, 2026-09-27, option هـ).
+#
+# CLINIC_TEST_TENANT_CONTRACT.md §4 rested that guarantee on `Client.phone = NULL`, because
+# `_notify_merchant_new_reservation` resolves its owner recipient as `whatsapp_number or phone` and
+# adds nobody when both are empty. Creating the test tenant is what proved that impossible:
+# schema.prisma:21 declares `phone String @unique` -- NOT NULL -- and `migrate diff` is empty, so the
+# deployed column really is NOT NULL. The contract's central safety property was therefore never
+# satisfiable, and had never been verified rather than having broken.
+#
+# So the rule becomes a real condition, checked before a single recipient is collected. Two
+# properties that the empty column never had: it is CHECKABLE (a test can assert zero sends for a
+# clinic and one for a barber from the same input), and it cannot be undone by someone filling in a
+# phone number later for an unrelated reason.
+#
+# This is a TEMPORARY fence with a named end: P6 is the phase that gives the clinic its own
+# WhatsApp behaviour, and this set is what P6 removes.
+NO_MERCHANT_WHATSAPP_VERTICALS = frozenset({"clinic"})
+
 
 # Phase D (Customer Experience, 2026-08-24) -- strong references for in-flight fire-and-forget
 # notification tasks. asyncio.create_task() alone doesn't keep its Task alive against GC; the
@@ -214,6 +232,18 @@ async def _notify_merchant_new_reservation(reservation_row) -> None:
     try:
         client = await prisma_client.client.find_unique(where={"id": reservation_row.clientId})
         if not client:
+            return
+
+        # Placed HERE deliberately -- before a single recipient exists, not as a filter applied to a
+        # built list. A vertical with no merchant channel yet must not be able to acquire one by any
+        # later path through this function.
+        vertical = getattr(client, "vertical", None)
+        if vertical in NO_MERCHANT_WHATSAPP_VERTICALS:
+            logger.info(
+                "Merchant alert suppressed for reservation %s: vertical=%r has no WhatsApp channel "
+                "until P6 (tenant %s). This is the rule, not a failure.",
+                reservation_row.id, vertical, getattr(client, "slug", None),
+            )
             return
 
         recipients: list[tuple[str, str]] = []          # (phone, label) — order = priority
