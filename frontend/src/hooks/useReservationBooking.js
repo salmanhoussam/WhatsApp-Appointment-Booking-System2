@@ -5,6 +5,7 @@ import publicApi from '../utils/publicApi'
 import { useAppLanguage } from '../context/AppLanguageContext'
 import { deriveBookingMode } from './bookingMode'
 import { staffListRequest, availabilityRequest, bookingMetadata } from './bookingEndpoints'
+import { withStaffAliases } from './staffSurface'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_WEEKDAYS_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
@@ -427,7 +428,9 @@ export default function useReservationBooking() {
     }
   }, [canConfirm, customerName, customerPhone, createReservation])
 
-  return {
+  // Wrapped so the neutral staff names are DERIVED from the barber-named ones rather than
+  // written a second time -- see ./staffSurface.js for why, and for when it goes away.
+  return withStaffAliases({
     config, configLoading, mode, bookingModule, lang,
     monthGrid, goPrevMonth, goNextMonth, monthOffset,
     weekdaysShort,
@@ -441,5 +444,5 @@ export default function useReservationBooking() {
     canConfirm, confirmViaWhatsApp, confirmLocally,
     botLink, bookViaWhatsAppBot,
     formatDate,
-  }
+  })
 }

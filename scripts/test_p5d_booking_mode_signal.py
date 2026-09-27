@@ -3,6 +3,9 @@
     T-ب-٦  the SIGNAL: `mode` comes from the server-resolved `booking_module`, not `barbers.length`.
     T-ب-٧  the REQUESTS: which staff/availability endpoint and which create metadata that module
            implies, resolved in one place instead of written literally at each call site.
+    T-ب-٨  the NAMES: a neutral `staff` surface for P5-E to consume, DERIVED from the barber-named
+           one so the two cannot drift, with the live BookingPage left untouched (option (أ),
+           approved 2026-09-27).
 
 Run:  venv/bin/python scripts/test_p5d_booking_mode_signal.py
 
@@ -99,7 +102,8 @@ def main():
 
     # ── BEHAVIOUR: the pure derivation, really executed ─────────────────────────────────────
     for probe, label, floor in (("scripts/booking_mode_cases.mjs", "T-ب-٦-b0", 12),
-                                ("scripts/booking_endpoints_cases.mjs", "T-ب-٧-b0", 15)):
+                                ("scripts/booking_endpoints_cases.mjs", "T-ب-٧-b0", 15),
+                                ("scripts/staff_surface_cases.mjs", "T-ب-٨-b0", 8)):
         node = subprocess.run(["node", probe], cwd=ROOT, capture_output=True, text=True, timeout=60)
         if node.returncode != 0:
             check(f"{label}  node could execute {probe} at all", False,
@@ -175,6 +179,23 @@ def main():
     endp = read(os.path.join(ROOT, "frontend/src/hooks/bookingEndpoints.js"))
     check("T-ب-٧-s5  [text] the resolver module imports nothing either — no React, no publicApi",
           "import" not in endp.split("export")[0], "zero imports before first export")
+
+    # ── T-ب-٨ structure: the neutral surface is derived, and the live UI is untouched ────────
+    check("T-ب-٨-s1  [code] the hook returns its surface THROUGH withStaffAliases, so the neutral "
+          "names cannot be forgotten for a value that has one",
+          "return withStaffAliases({" in hook_code and "from './staffSurface'" in hook_code)
+    surf = read(os.path.join(ROOT, "frontend/src/hooks/staffSurface.js"))
+    check("T-ب-٨-s2  [text] the alias module imports nothing — callable from node, like its siblings",
+          "import" not in surf.split("export")[0], "zero imports before first export")
+    check("T-ب-٨-s3  🔴 [code] INVARIANT — ReservePage still reads the LEGACY names and was not "
+          "renamed: this is the only live revenue-earning booking UI (rk, mr-h) and there is no "
+          "browser evidence available in this session to verify a rename of it",
+          "barbers, barbersLoading, selectedBarberId, chooseBarber," in page_code
+          and "selectedStaffId" not in page_code,
+          "legacy surface consumed, neutral surface unused by the live UI")
+    check("T-ب-٨-s4  [code] DECLARED MIGRATION STATE — the parallel names are documented as "
+          "temporary with a stated end (architecture.md §9), not as permanent architecture",
+          "MIGRATION STATE, WITH A STATED END" in surf)
 
     # ── INVARIANTS: what these gates must NOT have touched ─────────────────────────────────
     staff = read(os.path.join(ROOT, "frontend/src/components/dynamic-sections/StaffSection.jsx"))
