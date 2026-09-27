@@ -52,6 +52,11 @@ export const CLINIC_TEXT = {
   n17: 'رح نتواصل معك على الرقم يلي كتبته.',
   n18: 'هذه الخدمة مخصصة للحجز الداخلي فقط.',
   n19: 'لا يمكن الحجز (مدة الخدمة غير محددة).',
+  // ن-٢٠ — ratified by Salman 2026-09-27, filling the one gap §6's table had: it specified no
+  // label for the ⑤ -> ⑥ affordance (§7 only said a next-step button exists), so a glyph stood
+  // in rather than invented copy. His word: «اعتمد كلمة "متابعة"». Added to the contract's §6
+  // table in the same commit, so the byte-comparison gate covers it like the other 19.
+  n20: 'متابعة',
 }
 
 /**

@@ -91,7 +91,7 @@ EXPECTED = {
     'n10_name': (10, 0), 'n10_phone': (10, 1), 'n11_name': (11, 0), 'n11_phone': (11, 1),
     'n12': (12, 0), 'n13': (13, 0), 'n14': (14, 0), 'n14_retry': (14, 1),
     'n15': (15, 0), 'n15_sending': (15, 1), 'n16': (16, 0), 'n17': (17, 0),
-    'n18': (18, -1), 'n19': (19, -1),
+    'n18': (18, -1), 'n19': (19, -1), 'n20': (20, 0),
 }
 
 # Every barber-named key on the hook's surface. The clinic file must contain NONE of them.
@@ -123,9 +123,10 @@ def main():
 
     # ── T-هـ-s1 · the strings, against the contract itself ──────────────────────────────────
     contract = contract_strings()
-    check("T-هـ-s1a  §6's table really parsed — 19 ن-rows found (positive control: a parser that "
-          "silently matched nothing would make every comparison below vacuously true)",
-          len(contract) == 19, f"{len(contract)} rows")
+    check("T-هـ-s1a  §6's table really parsed — 20 ن-rows found (was 19 until ن-٢٠ was ratified "
+          "2026-09-27; positive control, since a parser that silently matched nothing would make "
+          "every comparison below vacuously true)",
+          len(contract) == 20, f"{len(contract)} rows")
 
     block = js.split("export const CLINIC_TEXT = {")[1].split("\n}")[0]
     mine = dict(re.findall(r"^\s*(\w+):\s*'((?:[^'\\]|\\.)*)',", block, re.M))

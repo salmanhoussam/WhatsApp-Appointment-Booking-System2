@@ -409,14 +409,12 @@ export default function ClinicBookingFlow({ booking, config, accent, onHome }) {
                   label={relation === 'self' ? CLINIC_TEXT.n10_phone : CLINIC_TEXT.n11_phone}
                   value={customerPhone} onChange={setCustomerPhone} type="tel"
                 />
-                {/* 🟡 §6 ratifies NO label for the ⑤ -> ⑥ affordance (§7 only says a next-step
-                    button exists). So a glyph is used rather than inventing Arabic copy, which this
-                    phase is explicitly forbidden from doing. One approved word (e.g. «متابعة»)
-                    replaces it; until then the glyph carries no claim. Flagged in the report. */}
+                {/* ن-٢٠, ratified 2026-09-27 — the glyph that stood here carried no claim because
+                    §6 gave this affordance no label. It does now. */}
                 <button
                   type="button" disabled={!canConfirm} onClick={() => setStep('confirm')}
                   style={primaryBtn(accent, !canConfirm)}
-                >←</button>
+                >{CLINIC_TEXT.n20}</button>
               </div>
             )}
           </>
