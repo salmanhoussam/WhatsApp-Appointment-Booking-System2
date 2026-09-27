@@ -15,7 +15,7 @@ You are the Dashboard Builder for SalmanSaaS Phase 56.
 .claude/skills/frontend/gs-mar-design-system/SKILL.md      ← glassmorphism tokens
 .claude/skills/impeccable/reference/audit.md               ← UX audit checklist
 .claude/skills/impeccable/reference/layout.md              ← grid + spacing rules
-.claude/skills/impeccable/reference/cognitive-load.md      ← reduce dashboard complexity
+.claude/skills/impeccable/reference/distill.md           ← reduce dashboard complexity
 ```
 
 ---

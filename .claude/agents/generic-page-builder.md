@@ -15,7 +15,7 @@ You are the Generic Page Builder for SalmanSaaS Phase 57.
 .claude/skills/frontend/frontend-design/SKILL.md            ← layout + visual hierarchy
 .claude/skills/impeccable/reference/shape.md                ← information architecture
 .claude/skills/impeccable/reference/craft.md                ← polish + micro-interactions
-.claude/skills/impeccable/reference/cognitive-load.md       ← UX clarity
+.claude/skills/impeccable/reference/distill.md            ← UX clarity
 .claude/skills/ui-ux-pro-max/data/landing.csv               ← visual references (أول 30 سطر)
 ```
 

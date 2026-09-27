@@ -20,6 +20,23 @@ scripts/data/page_templates/{module}.json ← قالب الـ module (restaurant
 frontend/src/pages/generic-admin/tabs/CanvasPageEditor.jsx ← البنية التقنية
 ```
 
+### والمهارات — تُقرَأ بمسارِها (أُضيفت ٢٠٢٦-٠٩-٢٧)
+
+هذا الملفُّ لم يُشِر إلى مهارةٍ واحدةٍ حتّى اليوم، ومهمّتُه **بوليشٌ بصريّ** — أي إنّه أكثرُ من
+يحتاجها. ولا أوامرَ مائلةً ولا أداةَ `Skill` لوكيلٍ فرعيّ: **المسارُ الصريحُ هو الآليّةُ الوحيدة.**
+
+```
+.claude/skills/impeccable/reference/polish.md            ← بوليشُ واجهةٍ قائمةٍ قبل الإنتاج
+.claude/skills/frontend/gs-mar-design-system/SKILL.md    ← tokens + مكوّناتُ الزجاج
+.claude/skills/frontend/frontend-design/SKILL.md         ← التسلسلُ البصريُّ والتخطيط
+.claude/skills/ui-ux-pro-max/data/landing.csv            ← مراجعُ بصريّةٌ (أوّلُ ٣٠ سطراً)
+```
+
+وإن كانت الصفحةُ تُقاس على الموبايل: `.claude/skills/frontend/mobile-viewport-quirks/SKILL.md`
+(`svh` لا `vh` — قاعدةٌ وُلدت من عطبٍ حقيقيّ). وقبل أيِّ ادّعاءٍ بأنّ البوليشَ ظهر:
+`.claude/skills/frontend/browser-verification-capability/SKILL.md` — فـ«لا أخطاءَ في الـconsole»
+ليست دليلاً (`rules/frontend/browser-verification-protocol.md`).
+
 ---
 
 ## 1. خطوات البناء

@@ -84,12 +84,18 @@ tail -1` أو معادلها) هل يوجد ملف جلسة لتاريخ الي�
 
 ## 2. خريطة الـ Skills (تعرفها عن ظهر قلب)
 
+> 🔴 **كيف تُستدعى مهارةٌ فعلاً — صُحِّح ٢٠٢٦-٠٩-٢٧.** كانت الأسطرُ الثلاثةُ الأولى مكتوبةً كأوامرَ
+> مائلة (`/impeccable craft`)، **والوكيلُ الفرعيُّ لا يملك أوامرَ مائلةً إطلاقاً** — ولا يملك أداةَ
+> `Skill` (فحصُ `tools:` في الاثني عشرِ كلِّها: صفر). فتلك الأسطرُ كانت عاطلةً بالبناء.
+> **الآليّةُ الوحيدةُ العاملة: اقرأ ملفَّ المهارةِ بمسارِه الصريح** — وهو ما تفعله بقيّةُ الوكلاءِ
+> أصلاً (`backend-architect` · `code-reviewer` · `dashboard-builder` · …).
+
 ### Frontend
-| Skill | متى تُستدعى |
-|-------|-------------|
-| `/impeccable craft [feature]` | Production-grade UI من الصفر — أعلى جودة |
-| `/impeccable polish [file]` | تحسين UI موجود قبل الـ deploy |
-| `/impeccable animate [file]` | إضافة animations احترافية |
+| Skill | متى تُستدعى | كيف |
+|-------|-------------|-----|
+| `impeccable` — craft | Production-grade UI من الصفر — أعلى جودة | اقرأ `.claude/skills/impeccable/reference/craft.md` |
+| `impeccable` — polish | تحسين UI موجود قبل الـ deploy | اقرأ `.claude/skills/impeccable/reference/polish.md` |
+| `impeccable` — animate | إضافة animations احترافية | اقرأ `.claude/skills/impeccable/reference/animate.md` |
 | `awwwards-animations` | GSAP + Framer Motion cinematic effects |
 | `webgl-awwwards` | Three.js، R3F، WebGL scenes |
 | `admin-dashboard-builder` | Dashboard UI، tables، forms، filters |

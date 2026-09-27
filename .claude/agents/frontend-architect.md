@@ -29,6 +29,31 @@ If the task touches cart or catalog:
 .claude/rules/frontend/catalog-contract.md
 ```
 
+### Skills — read the one that matches the task
+
+Added 2026-09-27. This file referenced **zero** skills until then, while the frontend skill folder
+held eight that no agent read — four of them named by binding rules. A subagent has no slash
+commands and no `Skill` tool: **the only working mechanism is reading the file by its path.**
+
+```
+.claude/skills/frontend/gs-mar-design-system/SKILL.md   ← glassmorphism tokens + components
+.claude/skills/frontend/frontend-design/SKILL.md        ← layout + visual hierarchy
+.claude/skills/frontend/frontend-component-builder/SKILL.md  ← reusable React components
+.claude/skills/impeccable/reference/craft.md            ← production-grade UI from scratch
+```
+
+Conditional, and each one exists because a real bug produced it:
+```
+animations / GSAP / Framer         → .claude/skills/frontend/awwwards-animations/SKILL.md
+Three.js / R3F / WebGL             → .claude/skills/frontend/webgl-awwwards/SKILL.md
+scroll-scrubbed real footage       → .claude/skills/frontend/frame-sequence-canvas/SKILL.md   (rules/frontend/animations.md §5)
+any full-viewport or mobile height → .claude/skills/frontend/mobile-viewport-quirks/SKILL.md  (svh not vh — a real live bug)
+any data fetching / cache          → .claude/skills/frontend/tanstack-query/SKILL.md          (multi-tenant cache keys)
+before claiming a frontend fix works → .claude/skills/frontend/browser-verification-capability/SKILL.md
+                                     (rules/frontend/browser-verification-protocol.md makes real
+                                      browser evidence MANDATORY — console-clean is not proof)
+```
+
 ---
 
 ## 1. BUILD PROTOCOL — Run in Order

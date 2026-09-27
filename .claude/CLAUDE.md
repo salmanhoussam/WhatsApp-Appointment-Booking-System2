@@ -197,13 +197,34 @@ frontend/ -- gs-mar-design-system, admin-dashboard-builder, awwwards-animations,
              browser-verification-capability (real Playwright MCP browser proof — not yet an
              Agent, see architecture/ENGINEERING_ORGANIZATION.md)
 shared/   -- auto-reporting, project-health, motion-design (Higgsfield video ads — /motion-design)
-general/  -- docx, pdf, pptx, xlsx, design-sprint, hooked-ux, refactoring-ui, mcp-builder,
-             safe-refactor (behavior-preserving structural cleanup only — moves logic between
-             layers, dedups, simplifies; any behavior/authorization/data-model/architecture change
-             found along the way escalates to an Implementation Contract/ADR instead, never
-             absorbed silently — established 2026-08-09), + more
-top-level: impeccable/ (craft/polish/animate — referenced directly by frontend-architect.md),
-seeding/, supabase-ref/, ui-ux-pro-max/.
+general/  -- 8 skills: design-sprint, hooked-ux, refactoring-ui, ux-heuristics, ios-hig-design,
+             research-analyst, file-reading, and safe-refactor (behavior-preserving structural
+             cleanup only — moves logic between layers, dedups, simplifies; any behavior/
+             authorization/data-model/architecture change found along the way escalates to an
+             Implementation Contract/ADR instead, never absorbed silently — established 2026-08-09).
+             🔴 **14 were deleted 2026-09-27** (docx, pdf, pptx, xlsx, skill-creator,
+             theme-factory, brand-guidelines, canvas-design, web-artifacts-builder,
+             slack-gif-creator, algorithmic-art, doc-coauthoring, internal-comms, mcp-builder).
+             Every one was an exact-name duplicate of a bundled `anthropic-skills:*` plugin skill
+             already available to the session, and zero agent, rule or command referenced any of
+             them. 11 MB → 92 KB. Second instance of the same duplication disease as `.agents/`,
+             found the same day; recoverable from history like the first.
+top-level: impeccable/ (craft/polish/animate — read by `code-reviewer`, `dashboard-builder`,
+`generic-page-builder` and, since 2026-09-27, `bo-hussein`, `frontend-architect` and
+`page-builder-polish`), seeding/ (14 references from `tenant-seeder`, the densest skill user in the
+repo), supabase-ref/, ui-ux-pro-max/.
+
+🔴 *Correction, 2026-09-27: this line used to say impeccable was "referenced directly by
+frontend-architect.md". It was not — `grep impeccable .claude/agents/frontend-architect.md` returned
+**zero**, and I carried that claim forward earlier the same day without checking it, then used it as
+part of the reason to keep impeccable while deleting `.agents/`. The keep decision holds on real
+grounds (three other agents did reference it); the stated reason was false.*
+
+**How an agent reaches a skill — the only mechanism that works.** No agent has the `Skill` tool
+(checked: `tools:` in all 12 → zero), and a subagent has no slash commands. So a skill is reached by
+**reading its file at an explicit path**, which is what eight agents already did. `bo-hussein`'s
+three `/impeccable craft|polish|animate` lines were inert by construction and were converted to read
+paths on 2026-09-27. `retriever:expand_skills` does not exist anywhere in this project (zero hits).
 
 **`.claude/skills/` now holds 8 real directories and zero symlinks (2026-09-27).** The note that
 stood here was wrong on both of its claims, and how it was wrong is worth keeping: it said ~20
