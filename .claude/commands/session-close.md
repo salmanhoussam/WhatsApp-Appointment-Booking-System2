@@ -1,157 +1,119 @@
 # /session-close
 
-Closes the current working session: writes a session report, updates memory, and prepares the context for the next session.
+**مُنفِّذٌ صارمٌ للقائمةِ الخماسيّةِ في `.claude/CLAUDE.md`.** لا يخترع عمليّةً جديدة — القائمةُ هناك
+هي القاعدةُ المُلزِمة (أُقرّت ٢٠٢٦-٠٨-٠١ بتعليمِ سلمان الصريح)، وهذا الأمرُ يفرضها بـ**بوّاباتٍ
+تُفحَص، لا خطواتٍ تُوعَد**.
 
-**Usage:** `/session-close` (run at the END of every session)
-
----
-
-## What This Command Does
-
-1. Reads what was done in this session (git log + conversation context)
-2. Writes a session report to `.claudedocs/sessions/[TODAY].md`
-3. Updates `.claude/memory.md` with new decisions/changes
-4. Updates `.claudedocs/todo_list.md` (marks done items, adds new ones)
-5. Prints a "Next Session Brief" so the next session starts instantly
+**Usage:** `/session-close`
 
 ---
 
-## Execution Steps
+## لماذا أُعيدت كتابتُه (٢٠٢٦-٠٩-٢٧)
 
-### Step 1 — Collect Session Data
+النسخةُ السابقةُ كانت تصف عمليّةً توقّفنا عنها، وكانت **قديمةً في خمسةِ مواضعَ مقيسة**:
+
+| # | ما كانت تقوله | الواقعُ المقيس |
+|---|---|---|
+| ١ | *"Trigger the memory-keeper agent"* | الوكيلُ **لم يكن مسجَّلاً إطلاقاً** — `.claude/agent/` بالمفرد وبلا سياج `---` (أُصلح في `6677cf9`) |
+| ٢ | تكتب الذاكرةَ في `.claude/memory.md` | **مهجورٌ منذ ٢٠٢٦-٠٨-١٦** بنصِّ رأسِه · ١٩١ KB · آخرُ مدخلٍ حقيقيٍّ ٢٠٢٦-٠٧-٢٥ |
+| ٣ | تحدّث `todo_list.md` | ١٢٩٨ سطراً، مُعلَنُ التقادمِ **بقلمِه** منذ ٢٠٢٦-٠٨-١٨ — ولا يُحدَّث فعلاً |
+| ٤ | قالبٌ يطلب `Duration` و`Lines added [estimate]` | يخالف قاعدةً مستقرّة: **عُدّ، ولا تُقدّر** |
+| ٥ | لا تحتوي القائمةَ الخماسيّةَ أصلاً | فكان في المشروعِ **مصدران للحقيقة، وأحدُهما كاذب** |
+
+⇒ هذه النسخةُ تحذف كلَّ ذلك وتصير **واجهةً تنفيذيّةً واحدةً** للقائمةِ المُلزِمة.
+
+---
+
+## 🛑 البوّابةُ الصفريّة — تُفحَص قبل أيِّ خطوة
 
 ```bash
-# What changed today?
-git log --oneline --since="6 hours ago"
-git diff --stat HEAD~3 HEAD 2>/dev/null | tail -20
-
-# What files were touched?
+echo "── حالةُ الشجرة ──"
 git status --short
+echo "── غيرُ المدفوع ──"
+git rev-list --count "@{upstream}..HEAD" 2>/dev/null || echo "لا upstream"
+echo "── التاريخ ──"
+date +%F
 ```
 
-Also read from context:
-- What did the user ask for in this session?
-- What was built/fixed/decided?
-- What was NOT finished?
+**لا يُكمَل الإغلاقُ إذا:**
+
+```
+❌ وُجد أيُّ تعديلٍ غيرِ مُودَعٍ في app/ · frontend/ · prisma/ · scripts/
+   ⇒ كودٌ غيرُ مُودَعٍ ليس عملاً منتهياً. أودِعه، أو صرّح لماذا يبقى (بقرارٍ مكتوب).
+❌ لم يُحدَّث `.claudedocs/sessions/$(date +%F).md`
+   ⇒ الجلسةُ بلا سجلٍّ لم تُغلَق، سُجِّل ما حصل أو لم يحصل.
+❌ اسمُ ملفِّ الجلسةِ لا يطابق `date +%F` · أو يحمل تاريخاً لم يأتِ بعد
+   ⇒ سجلٌّ بتاريخٍ مستقبليٍّ يُفسد كلَّ فحصٍ يقرأ الترتيبَ الزمنيَّ لاحقاً.
+```
+
+**استثناءٌ صريحٌ واحد:** ملفٌّ متروكٌ متعمَّداً (مثل سكربتِ استكشافٍ قيدَ العمل) يمرّ **بشرطِ
+تسميتِه في التقريرِ وسببِ تركِه** — «نظيفٌ ما عدا X، لأنّ Y». الصمتُ عنه ليس مروراً.
 
 ---
 
-### Step 2 — Write Session Report
+## الخطواتُ الخمس — بالترتيب، ولا واحدةَ تُقفَز
 
-Create `.claudedocs/sessions/[TODAY].md`:
+### ١ · سجلُّ الجلسة → `.claudedocs/sessions/$(date +%F).md`
+
+ما أُنجز · **وما لم يبدأ** · ونقطةُ الاستئنافِ الحرفيّة. ينشأ من القالبِ إن لم يوجد.
+**والأرقامُ تُعَدّ لا تُقدَّر:** عددُ الفحوصِ الحقيقيُّ، عددُ الإيداعات، عددُ الصفوف — بأمرٍ يُظهرها.
+
+### ٢ · أعمالُ التحقيقِ المفتوحة → `.claudedocs/work/.../summary.md`
+
+تُغلَق أو تُذكَر حالتُها الحقيقيّة. **لا تُترَك قديمةً في صمت.**
+
+### ٣ · Evolution / Rules — **فقط إن ظهرت قاعدةٌ حقيقيّة**
+
+بقاعدةِ التجريدِ (`rules/team-roles.md`): حالتان مستقلّتان حقيقيّتان، لا توقُّع. وإن لم تظهر، **لا
+تُكتَب مدخلةٌ لإبقاءِ العدّادِ يتحرّك** — هذا بذاتُه ما تمنعه `repository-hygiene.md`.
+
+### ٤ · الذاكرة — وللهدفِ الصحيح
+
+استدعِ **`memory-keeper`** (صار وكيلاً مسجَّلاً فعلاً منذ `6677cf9`).
+🔴 **هدفُه `~/.claude/projects/<project>/memory/` — وليس `.claude/memory.md` المهجور.**
+ولا تُكتَب إلّا لقرارٍ طويلِ الأمدِ حقيقيٍّ أو تغيُّرٍ حقيقيٍّ في طريقةِ العمل — لا للتقدّمِ الروتينيّ.
+
+### ٥ · التقريرُ داخلَ ملفِّ الجلسة
 
 ```markdown
-# Session Report — [TODAY]
-**Duration:** [estimated from conversation length]
-**Phase(s):** [e.g., Phase 35, Phase 36]
-
----
-
-## ✅ Completed This Session
-
-| Item | File(s) | Notes |
-|------|---------|-------|
-| [Feature/fix] | [path] | [brief note] |
-
----
-
-## 🔧 Technical Decisions Made
-
-- **[Decision]:** [Rationale in 1 sentence]
-- Example: Adopted DB table for GalleryImage instead of Storage listing — enables ordering and soft-delete
-
----
-
-## 🐛 Bugs Fixed
-
-| Bug | File | Root Cause | Fix Applied |
-|-----|------|------------|-------------|
-| [description] | [file:line] | [what caused it] | [what was changed] |
-
----
-
-## 🗄️ Schema Changes
-
-| Model | Change | Migration Needed? |
-|-------|--------|------------------|
-| [Model] | Added [field] ([type]) | ✅ Run `npx prisma db push` |
-
----
-
-## 🚧 Unfinished / Carry Forward
-
-- [ ] [Item 1 — why not done]
-- [ ] [Item 2]
-
----
-
-## 📋 Next Session — Start Here
-
-**Priority 1:** [Most important item with file path]
-**Priority 2:** [Second item]
-**Priority 3:** [Third item]
-
-**Context to re-read before starting:**
-- `.claude/memory.md` (last 2 entries)
-- `.claudedocs/sessions/[TODAY].md` (this file)
-- [specific file if relevant]
-
----
-
-## 📊 Session Stats
-
-| Metric | Value |
-|--------|-------|
-| Files modified | [count] |
-| Lines added | [estimate] |
-| Lines removed | [estimate] |
-| Tests run | ✅/❌/N/A |
-| Deployed to staging | ✅/❌ |
+### Completed          ← بالدليل: إيداعاتٌ بهاشاتها، أرقامٌ معدودة
+### Open Risks         ← وكلُّ خطرٍ بسببِه، لا بعنوانِه
+### Next Milestone
+### START HERE NEXT SESSION   ← أوّلُ ملفٍّ يُقرَأ، وأوّلُ قرارٍ مطلوب
 ```
 
 ---
 
-### Step 3 — Update Memory
-
-Trigger the `memory-keeper` agent to append today's entry to `.claude/memory.md`.
-
----
-
-### Step 4 — Update Todo List
-
-Read `.claudedocs/todo_list.md` and:
-- Mark completed items as `✅ Done — [date]`
-- Add any new items discovered in this session
-- Reorder by priority
-
----
-
-### Step 5 — Print Next Session Brief
-
-Output in chat:
+## وبعد الخمسِ فقط
 
 ```
-╔══════════════════════════════════════════╗
-║        SESSION CLOSED — [TODAY]          ║
-╚══════════════════════════════════════════╝
+Ready for Compact.
+```
 
-✅ Completed: [count] items
-🚧 Carried forward: [count] items
-📋 Report: .claudedocs/sessions/[today].md
-🧠 Memory: updated
+**ولا تُقَل هذه الجملةُ قبل إتمامِ الخمسِ.** هذا نصُّ القاعدةِ في `CLAUDE.md`: أُقرّت بعد أن
+اضطرّ سلمانُ للتذكيرِ بها، ووُضعت لكي لا يُضطرَّ مرّةً أخرى.
 
-━━━ NEXT SESSION: START HERE ━━━
-1. [Priority 1]
-2. [Priority 2]
-3. [Priority 3]
+---
 
-Run `/session-open` to reload context instantly.
+## ما لا يفعله هذا الأمر
+
+```
+❌ لا يكتب في .claude/memory.md            (مهجور)
+❌ لا يحدّث todo_list.md                    (مُعلَنُ التقادمِ — تقاعدُه أو إعادةُ بنائِه قرارٌ منفصل)
+❌ لا يطلب تقديراً لسطرٍ ولا لمدّة           (عُدّ، ولا تُقدّر)
+❌ لا يُودِع ولا يدفع ولا ينشر بنفسه         (الإيداعُ قرارٌ، والدفعُ قرارٌ آخر)
+❌ ولا يفتح ولا يغلق أيَّ بوّابةِ إنتاج       (البوّابةُ تُفتَح بعبارةِ سلمانَ الحرفيّةِ وحدَها)
 ```
 
 ---
 
-## Rules
+## العلاقةُ بالأوامرِ الأخرى
 
-- NEVER skip this command at end of session
-- If session was only reading/planning (no code), still write a short report
-- Date format: `YYYY-MM-DD`
+```
+/team-onboarding   بدايةُ الجلسة — فحصُ جاهزيّةٍ للقراءةِ فقط
+/session-open      بدايةُ الجلسة — إعادةُ بناءِ السياق
+/session-close     نهايتُها — هذا الملفّ
+```
+
+وبعد Compact أو "Continue" فالحاكمُ هو `rules/context-recovery-protocol.md`، لا هذا الأمر —
+ثلاثُ لحظاتٍ مختلفةٍ وثلاثُ قواعدَ مختلفة.

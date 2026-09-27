@@ -67,8 +67,19 @@ Rule: `/demo/{slug}` auto-redirects to `/{slug}/{defaultRedirect}` for registry 
 
 ## Commands
 start_dev.bat              -- Start FastAPI + Prisma + React locally
+/team-onboarding           -- START of session: readiness health check, read-only — prints the
+                              PRODUCTION GATE state and its source, how many agents exist vs how
+                              many the harness actually sees (a mismatch is printed 🔴, never
+                              silenced — that mismatch went unnoticed for three months), the
+                              targeted tenant or "none", and only the constraints relevant today.
+                              Built 2026-09-27; it did not exist before.
 /session-open              -- START of session: reload context, git status, last report
-/session-close             -- END of session: write report, update memory, todo list
+/session-close             -- END of session: strict executor of the mandatory five-step Session
+                              Closure Checklist below. Rewritten 2026-09-27 — it no longer writes
+                              to the deprecated .claude/memory.md, no longer updates the stale
+                              todo_list.md, and no longer asks for estimates (count, never
+                              estimate). It refuses to close on uncommitted app/frontend/prisma/
+                              scripts changes or a missing/future-dated session file.
 /scaffold-tenant [slug]    -- Scaffold new tenant (Frontend + Backend + DB seed)
 /deploy                    -- Pre-flight checks + git push → Railway auto-deploy
 /audit                     -- Full audit: security, architecture, schema, frontend
