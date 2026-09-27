@@ -10,6 +10,7 @@ import PhoneField            from '../../../design-system/molecules/PhoneField'
 import useTenantSlug          from '../../../hooks/useTenantSlug'
 import { useTenantBase }      from '../../../hooks/useTenantSlug'
 import useReservationBooking  from '../../../hooks/useReservationBooking'
+import ClinicBookingFlow     from './ClinicBookingFlow'
 import TenantModuleNav        from '../../../design-system/organisms/TenantModuleNav'
 import AmbientGridBackground  from '../../../components/AmbientGridBackground'
 import { hasCapability }      from '../../../utils/capabilities'
@@ -1028,7 +1029,21 @@ export default function ReservePage() {
     return <BookingPage booking={booking} config={config} accent={accent} />
   }
 
-  // 🔴 KNOWN, DECLARED GAP -- P5-E's first gate, not an oversight.
+  // P5-E (2026-09-27): the clinic's own six-step journey. Rendered here, under this page's own mode
+  // switch, so it is NOT the twin `ClinicReservePage` ق-٥-ب forbade -- same route, same page, same
+  // hook, exactly as BookingPage above. It reads only the NEUTRAL staff surface and only the 19
+  // ratified strings; the barber branch above is untouched and knows nothing about it.
+  if (mode === 'clinic') {
+    return (
+      <ClinicBookingFlow
+        booking={booking} config={config} accent={accent}
+        onHome={() => navigate(`${base}/`)}
+      />
+    )
+  }
+
+  // 🔴 (Closed 2026-09-27 by the branch above; this note is kept because the gate below still
+  // references it.) The gap that stood here -- P5-E's first gate, not an oversight.
   // `mode === 'clinic'` is now a real value the hook returns (T-ب-٦, ق-٥-ب, 2026-09-27) and there is
   // deliberately no branch for it yet, so a clinic falls through to the legacy form below. It is not
   // closed here for one reason: the clinic screen needs the 19 Arabic strings approved in

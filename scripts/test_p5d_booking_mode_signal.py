@@ -150,11 +150,16 @@ def main():
           and "mode, bookingModule, lang," in hook)
 
     # The declared interim -- expected to be flipped by P5-E, which is why it names itself.
-    check("T-ب-٦-s5  🔴 [code] DECLARED INTERIM — ReservePage's CODE still has NO `mode === "
-          "'clinic'` branch, so a clinic falls through to LegacyPage, and the gap is written down "
-          "where the next gate will act. P5-E closes this and flips this check",
-          "mode === 'clinic'" not in page_code and "KNOWN, DECLARED GAP" in page,
-          "gap documented in a comment, absent from the code")
+    # 🔴 FLIPPED 2026-09-27 by P5-E, exactly as this check said it would be. Its OLD assertion was
+    # the opposite: "ReservePage's CODE still has NO `mode === 'clinic'` branch, so a clinic falls
+    # through to LegacyPage" — a declared interim, asserted so it could not be forgotten. It was
+    # forgotten by nobody: P5-E closed it and the check inverted, naming its old value here
+    # (feedback_invariant_vs_transition_tests).
+    check("T-ب-٦-s5  🔴 [code] TRANSITION — ReservePage NOW has a `mode === 'clinic'` branch, and a "
+          "clinic no longer falls through to LegacyPage. Until P5-E this check asserted the exact "
+          "opposite, as a declared interim",
+          "mode === 'clinic'" in page_code and "ClinicBookingFlow" in page_code,
+          "clinic branch present; interim closed")
 
     # ── T-ب-٧ structure: no endpoint is named at a call site any more ───────────────────────
     # [code], not [text]: my own comments in the hook quote the literals they replaced

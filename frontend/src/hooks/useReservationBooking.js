@@ -311,7 +311,11 @@ export default function useReservationBooking() {
 
   const canConfirm = !!(selectedService && selectedBarber && selectedSlot)
 
-  const createReservation = useCallback(async (name, phone) => {
+  // `patient` added for P5-E (ق-٥-ج option أ): the booking body carries the patient itself, so
+  // no Patient row is ever stranded by a session that breaks between two calls. Omitted
+  // entirely for barber, whose body must not change -- `undefined` is dropped by JSON, so the
+  // barber payload is byte-identical to what it was.
+  const createReservation = useCallback(async (name, phone, patient = null) => {
     const { data } = await publicApi.post(
       '/reservations/',
       {
@@ -328,11 +332,12 @@ export default function useReservationBooking() {
         metadata:       bookingMetadata({
           bookingModule, staffId: selectedBarber.id, serviceId: selectedService.id,
         }),
+        ...(patient ? { patient } : {}),
       },
       { params: { client_slug: slug } }
     )
     return data?.data?.id ?? null
-  }, [selectedSlot, durationMin, selectedBarber, selectedService, slug])
+  }, [selectedSlot, durationMin, selectedBarber, selectedService, slug, bookingModule])
 
   // WhatsApp (primary) confirm path.
   const confirmViaWhatsApp = useCallback(async () => {
@@ -428,6 +433,36 @@ export default function useReservationBooking() {
     }
   }, [canConfirm, customerName, customerPhone, createReservation])
 
+  /**
+   * Clinic confirm (P5-E). Returns a RESULT instead of setting a prose error, because the clinic UI
+   * must branch on `error.code` and never show the server's own sentence.
+   *
+   * 🔴 It reads `error.code`, NOT `detail`. `_error_envelope` emits
+   * `{success:false, error:{code,message,details}}` with no top-level `detail` at all -- which is
+   * why `confirmLocally` above, like 54 other call sites, always falls through to its hard-coded
+   * fallback. Those are out of scope by explicit decision; the clinic is built on error.code from
+   * the first line (CLINIC_WEB_UX_CONTRACT §6).
+   */
+  const confirmClinic = useCallback(async ({ name, phone, patient }) => {
+    if (!canConfirm) return { ok: false, code: null }
+    setSubmitError(null)
+    setSubmitting(true)
+    try {
+      const id = await createReservation(name, phone, patient)
+      if (!mountedRef.current) return { ok: false, code: null }
+      setReservationId(id)
+      setConfirmMethod('local')
+      return { ok: true, id }
+    } catch (err) {
+      if (!mountedRef.current) return { ok: false, code: null }
+      // A missing code is itself a real case the UI must handle -- resolveClinicError() maps an
+      // unmapped or absent code to ن-١٣ rather than inventing a sentence for it.
+      return { ok: false, code: err?.response?.data?.error?.code ?? null }
+    } finally {
+      if (mountedRef.current) setSubmitting(false)
+    }
+  }, [canConfirm, createReservation])
+
   // Wrapped so the neutral staff names are DERIVED from the barber-named ones rather than
   // written a second time -- see ./staffSurface.js for why, and for when it goes away.
   return withStaffAliases({
@@ -441,7 +476,7 @@ export default function useReservationBooking() {
     showLocalForm, toggleLocalForm,
     customerName, setCustomerName, customerPhone, setCustomerPhone,
     submitting, submitError, reservationId, confirmMethod, whatsappUrl,
-    canConfirm, confirmViaWhatsApp, confirmLocally,
+    canConfirm, confirmViaWhatsApp, confirmLocally, confirmClinic,
     botLink, bookViaWhatsAppBot,
     formatDate,
   })
