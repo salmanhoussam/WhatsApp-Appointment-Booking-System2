@@ -1,0 +1,22 @@
+{
+  "slug": "cliniclab-test",
+  "created_at_utc": "2026-09-27T19:54:28.782924+00:00",
+  "client_id": "cdeb88ee-8682-4be8-a686-82892f72e349",
+  "client_service_id": "77d6e8d5-0517-4a23-a2ed-cd6169c4a9db",
+  "user_id": "ef0909bd-8ed4-44a2-b31d-ea5e60acf61e",
+  "category_id": "674d0d90-3657-4b9f-8c2c-4d0ba19296c3",
+  "service_ids": [
+    "200badbb-8e49-4f53-8b1d-379fda9675e6",
+    "a05193fd-b7f9-4c45-b5ac-efd627ce1713",
+    "7c7a7b2a-c56d-4c0f-8939-6ea736905c34"
+  ],
+  "resource_ids": [
+    "ebe13dc7-538a-4f9c-a299-18236b6f906d",
+    "50477d0b-fc83-4f24-902b-b890295a45b8"
+  ],
+  "resource_service_ids": [
+    "5647abbf-47d3-475c-87d7-738b9f723ca7",
+    "579e1218-c454-4f34-98b3-7e1b0bec1878",
+    "813792b3-37a4-4ace-be89-319b0540760c"
+  ]
+}

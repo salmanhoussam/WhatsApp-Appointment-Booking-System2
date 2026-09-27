@@ -15,6 +15,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import publicApi from '../../utils/publicApi'
+// W-1 (ق-و-٢, delivered with P5-E): the same resolver the booking hook uses, so this section
+// and the booking flow can never disagree about which endpoint a vertical's staff come from.
+import { staffListRequest } from '../../hooks/bookingEndpoints'
 import { homepageTokens } from './homepageTokens'
 
 const CARD_SURFACE = 'rgba(255,255,255,0.025)'
@@ -70,7 +73,21 @@ export default function StaffSection({ data, accent, slug, config, homepageTheme
       return
     }
 
-    publicApi.get('/reservations/barbers', { params: { client_slug: slug } })
+    // W-1 — "تعميمُ StaffSection" (CLINIC_WEB_UX_CONTRACT §11, to be delivered WITH P5-E). Until
+    // now this asked /reservations/barbers unconditionally, so a clinic's Staff section showed
+    // nothing at all: a clinic has zero Barber rows, its doctors are Resource rows.
+    //
+    // 🔴 The barber request is BYTE-IDENTICAL to what it was — `staffListRequest` returns exactly
+    // `/reservations/barbers` with `{client_slug}` for bookingModule 'barber', which is what every
+    // live tenant resolves to. Nothing about rk's or mr-h's landing page changes.
+    //
+    // A tenant whose module does not resolve (legacy, `booking_module: null`) gets NO request at
+    // all, where it used to make one it had no use for — the same dead request T-ب-٦ removed from
+    // the booking hook.
+    const req = staffListRequest({ bookingModule: config?.booking_module ?? null, slug })
+    if (!req) { setLoading(false); return }
+
+    publicApi.get(req.url, { params: req.params })
       .then(res => {
         if (!mountedRef.current) return
         setBarbers(res.data?.data ?? [])

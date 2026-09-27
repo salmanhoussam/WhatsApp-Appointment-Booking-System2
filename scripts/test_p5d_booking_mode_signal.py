@@ -204,10 +204,16 @@ def main():
 
     # ── INVARIANTS: what these gates must NOT have touched ─────────────────────────────────
     staff = read(os.path.join(ROOT, "frontend/src/components/dynamic-sections/StaffSection.jsx"))
-    check("T-ب-٦-s6  [text] INVARIANT — StaffSection's own /barbers fetch is untouched: it is a "
-          "homepage showcase list, unrelated to booking",
-          "publicApi.get('/reservations/barbers'" in staff
-          and "booking_module" not in staff and "deriveBookingMode" not in staff)
+    # 🔴 FLIPPED 2026-09-27 by W-1. Its OLD assertion was that StaffSection's /barbers fetch was
+    # UNTOUCHED and knew nothing of booking_module — true while W-1 was still pending. W-1
+    # ("تعميمُ StaffSection", CLINIC_WEB_UX_CONTRACT §11) is delivered WITH P5-E by that contract, so
+    # the section now resolves its endpoint like the booking hook does. The barber REQUEST is
+    # unchanged; what changed is that the URL is no longer written there literally.
+    check("T-ب-٦-s6  [text] TRANSITION — StaffSection now resolves its endpoint through the shared "
+          "resolver instead of naming /reservations/barbers literally, so a clinic's Staff section "
+          "can show doctors (W-1). Until today this asserted the opposite",
+          "staffListRequest({" in staff and "booking_module" in staff
+          and "publicApi.get('/reservations/barbers'" not in staff)
     admin = read(os.path.join(ROOT, "frontend/src/pages/generic-admin/components/reservationInteractions.jsx"))
     check("T-ب-٦-s7  [text] INVARIANT — the admin quick-book still sends module_key 'barber' "
           "literally; it is a different surface and out of this gate's scope",

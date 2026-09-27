@@ -206,6 +206,18 @@ def main():
           "const confirmLocally = useCallback" in hook_code
           and "data?.detail" in hook_code)
 
+    # ── W-1 · the landing page's Staff section, which §11 assigns to P5-E ──────────────────
+    staff = read("frontend/src/components/dynamic-sections/StaffSection.jsx")
+    check("T-هـ-s6  W-1 (§11, «تعميمُ StaffSection», delivered WITH P5-E) — the section resolves its "
+          "endpoint through the SAME resolver the booking hook uses, so the two can never disagree "
+          "about where a vertical's staff come from",
+          "staffListRequest({" in staff and "/reservations/barbers'" not in code_only(staff))
+    check("T-هـ-s7  🔴 INVARIANT — and the BARBER request is byte-identical: the resolver returns "
+          "exactly /reservations/barbers with {client_slug} for bookingModule 'barber', so rk's and "
+          "mr-h's landing pages are unaffected",
+          "bookingModule: config?.booking_module ?? null" in staff
+          and "if (!req) { setLoading(false); return }" in staff)
+
     print("\nALL GREEN" if ok else "\nFAILURES ABOVE")
     return 0 if ok else 1
 
