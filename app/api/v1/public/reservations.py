@@ -5,16 +5,17 @@ Works for: restaurant tables, service appointments, property viewings, clinic ap
 """
 
 from datetime import date, datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.dependencies import get_current_tenant
 from app.core.services import require_service
 from app.core.db_resilience import with_db_resilience
-from app.services import reservation_service, catalog_service_service, whatsapp_service
+from app.core.exceptions import AppException
+from app.services import reservation_service, catalog_service_service, whatsapp_service, patient_service
 from app.repositories import resource_repo, barber_repo, barber_service_repo
 from app.repositories import resource_service_repo
 
@@ -25,6 +26,29 @@ VALID_MODULE_KEYS = ["restaurant", "services", "real_estate", "hotel", "clinic",
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+class PatientIn(BaseModel):
+    """P5-C (ق-٥-ج option أ, Salman 2026-09-27) — the patient, described rather than identified.
+
+    A first-time visitor has no `patient_id`, so the booking body carries the patient itself and
+    `reservation_service` resolves it inside the same confirmation. No separate POST, therefore no
+    Patient row stranded when a session breaks mid-flow.
+
+    `relation` is `self` | `other` and NOTHING ELSE (F-1, Salman 2026-09-27). `guardian` asserts
+    legal responsibility; this screen asks one two-button question and collects no evidence of it,
+    and cannot even distinguish a minor since no date-of-birth column exists — by Salman's own
+    earlier decision that an empty column is a claim. Pydantic refuses any other value with a 422
+    before the service is reached.
+
+    `phone` is OPTIONAL and is the PATIENT's own, when they have one. The number we contact is
+    always `customer_phone` — «الـphone هنا هو رقم الشخص الذي يحجز، وليس بالضرورة رقم المريض»
+    (Salman, approving CLINIC_WEB_UX_CONTRACT §3). A child booked by a parent has no number, and
+    that is a valid state rather than a missing field.
+    """
+    name:     str = Field(min_length=2, max_length=120)
+    phone:    Optional[str] = None
+    relation: Literal["self", "other"] = "self"
+
+
 class ReservationIn(BaseModel):
     module_key:     str
     customer_name:  str
@@ -33,6 +57,7 @@ class ReservationIn(BaseModel):
     reserved_at:    datetime
     duration_min:   Optional[int] = None
     notes:          Optional[str] = None
+    patient:        Optional[PatientIn] = None
     # module-specific:
     # restaurant  → { "table_label": "A4", "party_size": 4 }
     # services    → { "service_name": "...", "staff_id": "..." }
@@ -92,7 +117,36 @@ async def create_reservation(
             notes          = body.notes,
             metadata       = body.metadata,
             source         = "website",
+            patient        = body.patient.model_dump() if body.patient else None,
         )
+    # P5-C / F-2 — ONE refusal is no longer ONE answer.
+    #
+    # Until now this was a single `except ValueError -> 409`, and nine different causes arrived at
+    # the browser as the same status carrying only an English sentence. The UX contract routes 409
+    # to «هالوقت انحجز قبل شوي… بياناتك محفوظة» and back to the time step — so an eligibility
+    # refusal displayed the SLOT-TAKEN message, which is precisely what
+    # rules/text-context-rule.md exists to prevent. Thirty lines below, the availability READER
+    # already separated its own cases by TYPE; only the writer did not.
+    #
+    # `ReservationRefused` carries its own `error_code` and `status_code`, and `AppException` is
+    # what puts a real code into the envelope: handler #1 renders `error.code`, whereas an
+    # HTTPException only ever yields the generic 409 -> "CONFLICT" mapping. So the client branches
+    # on a stable name, never on prose — which matters twice over, because the server's sentences
+    # are English while the approved patient-facing strings are Arabic and live in the UX contract.
+    except reservation_service.ReservationRefused as exc:
+        app_exc = AppException(str(exc), error_code=exc.error_code)
+        app_exc.status_code = exc.status_code
+        raise app_exc
+    # A patient that is REAL but belongs to another contact — 403, not 404 and not 409. Distinct
+    # from PatientNotFound (an unknown id) because an unknown id and a real one reached for wrongly
+    # are different facts, and only the second one is worth auditing.
+    except patient_service.PatientAccessDenied as exc:
+        app_exc = AppException(str(exc), error_code="PATIENT_ACCESS_DENIED")
+        app_exc.status_code = 403
+        raise app_exc
+    # Unchanged fallback, deliberately kept: every refusal NOT yet given a type still behaves
+    # exactly as it did today. This migration adds precision where it was decided; it does not
+    # silently reclassify what nobody has classified.
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 

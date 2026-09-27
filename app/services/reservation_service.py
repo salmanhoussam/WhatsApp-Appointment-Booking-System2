@@ -81,15 +81,92 @@ MODULE_DEFAULTS: dict[str, dict] = {
 #
 # `source=None` is therefore treated as staff. Every real caller sets it -- public/reservations.py
 # "website", whatsapp_reservation_flow.py "whatsapp", admin/reservations.py "admin", Lia "lia" --
-class ResourceDoesNotProvideService(ValueError):
+class ReservationRefused(ValueError):
+    """A refusal the CALLER must be able to tell apart from every other refusal (P5-C, F-2).
+
+    WHY THIS EXISTS. Until 2026-09-27 this module raised bare `ValueError` for nine different
+    reasons and `public/reservations.py` answered 409 for all of them. So "the slot was taken" and
+    "this doctor does not perform that service" arrived at the browser as the same status with only
+    a prose string to tell them apart -- and the prose is ENGLISH while the approved customer text
+    is Arabic, so the UI could not use it either. The WhatsApp flow meanwhile interpolated that
+    English string straight into a customer's chat. One cause, two opposite wrong behaviours.
+
+    `error_code` is the fix: a stable, machine-readable name the client branches on. `status_code`
+    is what the route answers. Both are CLASS attributes so a subclass is the whole declaration.
+
+    IT STAYS A ValueError SUBCLASS, and that is load-bearing, not legacy: four real callers wrap
+    `create_reservation` in `except ValueError` -- public/reservations.py:96, admin/reservations.py,
+    lia_owner_entry.py and whatsapp_reservation_flow.py. Subclassing means none of them changes
+    behaviour by one byte while the route gains the ability to answer precisely. The existing
+    suites assert `isinstance(exc, ValueError)` plus a message substring, which is exactly why
+    every message below is preserved WORD FOR WORD: the type is added, the text is not touched.
+    """
+    error_code:  str = "RESERVATION_REFUSED"
+    status_code: int = 409
+
+
+class SlotTaken(ReservationRefused):
+    """The time is no longer free -- a genuine conflict with current state (RFC 9110 §15.5.10)."""
+    error_code = "SLOT_TAKEN"
+
+
+class ResourceDoesNotProvideService(ReservationRefused):
     """This resource exists and is active, but performs no such service (ق-٤-ب / ق-٤-ز).
 
-    A ValueError SUBCLASS deliberately: every existing caller catches ValueError, so none of them
-    changes behaviour, while a route that wants to answer 409 instead of 404 can tell this apart
-    from "I could not find it" WITHOUT matching on the message text. Same reason
-    `PatientAccessDenied` is its own type -- an unknown id and a real one reached for wrongly are
-    different facts, and a caller must be able to audit the difference.
+    Kept at 409, deliberately, because `GET /resources/{id}/availability` already answers 409 for
+    this exact condition and states its reasoning in its own docstring: "both are real, but this
+    resource does not perform this service -- a conflict between two valid ids, not a missing
+    thing." The reader and the writer must not hold two opinions about one condition, so the
+    DIFFERENTIATION lives in `error_code`, not in a second status code invented here.
     """
+    error_code = "RESOURCE_SERVICE_MISMATCH"
+
+
+class ServiceNotBookableOnline(ReservationRefused):
+    """`bookable_by='staff_only'` reached from a patient-facing channel (P3).
+
+    409, by Salman's decision 2026-09-27, over the 403 I had recommended: 403 would have forced an
+    amendment to T-6 in CLINIC_TEST_TENANT_CONTRACT.md and therefore a STOP-4 crossing, and a
+    customer booking an internal-only service is a business-rule conflict rather than an
+    authorization failure. Recorded here because the reasoning is the decision.
+    """
+    error_code = "SERVICE_NOT_BOOKABLE_ONLINE"
+
+
+class ServiceMisconfigured(ReservationRefused):
+    """The service carries no usable duration -- the TENANT's data is wrong, not the request.
+
+    Named separately for exactly that reason: telling a patient "choose another time" for a defect
+    in the shop's own catalogue sends them to fix something they cannot see.
+    """
+    error_code = "SERVICE_MISCONFIGURED"
+
+
+class ServiceIdRequired(ReservationRefused):
+    """A resource-backed reservation arrived without a service_id. 400 -- the request is malformed.
+
+    A rule you can skip by omitting a field is not a rule (ق-٤-أ), which is why this is required
+    rather than defaulted.
+    """
+    error_code = "SERVICE_ID_REQUIRED"
+    status_code = 400
+
+
+class SlotInPast(ReservationRefused):
+    """A past datetime without `allow_past`. 400 -- nothing about current state conflicts."""
+    error_code = "SLOT_IN_PAST"
+    status_code = 400
+
+
+class PatientNotFound(ReservationRefused):
+    """The patient id is not this tenant's. 404 -- a missing thing, not a conflict.
+
+    Distinct from `PatientAccessDenied` (403), which means the patient is REAL and belongs to
+    someone else. An unknown id and a real one reached for wrongly are different facts, and a
+    caller must be able to audit the difference.
+    """
+    error_code = "PATIENT_NOT_FOUND"
+    status_code = 404
 
 
 # so None can only come from a script or an internal integration, both of which are trusted.
@@ -416,6 +493,25 @@ async def create_reservation(
     # and Lia's two write sites all omit it, and a barber reservation correctly has no patient.
     # It is not a placeholder for "unknown": for a barber row NULL is the true answer.
     patient_id: str | None = None,
+    # P5-C (ق-٥-ج option أ, Salman 2026-09-27). The website has no patient id -- a visitor has
+    # never been here before -- so it sends the patient ITSELF and this Service resolves it:
+    #     {"name": str, "phone": str | None, "relation": "self" | "other"}
+    #
+    # WHY IN THE BOOKING BODY rather than a separate POST /patients: one write path per Capability
+    # (rules/backend/architecture.md §9), and more concretely no ORPHAN. A visitor who abandons the
+    # flow after step ⑤ leaves nothing behind, because nothing is written until this function runs.
+    # A separate endpoint would write a Patient first and strand it whenever the session broke
+    # between the two calls -- the failure mode this option was chosen to remove.
+    #
+    # `relation` is `self` | `other` ONLY -- never `guardian` (F-1, Salman 2026-09-27). The website
+    # asks one two-button question and collects no evidence of guardianship, and it cannot even
+    # tell a minor from an adult since no date-of-birth column exists, by Salman's own earlier
+    # decision that an empty column is a claim. `guardian` stays valid in VALID_ROLES for a path
+    # that asks explicitly; the website is not that path.
+    #
+    # Mutually exclusive with `patient_id`: one of them identifies an existing patient, the other
+    # describes one to resolve. Both together is a caller bug, not a merge.
+    patient: dict | None = None,
 ) -> dict:
     """
     Fixed pipeline (Reservation Strategy Architecture design doc, Correction 1) — always in this
@@ -450,7 +546,7 @@ async def create_reservation(
     # that is not a route. Same shape as decision a3-PR — provisioning prevents the state and the
     # runtime detects it anyway.
     if not allow_past and reserved_at < datetime.now().replace(tzinfo=timezone.utc):
-        raise ValueError("Cannot reserve a past time slot.")
+        raise SlotInPast("Cannot reserve a past time slot.")
 
     # Clinic P2 -- the patient's TENANT ownership, checked here in Validate and not later, for
     # the same reason the past guard is first: a cross-tenant id must be refused before it costs
@@ -459,7 +555,24 @@ async def create_reservation(
     if patient_id:
         from app.repositories import patient_repo
         if await patient_repo.find_patient(client_id, patient_id) is None:
-            raise ValueError("Patient not found for this tenant.")
+            raise PatientNotFound("Patient not found for this tenant.")
+
+    # P5-C -- the `patient` descriptor is SHAPE-checked here, in Validate, for the same reason the
+    # past guard and the tenant check are: a malformed request must be refused before it costs a
+    # single write. Resolution itself happens after the Customer exists, further down.
+    if patient is not None:
+        if patient_id:
+            raise ValueError("Pass either patient_id or patient, never both.")
+        from app.services import patient_service
+        _p_name = (patient.get("name") or "").strip()
+        if len(_p_name) < 2:
+            raise ValueError("A patient needs a name.")
+        _p_relation = patient.get("relation") or "self"
+        # `guardian` is rejected HERE, not filtered silently: a caller asking for it is asking for
+        # a claim this channel cannot support, and answering "fine" while writing something else is
+        # the silent substitution this project keeps finding. VALID_ROLES still contains it.
+        if _p_relation not in ("self", "other"):
+            raise ValueError("relation must be 'self' or 'other'.")
 
     # (Duration default resolution — a Validate-adjacent concern: what this reservation's
     # duration is, absent an explicit override.)
@@ -499,7 +612,7 @@ async def create_reservation(
     # flow -- are hardcoded to "barber", so no live path loses anything.
     if resource:
         if catalog_service is None:
-            raise ValueError(f"'{module_key}' reservations require a valid service_id.")
+            raise ServiceIdRequired(f"'{module_key}' reservations require a valid service_id.")
         if not await resource_service_repo.is_eligible(client_id, resource.id, catalog_service.id):
             raise ResourceDoesNotProvideService(
                 "This resource does not provide the requested service.")
@@ -507,7 +620,7 @@ async def create_reservation(
         # sent is a backward-compatibility input, never a source of truth (ق-٤-أ٢). Recomputed
         # here rather than at the default above, because the service is only resolved now.
         if not catalog_service.durationMin or catalog_service.durationMin <= 0:
-            raise ValueError("This service has no usable duration.")
+            raise ServiceMisconfigured("This service has no usable duration.")
         effective_duration = catalog_service.durationMin
 
     # -- Booking Contract (Clinic P3) ------------------------------------------------------------
@@ -526,7 +639,7 @@ async def create_reservation(
     # through (Salman's decision, 2026-09-25).
     if catalog_service and source in PATIENT_FACING_SOURCES:
         if getattr(catalog_service, "bookableBy", "patients") == "staff_only":
-            raise ValueError("This service can only be booked by the clinic. Please contact us directly.")
+            raise ServiceNotBookableOnline("This service can only be booked by the clinic. Please contact us directly.")
 
     # -- Working Hours ---------------------------------------------------------------------------
     # Resource's own working_hours takes priority when set; falls back to the tenant-wide
@@ -554,13 +667,13 @@ async def create_reservation(
         # string-matching needed.
         candidates = await repo.find_overlapping_by_resource(client_id, resource.id, reserved_at, effective_duration)
         if _has_conflict(candidates, reserved_at, effective_duration):
-            raise ValueError("This resource is already booked for that time. Please choose a different time.")
+            raise SlotTaken("This resource is already booked for that time. Please choose a different time.")
     elif barber:
         # Barber-backed path — real barberId FK, its own query, written independently of the
         # resource branch above even though the shape ends up similar.
         candidates = await repo.find_overlapping_by_barber(client_id, barber.id, reserved_at, effective_duration)
         if _has_conflict(candidates, reserved_at, effective_duration):
-            raise ValueError("This barber is already booked for that time. Please choose a different time.")
+            raise SlotTaken("This barber is already booked for that time. Please choose a different time.")
     else:
         # Legacy path (restaurant/services/real_estate without a formal Resource row) — unchanged.
         should_check_conflict = bool(
@@ -584,7 +697,7 @@ async def create_reservation(
                 or (c.metadata or {}).get("unit_id") == resource_key
             ]
             if _has_conflict(overlapping, reserved_at, effective_duration):
-                raise ValueError("This slot is already reserved. Please choose a different time.")
+                raise SlotTaken("This slot is already reserved. Please choose a different time.")
 
     # -- Resolve [Customer] -----------------------------------------------------------------------
     # Phase A (Customer Identity + WhatsApp Booking Study, 2026-08-24) -- find-or-create by
@@ -620,6 +733,42 @@ async def create_reservation(
     if patient_id:
         from app.services import patient_service
         await patient_service.assert_contact_may_act(client_id, patient_id, customer.id)
+
+    # P5-C -- resolve the `patient` DESCRIPTOR into a real id, now that the contact is known.
+    #
+    # 🔴 THE ONE PLACE THIS DEPARTS FROM THE WORD "find-or-create", AND WHY. `match_in_contact`'s
+    # contract is explicit and ratified: a single name match returns `{"status": "one"}` which means
+    # ASK, NEVER ASSUME -- "two people genuinely share a name often enough that this project has
+    # already shipped a contract for it" (علي ×2, barber daily log, 2026-09-23, where Salman's own
+    # answer was "leave them separate"). A website confirmation has no turn in which to ask.
+    #
+    # So the two relations resolve differently, and the difference is forced by that contract:
+    #
+    #   self   -> FIND-OR-CREATE is safe and correct. "the patient is the person whose phone this
+    #             is" has no ambiguity to resolve, so reusing the existing self-linked patient is
+    #             identity, not a guess.
+    #   other  -> ALWAYS CREATE. Reusing a matched name would be exactly the silent merge
+    #             patient_service exists to prevent. A duplicate row is recoverable by a human;
+    #             two different people collapsed into one medical record is not.
+    #
+    # ⚠️ Recorded honestly: this removes the SESSION-ABANDONMENT orphan, which is what option (أ)
+    # was chosen for. It does not remove a RACE-LOSS orphan -- if the unique index rejects this
+    # booking after the patient row exists, that row survives. That exposure is identical to the
+    # one `Customer` already carries above (find-or-create also runs before repo.create), so this
+    # is not a new class of risk; it is the existing one, now stated instead of implied.
+    if patient is not None:
+        from app.services import patient_service
+        if _p_relation == "self":
+            existing = [p for p in await patient_service.list_for_contact(client_id, customer.id)
+                        if p.get("role") == "self"]
+            if existing:
+                patient_id = existing[0]["patient_id"]
+            else:
+                patient_id = (await patient_service.create_patient(
+                    client_id, _p_name, customer.id, role="self"))["patient_id"]
+        else:
+            patient_id = (await patient_service.create_patient(
+                client_id, _p_name, customer.id, role="other"))["patient_id"]
 
     # -- Create ------------------------------------------------------------------------------------
     create_data = {
@@ -687,8 +836,8 @@ async def create_reservation(
         reservation = await repo.create(create_data)
     except UniqueViolationError:
         if resource:
-            raise ValueError("This resource is already booked for that time. Please choose a different time.")
-        raise ValueError("This barber is already booked for that time. Please choose a different time.")
+            raise SlotTaken("This resource is already booked for that time. Please choose a different time.")
+        raise SlotTaken("This barber is already booked for that time. Please choose a different time.")
 
     # -- Post Actions --------------------------------------------------------------------------
     # Was an explicit no-op until 2026-09-07. It now carries exactly one action: telling the shop a

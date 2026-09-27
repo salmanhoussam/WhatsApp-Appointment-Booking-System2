@@ -125,14 +125,15 @@ async def main():
     # reason (P0.5, 2026-09-25): three of ten real Customer rows already carry reservations
     # under more than one name, one of them seven. Default None, and no caller in app/ passes
     # it yet, so every existing caller stays byte-for-byte identical.
-    check("T3-b/T3-c/T5/P2 added exactly five, at the end (was: four, then three, then none)",
+    check("T3-b/T3-c/T5/P2/P5-C added exactly six, at the end "
+          "(was: five, then four, then three, then none)",
           names[10:] == ["allow_past", "notify_merchant", "enforce_working_hours", "status",
-                         "patient_id"],
+                         "patient_id", "patient"],
           str(names[10:]))
     kinds = {n: sig.parameters[n].kind
              for n in ("allow_past", "notify_merchant", "enforce_working_hours", "status",
-                       "patient_id")}
-    check("   and all five are KEYWORD-ONLY — no positional call can land on them by accident",
+                       "patient_id", "patient")}
+    check("   and all six are KEYWORD-ONLY — no positional call can land on them by accident",
           all(k is inspect.Parameter.KEYWORD_ONLY for k in kinds.values()), str(kinds))
     defaulted = {n: p.default for n, p in sig.parameters.items()
                  if p.default is not inspect.Parameter.empty}
@@ -150,8 +151,16 @@ async def main():
                         # preservation like the two above, and NOT a placeholder for "unknown":
                         # for a barber reservation NULL is the TRUE answer, and all 66 existing
                         # production rows correctly hold it -- measured, not assumed.
+                        # TRANSITION (2026-09-27, Clinic P5-C): `patient: None` joined — the
+                        # descriptor the WEBSITE sends because a first-time visitor has no id.
+                        # None is a true preservation: every one of the four existing callers
+                        # omits it, so each keeps passing `patient_id` or nothing at all, and the
+                        # resolution block is gated on `patient is not None`. It is deliberately
+                        # NOT merged with `patient_id` into one polymorphic argument — one of them
+                        # names an existing patient, the other describes one to resolve, and
+                        # passing both is refused rather than silently reconciled.
                         "enforce_working_hours": True, "status": "pending",
-                        "patient_id": None}, str(defaulted))
+                        "patient_id": None, "patient": None}, str(defaulted))
 
     print("\n── 2. INVARIANT — the three callers, and NOTHING else calls it ──")
     # COUNTED AS CALLS, NOT AS TEXT. The first version of this check used a regex and answered
@@ -187,9 +196,15 @@ async def main():
         "admin route":   ["client_id", "module_key", "customer_name", "customer_phone",
                           "customer_email", "reserved_at", "duration_min", "notes", "metadata",
                           "source"],
+        # TRANSITION (2026-09-27, Clinic P5-C). WAS ten, ending at "source". `patient` is the
+        # eleventh, and ONLY the public route passes it: it is the one caller whose user is a
+        # first-time visitor with no patient id, so it sends the descriptor and the Service
+        # resolves it. The admin route and the WhatsApp flow still pass ten and nine — the
+        # invariant this section defends (no caller's behaviour moved) is unchanged and is still
+        # asserted below, for those two and for Lia.
         "public route":  ["client_id", "module_key", "customer_name", "customer_phone",
                           "customer_email", "reserved_at", "duration_min", "notes", "metadata",
-                          "source"],
+                          "source", "patient"],
         "whatsapp flow": ["client_id", "module_key", "customer_name", "customer_phone",
                           "reserved_at", "duration_min", "notes", "metadata", "source"],
     }
