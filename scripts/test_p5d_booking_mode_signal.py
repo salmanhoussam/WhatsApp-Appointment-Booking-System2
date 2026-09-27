@@ -1,4 +1,8 @@
-"""P5-D · T-ب-٦ — the page stops inferring its vertical from `barbers.length`.
+"""P5-D — the page stops inferring its vertical, and stops hard-coding the endpoints it calls.
+
+    T-ب-٦  the SIGNAL: `mode` comes from the server-resolved `booking_module`, not `barbers.length`.
+    T-ب-٧  the REQUESTS: which staff/availability endpoint and which create metadata that module
+           implies, resolved in one place instead of written literally at each call site.
 
 Run:  venv/bin/python scripts/test_p5d_booking_mode_signal.py
 
@@ -94,21 +98,23 @@ def main():
     print("\n── P5-D · T-ب-٦ — booking_module replaces barbers.length as the signal ──────────")
 
     # ── BEHAVIOUR: the pure derivation, really executed ─────────────────────────────────────
-    node = subprocess.run(["node", "scripts/booking_mode_cases.mjs"], cwd=ROOT,
-                          capture_output=True, text=True, timeout=60)
-    if node.returncode != 0:
-        check("T-ب-٦-b0  node could execute the derivation at all", False,
-              (node.stderr or "").strip()[:200])
-        print("\nFAILURES ABOVE")
-        return 1
-    # A counter that reports zero because nothing ran is not a result -- it is a question
-    # (2026-09-27, count_checks.py printed PASS=0 for 27 suites for exactly that reason).
-    cases = json.loads(node.stdout)
-    check("T-ب-٦-b0  the derivation module loaded and returned real results (positive control: a "
-          "zero-case run would be reported as a failure, not as success)",
-          len(cases) >= 12, f"{len(cases)} cases executed")
-    for c in cases:
-        check(c["label"], c["passed"], c.get("detail", ""))
+    for probe, label, floor in (("scripts/booking_mode_cases.mjs", "T-ب-٦-b0", 12),
+                                ("scripts/booking_endpoints_cases.mjs", "T-ب-٧-b0", 15)):
+        node = subprocess.run(["node", probe], cwd=ROOT, capture_output=True, text=True, timeout=60)
+        if node.returncode != 0:
+            check(f"{label}  node could execute {probe} at all", False,
+                  (node.stderr or "").strip()[:200])
+            print("\nFAILURES ABOVE")
+            return 1
+        # A run that reports nothing is not a pass -- it is a question. On 2026-09-27
+        # count_checks.py printed PASS=0 for all 27 suites because every one had died on an
+        # ImportError it never checked for, so a floor on the case count is the positive control.
+        cases = json.loads(node.stdout)
+        check(f"{label}  {os.path.basename(probe)} loaded and returned real results (positive "
+              f"control: a zero-case run is reported as a FAILURE, not as success)",
+              len(cases) >= floor, f"{len(cases)} cases executed")
+        for c in cases:
+            check(c["label"], c["passed"], c.get("detail", ""))
 
     hook, pure, page = read(HOOK), read(PURE), read(PAGE)
 
@@ -125,10 +131,15 @@ def main():
     check("T-ب-٦-s2  [text] TRANSITION — `module_key: 'barber'` is no longer a literal in the hook; "
           "it was a bare literal until today and is now the resolved value",
           "module_key:     'barber'" not in hook and "module_key:     bookingModule," in hook)
-    check("T-ب-٦-s3  [text] the first /barbers request is gated on the resolved module, so a legacy "
-          "tenant no longer makes a request it has no use for",
-          "if (bookingModule !== 'barber') { setBarbersLoading(false); return }" in hook
-          and "[slug, bookingModule, barbersRetryKey]" in hook)
+    # Updated when T-ب-٧ landed: the gate used to be an inline `bookingModule !== 'barber'` check
+    # and is now the resolver returning null, which covers legacy AND an unregistered module in one
+    # place. The suite caught the drift on its own run rather than going quietly stale.
+    check("T-ب-٦-s3  [code] the first staff request is gated on the RESOLVER returning a request, so "
+          "a legacy tenant still makes no request it has no use for — and the effect re-runs when "
+          "the resolved module arrives",
+          "const req = staffListRequest({ bookingModule, slug })" in hook_code
+          and "if (!req) { setBarbersLoading(false); return }" in hook_code
+          and "[slug, bookingModule, barbersRetryKey]" in hook_code)
     check("T-ب-٦-s4  [text] the resolved module is read from config with an explicit null fallback, "
           "and exposed for P5-E to branch on",
           "config?.booking_module ?? null" in hook
@@ -141,7 +152,31 @@ def main():
           "mode === 'clinic'" not in page_code and "KNOWN, DECLARED GAP" in page,
           "gap documented in a comment, absent from the code")
 
-    # ── INVARIANTS: what this gate must NOT have touched ───────────────────────────────────
+    # ── T-ب-٧ structure: no endpoint is named at a call site any more ───────────────────────
+    # [code], not [text]: my own comments in the hook quote the literals they replaced
+    # ("was the literal `{ barber_id, service_id }`"), which is the same self-documenting-absence
+    # trap that broke s1/s5 on their first run.
+    check("T-ب-٧-s1  [code] TRANSITION — the hook's CODE no longer names '/reservations/barbers' or "
+          "'/reservations/availability'; both were written literally at the call sites until today",
+          "'/reservations/barbers'" not in hook_code
+          and "'/reservations/availability'" not in hook_code
+          and "staffListRequest({" in hook_code and "availabilityRequest({" in hook_code)
+    check("T-ب-٧-s2  [code] TRANSITION — the create body no longer builds `{ barber_id: ... }` "
+          "inline; that literal object was the metadata until today",
+          "barber_id: selectedBarber.id" not in hook_code
+          and "bookingMetadata({" in hook_code)
+    check("T-ب-٧-s3  [code] the availability effect depends on selectedServiceId too — a clinic "
+          "cannot build that request without it, so omitting the dependency would leave stale slots",
+          "selectedServiceId, selectedDate, durationMin" in hook_code)
+    check("T-ب-٧-s4  [code] INVARIANT — the service-scoped refetch still refuses to run unless a "
+          "staff list really loaded; the old `mode !== 'booking'` guard was widened by exactly one "
+          "value, not removed",
+          "(mode !== 'booking' && mode !== 'clinic')" in hook_code)
+    endp = read(os.path.join(ROOT, "frontend/src/hooks/bookingEndpoints.js"))
+    check("T-ب-٧-s5  [text] the resolver module imports nothing either — no React, no publicApi",
+          "import" not in endp.split("export")[0], "zero imports before first export")
+
+    # ── INVARIANTS: what these gates must NOT have touched ─────────────────────────────────
     staff = read(os.path.join(ROOT, "frontend/src/components/dynamic-sections/StaffSection.jsx"))
     check("T-ب-٦-s6  [text] INVARIANT — StaffSection's own /barbers fetch is untouched: it is a "
           "homepage showcase list, unrelated to booking",

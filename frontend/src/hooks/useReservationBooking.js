@@ -4,6 +4,7 @@ import useTenantSlug from './useTenantSlug'
 import publicApi from '../utils/publicApi'
 import { useAppLanguage } from '../context/AppLanguageContext'
 import { deriveBookingMode } from './bookingMode'
+import { staffListRequest, availabilityRequest, bookingMetadata } from './bookingEndpoints'
 
 const AR_WEEKDAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_WEEKDAYS_SHORT = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمس', 'جمع', 'سبت']
@@ -185,10 +186,13 @@ export default function useReservationBooking() {
     //   2. 🔴 a legacy tenant's page can no longer be replaced by an error screen when that
     //      request fails -- which is exactly what happened before, for a tenant that never
     //      needed barbers at all.
-    if (bookingModule !== 'barber') { setBarbersLoading(false); return }
+    //   3. and, since P5-D, a CLINIC asks a different endpoint entirely -- ./bookingEndpoints.js
+    //      owns that choice, so no call site here decides it by hand.
+    const req = staffListRequest({ bookingModule, slug })
+    if (!req) { setBarbersLoading(false); return }
     setBarbersLoading(true)
     setBarbersError(false)
-    publicApi.get('/reservations/barbers', { params: { client_slug: slug } })
+    publicApi.get(req.url, { params: req.params })
       .then(({ data }) => {
         if (!mountedRef.current) return
         const list = data?.data ?? []
@@ -239,8 +243,16 @@ export default function useReservationBooking() {
   // the current selection against the new list -- if it's no longer present, falls back to the
   // new list's first entry, same auto-select-first pattern used everywhere else in this hook.
   useEffect(() => {
-    if (!slug || mode !== 'booking' || !selectedServiceId) return
-    publicApi.get('/reservations/barbers', { params: { client_slug: slug, service_id: selectedServiceId } })
+    // P5-D: runs for a clinic too, where the same call is a HARD filter -- an empty result there
+    // means "no doctor here performs this service", never "we could not tell" (ق-٤-ب/ق-٤-ز). The
+    // barber's soft filter is unchanged. Both shapes come from the one resolver.
+    // The old guard was `mode !== 'booking'`, i.e. "only once a staff list really loaded". Kept
+    // exactly, widened by one value: a clinic must pass it too. Without this, a barber tenant whose
+    // first request FAILED would quietly re-fetch here while still showing the error screen.
+    if (!selectedServiceId || (mode !== 'booking' && mode !== 'clinic')) return
+    const req = staffListRequest({ bookingModule, slug, serviceId: selectedServiceId })
+    if (!req) return
+    publicApi.get(req.url, { params: req.params })
       .then(({ data }) => {
         if (!mountedRef.current) return
         const list = data?.data ?? []
@@ -248,7 +260,7 @@ export default function useReservationBooking() {
         setSelectedBarberId((prev) => (list.some((b) => b.id === prev) ? prev : (list[0]?.id ?? null)))
       })
       .catch(() => {})
-  }, [slug, mode, selectedServiceId])
+  }, [slug, bookingModule, mode, selectedServiceId])
 
   const selectedService = services.find((s) => s.id === selectedServiceId) ?? null
   const selectedBarber  = barbers.find((b) => b.id === selectedBarberId) ?? null
@@ -258,13 +270,20 @@ export default function useReservationBooking() {
   const retrySlots = useCallback(() => setSlotsRetryKey((k) => k + 1), [])
 
   useEffect(() => {
-    if (!slug || !selectedBarberId || !durationMin || !selectedDate) return
+    // P5-D: the two availability contracts are mirror images, and the resolver holds the asymmetry
+    // so it cannot be got wrong here -- barber REQUIRES duration_min, clinic FORBIDS it and requires
+    // service_id instead, because the server derives the duration from the service (ق-٤-أ). A null
+    // request means "not answerable yet", which is why the guard is the resolver rather than a list
+    // of per-module field checks.
+    const req = availabilityRequest({
+      bookingModule, slug, staffId: selectedBarberId, serviceId: selectedServiceId,
+      date: selectedDate, durationMin,
+    })
+    if (!req) return
     setSlotsLoading(true)
     setSlotsError(false)
     setSelectedSlot(null)
-    publicApi.get('/reservations/availability', {
-      params: { client_slug: slug, barber_id: selectedBarberId, date: selectedDate, duration_min: durationMin },
-    })
+    publicApi.get(req.url, { params: req.params })
       .then(({ data }) => { if (mountedRef.current) setSlots(data?.data ?? []) })
       // Bug fix (2026-08-10): a failed request rendered the identical "no appointments today"
       // copy as a real, confirmed empty day -- a customer hitting a bad moment saw what looked
@@ -272,7 +291,8 @@ export default function useReservationBooking() {
       // slotsError keeps that distinction all the way to CalendarPanel.
       .catch(() => { if (mountedRef.current) { setSlots([]); setSlotsError(true) } })
       .finally(() => { if (mountedRef.current) setSlotsLoading(false) })
-  }, [slug, selectedBarberId, selectedDate, durationMin, slotsRetryKey])
+  }, [slug, bookingModule, selectedBarberId, selectedServiceId, selectedDate, durationMin,
+      slotsRetryKey])
 
   const resetConfirmation = useCallback(() => {
     setReservationId(null)
@@ -302,7 +322,11 @@ export default function useReservationBooking() {
         customer_phone: phone,
         reserved_at:    selectedSlot.datetime,
         duration_min:   durationMin,
-        metadata:       { barber_id: selectedBarber.id, service_id: selectedService.id },
+        // P5-D: was the literal `{ barber_id, service_id }`. A clinic sends resource_id,
+        // which the backend mirrors to the real Reservation.resourceId FK.
+        metadata:       bookingMetadata({
+          bookingModule, staffId: selectedBarber.id, serviceId: selectedService.id,
+        }),
       },
       { params: { client_slug: slug } }
     )
