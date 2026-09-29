@@ -5,6 +5,8 @@ Capability should be reachable from here in one link. **As of Phase 4** — `adr
 `principles/` are now real and populated; `capabilities/` still fills in during Phase 5. Do not
 treat the Capabilities table below as "doesn't exist," only as "not migrated yet."
 
+**Project entry point: [`../README.md`](../README.md)** — document types and their authority (governing / plan / evidence), the active workstreams and how they chain, and what to read per task. This file stays the *architecture* index: decisions, principles, Capabilities. It does not restate project state or workstream detail.
+
 ## Decisions
 
 | Decision | Location | Status |
