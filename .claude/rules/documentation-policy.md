@@ -122,6 +122,22 @@ real Domain (Tenant OS).
 │                        MANDATORY HOME (Salman, 2026-09-09): a plan is a project artefact, not a
 │                        scratch note. See "Plans" below.
 ├── evolution/           <topic>.md — accumulating insight, pre-ADR (see above)
+├── research/            <topic>.md — EXTERNAL research that could change a future decision or
+│                        prevent a repeat investigation. Defined 2026-09-30 (Salman) — the folder
+│                        had existed since 2026-07-19 with one file and no rule, and was listed as
+│                        gap ف-٦ in `.claudedocs/README.md`. Entry condition, deliberately narrow:
+│                        research that changes no decision and prevents no repeat investigation is
+│                        NOT filed here — this is not a documentation dump. Distinct from `work/`
+│                        (how we proved something about OUR system on a date) and from `evolution/`
+│                        (what we are learning across sessions, pre-decision): `research/` records
+│                        what is true OUTSIDE, what we rejected, and why. Every file separates
+│                        SOURCE FACT / MEASURED REPO FACT / INFERENCE / PROPOSAL / DECISION /
+│                        UNKNOWN, because a research finding is not a decision — the two additions
+│                        that vocabulary makes to `investigation-protocol.md`'s existing
+│                        Confirmed/Side/Unknowns are splitting an external fact from a measured
+│                        repo fact, and naming INFERENCE as its own class. Immutable like every
+│                        other ⚪ folder: corrected by a new dated entry, never rewritten. A
+│                        `research/` file NEVER becomes an ADR by itself; promotion is a decision.
 ├── maturity/            <topic>.md — recurring Architecture (Maturity) Review ledger, one per
 │                        Capability/Interface/System, appended to over time — see
 │                        `rules/architecture-review-loop.md`. Sibling to `evolution/`, not nested
