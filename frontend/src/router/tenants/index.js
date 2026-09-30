@@ -64,11 +64,6 @@ export const tenantRegistry = {
     theme:           'olive-dark',
   },
 
-  moments: {
-    routes:          lazy(() => import('./moments.routes')),
-    defaultRedirect: 'create',   // canonical: demo.salmansaas.com/moments/create
-    theme:           'gold-dark',
-  },
 
   'beit-al-fakhar': {
     routes:          lazy(() => import('./beit-al-fakhar.routes')),

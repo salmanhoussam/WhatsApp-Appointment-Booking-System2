@@ -47,9 +47,6 @@ const DynamicTenantResolver = lazy(() => import('./router/DynamicTenantResolver'
 // Marketing landing page — formerly on Cloudflare, now integrated
 const MarketingApp = lazy(() => import('./pages/marketing/MarketingApp'));
 
-// Dating module (Phase 75) — standalone, before /:slug/* catch-all
-const DatingPageResolver = lazy(() => import('./pages/dating/DatingPageResolver'));
-const DatingCreatePage   = lazy(() => import('./pages/dating/DatingCreatePage'));
 
 // Detect subdomain mode at module scope (stable across renders)
 // _IS_LOCAL_HOST mirrors useTenantSlug.js's own _isSubdomainMode() check — a private LAN IP
@@ -255,13 +252,6 @@ function App() {
               cleanup pass. */}
           <Route path="/alzabt" element={<Navigate to="/" replace />} />
 
-          {/* ── Dating module routes (must be before /:slug/*) ── */}
-          <Route path="/dating/create" element={
-            <Suspense fallback={null}><DatingCreatePage /></Suspense>
-          } />
-          <Route path="/dating/:slug" element={
-            <Suspense fallback={null}><DatingPageResolver /></Suspense>
-          } />
 
           {/* ── Dynamic tenant routes (must be last) ──
                Subdomain mode: /* so a real per-tenant subdomain resolves cleanly (legacy pattern,
