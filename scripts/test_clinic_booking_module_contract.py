@@ -105,8 +105,33 @@ async def main():
 
     # ── T-ب-١ · the declared module is one the CREATE PATH really branches on ────────────────
     declared = {v: e.get("booking_module") for v, e in VERTICAL_REGISTRY.items()}
-    check("T-ب-١a  every Registry entry declares a booking_module",
-          all(declared.values()), repr(declared))
+    # ── T-ب-١a · TRANSITION, 2026-09-30 (Salman) ─────────────────────────────────────────
+    # WAS: `all(declared.values())` — "every Registry entry declares a booking_module", i.e. every
+    # value must be TRUTHY. That assertion was correct for the world it was written in: the
+    # Registry held exactly two verticals, barber and clinic, and BOTH book someone — barber books
+    # a `Barber`, clinic books a `Resource`.
+    #
+    # CHANGED because `restaurant` was registered 2026-09-30 and a restaurant books NOBODY. Its
+    # `booking_module` is None on purpose: ق-٥-ب §7-ب already ratifies what the frontend does when
+    # booking_module is null, so declaring None opens no engine and invents no behaviour. Keeping
+    # the truthy requirement would have meant inventing a restaurant booking module to satisfy a
+    # test — the test dictating the product, exactly backwards.
+    #
+    # WHAT THE OLD ASSERTION PROTECTED, and what this one still protects: that the KEY is never
+    # silently forgotten. A MISSING key and a DELIBERATE None are different facts and only the
+    # first is a bug. T-ب-١b below is unchanged and still proves every non-None value is one the
+    # create path really branches on, so a declared module can never be a word nobody wired.
+    present = {v: ("booking_module" in e) for v, e in VERTICAL_REGISTRY.items()}
+    check("T-ب-١a  every Registry entry CARRIES the booking_module key — an explicit None is a "
+          "declaration (a restaurant books nobody), a MISSING key is the defect this guards. "
+          "Was: every value must be truthy — true while both verticals booked someone",
+          all(present.values()), repr(present))
+    check("T-ب-١a2  and a None is spelled None — never omitted, and never a falsy stand-in ('' or "
+          "0), which would pass as 'no module' while being a typo",
+          all(e["booking_module"] is None
+              or (isinstance(e["booking_module"], str) and e["booking_module"])
+              for e in VERTICAL_REGISTRY.values()),
+          repr(declared))
     check("T-ب-١b  and the declared set EQUALS the set with a written expectation — a new vertical "
           "cannot be declared without proving its module is wired",
           set(v for v in declared.values() if v) == set(EXPECTATIONS),

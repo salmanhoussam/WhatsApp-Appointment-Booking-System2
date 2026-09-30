@@ -89,6 +89,39 @@ VERTICAL_REGISTRY: dict[str, dict] = {
         "staff_backing_model": "Resource",
         "booking_module": "clinic",
     },
+    "restaurant": {
+        # Salman, 2026-09-30. Registered so `restaurant` becomes a real platform vertical rather
+        # than a word that already means two other things: a `service_key` in `client_services`
+        # (12 real `require_service("restaurant")` gates) and a `service_type` in
+        # services.py's SERVICE_TYPE_MAP. It was canonical in both of those layers and absent from
+        # this one -- which is why caracas carried every restaurant service and still had
+        # `vertical = NULL`.
+        #
+        # Matches what caracas already carries in production, measured 2026-09-30, rather than a
+        # list invented here: catalog + restaurant + restaurant.menu + whatsapp_ordering. That is
+        # SERVICE_TYPE_MAP["restaurant"] plus `catalog`, which the 97 real catalog_items need.
+        "default_services": ["catalog", "restaurant", "restaurant.menu", "whatsapp_ordering"],
+        # Not built. Same honesty as barber and clinic above -- None rather than a filename that
+        # does not exist.
+        "page_template": None,
+        # THREE Nones below, and none of them is an omission.
+        #
+        # staff_backing_model: a restaurant does not book a person. Barber books a `Barber`, clinic
+        # books a `Resource` (a doctor); a restaurant's bookable thing, if it ever gets one, is a
+        # table or a zone -- a different model that does not exist yet and is deliberately not
+        # invented here. None makes `provisioning_service.provision_vertical_domain_objects` fail
+        # CLOSED with "No provisioning implementation for staff_backing_model=None" instead of
+        # provisioning the wrong kind of object. That refusal is the correct behaviour today.
+        "staff_backing_model": None,
+        # booking_module: a restaurant has no public booking page. None is not a gap -- ق-٥-ب's own
+        # contract (§7-ب, CLINIC_Q5B_BOOKING_MODULE_CONTRACT.md) already ratifies what the frontend
+        # does when `booking_module` is null, and `resolve_booking_module` already returns None for
+        # a registered vertical whose entry says None. So registering this vertical opens no booking
+        # engine and invents no behaviour: it only stops the 🔴 "vertical is set but has no
+        # VERTICAL_REGISTRY entry" warning that `public_service` would otherwise log on every
+        # /config fetch once a tenant is classified.
+        "booking_module": None,
+    },
 }
 
 
