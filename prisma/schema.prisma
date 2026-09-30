@@ -1107,27 +1107,6 @@ model ResourceService {
 // Slug = the URL key and only access credential (no auth on view).
 // ================================================================================
 
-model DatePage {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug        String    @unique
-  her_name    String
-  config      Json // { theme, message, food_options[], emoji, custom_bg_url? }
-  ntfy_topic  String
-  owner_phone String
-  her_phone   String?
-  event_date  DateTime? @db.Timestamptz(6)
-  chosen_food String?
-  answered_at DateTime? @db.Timestamptz(6)
-  answer      String? // "yes" | "later" | "no"
-  is_deleted  Boolean   @default(false)
-  expires_at  DateTime  @db.Timestamptz(6)
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-
-  @@index([slug])
-  @@index([expires_at, is_deleted])
-  @@map("date_pages")
-  @@schema("public")
-}
 
 // ================================================================================
 // FLEET MODULE (Phase 76 - Vicale Fleet Platform)
@@ -1288,68 +1267,8 @@ model DriverConsent {
 // MOMENTS MODULE - Personal Occasion Pages
 // ===================================================
 
-model OccasionCreator {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String
-  phone         String   @unique
-  email         String?  @unique
-  password_hash String
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now()) @db.Timestamptz(6)
 
-  pages OccasionPage[]
 
-  @@map("occasion_creators")
-  @@schema("public")
-}
-
-model OccasionPage {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creator_id   String    @db.Uuid
-  slug         String    @unique
-  // wedding | anniversary | birthday | engagement | graduation | other
-  type         String
-  title_ar     String
-  title_en     String?
-  message_ar   String
-  message_en   String?
-  event_date   DateTime  @db.Timestamptz(6)
-  location_ar  String?
-  location_en  String?
-  cover_image  String?
-  // per-type theme color: #d4a853 wedding, #e11d48 anniversary, #8b5cf6 birthday
-  theme_color  String    @default("#d4a853")
-  max_guests   Int?
-  rsvp_enabled Boolean   @default(true)
-  is_active    Boolean   @default(true)
-  expires_at   DateTime? @db.Timestamptz(6)
-  created_at   DateTime  @default(now()) @db.Timestamptz(6)
-
-  creator OccasionCreator @relation(fields: [creator_id], references: [id], onDelete: Cascade)
-  rsvps   OccasionRSVP[]
-
-  @@index([creator_id])
-  @@index([slug])
-  @@map("occasion_pages")
-  @@schema("public")
-}
-
-model OccasionRSVP {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  page_id     String   @db.Uuid
-  guest_name  String
-  guest_phone String?
-  guest_count Int      @default(1)
-  message     String?
-  attending   Boolean  @default(true)
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-
-  page OccasionPage @relation(fields: [page_id], references: [id], onDelete: Cascade)
-
-  @@index([page_id])
-  @@map("occasion_rsvps")
-  @@schema("public")
-}
 
 // -- Security & Audit (ADR-0001: Tenant Status Enforcement, .claudedocs/decisions/0001-*) ---
 model SecurityAuditLog {
