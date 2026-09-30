@@ -20,6 +20,7 @@ from app.db.dependencies import get_current_admin_user
 from app.core.tenant import require_roles
 from app.core.services import require_service
 from app.repositories import admin_catalog_repo as _cat_repo
+from app.services import catalog_service
 
 router = APIRouter()
 
@@ -161,11 +162,13 @@ async def delete_category(
     _svc=Depends(require_service("restaurant")),
     _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
-    result = await _cat_repo.delete_category_by_filter(
+    # Track A3, 2026-09-30. Was a HARD delete, and the WIDEST of the three: a category cascades
+    # to its items and each item to its order lines, so removing one menu section erased the
+    # order history of every dish in it. It then read `.count` on a plain int, raising 500 after
+    # the rows were already gone. Now soft-deleted through the service (architecture.md §9).
+    await catalog_service.admin_delete_category(
         str(user.clientId), category_id, module_key="restaurant"
     )
-    if result.count == 0:
-        raise HTTPException(status_code=404, detail="Category not found.")
     return {"success": True}
 
 
@@ -280,9 +283,19 @@ async def delete_item(
     _role=Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
-    result = await _cat_repo.delete_item_by_filter(client_id, item_id, module_key="restaurant")
-    if result.count == 0:
-        raise HTTPException(status_code=404, detail="Item not found.")
+    # Track A3, 2026-09-30. TWO defects fixed in one line, and the second hid the first:
+    #
+    #   1. This used to call `_cat_repo.delete_item_by_filter()`, a HARD delete. CatalogItem
+    #      cascades to StoreOrderItem, so retiring a dish erased every order line that ever
+    #      referenced it -- from the owner's own delete button.
+    #   2. It then read `result.count` on the plain int that `delete_many()` returns in
+    #      prisma-client-py 0.15.0 (documented at admin/store.py:261-265 and
+    #      reservation_repo.py:206-208), so the response raised AttributeError -> 500 AFTER the
+    #      rows were already gone. The owner saw a failure and the data was destroyed anyway.
+    #
+    # Now routed through the service, which soft-deletes and raises its own 404, per
+    # rules/backend/architecture.md §9 -- one capability, one service, one write path.
+    await catalog_service.admin_delete_item(client_id, item_id, module_key="restaurant")
     return {"success": True}
 
 

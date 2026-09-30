@@ -203,11 +203,18 @@ async def admin_update_category(
     return {"id": updated.id}
 
 
-async def admin_delete_category(client_id: str, category_id: str) -> None:
+async def admin_delete_category(client_id: str, category_id: str,
+                                module_key: Optional[str] = None) -> None:
+    """Retire a category and its items. ALWAYS a soft delete -- never a row removal.
+
+    🔴 The only delete path for a category, and it must stay the only one: a hard delete cascades
+    CatalogCategory -> CatalogItem -> StoreOrderItem and erases the order history of every dish in
+    the section. See the tombstone in admin_catalog_repo.py for the measurement.
+    """
     cat = await admin_catalog_repo.find_category(client_id, category_id)
     if not cat:
         raise HTTPException(404, "Category not found")
-    await admin_catalog_repo.soft_delete_category(category_id, client_id)
+    await admin_catalog_repo.soft_delete_category(category_id, client_id, module_key)
 
 
 async def admin_seed_from_template(
@@ -329,8 +336,19 @@ async def admin_update_item(
     return {"id": updated.id}
 
 
-async def admin_delete_item(client_id: str, item_id: str) -> None:
-    item = await admin_catalog_repo.find_item(client_id, item_id)
+async def admin_delete_item(client_id: str, item_id: str, module_key: Optional[str] = None) -> None:
+    """Retire an item. ALWAYS a soft delete -- never a row removal.
+
+    `module_key` added 2026-09-30 (plan Track A3) so `admin/restaurant.py` and `admin/store.py`
+    can route their deletes through here instead of calling a hard delete on the repository
+    directly. It keeps each surface scoped to its own module, exactly as those routes already
+    were: a store route must not retire a restaurant item of the same tenant.
+
+    🔴 This is the ONLY delete path for a catalog item, and it must stay the only one. A hard
+    delete cascades to StoreOrderItem (schema.prisma:755) and erases order history -- see the
+    tombstone in admin_catalog_repo.py for the full measurement.
+    """
+    item = await admin_catalog_repo.find_item(client_id, item_id, module_key)
     if not item:
         raise HTTPException(404, "Item not found")
-    await admin_catalog_repo.soft_delete_item(client_id, item_id)
+    await admin_catalog_repo.soft_delete_item(client_id, item_id, module_key)

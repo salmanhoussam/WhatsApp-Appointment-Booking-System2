@@ -34,6 +34,7 @@ from app.db.dependencies import get_current_admin_user
 from app.core.permissions import require_permission
 from app.core.services import require_service, require_any_service
 from app.repositories import admin_catalog_repo as _cat_repo
+from app.services import catalog_service
 from app.repositories import store_admin_repo as _store_repo
 
 router = APIRouter()
@@ -258,14 +259,16 @@ async def delete_product(
     _role=Depends(require_permission("store.write", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
-    # delete_many() returns a plain int (row count) in this prisma-client-py version (0.15.0),
-    # not an object with a .count attribute -- same real bug class already found and fixed in
-    # reservation_repo.py's update_many() calls (2026-07-30). Found live here 2026-08-20 while
-    # cleaning up a real temporary test product created during Track B (Products/Services
-    # Separation) verification -- pre-existing, unrelated to that Track's own changes.
-    deleted_count = await _cat_repo.delete_item_by_filter(client_id, product_id, module_key="store")
-    if deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Product not found.")
+    # Track A3, 2026-09-30. Was a HARD delete via `_cat_repo.delete_item_by_filter()`, which
+    # cascades to StoreOrderItem and erased order history for the deleted product. Now routed
+    # through the service, which soft-deletes and raises its own 404
+    # (rules/backend/architecture.md §9 -- one capability, one service, one write path).
+    #
+    # The int-vs-.count note that used to live here is preserved where it is still load-bearing:
+    # `delete_many()`/`update_many()` return a plain int in prisma-client-py 0.15.0, which is why
+    # the repository returns a ROW from `soft_delete_item()` and the 404 now comes from the
+    # service's own `find_item()` pre-check rather than from a row count.
+    await catalog_service.admin_delete_item(client_id, product_id, module_key="store")
     return {"success": True}
 
 
@@ -346,9 +349,9 @@ async def delete_category(
     _role=Depends(require_permission("store.write", "SUPER_ADMIN", "TENANT_ADMIN", "MANAGER_RESERVATIONS")),
 ):
     client_id = str(user.clientId)
-    result = await _cat_repo.delete_category_by_filter(client_id, category_id, module_key="store")
-    if result.count == 0:
-        raise HTTPException(status_code=404, detail="Category not found.")
+    # Track A3, 2026-09-30. Was a HARD delete that cascaded category -> items -> order lines.
+    # Now soft-deleted through the service (architecture.md §9).
+    await catalog_service.admin_delete_category(client_id, category_id, module_key="store")
     return {"success": True}
 
 
