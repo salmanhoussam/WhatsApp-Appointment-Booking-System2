@@ -155,3 +155,20 @@ UPDATE clients SET vertical = 'restaurant' WHERE slug = 'caracas';   -- صفٌّ
 ---
 
 **Decision: مطلوبةٌ من سلمان. Execution: صفر.**
+
+---
+
+# إغلاقُ التحقيق · ٢٠٢٦-٠٩-٣٠
+
+| المجهول | الحالة |
+|---|---|
+| ك-١ نطاقُ التصنيف | 🟢 **caracas + arizona** بقرارِ سلمان · وfootlab وbeit-al-fakhar وsmar **لم تُلمَس** |
+| ك-٢ `staff_backing_model` للمطعم | 🟢 **`None`** مُقَرٌّ — المطعمُ لا يحجز شخصاً، والتزويدُ يفشل مغلقاً |
+| ك-٣ نقلُ arizona/footlab | 🟢 arizona نُقلت · footlab لم تُلمَس |
+
+**واكتشافٌ لم يكن في التحقيقِ الأصليّ وظهر أثناءَ التخطيط:** `clients.isActive` — حقلٌ ثانٍ منفصلٌ
+عن `status` يحجب كلَّ الـAPI العامّ. caracas كان `False` ⇒ `/config` يردّ `Tenant not found` بينما
+القاعدةُ تحمل ٩٧ صنفاً و٨ أقسام. ⇒ **التصنيفُ والتشغيلُ مسارانِ مستقلّان تماماً.**
+
+**التنفيذ:** `83287f2` (كود) + معاملةُ Phase B (قاعدة). والخطّةُ ونتائجُها في
+`.claudedocs/plans/restaurant-vertical-and-caracas-activation.md` §١١.

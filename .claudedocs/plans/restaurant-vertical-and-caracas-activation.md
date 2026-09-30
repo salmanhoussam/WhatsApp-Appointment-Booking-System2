@@ -426,3 +426,43 @@ resolve_booking_module("restaurant")  مسجَّلاً = None  ·  غيرَ مس
 ---
 
 **الحالة: 🟡 مُعدَّلةٌ وتنتظر بوّابةَ ١. Execution: صفر.**
+
+---
+
+# ١١ · ✅ نُفِّذت بالكامل · ٢٠٢٦-٠٩-٣٠
+
+| المرحلة | الحالة | الدليل |
+|---|---|---|
+| **A** كودٌ وفحوص | ✅ | `83287f2` · حزمة 22/22 · والانحدارُ **FAIL 10 → 10** مقابلَ HEAD نظيفٍ في worktree بنفسِ اللحظةِ والقاعدة |
+| **Deploy** | ✅ | `activeDeployments[0].meta.commitHash = 83287f2` · `status=SUCCESS` · `instances[0].status=RUNNING` — **لا `latestDeployment`** · و`/health` 200 على ٩ استطلاعات |
+| **B** تصنيفُ الإنتاج | ✅ | ثلاثةُ `UPDATE` بشروطٍ وRETURNING في معاملةٍ واحدة · وقارئٌ مختومٌ مستقلّ |
+| **C** تحقّقُ كاراكاس | ✅ | `/config` 200 · `booking_module=null` · ٤ خدمات · ٨ أقسام · ١٠ فئات · ١٤ صنفاً في أوّلِ فئة |
+
+## مخرجاتُ `RETURNING` — حرفيّاً
+
+```
+caracas · vertical    → ('caracas', 'restaurant', False)
+caracas · is_active   → ('caracas', 'restaurant', True)
+arizona · vertical    → ('arizona',  'restaurant', True)
+```
+
+**والصفّانِ الأوّلانِ يُظهران التغييرَين منفصلَين بالترتيب** — وهو ما لم يكن `rowcount` ليقوله.
+
+## الضبطُ الموجَب بعد التنفيذ
+
+```
+barber 4 (لم يُلمَسوا) · clinic 1 · restaurant 2
+clients 10 · reservations 67 · customers 11 · barbers 8   — كلُّها كما كانت
+rk='barber' · mr-h='barber' · cliniclab-test='clinic' · arizona=None
+والمحجوبون: footlab · smar   (كانوا ثلاثةً، وخرج caracas وحدَه)
+```
+
+## وثلاثةُ أشياءَ لم تُنفَّذ بقصد
+
+```
+🔒 R-7          التحذيرُ الكاذبُ يُطلَق الآن — بندٌ مستقلّ، ومُثبَّتٌ في الحزمةِ فلا يُنسى
+🔒 arizona      صُنِّفت ولم تُشغَّل — ٠ أقسامِ صفحة · ٠ مستخدمين · خدمةٌ واحدة
+🔒 الرسمُ في متصفّح  Playwright منقطعٌ ⇒ البياناتُ مُثبَتةٌ والرسمُ **Unknown**، لا مُفترَضٌ نجاحُه
+```
+
+**الحالة: 🟢 مُغلَقة.**
