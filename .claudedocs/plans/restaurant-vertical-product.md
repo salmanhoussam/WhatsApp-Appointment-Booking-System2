@@ -1,6 +1,7 @@
 # Restaurant Vertical — the product plan
 
-**Status:** 🔵 Plan · research complete, **zero implementation** · **production gate 🔴 CLOSED**
+**Status:** 🔵 Plan · **Track A CLOSED** 2026-09-30/10-01 · production gate 🔴 CLOSED
+**Shipped:** `7e208e5` (soft delete) · `e399988` (SKU + the fifth hard delete)
 **Measured against:** `HEAD = dcc1bc3`, 2026-09-30. Every repo figure is perishable.
 **Supersedes nothing.** `.claudedocs/plans/restaurant-visual-report.md` is **Track C** below, and its
 phases 1–2 are already shipped — that file keeps its own execution log.
@@ -408,3 +409,53 @@ updated without losing data, and the new menu is already in hand. It is also the
 A-Q2 are answered in a conversation, not in an editor.
 
 And **X-Q1 in the same visit** — one question to the owner, which decides Tracks C, D and E at once.
+
+
+---
+
+## 7. Execution log
+
+### Track A — 🟢 CLOSED, 2026-09-30 → 2026-10-01
+
+**A3 · soft delete** (`7e208e5`). Four hard-delete paths, not one — three more than the plan
+predicted, and all four were owner-facing buttons rather than scripts:
+
+```
+admin/restaurant.py:283  menu item      admin/store.py:266   product
+admin/restaurant.py:165  menu CATEGORY  admin/store.py:352   store category   ← widest
+```
+
+The fix was smaller than the hazard: `soft_delete_item`/`soft_delete_category` already existed
+directly above their destructive neighbours, and `catalog_service` already held the correct paths
+— `admin/catalog.py` used them. Only the two module routes bypassed the service, which is the
+bypass `rules/backend/architecture.md` §9 already names. All four now go through the service, so
+§9 holds again; the soft functions gained `module_key` so scoping survived the move.
+
+`is_active` needed no migration — it already existed. The column was never missing; nothing used
+it as a delete path.
+
+**A-Q2…A-Q6 · SKU** (`e399988`). Migration run on production via `DIRECT_URL`, `CONCURRENTLY`,
+verified with a positive control (a duplicate UPDATE refused inside a rolled-back transaction —
+an index that exists but does not reject a duplicate is not a key). `app/core/sku.py` is the one
+normalisation boundary, for the same reason `app/core/phone.py` exists. Backfill: **125 live items**
+(caracas 97, arizona 28), dry-run reviewed first, zero opaque keys, two duplicate names split by
+the counter, zero duplicates and zero normalisation violations after.
+
+**SD-8 closed.** The menu path archives instead of deleting, freeing each retired SKU. The
+provisioning path keeps a hard delete — it relies on the cascade to clear `CatalogServices` — but
+is renamed `hard_delete_categories_for_provisioning` and **refuses when any order line exists**.
+
+🔴 **A-Q5 vs A-Q6 resolved structurally, not by judgement:** `StoreOrderItem` references
+`catalogItemId`, a UUID, and stores no SKU. Archiving cannot move a historical figure. Recorded in
+`app/core/sku.py` because if a SKU is ever denormalised onto an order line, A-Q6 must be reopened.
+
+**One declared deviation:** the archive marker is `-ARCHIVED-`, not `_archived_` as sketched in the
+decision, so an archived SKU survives re-normalisation — otherwise A-Q4 and A-Q6 contradict each
+other the first time anything re-normalises a row.
+
+⇒ **Track A's goal is met: the catalog can now receive the new paper menu without losing data.**
+
+### Tracks B–F — unchanged
+
+`B` unresolved (three service maps) · `C` deferred by X-Q1, phases 1–2 shipped and green ·
+`D` narrowed · `E` closed for now · `F` last.
