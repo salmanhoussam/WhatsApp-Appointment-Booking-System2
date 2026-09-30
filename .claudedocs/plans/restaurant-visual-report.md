@@ -1,7 +1,13 @@
 # Restaurant Visual Report — implementation plan
 
 **Ratifies:** `ADR-0008-visual-report.md` · **Evidence:** `.claudedocs/research/whatsapp-visual-report-journey.md`
-**Status:** Phase 1 in progress · **Production gate:** 🔴 CLOSED — no push, no deploy, no production write
+**Status:** Phases 1–2 shipped (`dcc1bc3`) · Phase 3 **BLOCKED** · **Production gate:** 🔴 CLOSED
+**Umbrella plan:** this is **Track C** of `.claudedocs/plans/restaurant-vertical-product.md`
+
+> 🔴 **Phase 3 does not start yet (Salman, 2026-09-30).** It is blocked behind that plan's
+> Track A: `reseed_caracas_direct.py` deletes every `CatalogItem`, and `StoreOrderItem`
+> cascades from it — so the order lines this report reads can be erased by a seeder run.
+> A report whose history a seeder can empty is a report nobody should trust.
 
 > Executable from a cold start. Everything below was measured against `HEAD=3ade90a` on
 > 2026-09-30; re-measure before trusting a number here.

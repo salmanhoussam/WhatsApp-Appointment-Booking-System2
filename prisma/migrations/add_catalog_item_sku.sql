@@ -1,0 +1,116 @@
+-- A stable, tenant-unique key for a catalog item.
+--
+-- Authorised by Salman 2026-09-30 (A-Q2, .claudedocs/plans/restaurant-vertical-product.md):
+-- "the internal ID changes with every reseed... add an sku (or handle) field to CatalogItem as a
+-- stable, tenant-unique identifier. This is the lifeline for any safe future menu update or sync."
+--
+-- 🔴 NOT EXECUTED. Nothing here has run. Prepared for approval.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- WHAT THIS DOES *NOT* DO, AND WHY THAT MATTERS
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- The decision asked for two columns, `sku` and `is_active`. **`is_active` ALREADY EXISTS:**
+--
+--     prisma/schema.prisma, model CatalogItem:
+--         isActive  Boolean  @default(true)  @map("is_active")
+--
+-- So this file adds `sku` only. Adding the other would have failed on a duplicate column, and
+-- more importantly it would have implied the soft-delete problem was a missing column. It is not.
+-- The column is there; nothing uses it as a delete path:
+--
+--     app/repositories/admin_catalog_repo.py:168   """Hard-delete a single item..."""
+--     reached by  app/api/v1/admin/restaurant.py:283   (the owner's own delete button)
+--            and  app/api/v1/admin/store.py:266
+--
+-- and `StoreOrderItem` cascades from `CatalogItem` (schema.prisma:755), so that button destroys
+-- order history. THAT is a code change, not a migration, and it is tracked as A3.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- DESIGN
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- NULLABLE, deliberately. 97 live rows on `caracas` (plus arizona, footlab, beit-al-fakhar and the
+-- barber tenants' items) have no SKU and cannot be given one by this migration -- a paper menu has
+-- no SKUs to read. Making the column NOT NULL would mean inventing 97 values inside a DDL script,
+-- which is fabricating data to satisfy a constraint. Who assigns them, and from what, is recorded
+-- as open question A-Q3.
+--
+-- UNIQUE PER TENANT, NOT GLOBALLY. `(client_id, sku)`: two restaurants may both call a dish
+-- "SHAWARMA-01" and neither should block the other. This is the same isolation rule every other
+-- index in this schema follows.
+--
+-- MULTIPLE NULLS REMAIN LEGAL, and that is the property that makes a nullable unique key work
+-- here: in Postgres, NULL is never equal to NULL, so a UNIQUE index permits any number of rows
+-- with a NULL `sku` for the same client, while still rejecting two rows that share a real one.
+-- That is exactly the intended behaviour during the migration period, when most rows have no SKU
+-- and a few do.
+--
+-- CONCURRENTLY, and therefore NO TRANSACTION. Same reasoning as
+-- `add_store_order_created_at_index.sql`: a plain CREATE INDEX takes an ACCESS EXCLUSIVE lock and
+-- blocks writes to `catalog_items` -- the table every menu read and every order line touches. The
+-- trade accepted in exchange is that an interrupted CONCURRENTLY build leaves an INVALID index
+-- that must be dropped before retrying; the verification query below detects that state.
+--
+-- ADD COLUMN itself is safe and instant on modern Postgres: a nullable column with no default
+-- rewrites no rows.
+
+ALTER TABLE "public"."catalog_items"
+    ADD COLUMN IF NOT EXISTS "sku" TEXT;
+
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "catalog_items_client_id_sku_key"
+    ON "public"."catalog_items" ("client_id", "sku");
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- VERIFY — run these and READ the result; do not assume it
+-- ═══════════════════════════════════════════════════════════════════════════════
+--   -- 1. the column exists and is nullable
+--   SELECT column_name, data_type, is_nullable
+--     FROM information_schema.columns
+--    WHERE table_name = 'catalog_items' AND column_name = 'sku';
+--   -- expect: sku | text | YES
+--
+--   -- 2. the index exists AND IS VALID
+--   SELECT c.relname, i.indisvalid, i.indisunique
+--     FROM pg_class c
+--     JOIN pg_index i ON i.indexrelid = c.oid
+--    WHERE c.relname = 'catalog_items_client_id_sku_key';
+--   -- 🔴 indisvalid = false means the CONCURRENTLY build was interrupted. It serves no query.
+--   --    DROP INDEX CONCURRENTLY IF EXISTS "catalog_items_client_id_sku_key";  then re-run.
+--
+--   -- 3. POSITIVE CONTROL — prove the constraint actually bites, rather than trusting it exists.
+--   --    In a transaction you ROLL BACK, against a real client_id:
+--   --      BEGIN;
+--   --        UPDATE catalog_items SET sku = 'ZZ-CTRL' WHERE id = '<item A of client X>';
+--   --        UPDATE catalog_items SET sku = 'ZZ-CTRL' WHERE id = '<item B of client X>';
+--   --        -- expect: duplicate key value violates unique constraint
+--   --      ROLLBACK;
+--   --    An index that exists but does not reject a duplicate is not a key. This is the check
+--   --    that tells those two states apart.
+--
+--   -- 4. and confirm nothing was lost, since this table is the parent of three cascades
+--   SELECT (SELECT count(*) FROM catalog_items)    AS items,
+--          (SELECT count(*) FROM store_order_items) AS order_lines;
+--   -- compare against the counts taken immediately BEFORE running this file.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 🔴 PAIR WITH prisma/schema.prisma IN THE SAME OPERATION — DO NOT SPLIT
+--
+--     sku  String?  @map("sku")
+--     @@unique([clientId, sku], map: "catalog_items_client_id_sku_key")
+--
+-- This repository has already had a real production index proposed for DELETION by
+-- `prisma db push` because it reached the database but never the schema file
+-- (`@@index([clientId, customerId])` on StoreOrder, commit ce25aa5). `feedback_never_prisma_db_push`
+-- is the standing rule. The declaration is deliberately NOT added yet: adding it before this SQL
+-- runs would make the schema describe a column production does not have.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- WHAT MUST BE DECIDED BEFORE THIS IS USEFUL (it is safe, but inert, without them)
+--
+--   A-Q3  who assigns a SKU, and from what? A paper menu has no SKUs. Options not yet chosen:
+--         the owner types one · generated from the name · generated from (category, sort order).
+--   A-Q4  is `sku` case-sensitive? 'shawarma-01' and 'SHAWARMA-01' are two different keys to this
+--         index. If they should be one, normalisation belongs at the write boundary -- the same
+--         shape as app/core/phone.py, which this codebase already uses for exactly that reason.
+--   A-Q5  may a SKU be re-used after an item is deactivated? If yes, this unique index forbids it
+--         and the rule needs a different shape. Decide BEFORE any SKU is assigned, not after.
