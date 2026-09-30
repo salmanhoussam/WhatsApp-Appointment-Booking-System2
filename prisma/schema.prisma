@@ -519,7 +519,15 @@ model CatalogItem {
   isActive      Boolean  @default(true) @map("is_active")
   isFeatured    Boolean  @default(false) @map("is_featured")
   sortOrder     Int      @default(0) @map("sort_order")
-  // Module-specific extra fields (duration, unit, sku, weight, etc.)
+  // A stable, tenant-unique key for this item (A-Q2, 2026-09-30). The primary key is a UUID that
+  // changes on every reseed, and the NAME is not stable -- production holds five duplicate names
+  // -- so neither can join a menu update to the row it should update. Nullable because 181 rows
+  // predate it and a paper menu carries no SKUs; multiple NULLs coexist under the unique index
+  // because in Postgres NULL is never equal to NULL. Migration:
+  // prisma/migrations/add_catalog_item_sku.sql, executed 2026-09-30.
+  sku           String?  @map("sku")
+  // Module-specific extra fields (duration, unit, weight, etc.) -- `sku` used to live here as a
+  // metadata key by convention and is now a real column.
   metadata      Json?    @map("metadata")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -532,6 +540,10 @@ model CatalogItem {
 
   @@index([clientId])
   @@index([categoryId])
+  // Declared here because the index is REAL in production. This repository has already had a
+  // production index proposed for DELETION by `prisma db push` after reaching the database but
+  // never this file (@@index([clientId, customerId]) on StoreOrder, commit ce25aa5).
+  @@unique([clientId, sku], map: "catalog_items_client_id_sku_key")
   @@map("catalog_items")
   @@schema("public")
 }

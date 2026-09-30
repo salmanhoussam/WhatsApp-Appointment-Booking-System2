@@ -8,6 +8,7 @@ This file covers the admin CRUD operations.
 
 from typing import Optional
 from app.db.client import prisma_client
+from app.core import sku as sku_tool
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -88,11 +89,78 @@ async def soft_delete_category(category_id: str, client_id: str, module_key: Opt
     return await find_category(client_id, category_id)
 
 
-async def delete_categories_by_client(client_id: str):
-    """Hard-delete ALL categories for a tenant (used in seed-from-template clear)."""
-    return await prisma_client.catalogcategory.delete_many(
-        where={"clientId": client_id}
+async def hard_delete_categories_for_provisioning(client_id: str):
+    """Hard-delete a tenant's categories. PROVISIONING ONLY, and guarded.
+
+    Kept as a hard delete on purpose, unlike every other path in this file. `provisioning_service`
+    re-provisions a tenant from scratch and RELIES on the cascade: removing the Category takes its
+    CatalogServices with it, and those take their BarberService rows. Softening it would leave
+    those rows behind and re-provisioning would silently double them -- a different bug, not a fix.
+
+    🔴 SO THE HAZARD IS CLOSED BY A GUARD INSTEAD OF BY SOFTENING. If this tenant has even one
+    order line, the cascade would destroy real history, and this refuses rather than proceeding.
+    Re-provisioning a tenant that has already taken orders is not a routine operation and should
+    not happen silently.
+    """
+    existing = await prisma_client.storeorderitem.count(
+        where={"catalogItem": {"clientId": client_id}},
     )
+    if existing:
+        raise ValueError(
+            f"Refusing to hard-delete the catalog of tenant {client_id}: {existing} order line(s) "
+            f"reference it and would be destroyed by the cascade. Use archive_catalog_by_client(), "
+            f"or decide explicitly that this history may be lost."
+        )
+    return await prisma_client.catalogcategory.delete_many(where={"clientId": client_id})
+
+
+async def archive_catalog_by_client(client_id: str) -> int:
+    """Retire a tenant's whole catalog: deactivate every category and item, and FREE their SKUs.
+
+    Replaces `delete_categories_by_client()`, which hard-deleted every category for a tenant --
+    SD-8, the fifth and last hard-delete path, fixed 2026-09-30 on Salman's decision A-Q6.
+
+    🔴 WHY THE OLD ONE HAD TO GO. `CatalogItem` cascades from `CatalogCategory`
+    (prisma/schema.prisma:528) and `StoreOrderItem` cascades from `CatalogItem` (:755), so
+    clearing a catalog before re-seeding erased the order history of every dish that had ever been
+    sold. It was reachable from a live admin route (admin/catalog.py -> admin_seed_from_template)
+    and from `provisioning_service.py`, and loading a new paper menu goes through exactly that
+    call -- which is how this came to be fixed before the new menu was loaded rather than after.
+
+    🔴 WHY SKUs ARE ARCHIVED RATHER THAN LEFT ALONE. A-Q5 says a SKU is never re-used. Without
+    this step, retiring "CHICKEN-SHAWARMA-01" would permanently block the NEW menu from using that
+    obvious key, and `@@unique([clientId, sku])` would reject it. Archiving suffixes the retired
+    row (`...-ARCHIVED-<epoch>`), which frees the clean base immediately.
+
+    That is safe because an order line references `catalogItemId`, a UUID, and stores NO sku
+    (verified against the schema) -- so every historical figure keeps pointing at the same row
+    whatever its SKU now reads. See `app/core/sku.py` for the full reasoning.
+
+    Returns the number of ITEMS retired, so the caller can report a real figure rather than
+    "done". Note `update_many()` returns a plain int in prisma-client-py 0.15.0 (documented at
+    reservation_repo.py:206-208), which is what is summed here.
+    """
+    # SKUs first, one row at a time: each archived value must be distinct, and `update_many` can
+    # only write ONE value to every matched row. Only rows that actually HAVE a SKU are touched --
+    # a row without one stays without one rather than acquiring a meaningless archived key.
+    items = await prisma_client.catalogitem.find_many(
+        where={"clientId": client_id, "sku": {"not": None}},
+    )
+    for item in items:
+        await prisma_client.catalogitem.update_many(
+            where={"id": item.id, "clientId": client_id},
+            data={"sku": sku_tool.archive(item.sku)},
+        )
+
+    retired = await prisma_client.catalogitem.update_many(
+        where={"clientId": client_id},
+        data={"isActive": False},
+    )
+    await prisma_client.catalogcategory.update_many(
+        where={"clientId": client_id},
+        data={"isActive": False},
+    )
+    return retired
 
 
 # 🔴 REMOVED 2026-09-30 -- `delete_category_by_filter()`, a HARD delete. Do not reintroduce it.

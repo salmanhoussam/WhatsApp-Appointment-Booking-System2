@@ -214,7 +214,10 @@ async def provision_vertical_domain_objects(
             # cascades to THEIR BarberService rows too -- no separate cleanup call needed for
             # either.
             await barber_repo.delete_barbers_by_client(client_id)
-            await catalog_repo.delete_categories_by_client(client_id)
+            # Renamed + GUARDED 2026-09-30 (SD-8): still a hard delete, because this branch
+            # relies on the cascade to clear CatalogServices and their BarberService rows. It now
+            # REFUSES if the tenant has any order line, rather than destroying real history.
+            await catalog_repo.hard_delete_categories_for_provisioning(client_id)
 
             await provision_barber_domain(client_id, staff_name, services)
             await apply_page_repertoire(client_id, vertical)

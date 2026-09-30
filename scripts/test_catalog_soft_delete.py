@@ -173,33 +173,50 @@ check("SD-6b  admin/store.py no longer reads a delete row count either",
 check("SD-6-ctrl  the detector WOULD see a planted result.count",
       "result.count" in ast.unparse(ast.parse("if result.count == 0:\n    pass")))
 
-print("\n── 🔴 SD-8  THE KNOWN GAP — one hard delete survives, on the critical path ──")
+print("\n── 🔴 SD-8  TRANSITION: the fifth hard delete is CLOSED ──")
 #
-# Found by SD-7d failing, not by looking for it. `delete_categories_by_client()` hard-deletes
-# EVERY category for a tenant, and it is reachable from a live admin route:
+# WAS (pinned here 2026-09-30, earlier the same day): `delete_categories_by_client()` hard-deleted
+# EVERY category for a tenant and was reachable from admin/catalog.py:195 ->
+# admin_seed_from_template, plus provisioning_service.py:217. Same cascade as everything above:
+# categories -> items -> order lines. It was left unfixed at the time because "seed from template"
+# MEANS replace-the-catalog and softening it was a semantic decision, not a bug fix.
 #
-#     POST (admin/catalog.py:195) -> catalog_service.admin_seed_from_template (:231)
-#                                 -> delete_categories_by_client()
-#     also: provisioning_service.py:217
-#
-# Same cascade as everything above: categories -> items -> order lines.
-#
-# 🔴 DELIBERATELY NOT FIXED HERE. Track A3's authorisation was the owner-facing DELETE buttons,
-# and "seed from template" MEANS replace-the-catalog -- turning it into a soft delete would leave
-# retired categories accumulating on every reseed and is a semantic change, not a bug fix. It
-# needs its own decision, which is Track A's menu-replacement work.
-#
-# ⚠️ AND IT IS ON THE CRITICAL PATH: loading the new paper menu is exactly a seed-from-template.
-# Whoever does that must answer this first. Pinned as a failing-state guard so it cannot be
-# forgotten -- same shape as R-7 and LV-7.
-check("SD-8-ctrl  the detector sees a planted hard category delete",
-      "catalogcategory.delete_many" in ast.unparse(ast.parse("await prisma_client.catalogcategory.delete_many(where={})")))
-check("🔴 SD-8  delete_categories_by_client is STILL a hard delete",
-      hasattr(admin_catalog_repo, "delete_categories_by_client") and "catalogcategory.delete_many" in REPO,
-      "if this now fails it was fixed or removed: say so and name the old behaviour")
-check("🔴 SD-8b  and it is still reachable from admin_seed_from_template",
-      "delete_categories_by_client" in SVC,
-      "loading the new menu goes through here -- decide before running it")
+# NOW: Salman decided A-Q6 (2026-09-30) -- soft delete WITH namespace freeing. The menu path
+# archives instead of deleting, and the provisioning path keeps its hard delete (it relies on the
+# cascade to clear CatalogServices) but REFUSES when any order line exists.
+check("SD-8a  delete_categories_by_client is GONE — was a hard delete of every category",
+      not hasattr(admin_catalog_repo, "delete_categories_by_client"))
+check("SD-8b  archive_catalog_by_client replaces it", hasattr(admin_catalog_repo, "archive_catalog_by_client"))
+check("SD-8c  the menu path (seed-from-template) now ARCHIVES — was a hard delete",
+      "archive_catalog_by_client" in SVC and "delete_categories_by_client" not in SVC)
+check("SD-8d  archiving deactivates BOTH items and categories",
+      "catalogitem.update_many" in REPO and "catalogcategory.update_many" in REPO)
+check("SD-8e  and it frees each retired SKU (A-Q6), so the new menu can reuse the clean key",
+      "sku_tool.archive" in REPO)
+check("SD-8f  the archive path never deletes a row",
+      "catalogcategory.delete_many" not in REPO.split("def archive_catalog_by_client")[1].split("async def ")[0])
+
+print("\n── SD-9  the ONE surviving hard delete is provisioning-only, and guarded ──")
+check("SD-9a  it is renamed so its scope is unmistakable",
+      hasattr(admin_catalog_repo, "hard_delete_categories_for_provisioning"))
+guard_src = REPO.split("def hard_delete_categories_for_provisioning")[1].split("async def ")[0]
+check("SD-9b  it COUNTS order lines before deleting", "storeorderitem.count" in guard_src)
+check("SD-9c  and RAISES rather than proceeding when any exist", "raise ValueError" in guard_src)
+check("SD-9d  only provisioning_service calls it",
+      "hard_delete_categories_for_provisioning" not in SVC
+      and all("hard_delete_categories_for_provisioning" not in x for x in (R_ROUTE, S_ROUTE, C_ROUTE)))
+PROV = code_only("app/services/provisioning_service.py")
+check("SD-9e  provisioning uses the guarded name, not the old one",
+      "hard_delete_categories_for_provisioning" in PROV and "delete_categories_by_client" not in PROV)
+
+print("\n── SD-10  SKU: the column is real and the boundary owns it ──")
+check("SD-10a  schema.prisma declares sku, paired with the executed migration",
+      'sku           String?  @map("sku")' in SCHEMA)
+check("SD-10b  and declares the unique index that exists in production",
+      "@@unique([clientId, sku]" in SCHEMA,
+      "an index in the DB but not the schema is one prisma db push from deletion")
+check("SD-10c  app/core/sku.py is the single normalisation boundary",
+      (ROOT / "app/core/sku.py").exists())
 
 print(f"\nPASS={PASS}  FAIL={FAIL}")
 if FAIL:

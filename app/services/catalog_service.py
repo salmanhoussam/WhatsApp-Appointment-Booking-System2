@@ -228,7 +228,12 @@ async def admin_seed_from_template(
     if invalid:
         raise HTTPException(400, f"Invalid display_template value(s): {invalid}")
     if clear_existing:
-        await admin_catalog_repo.delete_categories_by_client(client_id)
+        # A-Q6, 2026-09-30. Was `delete_categories_by_client()`, a HARD delete that cascaded
+        # CatalogCategory -> CatalogItem -> StoreOrderItem and erased the order history of every
+        # dish before re-seeding. Loading a new menu goes through exactly this branch, which is
+        # why it was fixed before the new menu was loaded rather than after. Archiving frees each
+        # retired SKU so the new menu can reuse the obvious keys.
+        await admin_catalog_repo.archive_catalog_by_client(client_id)
     created = []
     for i, cat in enumerate(categories):
         record = await admin_catalog_repo.create_category(data={
