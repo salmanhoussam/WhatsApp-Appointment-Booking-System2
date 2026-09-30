@@ -580,7 +580,81 @@ async def _resolve_owner(sender_phone: str) -> tuple[Optional[str], Optional[str
 # runtime value. Measured 2026-09-25 before this shipped: all six active `lia`/`reservations`
 # rows in production belong to `vertical='barber'` tenants, so this fence removes access from
 # nobody (.claudedocs/work/clinic-preflight/2026-09-25/evidence.md, appendix P1-G).
-_LIA_VERTICALS = frozenset({"barber"})
+#
+# ── ADR-0008 D-5 (2026-09-30): the fence is now PER OPERATION, not per vertical ──────────────
+#
+# The gate above was a single frozenset over ALL of Lia -- `_vertical_allows_lia` is the primary
+# gate at the three entry points, not a write-only backstop. So granting a vertical access by
+# adding one word to that set would have opened all SEVEN registered operations, SIX of which
+# WRITE (counted from `lia_operations._REGISTRY`, 2026-09-30: only `daily_report` carries a
+# `.read` permission). Salman's decision for `restaurant` is READ-ONLY, and one word could not
+# express it.
+#
+# A vertical therefore declares WHICH OPERATIONS it may reach, by name. Same allow-list reasoning
+# as above, applied one level deeper: an operation nobody listed is refused, so a newly registered
+# write cannot leak into a read-only vertical merely by existing.
+#
+# 🔴 `restaurant` IS DELIBERATELY EMPTY TODAY, AND THAT IS THE POINT.
+# The fence is built BEFORE anything is granted. No restaurant-capable read operation exists yet
+# (`daily_report` reads the barber CASH LOG -- `_is_daily_log_row` over `status="arrived"`
+# reservations -- so a restaurant tenant reaching it would get an empty report, not a wrong one,
+# but it would still be a feature that does nothing).
+#
+# 🔴 AND WHAT PHASE 3 MUST DO IS *TWO* THINGS, NOT ONE. An earlier draft of this comment said
+# adding a name here was "a one-line data edit", and that was wrong in the dangerous direction:
+# `_vertical_allows_operation` below has **zero production call sites today** (measured
+# 2026-09-30 -- only the suite calls it). What keeps `restaurant` out right now is the DERIVED
+# `_LIA_VERTICALS` being empty for it, not this function.
+#
+# So a future phase that adds an operation name here WITHOUT wiring the call would make
+# `restaurant` a served vertical whose per-operation fence is never consulted -- the exact
+# silent-open failure this structure exists to prevent. Phase 3 must:
+#     1. register the restaurant read operation, and add its name here, AND
+#     2. call `_vertical_allows_operation(vertical, operation)` at the operation dispatch,
+#        refusing with its own text and a SecurityAuditLog row.
+# `scripts/test_lia_vertical_allowlist.py` LV-7 pins this gap so it cannot be forgotten, the same
+# way R-7 pins the booking_module warning in the restaurant-vertical suite.
+#
+# Until then this mapping is BEHAVIOURALLY IDENTICAL to the frozenset it replaces, because
+# `_vertical_allows_lia` requires a NON-EMPTY operation set (see below). Today: barber in,
+# everything else out -- exactly as before, and asserted as such by LV-1.
+_LIA_VERTICAL_OPERATIONS: dict[str, frozenset] = {
+    # Every operation Lia has today. Listed explicitly rather than derived from the registry with
+    # `frozenset(OPERATIONS)`: a derived set would silently grant `barber` any operation a future
+    # phase registers, which is the deny-list failure mode this whole structure exists to avoid.
+    "barber": frozenset({
+        "create_service",
+        "create_reservation",
+        "log_daily_visits",
+        "daily_report",
+        "create_catalog_item",
+        "create_product",
+        "update_product",
+    }),
+    # ADR-0008 D-5. Read-only, enforced by LV-2: every name added here must carry a `.read`
+    # permission in the registry. Empty until Phase 3.
+    "restaurant": frozenset(),
+}
+
+# Derived, so the existing call sites that log `sorted(_LIA_VERTICALS)` keep working untouched and
+# keep telling the truth. A vertical with no operations is NOT a vertical Lia serves -- which is
+# what keeps `restaurant` fenced out today despite being named above.
+_LIA_VERTICALS = frozenset(v for v, ops in _LIA_VERTICAL_OPERATIONS.items() if ops)
+
+
+def _vertical_allows_operation(vertical: Optional[str], operation: str) -> bool:
+    """May a tenant of `vertical` reach `operation`? ADR-0008 D-5.
+
+    Fails closed on every unknown: an unregistered vertical, a `None` vertical, and an operation
+    nobody listed all return False. That is the same property `_vertical_allows_lia` already has
+    for `vertical IS NULL`, carried one level down.
+
+    This does NOT replace the authorisation in `lia_operations.py` -- it precedes it. The registry
+    still answers "does THIS ACTOR hold the permission"; this answers "is this operation something
+    this VERTICAL may ask for at all". Two different questions, and collapsing them would re-pin
+    Lia's scope to whoever happens to hold a permission.
+    """
+    return operation in _LIA_VERTICAL_OPERATIONS.get(vertical or "", frozenset())
 
 
 async def _vertical_allows_lia(client_id: str) -> bool:

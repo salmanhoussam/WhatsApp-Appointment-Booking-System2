@@ -1,0 +1,86 @@
+-- Index StoreOrder for date-ranged report reads.
+--
+-- Authorised by Salman 2026-09-30 (Q5, ADR-0008): "prepare it as a completely standalone
+-- migration, to be executed carefully later."  🔴 NOT EXECUTED. Nothing here has run.
+--
+-- WHY
+-- ---
+-- `app/repositories/store_report_repo.list_orders_in_window()` filters
+-- `clientId` + `createdAt BETWEEN`. Measured 2026-09-30, `StoreOrder` carries only:
+--
+--     @@index([clientId])  ·  @@index([status])  ·  @@index([clientId, customerId])
+--
+-- so a windowed read scans every order this tenant has ever had and filters in memory. That is
+-- harmless today — the largest real order count on any tenant is 4 (`beit-al-fakhar`), and
+-- `caracas`/`arizona` hold zero — and it degrades with every order the platform ever takes.
+-- `Reservation` already carries `@@index([clientId, moduleKey, reservedAt])`, so the barber
+-- vertical never had this problem; this brings the restaurant path level with it.
+--
+-- COLUMN ORDER IS NOT ARBITRARY
+-- -----------------------------
+-- `(client_id, created_at)`, in that order. `client_id` is an equality predicate and `created_at`
+-- a range, and a btree can only use a range on the LAST column it reads. The reverse order would
+-- be usable but strictly worse, and it would also not serve the many existing queries that filter
+-- by tenant alone. This index therefore also covers plain `@@index([clientId])` lookups, which is
+-- noted rather than acted on: dropping the existing single-column index is a separate decision
+-- with its own risk, and is NOT part of this migration.
+--
+-- WHY CONCURRENTLY, AND WHY THERE IS NO TRANSACTION
+-- -------------------------------------------------
+-- A plain CREATE INDEX takes an ACCESS EXCLUSIVE lock and blocks every write to `store_orders`
+-- for its duration. On today's row counts that is milliseconds; the habit is what matters, because
+-- the first time it is not milliseconds is a live checkout failing.
+--
+-- CREATE INDEX CONCURRENTLY cannot run inside a transaction block, so this file deliberately has
+-- NO `BEGIN;`/`COMMIT;` — unlike `drop_tenantless_dating_moments.sql`, which is wrapped precisely
+-- because it must be all-or-nothing. The trade is real and is accepted here: a CONCURRENTLY build
+-- that is interrupted leaves an INVALID index behind, which serves no query and must be dropped
+-- before retrying. The verification query below detects exactly that state.
+--
+-- IF NOT EXISTS makes re-running this file safe.
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "store_orders_client_id_created_at_idx"
+    ON "public"."store_orders" ("client_id", "created_at");
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VERIFY (read-only — run after, and read the result rather than assuming it)
+--
+--   SELECT indexname, indexdef, indisvalid
+--     FROM pg_indexes
+--     JOIN pg_class ON pg_class.relname = pg_indexes.indexname
+--     JOIN pg_index ON pg_index.indexrelid = pg_class.oid
+--    WHERE tablename = 'store_orders';
+--
+-- 🔴 `indisvalid = false` means the CONCURRENTLY build was interrupted. The index is dead weight,
+--    not a working index. Drop it and run this file again:
+--        DROP INDEX CONCURRENTLY IF EXISTS "store_orders_client_id_created_at_idx";
+--
+-- And confirm the planner actually uses it, rather than trusting that it exists:
+--
+--   EXPLAIN ANALYZE
+--   SELECT * FROM store_orders
+--    WHERE client_id = '<a real uuid>'
+--      AND created_at >= '2026-09-01' AND created_at < '2026-10-01';
+--
+--   ⚠️ On a table holding 4 rows the planner will choose a sequential scan no matter what, and
+--      that is CORRECT, not a failure. This EXPLAIN is meaningful only once the table is large
+--      enough for an index to win. Seeing "Seq Scan" here proves nothing either way — say so
+--      rather than recording a green tick.
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 🔴 PAIR THIS WITH prisma/schema.prisma IN THE SAME OPERATION — DO NOT SPLIT THEM
+--
+-- Add to `model StoreOrder`, beside the indexes already declared there:
+--
+--     @@index([clientId, createdAt])
+--
+-- This is not cosmetic. `StoreOrder`'s own schema comment records that a real production index
+-- (`@@index([clientId, customerId])`, from `repoint_store_orders_to_customer.sql`, commit ce25aa5)
+-- reached the database but never the schema file — and `prisma db push` then proposed DROPPING it.
+-- An index that exists in production and not in `schema.prisma` is an index waiting to be deleted
+-- by the next person who runs a push. `feedback_never_prisma_db_push` is the standing rule.
+--
+-- The declaration is deliberately NOT added to `schema.prisma` yet: doing so before this SQL runs
+-- would make the schema describe an index production does not have — drift in the other direction,
+-- and exactly as misleading.
