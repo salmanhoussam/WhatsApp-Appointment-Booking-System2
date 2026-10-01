@@ -1,0 +1,248 @@
+
+==============================================================================================
+CATALOG MEDIA MIGRATION — DRY RUN · tenant = caracas
+==============================================================================================
+
+[0] SEAL
+    probe on a column that EXISTS (sort_order) : REFUSED — cannot execute UPDATE in a read-only transaction
+    ✅ writes refused AS READ-ONLY, on a column that is really there
+
+[1] SELECTION — 133 rows exist for caracas
+    −35   no image on the row
+    −26   archived (is_active = false)
+    = 72 SELECTED
+
+[2] SELECTION CONTROLS — can the query prove itself?
+    ✅ POSITIVE  must be IN : ZINGER-SANDWICH-01 — in = True
+    ✅ NEGATIVE  archived, carries an image, must be OUT : BROASTED-CHICKEN-4PCS-01-ARCHIVED-1790868877 — in = False
+    ✅ NEGATIVE  live, no image, must be OUT : BUFFALO-WINGS-9PCS-01 / بافلو 9 قطع
+    ✅ NEGATIVE  other tenants carrying live images, all must be OUT : 67 rows, selected = 0
+
+[3] SOURCE VERIFICATION — HEAD every old URL (only 200 passes; 3 attempts)
+      72  200
+    content-types served: {'image/jpeg': 72}
+    stored extension → destination extension:
+         71  .jfif   → .jpg   ← CHANGES
+          1  .jpg    → .jpg
+
+[4] DETERMINISM — is the destination a pure function of (slug, sku, ext)?
+    computed twice, independently → identical : True  (72 destinations)
+    destinations carrying a random suffix       : 0  (decision (1) → must be 0)
+    ✅ NEGATIVE CONTROL — the shape storage_service.py produces today, computed twice:
+        caracas/catalog/X-62cec0.jpg
+        caracas/catalog/X-51dda2.jpg
+        identical = False  ← must be False, proving this test can fail
+
+[5] DESTINATION STATE — enumerated from the bucket, then confirmed by HEAD
+    files directly under caracas/catalog/ : 1
+        CARACAS-BEEF-BURGER-01-5539a2.png   image/png
+    CLASSIFIER CONTROL — the predicate, exercised on both outcomes:
+        ✅ enumerated=False status=400               → FREE         (must be FREE)
+        ✅ enumerated=True  status=200               → PRESENT      (must be PRESENT)
+        ✅ enumerated=False status=429               → INCONCLUSIVE (must be INCONCLUSIVE)
+        ✅ enumerated=False status=ERR:TimeoutError  → INCONCLUSIVE (must be INCONCLUSIVE)
+        ✅ enumerated=True  status=400               → INCONCLUSIVE (must be INCONCLUSIVE)
+      72  TO COPY (destination free)
+    statuses seen on destinations absent from the listing: ['400']
+    ← 400 is Supabase for 'not there' and is the ONLY status that corroborates absence.
+      429 / 5xx / a timeout are unresolved probes and STOP the row.
+
+[6] COLLISIONS among the 72 destinations : 0
+
+[7] PROBE CONTROLS — does the instrument know how to fail?
+    ✅ POSITIVE  a file known to exist        : 200  (must be 200)
+    ✅ NEGATIVE  a key deliberately absent    : 400  (must NOT be 200)
+    ✅ NEGATIVE  the decommissioned project   : ERR:URLError  (must NOT be 200)
+
+[8] THE PLAN — 72 copies, grouped by category
+
+  [ساندويش]  18
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/b7a0fd03-aadb-4208-9f82-164c4db27663/main.jfif
+      → caracas/catalog/ZINGER-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/0d70b68a-2246-4b8e-a76f-73de530a8625/main.jfif
+      → caracas/catalog/PHILADELPHIA-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/8f683449-b725-49a9-ae45-cd1c59a1d9c3/main.jfif
+      → caracas/catalog/SPICY-STEAK-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/7e61bfeb-fcac-42d3-8ce6-ae858c05ab05/main.jfif
+      → caracas/catalog/SUJUK-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/f7a4c045-6f9c-4f25-a7d7-4170bc5add74/main.jfif
+      → caracas/catalog/CHICKEN-LIVER-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/f75be7ba-0bff-44d8-8380-f5a4145ea90d/main.jfif
+      → caracas/catalog/ROAST-BEEF-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/0cf31318-3123-4e8b-b1ea-adcac095ec9e/main.jfif
+      → caracas/catalog/MEXICANO-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/2ae571ec-1888-493e-ae65-bd59b2c53fd2/main.jfif
+      → caracas/catalog/CHINESE-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/1d5615ab-876f-4e11-b3c7-9641557eff19/main.jfif
+      → caracas/catalog/SHRIMP-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/f00bb80b-4cca-4fe8-b8af-307817e1c60e/main.jfif
+      → caracas/catalog/ESCALOPE-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/5a0aad96-b1b4-48dd-8c2a-c74891bcff43/main.jfif
+      → caracas/catalog/TWISTER-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/058c9360-da09-42fd-ab9f-cc88b3858706/main.jfif
+      → caracas/catalog/CHICKEN-SUB-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/1c7fe365-af4a-46bc-90d8-11b004e12686/main.jfif
+      → caracas/catalog/CRISPY-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/aa18b9d5-6d49-447d-8753-e5405e9b6e73/main.jfif
+      → caracas/catalog/FAJITA-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/14351f34-e795-46c3-a311-c086e5368a11/main.jfif
+      → caracas/catalog/FRIES-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/3823b8fd-12f7-4fac-94f2-6b667990c324/main.jfif
+      → caracas/catalog/TAWOOK-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/2ae64042-6cab-4a48-b787-d82beb474840/c87faa40-368a-49bd-9cc1-50e51de736d9/main.jfif
+      → caracas/catalog/FRANCISCO-SANDWICH-01.jpg      src=200 dest=400
+    caracas/catalog/abe6d724-9e85-4445-9c0e-f3aafc7efb0e/1fb2eb22-70cc-4b5c-bd6f-90e27302b175/main.jfif
+      → caracas/catalog/MAKANEK-SANDWICH-01.jpg      src=200 dest=400
+
+  [وجبات]  7
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/a9b51c99-5db7-4e5e-bbdd-92b096fec69f/main.jfif
+      → caracas/catalog/ZINGER-MEAL-5PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/ac0e7888-e766-4174-b49a-4dd11d571551/main.jfif
+      → caracas/catalog/ESCALOPE-MEAL-5PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/cc7192fc-45b5-4e2b-8b78-2a2fbc324654/main.jfif
+      → caracas/catalog/CRISPY-MEAL-10PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/c9825dfa-bce2-4059-9cbe-370ef9ce515c/main.jfif
+      → caracas/catalog/CRISPY-MEAL-5PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/72e5942a-a0eb-4ac3-a44e-0ae0f372e261/main.jfif
+      → caracas/catalog/CRISPY-MEAL-15PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/37a703b3-0cc4-4236-a57e-d6e07c2cf987/main.jfif
+      → caracas/catalog/ESCALOPE-MEAL-15PCS-01.jpg      src=200 dest=400
+    caracas/catalog/5a5bef65-b803-47b2-9434-58a47a1c587f/934affe2-808e-4e8b-be71-5918b241dce6/main.jfif
+      → caracas/catalog/ESCALOPE-MEAL-10PCS-01.jpg      src=200 dest=400
+
+  [مازة]  5
+    caracas/catalog/221b405b-715b-4528-b300-728d684fe086/52fdd7af-d23a-4faf-816d-5783cf967446/main.jfif
+      → caracas/catalog/POTATO-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/221b405b-715b-4528-b300-728d684fe086/4400cfed-f6bd-4f33-81b6-71ba7796b99d/main.jfif
+      → caracas/catalog/FRENCH-FRIES-PLATE-01.jpg      src=200 dest=400
+    caracas/catalog/221b405b-715b-4528-b300-728d684fe086/6eb6dd6f-c574-410a-b2ec-ba2918bb847f/main.jfif
+      → caracas/catalog/GARLIC-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/221b405b-715b-4528-b300-728d684fe086/b7039ad7-9713-4d90-82c9-9242da6a3b58/main.jfif
+      → caracas/catalog/CHEDDAR-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/221b405b-715b-4528-b300-728d684fe086/0aebf2b8-1bea-47e2-b711-5d0c34acf2dc/main.jfif
+      → caracas/catalog/BBQ-BOX-01.jpg      src=200 dest=400
+
+  [مشروبات باردة]  10
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/844836fd-23a3-4d5e-bcad-f848761f69ff/main.jfif
+      → caracas/catalog/7-UP-SMALL-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/10f93541-1f11-4393-bce6-b930e6249ed5/main.jfif
+      → caracas/catalog/MIRINDA-SMALL-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/4527fc58-bf93-4fcf-a4be-adb279ff5de4/main.jfif
+      → caracas/catalog/PEPSI-LARGE-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/e42ca0b1-8268-4712-8813-5d0ddc3039d4/main.jfif
+      → caracas/catalog/7-UP-LARGE-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/563729aa-b56d-4c54-a0cc-6587c07245be/main.jfif
+      → caracas/catalog/COLD-DRINK-MEDIUM-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/778f64b8-f0e8-4441-8f2b-c40ee209a463/main.jfif
+      → caracas/catalog/PEPSI-SMALL-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/ed708db0-b165-49a4-9c5c-ea7583521ebe/main.jfif
+      → caracas/catalog/AYRAN-YOGURT-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/2986cf7f-6090-4350-a0c8-ddf9382589c5/main.jfif
+      → caracas/catalog/MIRINDA-LARGE-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/ef43c9ff-c31f-40db-9556-716bdd68fb94/main.jfif
+      → caracas/catalog/7-UP-MEDIUM-01.jpg      src=200 dest=400
+    caracas/catalog/8adfd2a9-3aca-443e-83a4-036c927c1361/10fc9f03-7b1c-4dcb-9f73-e5a43cf8681c/main.jfif
+      → caracas/catalog/MIRINDA-MEDIUM-01.jpg      src=200 dest=400
+
+  [ترويقة]  14
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/f348a193-d084-4254-8cd8-054253a77be2/main.jfif
+      → caracas/catalog/HUMMUS-PLATE-BREAKFAST-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/05bdab14-70fe-4030-91ab-4dff47a4a09a/main.jfif
+      → caracas/catalog/BALILA-LARGE-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/15d70c42-00fd-4036-83d9-8e379ef2323f/main.jfif
+      → caracas/catalog/MSABBAHA-LARGE-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/4796c2c0-3e01-4c91-995e-72dc600ff655/main.jfif
+      → caracas/catalog/HUMMUS-LARGE-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/b4246454-a423-4133-b125-1746229ed4d3/main.jfif
+      → caracas/catalog/BALILA-PLATE-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/c17d268b-f3c4-4740-94aa-46c52fd5028f/main.jfif
+      → caracas/catalog/BALILA-SMALL-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/1699ed85-6209-406b-92d1-69413414db29/main.jfif
+      → caracas/catalog/MSABBAHA-SMALL-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/83e3ca87-92fd-4a29-8583-2076749892d2/main.jfif
+      → caracas/catalog/HUMMUS-SMALL-BOX-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/8efc621d-2bcd-4f60-b6ae-7ac3573c9d52/main.jfif
+      → caracas/catalog/FATTEH-WITH-YOGURT-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/b0e1f66f-48f7-4280-9094-2555edf9c202/main.jfif
+      → caracas/catalog/FATTEH-WITH-MEAT-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/e0e8e16c-23e0-44e7-8791-6ee20ffe2089/main.jfif
+      → caracas/catalog/HUMMUS-WITH-MEAT-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/b713b584-78f5-4510-80e7-5135d96a3f9c/main.jfif
+      → caracas/catalog/SUJUK-WITH-EGGS-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/ddbf4e0d-09ff-4b83-873d-bf5754c5f617/main.jfif
+      → caracas/catalog/EGGS-WITH-MEAT-01.jpg      src=200 dest=400
+    caracas/catalog/cb1f99c3-e28b-4ae4-bf74-b82a979dd6c9/525ca6cc-32db-4bd1-bd94-231f66c470d8/main.jfif
+      → caracas/catalog/MSABBAHA-PLATE-01.jpg      src=200 dest=400
+
+  [متبلات(1كغ)]  10
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/da2b43f0-46b1-46eb-be89-67e43483e7a3/main.jfif
+      → caracas/catalog/MARINATED-TAWOOK-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/f51df0f5-0d25-4783-b33c-164eed4b2121/main.jfif
+      → caracas/catalog/CHICKEN-NUGGETS-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/78fce8f4-417a-49e2-af40-b6e525628a95/main.jfif
+      → caracas/catalog/MARINATED-CHICKEN-SHAWARMA-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/7111847c-9591-45d5-9605-4b60f8a2c73c/main.jfif
+      → caracas/catalog/MARINATED-CHICKEN-WINGS-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/b86f5ed3-80b6-431e-a90b-9112bd9c5b67/main.jpg
+      → caracas/catalog/MARINATED-ZINGER-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/0e63a33f-a7bb-49e7-ad47-8c477d0c7dcf/main.jfif
+      → caracas/catalog/MARINATED-CHICKEN-BURGER-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/a3dcc011-8163-4545-8649-c7c4ae5f4447/main.jfif
+      → caracas/catalog/MARINATED-FAJITA-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/453eb24e-3cbd-49dc-acdb-b0bdd318dfff/main.jfif
+      → caracas/catalog/MARINATED-CHICKEN-THIGHS-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/e5584af5-7eff-4c43-8aad-9d8fd333bece/main.jfif
+      → caracas/catalog/MARINATED-CRISPY-01.jpg      src=200 dest=400
+    caracas/catalog/e14953ee-9c2b-4f25-be08-dfd47c642e8a/ecac5b8d-fed2-49d3-a7a4-7101bda042a0/main.jfif
+      → caracas/catalog/MARINATED-ESCALOPE-01.jpg      src=200 dest=400
+
+  [قطع دجاج نيء(1كغ)]  8
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/490da65d-9fb5-4a1f-98a1-1dcf54e3b2b9/main.jfif
+      → caracas/catalog/BONELESS-CHICKEN-BREASTS-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/94f21bb7-d4ce-4a01-8ef9-793eb5918716/main.jfif
+      → caracas/catalog/CHICKEN-LIVER-RAW-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/8dd07632-7ab6-458b-8b00-3856312931d1/main.jfif
+      → caracas/catalog/BONELESS-CHICKEN-THIGHS-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/fdc7db83-e9b9-4cde-b67a-a7b86ae3a3fc/main.jfif
+      → caracas/catalog/CHICKEN-WINGS-RAW-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/5bad903a-4968-4e95-b2c1-255bf0545f9c/main.jfif
+      → caracas/catalog/WHOLE-CHICKEN-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/ca7c7974-c756-4185-b943-f2922c2b323d/main.jfif
+      → caracas/catalog/CHICKEN-GIZZARDS-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/949a58e7-17c3-4620-81bc-5bbe2bef9a08/main.jfif
+      → caracas/catalog/CHICKEN-BREASTS-WITH-BONE-01.jpg      src=200 dest=400
+    caracas/catalog/2fb9824a-dfa5-49b4-bd8f-822116544a9f/831f73df-1bd9-485e-b1f6-ffc0cbac5b17/main.jfif
+      → caracas/catalog/CHICKEN-THIGHS-01.jpg      src=200 dest=400
+
+==============================================================================================
+[9] EXECUTION PLAN (not executed — this script has no --execute)
+==============================================================================================
+
+    BEFORE   caracas: 133 items · 72 selected · 72 to copy · 1 files already under catalog/
+
+    1  COPY   download each source (verified 200 above) and upload to its destination with
+              content-type image/jpeg. Never move. Never delete. Never overwrite — a destination
+              that is occupied stopped this run at [5].
+    2  VERIFY HEAD every new URL. **Only 200 passes.** 400 / timeout / anything else retries
+              3×, then STOPS the whole run. No row is skipped quietly.
+    3  WRITE  one transaction, this tenant only:
+                 BEGIN;
+                 UPDATE catalog_items SET image_url = $new, updated_at = now()
+                  WHERE id = $id AND client_id = $caracas AND image_url = $old;
+                 -- the `image_url = $old` guard makes the UPDATE idempotent and makes a
+                 -- concurrent dashboard edit lose instead of being silently overwritten
+                 -- expect rowcount = 1 per statement; any 0 → ROLLBACK
+                 COMMIT;
+    4  AFTER  re-read all 72 rows: every image_url matches {slug}/catalog/{sku}.{ext},
+              every one returns 200, platform-wide StoreOrderItem count unchanged.
+
+    ROLLBACK the old files are untouched and still 200. Reverting is one UPDATE back to $old
+             per row — no file operation at all. Decision (4).
+
+    RE-RUN   the destination is a pure function of (slug, sku, ext), so a second run finds every
+             destination ALREADY AT DESTINATION and plans 0 copies. That is the repeatability
+             decision (5) asked for, and it is measured at [5], not asserted.
+
+    GATE: 🟢 every check passes — ready for your word
+    This run wrote nothing: 0 copies, 0 DB writes, 0 deletes.
+

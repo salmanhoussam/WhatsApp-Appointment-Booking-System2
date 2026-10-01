@@ -140,3 +140,37 @@ it is recorded so the decision is made on purpose.
 ```
 
 **No code is written and no file is moved until ① is answered.**
+
+---
+
+## 7. RATIFIED — 2026-10-01, Salman, five decisions
+
+① and ② are answered, and one thing this plan did not foresee had to be answered with them.
+
+```
+①  the destination is the BARE {SKU}.{ext}        — deterministic, re-runnable, reconcilable
+②  {ext} = jpg, from the SERVED content-type      — so 71 of 72 .jfif become .jpg
+③  storage_service.py is NOT touched by step 4    — see below, this is the new one
+④  the old files stay — they are the rollback
+⑤  dry run first, and it must PROVE determinism and repeatability before any production write
+```
+
+**Why ③ exists.** §2 above proposed the bare `{SKU}.{ext}`, and the code that shipped the same day
+(`fb39636`, `storage_service.py:216-218`) produces `{SKU}-{6 hex}.{ext}` — deliberately, because
+this bucket uploads with `upsert:"false"` and a year-long `cache-control`, so a bare name **fails
+the second time an owner replaces a dish photo**. §2 did not know that constraint when it was
+written. So the plan and the shipped code disagreed on the one thing step 4 is about, and the
+disagreement is real on both sides.
+
+Salman's split, verbatim in effect: the migration takes the bare deterministic form **now**, and
+whether a REPLACEMENT upload should also become deterministic (an `upsert` on the catalog path) is
+**a separate behaviour decision, later, on its own evidence**. The rule it protects: *a migration
+does not get to refactor the upload service on its way past.*
+
+**Dry run executed, gate 🟢** — `scripts/plan_catalog_media_migration.py` (no `--execute` exists),
+evidence in `.claudedocs/work/catalog-media-migration/2026-10-01/`. 72 selected with controls both
+directions, 72/72 sources at 200, 72 destinations free, 0 collisions, determinism proven with a
+negative control that the test can fail.
+
+**Execution is NOT authorised by this entry.** Decisions ③–⑤ of §6 (the dead category images, the
+35 missing photos, the hide/show asymmetry) remain open and untouched.
