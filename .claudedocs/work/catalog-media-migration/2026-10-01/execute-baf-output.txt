@@ -1,0 +1,90 @@
+
+    authorisation: beit-al-fakhar — 2026-10-01 ① — 34 rows, no reservation
+
+==============================================================================================
+CATALOG MEDIA MIGRATION — EXECUTE · tenant = beit-al-fakhar
+==============================================================================================
+target: aws-0-eu-central-1.pooler.supabase.com  (via DIRECT_URL)
+
+[1] BEFORE
+    client_id                      : 10e5cecd-0b6f-4041-91b6-e0f22ff8c5a6
+    catalog_items for beit-al-fakhar  : 34
+    store_order_items PLATFORM-WIDE: 18   ← the invariant. Tenant-scoped it would read 0→0 and could never fail.
+    rows selected                  : 34
+    authorised SKUs                : 34
+    ✅ the selection is EXACTLY the authorised set, in both directions
+    ✅ CONTROL — the same comparison against the set plus one invented SKU reports 1 extra (must be 1)
+
+[2] SOURCES — HEAD every one; only 200 passes
+    statuses: {200: 34}
+    content-types: {'image/jpeg': 34}
+    extensions derived: {'jpg': 34}
+
+[3] DESTINATIONS — still free? (enumeration + a settled 400, both required)
+    {'FREE': 34}
+
+[4] COPY — 34 files · upsert=false · content-type carried from the source
+      1/34   130,846B  HAND-PAINTED-CERAMIC-PLATE-1-01
+      2/34   124,561B  HAND-PAINTED-CERAMIC-PLATE-2-01
+      3/34   177,930B  HAND-PAINTED-CERAMIC-PLATE-3-01
+      4/34   146,729B  HAND-PAINTED-CERAMIC-PLATE-4-01
+      5/34    99,971B  HAND-PAINTED-CERAMIC-PLATE-5-01
+      6/34   136,876B  HAND-PAINTED-CERAMIC-PLATE-6-01
+      7/34    94,950B  HAND-PAINTED-CERAMIC-PLATE-7-01
+      8/34   120,654B  HAND-PAINTED-CERAMIC-PLATE-8-01
+      9/34   120,222B  HAND-PAINTED-CERAMIC-PLATE-9-01
+     10/34   120,654B  HAND-PAINTED-CERAMIC-PLATE-10-01
+     11/34   120,222B  HAND-PAINTED-CERAMIC-PLATE-11-01
+     12/34   115,038B  HAND-PAINTED-CERAMIC-PLATE-12-01
+     13/34   118,801B  HAND-PAINTED-CERAMIC-PLATE-13-01
+     14/34   105,707B  HAND-PAINTED-CERAMIC-PLATE-14-01
+     15/34    81,043B  HAND-PAINTED-CERAMIC-PLATE-15-01
+     16/34   108,088B  HAND-PAINTED-CERAMIC-PLATE-16-01
+     17/34   124,398B  HAND-PAINTED-CERAMIC-PLATE-17-01
+     18/34    85,807B  HAND-PAINTED-CERAMIC-PLATE-18-01
+     19/34   107,278B  HAND-PAINTED-CERAMIC-PLATE-19-01
+     20/34   127,963B  HAND-PAINTED-CERAMIC-PLATE-20-01
+     21/34   124,069B  HAND-PAINTED-CERAMIC-PLATE-21-01
+     22/34    92,135B  HAND-PAINTED-CERAMIC-PLATE-22-01
+     23/34   114,935B  HAND-PAINTED-CERAMIC-PLATE-23-01
+     24/34    86,744B  HAND-PAINTED-CERAMIC-PLATE-24-01
+     25/34    86,081B  HAND-PAINTED-CERAMIC-PLATE-25-01
+     26/34    98,497B  HAND-PAINTED-CERAMIC-VASE-1-01
+     27/34   103,873B  HAND-PAINTED-CERAMIC-VASE-2-01
+     28/34   105,833B  HAND-PAINTED-CERAMIC-VASE-3-01
+     29/34    97,483B  HAND-PAINTED-CERAMIC-BOWL-4-01
+     30/34   103,617B  HAND-PAINTED-CERAMIC-BOWL-5-01
+     31/34    89,913B  HAND-PAINTED-CERAMIC-BOWL-6-01
+     32/34   105,553B  HAND-PAINTED-CERAMIC-BOWL-7-01
+     33/34    85,752B  HAND-PAINTED-CERAMIC-BOWL-8-01
+     34/34    91,768B  HAND-PAINTED-CERAMIC-BOWL-9-01
+    copied 34 · failed 0
+
+[5] GATE — HEAD every NEW url. Only 200 passes. This runs BEFORE any DB write.
+    statuses: {200: 34}
+    content-types: {'image/jpeg': 34}
+    ✅ NEGATIVE CONTROL — a key deliberately never copied: 400 (must not be 200)
+    🟢 content-type survived the copy on all 34
+    🟢 34/34 new URLs alive at 200
+
+[6] TRANSACTION — beit-al-fakhar only · guard `image_url = $old` · rowcount must be 1
+    🟢 COMMITTED · 34 rows updated · rowcount 1 on every statement
+
+[7] AFTER — re-read from the database
+
+    metric                                        before     after
+    --------------------------------------------------------------
+    store_order_items (PLATFORM-WIDE)                 18        18   ✅
+    catalog_items for beit-al-fakhar                  34        34   ✅
+    rows at their new SKU url                          0        34   ✅
+    live urls matching {sku}.{ext}                     -        34
+    live urls still in the OLD id/id/main shape         -         0   ✅
+
+    OLD files still alive at 200 (the rollback) : 34/34   ✅
+
+==============================================================================================
+    🟢 MIGRATION COMPLETE AND VERIFIED
+    rollback: UPDATE catalog_items SET image_url = <old> per row. No file operation.
+              every old file is still served. Nothing was moved or deleted.
+==============================================================================================
+

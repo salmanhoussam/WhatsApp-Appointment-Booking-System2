@@ -52,6 +52,18 @@ from scripts.plan_catalog_media_migration import (             # noqa: E402
 load_dotenv()
 PUBLIC_BASE = os.getenv("SUPABASE_URL").rstrip("/") + PUBLIC_PREFIX
 
+# 🔴 A NAMED EXCEPTION, NOT A LOOSENED GUARD (2026-10-01, Salman's ③).
+# The selection normally refuses any image whose storage key does not begin with the tenant's own
+# slug — that rule is what stops this script reading another tenant's file, and it is not relaxed.
+# `rk` has exactly one row, HAIR-FIXING-SPRAY-01, stored under `hr/`. MEASURED before admitting it:
+# there is NO `clients` row with slug `hr` at all, and the repository's own record says the slug
+# `hr` was RENAMED to `rk`. So `hr/` is rk's own pre-rename folder, not a second tenant — the
+# guard was right to flag it and the reason is benign. Migrating it finally brings the file under
+# the correct prefix, which fixes a rename artefact for free.
+# Any future entry here needs the same thing: a measurement showing the prefix belongs to no live
+# tenant, written down next to it.
+HISTORICAL_PREFIXES = {"rk": ("hr/",)}
+
 
 def fetch(url: str, tries: int = 3) -> bytes:
     last = None
@@ -71,23 +83,50 @@ def main() -> int:
     # wildcard: a tenant that is not written here cannot be migrated by this script, however it
     # is invoked. `beit-al-fakhar`, `footlab` and `rk` are deliberately absent — 39 of their live
     # image-carrying rows have no SKU and cannot be named under this contract at all.
-    # slug -> (expected row count, the authorisation). The COUNT is part of the authorisation,
-    # not a constant in the code: the run refuses if the tenant presents a different number of
-    # rows than the dry run measured, which is what makes "something changed between the plan and
-    # the execution" a stop rather than a surprise.
+    # slug -> (the exact SKUs authorised, the authorisation). Salman, 2026-10-01: the map must
+    # name "الصفوف/المصادر المحددة بالضبط، وليس wildcard". So the authorisation is an explicit SET
+    # OF ROWS, not a tenant plus a number — a count alone would still let a row that appeared
+    # after the plan ride along unnoticed, as long as another had disappeared. The run refuses
+    # unless the rows it selects are EXACTLY this set, in both directions.
+    #
+    # caracas and arizona are recorded as executed; their lists are not restated because their
+    # files are already migrated and a re-run finds every destination ALREADY AT DESTINATION.
     AUTHORISED = {
-        "caracas": (72, "2026-10-01 — executed, 72 rows"),
-        "arizona": (28, "2026-10-01 — authorised the same day, 28 rows"),
+        "caracas": (None, "2026-10-01 — EXECUTED, 72 rows"),
+        "arizona": (None, "2026-10-01 — EXECUTED, 28 rows"),
+        "beit-al-fakhar": ((
+            "HAND-PAINTED-CERAMIC-BOWL-4-01", "HAND-PAINTED-CERAMIC-BOWL-5-01",
+            "HAND-PAINTED-CERAMIC-BOWL-6-01", "HAND-PAINTED-CERAMIC-BOWL-7-01",
+            "HAND-PAINTED-CERAMIC-BOWL-8-01", "HAND-PAINTED-CERAMIC-BOWL-9-01",
+            "HAND-PAINTED-CERAMIC-PLATE-1-01", "HAND-PAINTED-CERAMIC-PLATE-2-01",
+            "HAND-PAINTED-CERAMIC-PLATE-3-01", "HAND-PAINTED-CERAMIC-PLATE-4-01",
+            "HAND-PAINTED-CERAMIC-PLATE-5-01", "HAND-PAINTED-CERAMIC-PLATE-6-01",
+            "HAND-PAINTED-CERAMIC-PLATE-7-01", "HAND-PAINTED-CERAMIC-PLATE-8-01",
+            "HAND-PAINTED-CERAMIC-PLATE-9-01", "HAND-PAINTED-CERAMIC-PLATE-10-01",
+            "HAND-PAINTED-CERAMIC-PLATE-11-01", "HAND-PAINTED-CERAMIC-PLATE-12-01",
+            "HAND-PAINTED-CERAMIC-PLATE-13-01", "HAND-PAINTED-CERAMIC-PLATE-14-01",
+            "HAND-PAINTED-CERAMIC-PLATE-15-01", "HAND-PAINTED-CERAMIC-PLATE-16-01",
+            "HAND-PAINTED-CERAMIC-PLATE-17-01", "HAND-PAINTED-CERAMIC-PLATE-18-01",
+            "HAND-PAINTED-CERAMIC-PLATE-19-01", "HAND-PAINTED-CERAMIC-PLATE-20-01",
+            "HAND-PAINTED-CERAMIC-PLATE-21-01", "HAND-PAINTED-CERAMIC-PLATE-22-01",
+            "HAND-PAINTED-CERAMIC-PLATE-23-01", "HAND-PAINTED-CERAMIC-PLATE-24-01",
+            "HAND-PAINTED-CERAMIC-PLATE-25-01", "HAND-PAINTED-CERAMIC-VASE-1-01",
+            "HAND-PAINTED-CERAMIC-VASE-2-01", "HAND-PAINTED-CERAMIC-VASE-3-01",
+        ), "2026-10-01 ① — 34 rows, no reservation"),
+        # ② HAIR-OIL-01 sits under rk/. ③ HAIR-FIXING-SPRAY-01 sits under hr/ — see
+        # HISTORICAL_PREFIXES below for the measurement that makes that one row admissible.
+        "rk": (("HAIR-OIL-01", "HAIR-FIXING-SPRAY-01"),
+               "2026-10-01 ②③ — 2 rows, one of them via the hr/ historical prefix"),
     }
     args = sys.argv[1:]
     slug = next((a for a in args if not a.startswith("-")), None)
     if slug not in AUTHORISED or "--execute" not in args:
         print(__doc__)
         print(f"🔴 refused. Authorised tenants, with --execute:")
-        for k, (n, v) in AUTHORISED.items():
+        for k, (_sk, v) in AUTHORISED.items():
             print(f"       {k:<16} {v}")
         return 2
-    expected_rows, _note = AUTHORISED[slug]
+    authorised_skus, _note = AUTHORISED[slug]
     print(f"\n    authorisation: {slug} — {_note}")
 
     print(f"\n{'='*94}\nCATALOG MEDIA MIGRATION — EXECUTE · tenant = {slug}\n{'='*94}")
@@ -123,7 +162,8 @@ def main() -> int:
         if PUBLIC_PREFIX not in url:
             continue
         key = url.split(PUBLIC_PREFIX, 1)[1]
-        if not key.startswith(f"{slug}/"):
+        allowed_prefixes = (f"{slug}/",) + HISTORICAL_PREFIXES.get(slug, ())
+        if not key.startswith(allowed_prefixes):
             continue
         rows.append(dict(id=iid, sku=sku, name_ar=nar, cat=cat, old_url=url, old_key=key))
     ro.close()
@@ -134,9 +174,24 @@ def main() -> int:
     print(f"    store_order_items PLATFORM-WIDE: {before_order_lines}"
           f"   ← the invariant. Tenant-scoped it would read 0→0 and could never fail.")
     print(f"    rows selected                  : {len(rows)}")
-    if len(rows) != expected_rows:
-        print(f"    🔴 the authorisation names {expected_rows} rows. This run sees {len(rows)}. "
-              f"Something changed between the plan and the execution — STOP and re-plan.")
+    if authorised_skus is not None:
+        got, want = {r["sku"] for r in rows}, set(authorised_skus)
+        extra, missing = got - want, want - got
+        print(f"    authorised SKUs                : {len(want)}")
+        if extra or missing:
+            print(f"    🔴 the selection is not the authorised set. STOP.")
+            for sk in sorted(extra):
+                print(f"        + {sk}  selected but NOT authorised")
+            for sk in sorted(missing):
+                print(f"        − {sk}  authorised but NOT selected")
+            return 1
+        print(f"    ✅ the selection is EXACTLY the authorised set, in both directions")
+        # a control: the comparison must be able to fail
+        print(f"    ✅ CONTROL — the same comparison against the set plus one invented SKU "
+              f"reports {len((got | {'__NOT_A_REAL_SKU__'}) - want)} extra (must be 1)")
+    else:
+        print(f"    🔴 {slug} is recorded as already executed; no SKU list to check against. "
+              f"Re-running it is only meaningful to confirm 0 copies. STOP.")
         return 1
 
     # ── 2 · resolve the extension from the SERVED content-type, and re-check every source ─────
