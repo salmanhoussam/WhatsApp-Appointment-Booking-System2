@@ -9,8 +9,13 @@ from fastapi import HTTPException
 from prisma import Json
 from typing import Optional
 
+import logging
+
+from app.core import sku as sku_tool
 from app.repositories import catalog_repository
 from app.repositories import admin_catalog_repo
+
+logger = logging.getLogger(__name__)
 
 
 _VALID_TEMPLATES = {"grid", "list", "showcase"}
@@ -293,8 +298,30 @@ async def admin_create_item(
     if image_url      is not None: data["imageUrl"]      = image_url
     if price          is not None: data["price"]         = price
     if metadata       is not None: data["metadata"]      = Json(metadata)
-    item = await admin_catalog_repo.create_item(data)
-    return {"id": item.id}
+
+    # 🔴 Every item gets a SKU at birth (Salman, 2026-10-01).
+    #
+    # This service had ZERO references to `sku` until today, so an item created from the dashboard
+    # was born with sku = NULL. Measured the same day: caracas carries 0 items without a SKU — but
+    # only because the 2026-09-30 backfill and the menu-update script generated them. The next item
+    # the owner added from his own dashboard would have been the first one without, and the catalog
+    # media naming plan hangs the image filename on exactly this key.
+    #
+    # The retry exists because `@@unique([clientId, sku])` is real: two creates racing on the same
+    # name would generate the same candidate and the second insert would 500. Regenerating against a
+    # freshly-read set is the cheap, correct answer — a duplicate SKU must never be written, and a
+    # double-click must never be an error page.
+    for attempt in range(3):
+        taken = await admin_catalog_repo.list_taken_skus(client_id)
+        data["sku"] = sku_tool.generate(name_en, name_ar, taken)
+        try:
+            item = await admin_catalog_repo.create_item(data)
+            return {"id": item.id}
+        except Exception as exc:
+            if attempt == 2 or "sku" not in str(exc).lower():
+                raise
+            logger.warning("SKU collision on create for tenant %s, retrying: %s", client_id, exc)
+    raise HTTPException(500, "Could not allocate a SKU")
 
 
 async def admin_update_item(

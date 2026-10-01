@@ -215,6 +215,19 @@ async def find_item(client_id: str, item_id: str, module_key: Optional[str] = No
     return await prisma_client.catalogitem.find_first(where=where)
 
 
+async def list_taken_skus(client_id: str) -> set:
+    """Every SKU this tenant already occupies, archived ones included.
+
+    Archived keys still sit in `@@unique([clientId, sku])`, so leaving them out would generate a
+    value the database then rejects. Scoped to the tenant because that is the uniqueness scope —
+    two restaurants may both hold SHAWARMA-01.
+    """
+    rows = await prisma_client.catalogitem.find_many(
+        where={"clientId": client_id, "sku": {"not": None}},
+    )
+    return {r.sku for r in rows if r.sku}
+
+
 async def create_item(data: dict):
     """Create a CatalogItem row."""
     return await prisma_client.catalogitem.create(data=data)

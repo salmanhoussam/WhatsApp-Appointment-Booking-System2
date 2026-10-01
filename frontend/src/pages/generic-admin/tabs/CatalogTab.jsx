@@ -72,7 +72,7 @@ function Field({ label, children }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid', module_key: 'catalog', parent_id: '' }
+const EMPTY_CAT  = { name_ar: '', name_en: '', display_template: 'grid', module_key: 'catalog', parent_id: '', image_url: '' }
 const EMPTY_ITEM = { name_ar: '', name_en: '', price: '', currency: 'USD', description_ar: '', image_url: '' }
 
 const MODULE_KEY_META = {
@@ -113,6 +113,10 @@ export default function CatalogTab({ color }) {
   // Image upload
   const [imageFile,    setImageFile]    = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  // The category modal keeps its own pair. Sharing them with the item modal would show a dish's
+  // photo in the category dialog the moment both had been opened in one session.
+  const [catImageFile,    setCatImageFile]    = useState(null)
+  const [catImagePreview, setCatImagePreview] = useState(null)
   const { upload, error: uploadError, reset: resetUpload } = useImageUpload()
 
   // ── Load categories ────────────────────────────────────────────────────────
@@ -140,11 +144,14 @@ export default function CatalogTab({ color }) {
 
   // ── Category CRUD ──────────────────────────────────────────────────────────
 
-  const openCreateCat = () => { setEditingCat(null); setCatForm(EMPTY_CAT); setShowCatModal(true) }
+  const openCreateCat = () => { setEditingCat(null); setCatForm(EMPTY_CAT); setCatImageFile(null); setCatImagePreview(null); resetUpload(); setShowCatModal(true) }
   const openEditCat   = (cat, e) => {
     e.stopPropagation()
     setEditingCat(cat)
-    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid', module_key: cat.module_key ?? 'catalog', parent_id: cat.parent_id ?? '' })
+    setCatForm({ name_ar: cat.name_ar, name_en: cat.name_en ?? '', display_template: cat.display_template ?? 'grid', module_key: cat.module_key ?? 'catalog', parent_id: cat.parent_id ?? '', image_url: cat.image_url ?? '' })
+    setCatImageFile(null)
+    setCatImagePreview(cat.image_url || null)
+    resetUpload()
     setShowCatModal(true)
   }
 
@@ -152,11 +159,19 @@ export default function CatalogTab({ color }) {
     if (!catForm.name_ar.trim()) return
     setCatSaving(true)
     try {
-      if (editingCat) {
-        await adminApi.patch(`/catalog/categories/${editingCat.id}`, catForm)
-      } else {
-        await adminApi.post('/catalog/categories', catForm)
+      // Upload BEFORE the write, so the row never exists with a picture that failed to arrive —
+      // the same order the item modal already uses.
+      let body = catForm
+      if (catImageFile) {
+        const { url } = await upload(catImageFile, { context: 'catalog_category' })
+        body = { ...catForm, image_url: url }
       }
+      if (editingCat) {
+        await adminApi.patch(`/catalog/categories/${editingCat.id}`, body)
+      } else {
+        await adminApi.post('/catalog/categories', body)
+      }
+      setCatImageFile(null)
       loadCategories()
       setShowCatModal(false)
     } catch (err) {
@@ -465,6 +480,53 @@ export default function CatalogTab({ color }) {
           <Field label="اسم القسم (إنجليزي)">
             <input style={inputStyle} value={catForm.name_en} onChange={e => setCatForm(p => ({ ...p, name_en: e.target.value }))} placeholder="e.g. Women's Clothing" />
           </Field>
+          {/* ── Category image (2026-10-01) ──────────────────────────────────────────────
+              The backend was already complete for this: CategoryCreate.image_url,
+              CategoryUpdate.image_url and both service functions pass it through. Only this
+              control and an upload context were missing, which is why ten caracas categories
+              could not be given a live picture after the storage migration killed the originals
+              — every stored category image points at a decommissioned Supabase project and fails
+              to connect. Same two-step shape the item modal uses: upload, then write the URL. */}
+          <Field label="صورة القسم" hint="تظهر في شريط الأقسام على صفحة الزبون">
+            {catImagePreview && (
+              <img src={catImagePreview} alt=""
+                   style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover',
+                            marginBottom: 10, display: 'block', border: `1px solid ${T.border}` }} />
+            )}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 14px', borderRadius: 8, cursor: 'pointer',
+              background: T.pageBg,
+              border: `1px dashed ${catImageFile ? color : T.border}`,
+              color: catImageFile ? color : T.textMuted,
+              fontSize: 13, fontFamily: FONT,
+            }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              {catImageFile ? catImageFile.name : 'اختر صورة من جهازك'}
+              <input type="file" accept="image/*" style={{ display: 'none' }}
+                     onChange={(e) => {
+                       const f = e.target.files?.[0]
+                       if (!f) return
+                       setCatImageFile(f)
+                       setCatImagePreview(URL.createObjectURL(f))
+                     }} />
+            </label>
+            {!catImageFile && (
+              <input style={{ ...inputStyle, marginTop: 8, fontSize: 13 }} dir="ltr"
+                     value={catForm.image_url}
+                     onChange={e => { setCatForm(p => ({ ...p, image_url: e.target.value }))
+                                      setCatImagePreview(e.target.value || null) }}
+                     placeholder="أو أدخل رابط الصورة مباشرةً" />
+            )}
+            {uploadError && (
+              <div style={{ fontSize: 12, color: T.danger, marginTop: 6 }}>{uploadError}</div>
+            )}
+          </Field>
+
           <Field label="نوع القسم — خدمة أم منتج للبيع؟">
             <select
               style={{ ...inputStyle, opacity: editingCat ? 0.5 : 1 }}

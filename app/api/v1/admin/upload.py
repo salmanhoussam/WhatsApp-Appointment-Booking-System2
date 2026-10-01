@@ -52,6 +52,17 @@ router = APIRouter(prefix="/upload", tags=["Admin Upload"])
 
 FOLDER_MAP = {
     "catalog_item":   "catalog/{category_id}/{item_id}",
+    # A category's own picture (2026-10-01). `_categories` under the tenant's catalog, ratified by
+    # Salman as part of the media-naming plan: a category has no SKU, so this is the one place a
+    # name-derived file is used, and the leading underscore keeps it sorting apart from the item
+    # folders when the bucket is browsed — which is the thing `Storage_Architecture_Plan.md` exists
+    # to protect.
+    #
+    # MEASURED the same day: the backend was already complete for this — CategoryCreate.image_url,
+    # CategoryUpdate.image_url and both service functions all pass it through. Only the upload
+    # context and the dashboard field were missing, so ten tenants' category pictures could not be
+    # replaced after the storage migration killed the originals.
+    "catalog_category": "catalog/_categories",
     "page_hero":      "pages/home/hero",
     "page_logo":      "pages/home/logo",
     "page_story":     "pages/home/story",
@@ -65,6 +76,7 @@ FOLDER_MAP = {
 
 IMAGE_TYPE_MAP = {
     "catalog_item":   "catalog",
+    "catalog_category": "catalog",
     "page_hero":      "page_hero",
     "page_logo":      "page_logo",
     "page_story":     "gallery",
