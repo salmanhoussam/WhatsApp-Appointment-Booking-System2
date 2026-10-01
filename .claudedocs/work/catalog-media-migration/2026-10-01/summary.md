@@ -362,3 +362,72 @@ scenarios (L-11…L-15) are written around, and it is now `WOODEN-COMB-01` rathe
 🟡 10 dead caracas category images · 35 caracas items with no photo
 🔴 order notification still unbuilt ⇒ StoreOrder stays 0, so revenue and best-sellers cannot fill
 ```
+
+---
+
+# ① ② ③ executed — and a gap my own sequencing created
+
+`beit-al-fakhar` 34 · `rk` 2, within one gate on Salman's explicit word. `footlab` deliberately
+out: its three live images are `images.unsplash.com` URLs that were never in our bucket.
+
+## The authorisation now names rows, not a count
+
+Salman's requirement: the map must name *"الصفوف/المصادر المحددة بالضبط، وليس wildcard"*. A tenant
+plus a count is not that — **34 stays 34 if one row appears and another disappears**, so a row that
+showed up after the plan could ride along unseen. `AUTHORISED` now holds the exact SKU set and the
+run refuses unless the selection equals it **in both directions**, printing every extra with `+`
+and every missing with `−`. The comparison carries its own control: the same check against the set
+plus one invented SKU must report exactly 1 extra. Both runs printed it.
+
+`caracas` and `arizona` are recorded `None`/EXECUTED, which makes re-running them through this tool
+**impossible** rather than merely pointless.
+
+## ③ is a named exception, not a loosened guard
+
+The rule refusing any image outside the tenant's own folder is untouched. `HISTORICAL_PREFIXES`
+adds exactly one entry, `{"rk": ("hr/",)}`, with the measurement beside it: **there is no `clients`
+row with slug `hr` at all**, and the repository's own record says `hr` was renamed to `rk`. The
+guard was right to flag it and the reason is benign; migrating it brings the file under the correct
+prefix and fixes a rename artefact for free.
+
+| | before | after | |
+|---|---:|---:|---|
+| beit-al-fakhar — rows at their new url | 0 | 34 | ✅ |
+| rk — rows at their new url | 0 | 2 | ✅ |
+| `store_order_items` platform-wide | 18 | 18 | ✅ both runs |
+| old files still served | 36 | 36 | ✅ |
+
+rk exercised the arizona fix for real: its two rows are one **webp** and one **jpeg**, both copied
+under their source's content-type and both verified to have kept it. A status-only gate would have
+passed a mislabelled file silently.
+
+## 🔴 The gap: 8 caracas rows are still on the old shape, and I caused it
+
+```
+المصدر: الكوشينيا الثمانية
+  they were INACTIVE when caracas migrated, so `is_active` correctly excluded them
+  the cascade repair reactivated them AFTERWARDS
+  ⇒ they came back live carrying their original id/id/main URLs
+```
+
+**Neither step is defective. The ORDER was.** Migrating on `is_active` and then changing
+`is_active` in a later step leaves exactly this residue, and nothing in either script could have
+noticed — each was correct about the state it saw.
+
+It is not currently visible to anyone: the category is still hidden, and the old URLs still serve
+200, so even un-hiding it would render correctly. It is a **consistency gap, not a breakage** — but
+it means "every live image is named after its dish" is false by 8 until it is closed, and
+`caracas` is recorded EXECUTED so the executor will refuse to run it. Closing it needs a new dated
+authorisation line naming those 8 SKUs.
+
+## Platform-wide, measured after both runs
+
+```
+live image-carrying rows        147
+  on the new {SKU}.{ext} shape  136   ✅  every one served at 200
+                                      133 jpeg · 2 webp · 1 png, each matching its source
+  external (footlab, unsplash)    3   ⚪  nothing to migrate, correctly
+  still on the old id/id shape    8   🔴  the كوشينيا rows above
+live rows without a SKU           0
+store_order_items platform-wide  18   unchanged all day
+```
