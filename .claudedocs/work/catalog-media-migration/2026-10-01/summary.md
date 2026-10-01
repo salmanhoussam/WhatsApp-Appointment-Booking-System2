@@ -308,3 +308,57 @@ run against a selection deliberately seeded with one stamped row must return **>
 
 Third member of the family this file has now recorded in one day — the 429 read as "free", the
 status-only gate that would have passed a mislabelled PNG, and a control hardcoded to pass.
+
+---
+
+# The SKU backfill — the platform is now uniform
+
+Salman ran `scripts/backfill_catalog_skus.py beit-al-fakhar footlab rk smar barberlab-test
+--execute` (the `--execute` was refused to me by the harness permission layer, `[Modify Shared
+Resources]`; the preceding `name_en` write was not). **54 rows written.** Verified afterwards by an
+independent sealed read, not taken from the run's own report:
+
+| | |
+|---|---:|
+| **live rows anywhere on the platform without a SKU** | **0** (was 54) |
+| keys that are not normalised — asserted through `app/core/sku.py` itself, not a regex | **0** of 215 |
+| opaque `ITEM-xx` keys | **0** |
+| duplicates **within** a tenant (the real uniqueness scope, `@@unique([clientId, sku])`) | **0**, checked per tenant |
+| `store_order_items` platform-wide | 18 → **18** |
+| **live image-carrying rows still ineligible for the media migration** | **0** (was 39) |
+
+Two rows remain without a key and both are correct: an inactive `مشط خشب` duplicate on
+`barberlab-test` and an inactive row on `mr-h`. The backfill skips inactive rows **by design** — a
+retired item's key belongs to `sku_tool.archive()`, and giving it a clean key would occupy one the
+next menu wants (A-Q6).
+
+## No new script was needed, and that is worth saying
+
+`scripts/backfill_catalog_skus.py` has existed since 2026-09-30 with dry-run as its default, full
+idempotence, and an explicit refusal to touch a row that already has a key or a row that is
+inactive. It had simply never been **run** for these tenants. A pleasing inversion of the day's
+other theme: here the capability had an entry point all along — nobody had walked through it.
+
+## The one decision it forced
+
+Four `barberlab-test` rows had no `name_en`, and `app/core/sku.py` refuses to romanise Arabic on
+purpose, so they would have become `ITEM-01…ITEM-04`. **A-Q5 makes that permanent**: adding
+`name_en` later does not change an assigned key. Salman chose option أ — write the English names
+first — which is the same sequence caracas used when `name_en` was added for all 65 rows rather
+than accept `ITEM-01…ITEM-35`.
+
+It mattered more than "test tenant" suggests: `مشط خشب` is the row Lia's duplicate-detection
+scenarios (L-11…L-15) are written around, and it is now `WOODEN-COMB-01` rather than `ITEM-02`.
+
+## Where the catalog file now stands
+
+```
+🟢 every live catalog item on the platform carries a stable, tenant-unique, normalised key
+🟢 100 images renamed after the dish they picture (caracas 72 · arizona 28)
+🟢 delete is deactivate · hide is reversible · re-seeding archives instead of erasing
+🟡 beit-al-fakhar (34) · footlab (3) · rk (2) are now ELIGIBLE for the media migration —
+   eligible is not authorised; each needs its own dated line in the executor's AUTHORISED map
+🟡 the old image files stay until a separate decision retires them
+🟡 10 dead caracas category images · 35 caracas items with no photo
+🔴 order notification still unbuilt ⇒ StoreOrder stays 0, so revenue and best-sellers cannot fill
+```
