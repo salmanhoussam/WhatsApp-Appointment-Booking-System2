@@ -140,3 +140,89 @@ BEFORE   133 items · 72 selected · 72 to copy · 1 pre-existing file under cat
          StoreOrderItem count unchanged
 ROLLBACK one UPDATE back to $old per row. No file operation at all — the old files are untouched.
 ```
+
+---
+
+# EXECUTED — 2026-10-01, authorised by Salman ("البوابة 🟢 OPEN. نفّذ ٤")
+
+Script: `scripts/apply_catalog_media_migration.py` — requires `caracas --execute`; refuses any
+other tenant and refuses without the flag (both refusals exercised before the run).
+Raw output: `execute-output.txt`.
+
+`destination()`, `classify_destination()`, `head()`, `EXT_BY_CONTENT_TYPE` and `ABSENT` are
+**imported** from the planner, not re-implemented. A planner and an executor that each compute the
+destination their own way are two matchers that agree until the day they do not.
+
+## The order was the safety
+
+```
+copy all 72  →  verify ALL 72 new URLs at 200  →  THEN one transaction
+```
+
+Nothing reached the database until every new URL was proven alive. A failure before that point
+would have left the database untouched, with copied-but-unreferenced files as the only residue.
+
+## Before / after
+
+| metric | before | after | |
+|---|---:|---:|---|
+| `store_order_items` **platform-wide** | 18 | 18 | ✅ |
+| `catalog_items` for caracas | 133 | 133 | ✅ |
+| rows at their new SKU url | 0 | 72 | ✅ |
+| live urls matching `{SKU}.jpg` | — | 72 | |
+| live urls still in the old `id/id/main` shape | — | 0 | ✅ |
+| **old files still served at 200 (the rollback)** | 72 | 72 | ✅ |
+
+The order-line invariant is counted **platform-wide on purpose**: caracas holds zero order lines,
+so a tenant-scoped check would read 0 → 0 and could never fail. It was also re-counted *inside*
+the transaction, before `COMMIT`, with a rollback on any change.
+
+## Gates that actually fired
+
+```
+[2] sources      72/72 settled 200 · all image/jpeg
+[3] destinations 72/72 FREE — absent from the folder enumeration AND a settled 400, both required
+[4] copy         72 copied · 0 failed · upsert="false" throughout, so an overwrite was impossible
+[5] gate         72/72 new URLs at 200, BEFORE any DB write
+                 ✅ negative control: a key deliberately never copied → 400, so the gate can fail
+[6] transaction  rowcount == 1 on all 72 statements · guard `AND image_url = $old`
+[7] after        re-read from the database, not inferred from the write
+```
+
+## Runtime verification — past the database
+
+`investigation-protocol.md`'s Runtime Before Assumption: a committed transaction is one link, not
+the feature. Verified against the **Public Contract the menu actually reads**, on production:
+
+```
+GET /api/v1/public/restaurant/menu?client_slug=caracas
+   11 categories · 107 items · 72 carrying an image
+   72 on the new {SKU}.jpg shape · 0 still on the old id/id shape
+   72/72 served images return 200
+   سجق → caracas/catalog/SUJUK-SANDWICH-01.jpg
+```
+
+## Two self-inflicted measurement failures, both recorded
+
+1. **A parallel HEAD pass reported one `URLError` out of 72.** Under this run's own rule that is
+   not a pass. Re-verified **serially with 4 retries → 72/72 at 200.** The error was my own
+   concurrency, exactly the same class as the 429 the dry run caught: *the instrument failed, and
+   the instrument's failure is not a finding about the thing measured.*
+2. **A bare `python-urllib` user-agent gets `403` from the production API.** The first verification
+   attempt failed this way and it says nothing about the API — a browser UA returns 200. Recorded
+   because reading that 403 as an API fault would have been a false alarm about live production.
+
+## Still open after this step
+
+```
+🟡 step 5 — the hide/show asymmetry (plan §5). NOT started. A blanket reactivate would resurrect
+   13 deliberately-retired items including the 3 فول rows.
+🟡 the old files are untouched by design (decision ④). Deleting them is a separate authorisation
+   and should wait until caracas has run visibly correct for a period.
+🟡 the 10 caracas CATEGORY images still point at the decommissioned project. Untouched by this
+   step; the item-photo fallback carries the UI.
+🟡 35 live caracas items still have no photo at all.
+🔴 39 live image-carrying rows platform-wide have NO SKU (beit-al-fakhar 34, footlab 3, rk 2) and
+   cannot migrate until a SKU backfill runs for them — Salman's own note. `arizona` (28 rows, all
+   with SKUs) is the one tenant that could run this script unchanged, and is NOT authorised.
+```
