@@ -78,6 +78,52 @@ async def update_hero_image(
         raise HTTPException(status_code=500, detail="Database connection failed")
 
 
+# ── Logo (2026-10-01) — the second page-level singleton, for the printable QR card ─────────────
+# Everything this needs already existed and was never wired to a route: `page_logo` is in
+# upload.py's FOLDER_MAP (→ pages/home/logo), gallery_repo already treats it as a singleton, and
+# media_service.replace_page_media is generic over the slot ("page_hero, page_logo, ..., same
+# function either way"). So this adds a route and **no new write path** — §9 holds.
+#
+# MEASURED 2026-10-01, which is why it was needed: zero tenants on the entire platform carry a
+# `page_logo` row, and no `logo/` folder exists in the storage bucket for any tenant. The logo was
+# not misplaced by the folder-renaming migration; it was never uploadable, because nothing could
+# write it.
+
+class LogoUpdate(BaseModel):
+    image_url: str
+
+
+@router.get("/logo")
+async def get_logo(
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """The tenant's logo, or None. Deliberately NOT a 404 when absent: a tenant with no logo is the
+    normal state today (every tenant), and the printable card falls back to the tenant's initial
+    rather than failing."""
+    media = await media_service.get_page_media(tenant["id"], "page_logo")
+    return {"success": True, "data": {"image_url": media["url"] if media else None}}
+
+
+@router.patch("/logo")
+async def update_logo(
+    body: LogoUpdate,
+    tenant: dict = Depends(get_current_tenant),
+    _user = Depends(require_roles("SUPER_ADMIN", "TENANT_ADMIN")),
+):
+    """ReplaceMedia on the logo slot — same Operation as hero, same service, different slot."""
+    try:
+        await media_service.replace_page_media(tenant["id"], "page_logo", body.image_url, "image")
+        invalidate_tenant_cache(tenant["slug"])
+        logger.info("Media: logo replaced for tenant '%s'", tenant["slug"])
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"🔥 DB error updating logo for tenant {tenant}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+
 # ── Homepage Phase 2.4 (2026-08-18) — gallery, a collection not a singleton ────────────────────
 # AddMedia/RemoveMedia/ReorderMedia on imageType="page_gallery" -- distinct Operation shape from
 # hero's ReplaceMedia above (delete-then-create), same reasoning as media_service.py's own split.

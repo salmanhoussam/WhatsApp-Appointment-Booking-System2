@@ -86,22 +86,164 @@ const LAYOUT_OPTS = [
 // ── Store QR — deliberately minimal (Store Template Pilot, 2026-07-31) ────────
 // Generates on demand from the backend (GET /admin/settings/qr), no complex QR system --
 // one static image encoding the tenant's real public store URL, per Salman's explicit scope.
-function StoreQRSection({ color }) {
-  const [qr,      setQr]      = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-  const [copied,  setCopied]  = useState(false)
+// ── The printable QR card ──────────────────────────────────────────────────────────────────────
+// Salman, 2026-10-01: "بدي تعملي الـqrcode من الستينجز بالداشبورد لشوف انا كيف بدي زبط الورقة".
+// So this is not a QR thumbnail with a download link — it renders the SHEET, at print resolution,
+// the way it will look taped to the counter.
+//
+// Everything is drawn onto one canvas rather than printed from the DOM: window.print() would carry
+// the whole dashboard, and a print stylesheet is a second source of truth for a layout that only
+// exists to be exported once. A PNG is also something Salman can hand to a print shop.
+const CARD_W = 1200
+const CARD_H = 1600
+
+function loadImage(src, { cors = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    if (cors) img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error(`image failed: ${String(src).slice(0, 60)}`))
+    img.src = src
+  })
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y,     x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x,     y + h, r)
+  ctx.arcTo(x,     y + h, x,     y,     r)
+  ctx.arcTo(x,     y,     x + w, y,     r)
+  ctx.closePath()
+}
+
+/**
+ * Compose the sheet. Returns a PNG data URL.
+ *
+ * The logo is optional ON PURPOSE: measured 2026-10-01, **zero tenants on the platform carry a
+ * `page_logo`** and no logo folder exists in the bucket. A card that waits for an asset nobody has
+ * is a card nobody can print, so the fallback — the shop's first letter on its own brand colour —
+ * is the path that actually runs today, not an afterthought.
+ */
+async function drawQrCard({ qrB64, logoUrl, shopName, url, color }) {
+  const canvas = document.createElement('canvas')
+  canvas.width = CARD_W
+  canvas.height = CARD_H
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, CARD_W, CARD_H)
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, CARD_W, 28)
+
+  // Without this the first paint can use a fallback face and the Arabic renders wrong.
+  try { await document.fonts.ready } catch { /* a browser without the API still draws */ }
+
+  ctx.textAlign = 'center'
+  ctx.direction = 'rtl'
+
+  ctx.fillStyle = '#111111'
+  ctx.font = `700 88px ${FONT}`
+  ctx.fillText(shopName || '', CARD_W / 2, 230)
+
+  ctx.fillStyle = '#5A5A5A'
+  ctx.font = `400 46px ${FONT}`
+  ctx.fillText('امسح الرمز لتشاهد المنيو وتطلب', CARD_W / 2, 330)
+
+  // The QR itself. The backend renders it at ERROR_CORRECT_H, which is what makes covering the
+  // centre with a badge legal — do not shrink the badge logic without checking that.
+  const qr = await loadImage(`data:image/png;base64,${qrB64}`)
+  const S = 820
+  const qx = (CARD_W - S) / 2
+  const qy = 420
+  ctx.imageSmoothingEnabled = false   // a QR is a bitmap of squares; smoothing blurs the modules
+  ctx.drawImage(qr, qx, qy, S, S)
+  ctx.imageSmoothingEnabled = true
+
+  // Centre badge — 22% of the code, inside what H-level correction can lose.
+  const B = Math.round(S * 0.22)
+  const bx = (CARD_W - B) / 2
+  const by = qy + (S - B) / 2
+  ctx.fillStyle = '#FFFFFF'
+  roundRect(ctx, bx - 14, by - 14, B + 28, B + 28, 26)
+  ctx.fill()
+
+  let drewLogo = false
+  if (logoUrl) {
+    try {
+      // CORS matters: a tainted canvas cannot be exported at all, so a logo that fails to load
+      // cross-origin must fall through to the letter rather than break the whole card.
+      const lg = await loadImage(logoUrl, { cors: true })
+      const scale = Math.min(B / lg.width, B / lg.height)
+      const lw = lg.width * scale
+      const lh = lg.height * scale
+      ctx.drawImage(lg, (CARD_W - lw) / 2, by + (B - lh) / 2, lw, lh)
+      drewLogo = true
+    } catch { /* fall through to the initial */ }
+  }
+  if (!drewLogo) {
+    ctx.fillStyle = color
+    roundRect(ctx, bx, by, B, B, 20)
+    ctx.fill()
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = `700 ${Math.round(B * 0.56)}px ${FONT}`
+    ctx.textBaseline = 'middle'
+    ctx.fillText((shopName || '؟').trim().charAt(0), CARD_W / 2, by + B / 2 + 4)
+    ctx.textBaseline = 'alphabetic'
+  }
+
+  ctx.direction = 'ltr'
+  ctx.fillStyle = '#8A8A8A'
+  ctx.font = `400 32px ${FONT}`
+  ctx.fillText(url, CARD_W / 2, qy + S + 120)
+
+  ctx.direction = 'rtl'
+  ctx.fillStyle = '#B0B0B0'
+  ctx.font = `400 28px ${FONT}`
+  ctx.fillText('أو افتح الرابط من المتصفّح', CARD_W / 2, qy + S + 180)
+
+  return canvas.toDataURL('image/png')
+}
+
+function StoreQRSection({ color, shopName }) {
+  const [qr,       setQr]       = useState(null)
+  const [logoUrl,  setLogoUrl]  = useState(null)
+  const [cardPng,  setCardPng]  = useState(null)
+  const [loading,  setLoading]  = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error,    setError]    = useState(null)
+  const [copied,   setCopied]   = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    adminApi.get('/settings/qr')
-      .then(({ data }) => { if (data.success) setQr(data.data) })
+    Promise.all([
+      adminApi.get('/settings/qr').then(({ data }) => (data.success ? data.data : null)),
+      // A tenant with no logo is the normal state today, so a failure here must not block the card.
+      adminApi.get('/media/logo').then(({ data }) => data?.data?.image_url ?? null).catch(() => null),
+    ])
+      .then(([qrData, logo]) => { setQr(qrData); setLogoUrl(logo) })
       .catch(() => setError('تعذّر توليد رمز QR'))
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { load() }, [load]) // eslint-disable-line
+
+  // Redraw whenever anything the sheet shows changes — including the colour, which the owner is
+  // editing live in the field right above this card.
+  useEffect(() => {
+    let cancelled = false
+    if (!qr?.image_b64) { setCardPng(null); return }
+    drawQrCard({ qrB64: qr.image_b64, logoUrl, shopName, url: qr.url, color })
+      .then((png) => { if (!cancelled) setCardPng(png) })
+      .catch(() => { if (!cancelled) setCardPng(null) })
+    return () => { cancelled = true }
+  }, [qr, logoUrl, shopName, color])
+
+  const slug = (() => {
+    try { return new URL(qr?.url ?? '').pathname.split('/').filter(Boolean)[0] || 'tenant' }
+    catch { return 'tenant' }
+  })()
 
   const copyLink = () => {
     if (!qr?.url) return
@@ -110,37 +252,101 @@ function StoreQRSection({ color }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('context', 'page_logo')
+      const { data: uploadRes } = await adminApi.post('/upload/', form)
+      await adminApi.patch('/media/logo', { image_url: uploadRes.url })
+      setLogoUrl(uploadRes.url)
+    } catch (err) {
+      setError(err?.response?.data?.detail ?? 'تعذّر رفع الشعار')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
   return (
-    <Card style={{ marginBottom: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-      <div style={{ ...sectionTitle, marginBottom: 0, width: '100%' }}>رابط متجرك ورمز QR</div>
+    <Card style={{ marginBottom: 20 }}>
+      <div style={sectionTitle}>رابط متجرك ورمز QR</div>
       {loading && <div style={{ fontSize: 13, color: T.textMuted }}>جاري التوليد...</div>}
-      {error && <div style={{ fontSize: 13, color: T.danger }}>{error}</div>}
+      {error && <div style={{ fontSize: 13, color: T.danger, marginBottom: 10 }}>{error}</div>}
+
       {qr && (
-        <>
-          {/* QR quiet-zone background stays literal white regardless of theme -- required for
-              the code to scan correctly, not a dark-theme leftover. */}
-          <img
-            src={`data:image/png;base64,${qr.image_b64}`}
-            alt="QR code لمتجرك"
-            style={{ width: 140, height: 140, borderRadius: 10, background: '#fff', padding: 8, border: `1px solid ${T.border}` }}
-          />
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 12, color: T.textSecond, marginBottom: 8 }}>
-              اطبع هذا الرمز واعرضه في متجرك — يفتح الزبون المتجر مباشرة من هاتفه
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {/* The sheet, exactly as it prints. Shown small; the file is 1200×1600. */}
+          <div style={{ flexShrink: 0 }}>
+            {cardPng
+              ? <img src={cardPng} alt="بطاقة QR جاهزة للطباعة"
+                     style={{ width: 230, borderRadius: 12, border: `1px solid ${T.border}`, display: 'block', background: '#fff' }} />
+              : <div style={{ width: 230, height: 306, borderRadius: 12, border: `1px solid ${T.border}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 12, color: T.textMuted }}>جاري تجهيز البطاقة…</div>}
+            <div style={{ fontSize: 11, color: T.textMuted, textAlign: 'center', marginTop: 6 }}>
+              معاينة الورقة — الملف بدقّة طباعة
             </div>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 12, color: T.textSecond, marginBottom: 10 }}>
+              اطبع هذه الورقة وضعها على الطاولة أو الكاشير — الزبون يمسحها فتفتح لديه القائمة مباشرة
+            </div>
+
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              background: T.pageBg, borderRadius: 8, padding: '8px 12px',
+              background: T.pageBg, borderRadius: 8, padding: '8px 12px', marginBottom: 12,
             }}>
-              <span style={{ fontSize: 12, color: T.textPrimary, direction: 'ltr', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 12, color: T.textPrimary, direction: 'ltr', flex: 1,
+                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {qr.url}
               </span>
               <Button variant="secondary" size="sm" color={color} onClick={copyLink} style={{ flexShrink: 0 }}>
                 {copied ? '✓ تم النسخ' : 'نسخ الرابط'}
               </Button>
             </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {/* A filename that says what the file is — Salman, 2026-10-01: a UUID tells nobody
+                  anything. Every image this platform stores is currently named after one. */}
+              <a href={cardPng ?? undefined} download={`${slug}-menu-qr-card.png`}
+                 style={{ textDecoration: 'none', pointerEvents: cardPng ? 'auto' : 'none', opacity: cardPng ? 1 : 0.5 }}>
+                <Button variant="primary" color={color} size="sm">تنزيل الورقة للطباعة</Button>
+              </a>
+              <a href={qr.image_b64 ? `data:image/png;base64,${qr.image_b64}` : undefined}
+                 download={`${slug}-menu-qr.png`} style={{ textDecoration: 'none' }}>
+                <Button variant="secondary" color={color} size="sm">تنزيل الرمز وحده</Button>
+              </a>
+            </div>
+
+            <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
+              <div style={{ fontSize: 12, color: T.textSecond, marginBottom: 8 }}>
+                شعار المحل — يظهر داخل الرمز. {logoUrl ? '' : 'لا يوجد شعار بعد، ويظهر حالياً أول حرف من الاسم.'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {logoUrl && <img src={logoUrl} alt="الشعار"
+                                 style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8,
+                                          border: `1px solid ${T.border}`, background: '#fff' }} />}
+                <label style={{ cursor: uploading ? 'default' : 'pointer' }}>
+                  <input type="file" accept="image/*" onChange={uploadLogo} disabled={uploading}
+                         style={{ display: 'none' }} />
+                  <span style={{
+                    display: 'inline-block', padding: '8px 14px', borderRadius: 8, fontSize: 13,
+                    border: `1px solid ${T.border}`, color: T.textPrimary, background: T.cardBg,
+                    opacity: uploading ? 0.6 : 1,
+                  }}>
+                    {uploading ? 'جاري الرفع…' : (logoUrl ? 'تغيير الشعار' : 'رفع الشعار')}
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </Card>
   )
@@ -935,7 +1141,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
       </Card>
 
       {/* ── Store QR ──────────────────────────────────────────────────── */}
-      <StoreQRSection color={form.primary_color} />
+      <StoreQRSection color={form.primary_color} shopName={form.name_ar} />
 
       {/* ── Design & Templates ────────────────────────────────────────── */}
       <Card style={{ marginBottom: 20 }}>
