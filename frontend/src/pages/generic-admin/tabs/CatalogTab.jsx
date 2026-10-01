@@ -61,10 +61,14 @@ function Modal({ title, onClose, onSave, saving, children }) {
 
 // ── Field ─────────────────────────────────────────────────────────────────────
 
-function Field({ label, children }) {
+function Field({ label, children, hint }) {
+  // `hint` added 2026-10-01: a hint passed to this component used to be silently dropped, so a
+  // sentence written for the owner never reached him. Caught in a browser check that asserted the
+  // text was on screen rather than that the prop had been passed.
   return (
     <div style={{ marginBottom: 16 }}>
       <label style={labelStyle}>{label}</label>
+      {hint && <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>{hint}</div>}
       {children}
     </div>
   )

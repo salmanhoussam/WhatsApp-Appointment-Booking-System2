@@ -71,6 +71,12 @@ def _fmt_item_admin(i) -> dict:
         "sort_order":    i.sortOrder,
         "category_id":   i.categoryId,
         "category_name": i.category.nameAr if hasattr(i, "category") and i.category else None,
+        # The owner's own stable key. Added 2026-10-01 after a smoke test read `sku: None` from
+        # this endpoint on a row that carried SKU-SMOKE-TEST-01 in the database — the field was
+        # simply never serialized. The dashboard needs it for the media-naming work (an image is
+        # named after it), and a key nobody can see is a key nobody can quote when something goes
+        # wrong.
+        "sku":           i.sku,
         "metadata":      i.metadata or {},
     }
 
