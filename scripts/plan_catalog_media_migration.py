@@ -193,7 +193,19 @@ def main() -> int:
 
     # ── 2 · controls on the selection itself ──────────────────────────────────────────────────
     print("\n[2] SELECTION CONTROLS — can the query prove itself?")
-    pos = selected[0] if selected else None
+    if not selected:
+        # An empty selection is a real, reportable answer — `footlab` holds three live items whose
+        # images are images.unsplash.com URLs that were never in our bucket, so there is nothing to
+        # copy and nothing is wrong. The first version of this script CRASHED here
+        # (`'NoneType' object is not subscriptable`) because it assumed at least one row, which
+        # turned "nothing to migrate" into a traceback — a tool that cannot say "zero" cleanly
+        # will eventually have its zero mistaken for a failure, or its failure for a zero.
+        print("    (no rows selected — the controls below need at least one, so they are skipped)")
+        print(f"\n{'='*94}\n    🟢 NOTHING TO MIGRATE for {slug}. The exclusions above are the "
+              f"whole story, and none of them is an error.\n{'='*94}\n")
+        conn.close()
+        return 0
+    pos = selected[0]
     cur.execute("""
         SELECT i.sku, i.name_ar FROM catalog_items i JOIN clients cl ON cl.id = i.client_id
          WHERE cl.slug = %s AND NOT i.is_active AND i.image_url IS NOT NULL LIMIT 1
