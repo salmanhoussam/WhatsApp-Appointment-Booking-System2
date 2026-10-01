@@ -37,15 +37,35 @@ def _fmt_item(item) -> dict:
 
 
 def _fmt_category(cat, include_items: bool = True) -> dict:
+    """Serialize a category.
+
+    `fallback_image_url` exists because `image_url` is stored but not necessarily alive. MEASURED
+    2026-10-01: all ten of caracas' categories carry an `imageUrl` pointing at
+    `gdzthjcvzvhfpsvoxhbm.supabase.co` — a DECOMMISSIONED Supabase project. Every one fails to
+    connect, while the item images on the live project return 200. A category circle drawn from
+    `image_url` would be ten broken images.
+
+    Both are returned rather than one chosen here, deliberately. The server cannot know a URL is
+    dead without fetching it, and host-sniffing would only recognise the one decommissioned project
+    we happen to know about today. The browser already knows: it renders `image_url` and swaps to
+    the fallback on error, which works for this migration and for any image that dies later.
+
+    The fallback is the first active item that has a picture — a sandwich category shows a
+    sandwich, which is what a round thumbnail is for. `image_url` is returned unchanged, because
+    dropping the stored value would hide the broken migration instead of working around it.
+    """
+    items = [i for i in (cat.items or []) if i.isActive] if cat.items is not None else []
     result = {
         "id":         cat.id,
         "name_ar":    cat.nameAr,
         "name_en":    cat.nameEn,
         "image_url":  cat.imageUrl,
+        "fallback_image_url": next((i.imageUrl for i in items if i.imageUrl), None),
+        "item_count": len(items) if cat.items is not None else None,
         "sort_order": cat.sortOrder,
     }
-    if include_items and cat.items is not None:
-        result["items"] = [_fmt_item(i) for i in cat.items if i.isActive]
+    if include_items:
+        result["items"] = [_fmt_item(i) for i in items]
     return result
 
 
@@ -84,8 +104,14 @@ async def get_categories(
     tenant: dict = Depends(get_current_tenant),
     _svc=Depends(require_service("restaurant")),
 ):
-    """Categories only, without items — for tab navigation."""
-    categories = await restaurant_repo.list_menu_categories(tenant["id"], include_items=False)
+    """Categories for tab navigation — no items in the payload, but loaded to derive two fields.
+
+    `include_items=True` with `include_items=False` on the serializer is deliberate, not a
+    contradiction: the rows are needed to compute `fallback_image_url` and `item_count`, and are
+    then dropped from the response. One query instead of making every caller fetch the whole menu
+    just to draw a thumbnail.
+    """
+    categories = await restaurant_repo.list_menu_categories(tenant["id"], include_items=True)
     return {
         "success": True,
         "data": [_fmt_category(c, include_items=False) for c in categories],

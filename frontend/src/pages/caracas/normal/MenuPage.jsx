@@ -28,6 +28,69 @@ function buildWaMessage(cartItems, total) {
   return `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${total.toFixed(2)}`;
 }
 
+
+// ── Category pill — one circle, one caption ───────────────────────────────────
+// Salman, 2026-10-01: "البار تبع الكاتيجوري خليه دوائر نفس الحجم، إذا في صورة للصنف حطها والكتابة
+// تحتها". Every circle is the same size whatever the name's length, so the row reads as a rhythm
+// rather than as pills of random width.
+//
+// 🔴 The image needs two sources, and that is measured, not defensive. All ten of caracas'
+// categories store an `image_url` on `gdzthjcvzvhfpsvoxhbm.supabase.co` — a decommissioned Supabase
+// project; every one fails to connect, while item images on the live project return 200. The API
+// now also returns `fallback_image_url`, the first item in that category that has a picture. The
+// browser is what actually knows which URL is alive, so it tries the stored one and swaps on error
+// — which fixes this migration and any image that dies after it.
+//
+// With neither, the circle shows the first letter on the brand colour instead of a broken-image
+// glyph. Ten tenants carry no category art at all, so that path is the common one, not a corner.
+function CategoryPill({ cat, isActive, onSelect }) {
+  const [src, setSrc] = useState(cat.image_url || cat.fallback_image_url || null);
+  const [failed, setFailed] = useState(false);
+
+  // Re-arm when the category data arrives or changes; without this a pill rendered before the
+  // fetch resolves keeps its null src forever.
+  useEffect(() => {
+    setSrc(cat.image_url || cat.fallback_image_url || null);
+    setFailed(false);
+  }, [cat.image_url, cat.fallback_image_url]);
+
+  const onError = () => {
+    if (src !== cat.fallback_image_url && cat.fallback_image_url) setSrc(cat.fallback_image_url);
+    else setFailed(true);
+  };
+
+  const label = cat.name_ar || cat.name_en || '';
+  return (
+    <button onClick={onSelect} className="shrink-0 flex flex-col items-center gap-1.5 w-[76px]"
+            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
+      <span
+        className="rounded-full overflow-hidden flex items-center justify-center transition-all duration-200"
+        style={{
+          width: 60, height: 60, flexShrink: 0,
+          background: failed || !src ? ACCENT : '#F5F5F4',
+          outline: isActive ? `3px solid ${ACCENT}` : '3px solid transparent',
+          outlineOffset: 2,
+          boxShadow: isActive ? '0 4px 14px rgba(234,88,12,0.30)' : '0 1px 3px rgba(0,0,0,0.08)',
+          transform: isActive ? 'scale(1.04)' : 'none',
+        }}
+      >
+        {!failed && src
+          ? <img src={src} alt="" onError={onError} loading="lazy"
+                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <span style={{ color: '#fff', fontWeight: 800, fontSize: 22,
+                           fontFamily: "'Cairo', sans-serif" }}>{label.trim().charAt(0) || '؟'}</span>}
+      </span>
+      {/* Two lines maximum, centred, so a long name never widens the circle or breaks the rhythm. */}
+      <span style={{
+        fontFamily: "'Cairo', sans-serif", fontSize: 11, lineHeight: 1.25, textAlign: 'center',
+        fontWeight: isActive ? 800 : 600, color: isActive ? ACCENT : '#57534E',
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden', width: '100%',
+      }}>{label}</span>
+    </button>
+  );
+}
+
 // ── Order Panel ────────────────────────────────────────────────────────────────
 function OrderPanel({ onClose }) {
   const { cartItems, removeItem, updateQuantity, clearCart } = useCaracasStore();
@@ -209,19 +272,15 @@ export default function MenuPage() {
       {/* ── Sticky Category Nav ── */}
       <div className="sticky top-0 z-40 bg-[#FAFAF9]/90 backdrop-blur-md border-b border-stone-200 shadow-sm">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="flex overflow-x-auto py-4 gap-3" style={{ scrollbarWidth: 'none' }}>
+          {/* items-start so a two-line caption never stretches its neighbours' circles, and py-3
+              because a circle plus two lines is already ~95px of sticky bar on a phone. */}
+          <div className="flex items-start overflow-x-auto py-3 gap-3"
+               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {allCategories.map((cat) => {
               const isActive = activeCategoryId === cat.id;
               return (
-                <button key={cat.id} onClick={() => setActiveCategoryId(cat.id)}
-                  className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 shrink-0
-                    ${isActive
-                      ? 'text-white shadow-md scale-105'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                  style={isActive ? { background: ACCENT, boxShadow: '0 4px 14px rgba(234,88,12,0.3)' } : {}}
-                >
-                  {cat.name_ar || cat.name_en}
-                </button>
+                <CategoryPill key={cat.id} cat={cat} isActive={isActive}
+                              onSelect={() => setActiveCategoryId(cat.id)} />
               );
             })}
           </div>
