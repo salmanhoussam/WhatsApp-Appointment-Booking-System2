@@ -51,7 +51,11 @@ _unit_repo = UnitRepository(prisma_client)
 router = APIRouter(prefix="/upload", tags=["Admin Upload"])
 
 FOLDER_MAP = {
-    "catalog_item":   "catalog/{category_id}/{item_id}",
+    # 2026-10-01: the category id came OUT of this path. It made the tree lie the moment an item
+    # moved — measured the same day, six caracas items had an image URL naming a category they no
+    # longer belonged to. The SKU in the filename carries the identity instead, and it is stable
+    # across both a category move and a rename.
+    "catalog_item":   "catalog",
     # A category's own picture (2026-10-01). `_categories` under the tenant's catalog, ratified by
     # Salman as part of the media-naming plan: a category has no SKU, so this is the one place a
     # name-derived file is used, and the leading underscore keeps it sorting apart from the item
@@ -109,6 +113,7 @@ async def upload_image(
     unit_id:     Optional[str]  = Form(None),
     barber_id:   Optional[str]  = Form(None),
     service_id:  Optional[str]  = Form(None),
+    filename_hint: Optional[str] = Form(None),
     caption_ar:  Optional[str]  = Form(None),
     caption_en:  Optional[str]  = Form(None),
     tenant:      dict            = Depends(get_current_tenant),
@@ -121,8 +126,10 @@ async def upload_image(
         )
 
     # Validate required IDs per context
-    if context == "catalog_item" and (not category_id or not item_id):
-        raise HTTPException(status_code=400, detail="catalog_item context requires category_id and item_id")
+    # `category_id` is no longer required: it left the path (see FOLDER_MAP). Still accepted so
+    # existing callers keep working unchanged — it is simply not used to build the destination.
+    if context == "catalog_item" and not item_id:
+        raise HTTPException(status_code=400, detail="catalog_item context requires item_id")
     if context in ("unit_cover", "unit_gallery") and not unit_id:
         raise HTTPException(status_code=400, detail=f"{context} context requires unit_id")
     if context == "barber" and not barber_id:
@@ -147,6 +154,27 @@ async def upload_image(
 
     folder = _build_folder(context, category_id, item_id, unit_id, barber_id, service_id)
 
+    # Name the file after the thing it pictures. Resolved BEFORE the upload, because a file cannot
+    # be named after a row nobody has read yet — and because an item without a SKU must fail here,
+    # loudly, rather than land as another anonymous UUID.
+    filename_base = None
+    if context == "catalog_item":
+        _item = await _cat_repo.find_item(tenant["id"], item_id)
+        if not _item:
+            raise HTTPException(status_code=404, detail="Catalog item not found")
+        if not _item.sku:
+            # Unreachable for anything created since admin_create_item started generating keys;
+            # kept because a silent fallback to a UUID is how the old naming survived unnoticed.
+            raise HTTPException(status_code=409, detail="Item has no SKU — cannot name its image")
+        filename_base = _item.sku
+    elif context == "catalog_category" and filename_hint:
+        # A category has no SKU. The hint is the Latin name the dashboard already holds; the
+        # sanitizer rejects Arabic, so an Arabic-only category falls back to a UUID rather than
+        # failing an upload over a filename.
+        import re as _re
+        cleaned = _re.sub(r"[^A-Za-z0-9-]+", "-", filename_hint).strip("-")[:48].upper()
+        filename_base = cleaned or None
+
     # File Upload Security Audit (2026-08-30): a missing/empty Content-Type header must NOT
     # silently default to an allowed value (that would let an attacker bypass the allowlist just
     # by omitting the header) -- pass it through as-is; storage_service's own allowlist check
@@ -157,15 +185,14 @@ async def upload_image(
         file=file,
         content_type=file.content_type,
         original_filename=file.filename or "",
+        filename_base=filename_base,
     )
 
     image_type = IMAGE_TYPE_MAP[context]
     image_id   = None
 
     if context == "catalog_item":
-        item = await _cat_repo.find_item(tenant["id"], item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail="Catalog item not found")
+        item = _item   # already read and ownership-checked above; one query, not two
 
         img = await _gallery.create_gallery_image({
             "clientId":      tenant["id"],

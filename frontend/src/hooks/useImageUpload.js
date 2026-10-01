@@ -46,6 +46,11 @@ import adminApi from '../utils/admin.config'
 
 const VALID_CONTEXTS = [
   'catalog_item',
+  // 2026-10-01 — added with the category-image field. It was missing, so the new upload button
+  // threw `Invalid context` before any request left the browser. The backend accepted it fine,
+  // which is why a curl test passed and the button would not have: this list is a second
+  // allowlist in front of the server's own, and adding a context means adding it twice.
+  'catalog_category',
   'page_hero', 'page_logo', 'page_story', 'page_demo',
   'unit_cover', 'unit_gallery',
   'barber',
@@ -68,6 +73,7 @@ export default function useImageUpload() {
       service_id  = null,
       caption_ar  = null,
       caption_en  = null,
+      filename_hint = null,
     } = options
 
     if (!file) throw new Error('No file provided')
@@ -87,6 +93,7 @@ export default function useImageUpload() {
       if (unit_id)     form.append('unit_id',     unit_id)
       if (barber_id)   form.append('barber_id',   barber_id)
       if (service_id)  form.append('service_id',  service_id)
+      if (filename_hint) form.append('filename_hint', filename_hint)
       if (caption_ar)  form.append('caption_ar',  caption_ar)
       if (caption_en)  form.append('caption_en',  caption_en)
 

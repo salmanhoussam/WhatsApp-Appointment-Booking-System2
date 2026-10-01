@@ -167,7 +167,13 @@ export default function CatalogTab({ color }) {
       // the same order the item modal already uses.
       let body = catForm
       if (catImageFile) {
-        const { url } = await upload(catImageFile, { context: 'catalog_category' })
+        // The Latin name is what the file can be named after — a category has no SKU, and the
+        // storage sanitizer rejects Arabic rather than mangling it. With no English name the
+        // upload still succeeds and falls back to a UUID; a filename must never block a picture.
+        const { url } = await upload(catImageFile, {
+          context: 'catalog_category',
+          filename_hint: catForm.name_en || '',
+        })
         body = { ...catForm, image_url: url }
       }
       if (editingCat) {

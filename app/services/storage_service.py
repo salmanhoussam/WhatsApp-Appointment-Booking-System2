@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import re
+from typing import Optional
 import uuid
 from fastapi import HTTPException, UploadFile
 
@@ -175,6 +176,7 @@ async def upload_to_gallery_path(
     file: UploadFile,
     content_type: str,
     original_filename: str,
+    filename_base: Optional[str] = None,
 ) -> str:
     """
     Upload a gallery image to Supabase Storage at:
@@ -199,7 +201,23 @@ async def upload_to_gallery_path(
     safe_slug = _sanitize_path_segment(client_slug, "client_slug")
     safe_folder = _sanitize_folder_path(folder_context, "folder_context")
     ext = _ext_for_content_type(content_type)
-    path = f"{safe_slug}/{safe_folder}/{uuid.uuid4()}.{ext}"
+
+    # `filename_base` makes the file say what it is (2026-10-01, Salman: a UUID filename loses the
+    # information and makes a link impossible to find). It is sanitized by the same segment rule as
+    # every other path part, so Arabic and traversal are rejected rather than mangled.
+    #
+    # A short random suffix is kept deliberately instead of a bare `{base}.{ext}`:
+    #   * this bucket uploads with `upsert: "false"`, so a bare name would FAIL the second time an
+    #     owner replaced a dish photo — the common case, not the rare one;
+    #   * and `cache-control` is 31536000, a year, so reusing the exact path would serve the old
+    #     picture long after it was replaced.
+    # The prefix still does the whole job: sorting the folder groups every version of an item
+    # together, and the row's own image_url names the current one.
+    if filename_base:
+        safe_base = _sanitize_path_segment(filename_base, "filename_base")
+        path = f"{safe_slug}/{safe_folder}/{safe_base}-{uuid.uuid4().hex[:6]}.{ext}"
+    else:
+        path = f"{safe_slug}/{safe_folder}/{uuid.uuid4()}.{ext}"
 
     def _do_upload():
         _supabase.storage.from_(_BUCKET).upload(

@@ -349,6 +349,26 @@ async def admin_update_item(
     item = await admin_catalog_repo.find_item(client_id, item_id)
     if not item:
         raise HTTPException(404, "Item not found")
+
+    # The other half of A-Q6, and it has to exist or the fix above creates exactly the asymmetry
+    # this codebase just spent a day criticising elsewhere: hiding archives the key, so showing must
+    # give one back. Bringing an item back alive with an `-ARCHIVED-` key would leave a live row
+    # carrying a retirement stamp.
+    #
+    # The clean base is reclaimed when it is still free. When it is not — because the whole point of
+    # archiving was to let a NEW dish take it — a fresh key is generated instead. Self-healing in
+    # both directions, with no state to remember.
+    if is_active is True and item.sku and sku_tool.is_archived(item.sku):
+        base  = item.sku.split(sku_tool.ARCHIVE_MARKER)[0]
+        taken = await admin_catalog_repo.list_taken_skus(client_id)
+        restored = base if base not in taken else sku_tool.generate(
+            name_en if name_en is not None else item.nameEn,
+            name_ar if name_ar is not None else item.nameAr,
+            taken,
+        )
+        await admin_catalog_repo.update_item(client_id, item_id, {"sku": restored})
+        logger.info("SKU un-archived on reactivate: %s → %s", item.sku, restored)
+
     if category_id is not None:
         cat = await admin_catalog_repo.find_active_category(client_id, category_id)
         if not cat:
@@ -390,3 +410,13 @@ async def admin_delete_item(client_id: str, item_id: str, module_key: Optional[s
     if not item:
         raise HTTPException(404, "Item not found")
     await admin_catalog_repo.soft_delete_item(client_id, item_id, module_key)
+
+    # A-Q6: retiring an item ARCHIVES its SKU, which frees the clean key for a new menu.
+    #
+    # Added 2026-10-01 (Salman). The decision was ratified on 2026-09-30 and implemented only in
+    # the migration script, so the two retirement paths disagreed: `scripts/apply_menu_update.py`
+    # archived, and the owner's own delete button did not. The consequence is quiet and permanent —
+    # retire «برغر لبنانية» from the dashboard and LEBANESE-BURGER-01 stays occupied forever, so
+    # re-creating the same dish later yields -02 for no reason a human could explain.
+    if item.sku and not sku_tool.is_archived(item.sku):
+        await admin_catalog_repo.update_item(client_id, item_id, {"sku": sku_tool.archive(item.sku)})
