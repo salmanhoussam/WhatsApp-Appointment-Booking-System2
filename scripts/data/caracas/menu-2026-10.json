@@ -22,7 +22,8 @@
       "verbatim": "the line appears in Mahmoud's message exactly as written here",
       "derived": "expanded by us from a variant line — MUST be reviewed, it is our reading, not his words"
     },
-    "open_question": "«الفول» resolved to THREE live rows, not one. All three are listed. If Salman meant only the boxes, or only the plate, this block is what he edits — nothing matches on the word itself."
+    "open_question": "«الفول» resolved to THREE live rows, not one. All three are listed. If Salman meant only the boxes, or only the plate, this block is what he edits — nothing matches on the word itself.",
+    "authority": "Salman 2026-10-01: «لازم تكون المنيو مثل لي رسلتهم». Inside a category present in `categories` below, Mahmoud's list IS the category. Anything live there and absent from it is retired. `keep_untouched` categories are exempt and are not read by that rule."
   },
   "retire": [
     {
@@ -420,6 +421,62 @@
           "row_source": "verbatim"
         }
       ]
+    }
+  ],
+  "retire_unlisted_in_sent_categories": true,
+  "aliases": [
+    {
+      "new": "فلادلفيا",
+      "sku": "PHILADELPHIA-SANDWICH-01",
+      "live": "فيلادلفيا",
+      "why": "إملاءان لطبقٍ واحد"
+    },
+    {
+      "new": "أسكلوب",
+      "sku": "ESCALOPE-SANDWICH-01",
+      "live": "اسكالوب",
+      "why": "إملاءان لطبقٍ واحد"
+    },
+    {
+      "new": "علبة بربكيو",
+      "sku": "BBQ-BOX-01",
+      "live": "علبة باربيكيو",
+      "why": "إملاءان لطبقٍ واحد · والسعرُ نفسُه ٢٫٢٠"
+    },
+    {
+      "new": "توستير",
+      "sku": "TWISTER-SANDWICH-01",
+      "live": "تويستر",
+      "why": "Twister — إملاءان"
+    },
+    {
+      "new": "ماكسيكن",
+      "sku": "MEXICANO-SANDWICH-01",
+      "live": "مكسيكانو",
+      "why": "Mexicano — إملاءان"
+    },
+    {
+      "new": "سودة",
+      "sku": "CHICKEN-LIVER-SANDWICH-01",
+      "live": "سودة",
+      "why": "الاسمُ على صفّين: ساندويش ٢٫٥٠ ودجاجٌ نيءٌ ٠٫٠٠. ومحمود كتبها تحت الساندويش ⇒ صفُّ الساندويش"
+    }
+  ],
+  "never_match": [
+    {
+      "a": "ستيك فطر",
+      "b": "ستيك حر",
+      "why": "فطرٌ غيرُ حرّ — وقائمتُه تحمل الاثنين"
+    },
+    {
+      "a": "وجبة زنجر (10 قطع)",
+      "b": "وجبة كرسبي (10 قطع)",
+      "why": "زنجرٌ غيرُ كرسبي"
+    },
+    {
+      "a": "وجبة زنجر (15 قطعة)",
+      "b": "وجبة كرسبي (15 قطعة)",
+      "why": "زنجرٌ غيرُ كرسبي"
     }
   ]
 }

@@ -128,6 +128,15 @@ export default function MenuPage() {
   const allCategories = [{ id: '__all__', name_ar: 'الكل', name_en: 'All' }, ...categories];
   const [allItems, setAllItems] = useState([]);
   const [allLoading, setAllLoading] = useState(false);
+  // 🔴 A failure used to be indistinguishable from an empty category. `GET /restaurant/menu`
+  // returned 404 for the whole life of this page — the route did not exist — and the catch below
+  // rendered that as «لا توجد عناصر في هذا التصنيف» on a menu holding 97 live items. The endpoint
+  // is fixed; this flag is so the NEXT failure says it failed.
+  const [allError, setAllError] = useState(false);
+  // A retry counter, not a re-set of activeCategoryId: the value is already '__all__' when the
+  // button is visible, so re-setting it changes no dependency and the effect never re-runs — a
+  // retry button that does nothing is worse than none.
+  const [allRetry, setAllRetry] = useState(0);
 
   // Auto-select first real category on load
   useEffect(() => {
@@ -140,15 +149,16 @@ export default function MenuPage() {
   useEffect(() => {
     if (activeCategoryId !== '__all__') return;
     setAllLoading(true);
+    setAllError(false);
     publicApi.get('/restaurant/menu', { params: { client_slug: SLUG } })
       .then((r) => {
         const cats = r.data?.data?.categories ?? [];
         const flat = cats.flatMap((c) => (c.items ?? []).filter((i) => i.is_available !== false));
         setAllItems(flat);
       })
-      .catch(() => setAllItems([]))
+      .catch(() => { setAllItems([]); setAllError(true); })
       .finally(() => setAllLoading(false));
-  }, [activeCategoryId]);
+  }, [activeCategoryId, allRetry]);
 
   const displayItems = activeCategoryId === '__all__' ? allItems : items;
   const displayLoading = activeCategoryId === '__all__' ? allLoading : itemsLoading;
@@ -228,7 +238,19 @@ export default function MenuPage() {
           </div>
         ) : displayItems.length === 0 ? (
           <div className="text-center py-20 text-stone-400">
-            <p style={{ fontFamily: "'Cairo', sans-serif" }}>لا توجد عناصر في هذا التصنيف</p>
+            {/* Two states, two sentences — `rules/text-context-rule.md`. "Nothing here" and
+                "we could not load it" are different facts, and showing the first for the second is
+                exactly how a 404 spent this page's whole life disguised as an empty menu. */}
+            <p style={{ fontFamily: "'Cairo', sans-serif" }}>
+              {allError ? 'تعذّر تحميل القائمة — حاول مرة أخرى' : 'لا توجد عناصر في هذا التصنيف'}
+            </p>
+            {allError && (
+              <button onClick={() => setAllRetry((n) => n + 1)}
+                      className="mt-3 px-4 py-2 rounded-lg text-sm text-white"
+                      style={{ background: ACCENT, fontFamily: "'Cairo', sans-serif" }}>
+                إعادة المحاولة
+              </button>
+            )}
           </div>
         ) : (
           <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-5">
