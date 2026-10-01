@@ -21,15 +21,60 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.security import decode_token
+from app.core.services import get_client_services
 from app.core.tenant import get_current_tenant, invalidate_tenant_cache, require_roles, allow_during_soft_block
 from app.services import site_configuration_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin Settings"])
 
-# Canonical public URL base — matches the documented pattern (demo.salmansaas.com/{slug}/{
-# defaultRedirect}, rules/frontend/routing.md). Overridable via env for other environments.
-STORE_QR_BASE_URL = os.getenv("STORE_QR_BASE_URL", "https://demo.salmansaas.com")
+# Canonical public URL base for a PRINTED code. Overridable via env for other environments.
+#
+# Ratified by Salman 2026-10-01: `alzabt.salmansaas.com`, "ليعتمده الكلاينت". It deliberately does
+# NOT follow `lifecycle_state` (trial → demo, subscribed → alzabt, rules/frontend/routing.md),
+# and the reason is the artefact itself: this URL gets PRINTED and taped to a counter. A
+# lifecycle-derived host would silently change the day a tenant converts from trial to subscribed,
+# and every printed sheet would stop working. A printed link must be the one thing that cannot move.
+STORE_QR_BASE_URL = os.getenv("STORE_QR_BASE_URL", "https://alzabt.salmansaas.com")
+
+# Which public page a scanned code should land on, per module.
+#
+# 🔴 WHY THIS EXISTS: the path used to be the literal string "store", written when this endpoint was
+# built for the Store Template Pilot (2026-07-31). Measured in a real browser 2026-10-01:
+# `/caracas/store` renders NOTHING — zero text after 45 seconds — while `/caracas/menu` renders the
+# full 97-item menu. So the QR the dashboard offered a restaurant owner pointed at a blank page, and
+# printing it would have sent every customer to a white screen.
+#
+# Derived from the tenant's OWN active services rather than from a new field, because
+# `client_services` is already the one gate (`rules/backend/service-system.md` §3) and
+# `VERTICAL_REGISTRY`'s ownership boundary forbids adding a fifth key without an explicit decision.
+# Restaurant wins over store deliberately: a restaurant tenant also carries `catalog`, and the menu
+# is what its customers scan for.
+# Order matters. `reservations` deliberately maps to None rather than to a guessed path: a barber or
+# a clinic also carries `store`, so a naive services lookup sent `rk` — a real paying tenant — to
+# `/rk/store` instead of wherever its customers actually book. Nobody has asked for a code for those
+# verticals yet, and inventing a path for them is how `/caracas/store` happened in the first place.
+_QR_PATH_BY_SERVICE = (
+    ("restaurant.menu", "menu"),
+    ("restaurant",      "menu"),
+    ("reservations",    None),
+    ("store",           "store"),
+)
+
+
+def _qr_path_for(active_services: List[str]) -> Optional[str]:
+    """The public path for a printed code, or None when we genuinely do not know.
+
+    None is not a failure mode — it falls back to the bare `/{slug}`, which `DynamicTenantResolver`
+    redirects to that tenant's own `defaultRedirect`. That is the honest answer for a vertical
+    nobody has printed a code for yet (barber, clinic): send them to the tenant's canonical landing
+    page rather than guess a path that may render blank, which is the exact bug this function fixes.
+    """
+    svc = set(active_services or [])
+    for key, path in _QR_PATH_BY_SERVICE:
+        if key in svc:
+            return path
+    return None
 
 
 async def _require_valid_tenant_jwt(request: Request) -> None:
@@ -162,9 +207,18 @@ async def get_store_qr(
     the store's public page is enough" per Salman's explicit scope). Not stored — generated fresh
     on every call, since the URL itself never changes and there's nothing to cache.
     """
-    url = f"{STORE_QR_BASE_URL}/{tenant['slug']}/store"
+    services = await get_client_services(tenant["id"])
+    path     = _qr_path_for(services)
+    url      = f"{STORE_QR_BASE_URL}/{tenant['slug']}" + (f"/{path}" if path else "")
 
-    img = qrcode.make(url)
+    # ERROR_CORRECT_H, not the default M: it tolerates ~30% damage, which is what makes it legal to
+    # cover the centre with a logo later AND what keeps a printed sheet scannable after it has been
+    # handled, splashed and taped to a counter for a year.
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=16, border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     png_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -174,5 +228,9 @@ async def get_store_qr(
         "data": {
             "url":        url,
             "image_b64":  png_base64,
+            # The frontend prints a card around this; it needs to know what it is pointing at and
+            # how big the code really is, rather than re-deriving either.
+            "path":       path,
+            "size_px":    img.size[0],
         },
     }
