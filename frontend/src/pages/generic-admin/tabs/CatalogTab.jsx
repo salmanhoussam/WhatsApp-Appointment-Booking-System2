@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import adminApi       from '../../../utils/admin.config'
 import useImageUpload from '../../../hooks/useImageUpload'
 import { T, FONT } from '../theme'
@@ -85,6 +85,15 @@ const MODULE_KEY_META = {
 export default function CatalogTab({ color }) {
   const [categories,   setCategories]   = useState([])
   const [selectedCat,  setSelectedCat]  = useState(null)
+  const itemsRef = useRef(null)
+
+  // Make the tap visible. `block: 'start'` rather than 'center' so the panel's own header
+  // ("منتجات — <القسم>" and "+ منتج جديد") is the first thing on screen, which is what the
+  // owner came for. Guarded for jsdom/older engines where the method is absent.
+  useEffect(() => {
+    if (!selectedCat || !itemsRef.current?.scrollIntoView) return
+    itemsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [selectedCat])
   const [items,        setItems]        = useState([])
   const [catLoading,   setCatLoading]   = useState(true)
   const [itemsLoading, setItemsLoading] = useState(false)
@@ -355,15 +364,35 @@ export default function CatalogTab({ color }) {
                   <Button variant="secondary" size="sm" disabled={catIndex === 0} onClick={e => moveCat(catIndex, -1, e)}>↑</Button>
                   <Button variant="secondary" size="sm" disabled={catIndex === categories.length - 1} onClick={e => moveCat(catIndex, 1, e)}>↓</Button>
                 </div>
+                {/* 🔴 THE AFFORDANCE (2026-10-01).
+                    The card has always been clickable — `onClick={() => setSelectedCat(...)}` above
+                    — and nothing said so. Every control the eye could see (تعديل / إخفاء / ↑ / ↓)
+                    belongs to the CATEGORY, so the owner of caracas tapped those, got a category
+                    dialog, and reported to Salman that there was no way to edit items at all. He was
+                    right about what he saw: the item editor, price field included, sat behind an
+                    invisible tap target. This row is the whole fix. */}
+                <div style={{
+                  marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  fontSize: 12, fontWeight: 600,
+                  color: selected ? color : T.textSecond,
+                }}>
+                  <span>{selected ? 'إخفاء الأصناف' : 'عرض الأصناف وتعديل الأسعار'}</span>
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>{selected ? '▾' : '◂'}</span>
+                </div>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* ── Items for selected category ── */}
+      {/* ── Items for selected category ──
+          The panel renders BELOW the whole category grid. On a phone, ten categories push it well
+          past the fold, so tapping a card changed nothing the owner could see — which compounds the
+          same defect the affordance row above fixes. `itemsRef` + the effect near the top of this
+          component scroll it into view, so the tap has a visible consequence. */}
       {selectedCat && (
-        <div>
+        <div ref={itemsRef}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary }}>
