@@ -1,0 +1,81 @@
+
+    authorisation: arizona — 2026-10-01 — authorised the same day, 28 rows
+
+==============================================================================================
+CATALOG MEDIA MIGRATION — EXECUTE · tenant = arizona
+==============================================================================================
+target: aws-0-eu-central-1.pooler.supabase.com  (via DIRECT_URL)
+
+[1] BEFORE
+    client_id                      : 343c850b-956a-41fb-9153-7be39b704e02
+    catalog_items for arizona       : 28
+    store_order_items PLATFORM-WIDE: 18   ← the invariant. Tenant-scoped it would read 0→0 and could never fail.
+    rows selected                  : 28
+
+[2] SOURCES — HEAD every one; only 200 passes
+    statuses: {200: 28}
+    content-types: {'image/jpeg': 26, 'image/webp': 1, 'image/png': 1}
+    extensions derived: {'jpg': 26, 'webp': 1, 'png': 1}
+
+[3] DESTINATIONS — still free? (enumeration + a settled 400, both required)
+    {'FREE': 28}
+
+[4] COPY — 28 files · upsert=false · content-type carried from the source
+      1/28     7,046B  FRENCH-FRIES-01
+      2/28     9,101B  FRIED-SHRIMP-01
+      3/28     8,893B  HOT-DOG-01
+      4/28     6,050B  MAKANEK-01
+      5/28   633,266B  MEXICAN-01
+      6/28     9,578B  PHILLY-CHEESESTEAK-01
+      7/28    11,898B  ROAST-BEEF-01
+      8/28    44,800B  TAOUK-01
+      9/28     7,777B  SHRIMP-01
+     10/28     8,661B  SOJOK-01
+     11/28    11,043B  SPICY-STEAK-01
+     12/28    10,369B  ZINGER-01
+     13/28     5,801B  NOKHAH-01
+     14/28     9,751B  CHICKEN-LIVER-01
+     15/28    69,878B  FRANCISCO-01
+     16/28     8,630B  CRISPY-01
+     17/28   105,118B  AMERICAN-BURGER-01
+     18/28    10,360B  BEEF-BURGER-01
+     19/28     9,663B  CHEESEBURGER-01
+     20/28    12,145B  ESCALOPE-01
+     21/28    10,638B  FAJITA-01
+     22/28    11,718B  CHICKEN-SUB-01
+     23/28    10,134B  TWISTER-01
+     24/28     8,021B  CHICKEN-BURGER-01
+     25/28    13,388B  CHINESE-CHICKEN-01
+     26/28     7,452B  CHICKEN-01
+     27/28    43,545B  EGG-BURGER-01
+     28/28    11,140B  PEPSI-01
+    copied 28 · failed 0
+
+[5] GATE — HEAD every NEW url. Only 200 passes. This runs BEFORE any DB write.
+    statuses: {200: 28}
+    content-types: {'image/jpeg': 26, 'image/webp': 1, 'image/png': 1}
+    ✅ NEGATIVE CONTROL — a key deliberately never copied: 400 (must not be 200)
+    🟢 content-type survived the copy on all 28
+    🟢 28/28 new URLs alive at 200
+
+[6] TRANSACTION — arizona only · guard `image_url = $old` · rowcount must be 1
+    🟢 COMMITTED · 28 rows updated · rowcount 1 on every statement
+
+[7] AFTER — re-read from the database
+
+    metric                                        before     after
+    --------------------------------------------------------------
+    store_order_items (PLATFORM-WIDE)                 18        18   ✅
+    catalog_items for arizona                         28        28   ✅
+    rows at their new SKU url                          0        28   ✅
+    live urls matching {sku}.{ext}                     -        28
+    live urls still in the OLD id/id/main shape         -         0   ✅
+
+    OLD files still alive at 200 (the rollback) : 28/28   ✅
+
+==============================================================================================
+    🟢 MIGRATION COMPLETE AND VERIFIED
+    rollback: UPDATE catalog_items SET image_url = <old> per row. No file operation.
+              every old file is still served. Nothing was moved or deleted.
+==============================================================================================
+
