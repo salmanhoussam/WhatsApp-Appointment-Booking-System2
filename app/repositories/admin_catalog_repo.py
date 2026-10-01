@@ -69,18 +69,37 @@ async def update_category(client_id: str, category_id: str, data: dict):
 
 
 async def soft_delete_category(category_id: str, client_id: str, module_key: Optional[str] = None):
-    """Deactivate a category and all its items, scoped to tenant and optionally to a module.
+    """Deactivate a CATEGORY. Its items are deliberately left alone.
 
     `module_key` added 2026-09-30 (plan Track A3) so this can replace the hard category delete
     that used to sit below. It filters on `CatalogCategory.moduleKey` exactly as
     `find_category()` and the old hard delete already did -- the same mechanism, applied to the
     safe function so nothing is lost by switching to it.
+
+    🔴 THE CASCADE TO ITEMS WAS REMOVED 2026-10-01 (plan §5, Salman's decision). It used to run
+
+        catalogitem.update_many(where={categoryId, clientId}, data={isActive: False})
+
+    right here, and that single statement is why "hide" had no working "undo": hiding a category
+    deactivated every item in it, and showing it back patches the CATEGORY ROW ONLY
+    (`catalog_service.admin_update_category`). So the owner pressed hide, pressed show, and got an
+    empty section. MEASURED the same day: Salman hid كوشينيا at 15:58 at Mahmoud's request and its
+    8 items went inactive with it -- all 8 still carry an unarchived SKU, which is how they are
+    distinguishable from the 17 items the menu update retired ON PURPOSE (those carry an
+    `-ARCHIVED-<epoch>` stamp).
+
+    The cascade also bought nothing it claimed to. Visibility was ALREADY correct without it:
+    `restaurant_repo.list_menu_categories` and `find_menu_category_with_items` both filter
+    `isActive: True` on the CATEGORY, so a hidden category and everything under it disappears from
+    the public menu whether or not its items were touched. The cascade was pure collateral -- it
+    could not make anything more hidden, and it destroyed the ability to come back.
+
+    What this function must NOT become is the opposite mistake. Nothing here reactivates items,
+    and no blanket reactivate belongs anywhere: 17 caracas items are retired deliberately,
+    including the three فول rows, and turning the category back on must never resurrect them.
+    Hiding is reversible because it no longer reaches the items -- not because something undoes it.
     """
-    await prisma_client.catalogitem.update_many(
-        where={"categoryId": category_id, "clientId": client_id},
-        data={"isActive": False},
-    )
-    # Multi-tenant DB Integrity Audit (Study 7, 2026-08-24) -- this second call was the one
+    # Multi-tenant DB Integrity Audit (Study 7, 2026-08-24) -- this call was the one
     # unscoped query in a function whose first call already scoped correctly; now consistent.
     cat_where: dict = {"id": category_id, "clientId": client_id}
     if module_key:

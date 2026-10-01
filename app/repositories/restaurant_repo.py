@@ -31,13 +31,24 @@ async def find_menu_category_with_items(client_id: str, category_id: str):
 
 
 async def find_catalog_items_by_ids(client_id: str, item_ids: list) -> list:
-    """Fetch multiple active restaurant catalog items by ID list."""
+    """Fetch multiple active restaurant catalog items by ID list, from VISIBLE categories only.
+
+    `category.isActive` added 2026-10-01, in the same change that removed the hide-cascade from
+    `admin_catalog_repo.soft_delete_category`, because one is the direct consequence of the other.
+    While the cascade existed, hiding a category deactivated its items and `isActive: True` here
+    happened to exclude them -- the right outcome reached by accident, through a side effect
+    nobody chose. With the cascade gone an item in a hidden category stays active, so this filter
+    is now what keeps it unorderable, on purpose and at read time.
+
+    This is exactly what `list_menu_categories` and `find_menu_category_with_items` already do one
+    level up: the CATEGORY's own `isActive` decides visibility, every time it is read.
+    """
     return await prisma_client.catalogitem.find_many(
         where={
             "id":       {"in": item_ids},
             "clientId": client_id,
             "isActive": True,
-            "category": {"moduleKey": "restaurant"},
+            "category": {"moduleKey": "restaurant", "isActive": True},
         }
     )
 
