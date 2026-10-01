@@ -1,0 +1,50 @@
+
+========================================================================================
+CASCADE REPAIR — caracas · «كوشينيا (دزينة)» · EXECUTE
+========================================================================================
+
+[0] SEAL  ✅ cannot execute UPDATE in a read-only transaction  (on sort_order — a column that exists)
+
+[1] TARGET
+    category  : 5525e4e5-7668-4d63-bab6-c5cc92e8ee4d  «كوشينيا (دزينة)»
+    is_active : False   ← stays exactly as it is. This repairs the undo, it does not perform it.
+
+[2] SELECTION — 8 row(s)
+    كوشينيا مشكلة              MIXED-COXINHA-01
+    كوشينيا جبنة وسجق          CHEESE-AND-SUJUK-COXINHA-02
+    كوشينيا لحمة مفرومة        MINCED-MEAT-COXINHA-02
+    كوشينيا جبنة وسجق          CHEESE-AND-SUJUK-COXINHA-01
+    كوشينيا لحمة مفرومة        MINCED-MEAT-COXINHA-01
+    كوشينيا دجاج               CHICKEN-COXINHA-01
+    كوشينيا جبنة               CHEESE-COXINHA-01
+    كوشينيا بيتزا              PIZZA-COXINHA-01
+
+[3] CONTROLS — in both directions
+    ✅ NEGATIVE  17 deliberately-retired (stamped) rows exist; selected = 0   (must be 0)
+    ✅ CONTROL OF THE CONTROL — the same check against a selection deliberately seeded with one stamped row returns 1   (must be > 0)
+    ✅ NEGATIVE  فول row must be OUT : صحن فول                FOUL-PLATE-01-ARCHIVED-1790868877   in = False
+    ✅ NEGATIVE  فول row must be OUT : علبة فول صغيرة         FOUL-SMALL-BOX-01-ARCHIVED-1790868877   in = False
+    ✅ NEGATIVE  فول row must be OUT : علبة فول كبيرة         FOUL-LARGE-BOX-01-ARCHIVED-1790868877   in = False
+    ✅ NEGATIVE  the nearest miss — unstamped AND inactive, but in another category : اختبار مفتاح   in = False
+    ✅ NEGATIVE  inactive rows on other tenants : 2, selected = 0
+
+[4] BEFORE
+    caracas live items              : 107
+    store_order_items PLATFORM-WIDE : 18
+
+[5] TRANSACTION — rowcount must be 1 per statement, guarded on the current state
+    🟢 COMMITTED · 8 rows reactivated · 17 retired rows untouched
+
+[6] AFTER — re-read from the database
+
+    metric                                         before    after
+    --------------------------------------------------------------
+    store_order_items (PLATFORM-WIDE)                  18       18  ✅
+    caracas live items                                107      115  ✅ +8
+    deliberately-retired (stamped) rows                17       17  ✅
+    live items inside كوشينيا                           0        8  ✅
+    the category itself — still hidden              False    False  ✅
+
+    🟢 REPAIR COMPLETE
+    rollback: UPDATE catalog_items SET is_active = false WHERE id IN (the 8 ids printed above).
+

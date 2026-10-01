@@ -226,3 +226,85 @@ GET /api/v1/public/restaurant/menu?client_slug=caracas
    cannot migrate until a SKU backfill runs for them — Salman's own note. `arizona` (28 rows, all
    with SKUs) is the one tenant that could run this script unchanged, and is NOT authorised.
 ```
+
+---
+
+# arizona + step 5 + the cascade repair — 2026-10-01, same day
+
+## arizona — and a premise of mine that was wrong
+
+The authorisation rested on "arizona is clean and 100% identical". True about SKUs (28/28 carry
+one), **not true about formats**: arizona serves one `image/webp` and one `image/png`. Running the
+dry run instead of trusting my own earlier report found two real defects in the executor:
+
+1. **It hardcoded `content-type: image/jpeg` on every upload.** Harmless on caracas — all 72
+   sources really are jpeg and the gate measured it — and on arizona it would have served a PNG as
+   a JPEG: a file whose name, extension and header all disagree with its bytes. It now carries the
+   **source's** content-type, and the gate verifies the content-type **survived the copy**, not
+   just that the status is 200. A status-only gate passes a mislabelled file silently.
+2. **The guard refused any extension that was not literally `jpg`.** But decision ② says the
+   extension comes from the **served content-type** through the map — `jpg` was the *measured
+   outcome* for caracas, never a constant. The rule gives arizona `.webp` and `.png`: the contract
+   honoured, not widened. The guard that stays is the one that matters — a content-type **outside
+   the map** has no name and is never guessed.
+
+Also hardened: the authorised tenants are an explicit dated allowlist in the source, and the
+**expected row count is part of the authorisation**, so a tenant presenting a different number of
+rows than the plan measured stops the run. It fired on the first try (28 ≠ 72).
+
+| arizona | before | after | |
+|---|---:|---:|---|
+| `store_order_items` platform-wide | 18 | 18 | ✅ |
+| `catalog_items` | 28 | 28 | ✅ |
+| rows at their new SKU url | 0 | 28 | ✅ |
+| old shape left | — | 0 | ✅ |
+| old files still served | 28 | 28 | ✅ |
+
+Live public menu: **caracas 72/72 · arizona 28/28**, every image 200, and arizona's webp and png
+still served as webp and png. **100 images migrated in total.**
+
+## Step 5 — hiding a section no longer swallows its dishes
+
+The cascade in `soft_delete_category` **bought nothing it claimed to**: `list_menu_categories` and
+`find_menu_category_with_items` already filter `isActive` on the CATEGORY, so a hidden category and
+everything under it was already gone from the public menu whether or not its items were touched.
+The cascade could not make anything more hidden; it only destroyed the ability to come back.
+
+`find_catalog_items_by_ids` gains `category.isActive` in the same change, because it is the direct
+consequence: while the cascade existed, a hidden category's items were unorderable **by accident**,
+through a side effect nobody chose. Prevention now sits at the read, deliberately.
+
+The new guard **parses** the code rather than searching it, and proves it must: the docstring
+**names the removed call on purpose**, so a `grep` for it matches the sentence and reports the
+cascade alive. CH-1d shows the trap is real, CH-1e shows the AST walk is not caught by it, CH-1f is
+a positive control on a function that genuinely still cascades.
+`test_category_hide_symmetry.py` PASS=11 FAIL=0 · `test_catalog_soft_delete.py` PASS=52 FAIL=0.
+
+## The كوشينيا repair — 8 rows, and not one more
+
+Removing the cascade stops the recurrence; it does not undo what happened. The two groups are
+separated by a **real stamp**, not a date range: a deliberate retirement rewrites the SKU to
+`-ARCHIVED-<epoch>`, the cascade never touched the SKU.
+
+| | before | after | |
+|---|---:|---:|---|
+| `store_order_items` platform-wide | 18 | 18 | ✅ |
+| caracas live items | 107 | 115 | ✅ +8 |
+| **deliberately-retired (stamped) rows** | **17** | **17** | ✅ not one resurrected |
+| live items inside كوشينيا | 0 | 8 | ✅ |
+| the category itself | hidden | **hidden** | ✅ unchanged |
+
+**The repair is invisible to customers, which is the point.** The public menu reads 11 categories
+and 107 items before and after; كوشينيا is still hidden exactly as Mahmoud asked, no كوشينيا dish
+leaked, no فول row resurrected. The 8 now sit live underneath a hidden category, so the owner's
+"show" button finally works.
+
+### 🔴 And a fake control of my own, caught before it shipped
+
+The first version of the repair's control printed `selected = 0` from
+`… if False else 0` — **a control that always passes.** It was corrected to count the real overlap
+between the stamped rows and the selection, and then given a control of its own: the same predicate
+run against a selection deliberately seeded with one stamped row must return **> 0**. It does.
+
+Third member of the family this file has now recorded in one day — the 429 read as "free", the
+status-only gate that would have passed a mislabelled PNG, and a control hardcoded to pass.
