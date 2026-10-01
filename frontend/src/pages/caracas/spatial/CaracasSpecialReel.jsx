@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MessageCircle, ArrowLeft } from 'lucide-react';
 import { spring } from '../../../design-system/tokens';
+import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 
 // ── Tokens — red/white QSR brand identity (sampled from the real logo:
 // dominant red cluster ~rgb(207,15,30)) — distinct from the dark fine-dining
@@ -14,7 +15,9 @@ const C = {
   muted: '#C9C2C2',
 };
 
-const WA = `https://wa.me/96178727986?text=${encodeURIComponent('مرحباً 👋 أريد أطلب من كاراكاس')}`;
+// The hardcoded number that stood here was the PLATFORM owner's, not the restaurant's, so
+// every tap reached the wrong person. It now comes from the tenant config — see
+// `hooks/useCaracasWhatsApp.js`. Derived inside the component, because it is a hook.
 
 // ── Chapters — real Higgsfield-generated video clips, uploaded to Supabase
 // (properties/caracas/pages/special/cube-reel/), staged as a kitchen line. ──
@@ -94,6 +97,8 @@ function useChapterOpacity(scrollYProgress, i, total) {
 }
 
 function ChapterLayer({ chapter, opacity }) {
+  const { phone, link } = useCaracasWhatsApp();
+  const WA = link('مرحباً 👋 أريد أطلب من كاراكاس');
   return (
     <motion.div style={{ position: 'absolute', inset: 0, opacity }}>
       {chapter.video ? (
@@ -175,7 +180,7 @@ function ChapterLayer({ chapter, opacity }) {
                 شوف المنيو <ArrowLeft size={15} />
               </motion.span>
             </Link>
-            <a href={WA} target="_blank" rel="noreferrer">
+            <a href={WA || undefined} target="_blank" rel="noreferrer">
               <motion.span
                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} transition={spring.snappy}
                 style={{

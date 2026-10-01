@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Info, ChevronRight, Minus, Plus, X, MessageCircle } from 'lucide-react';
 import { useCaracasCategories, useCaracasItems } from '../hooks/useCaracasMenu';
+import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 import useCaracasStore from '../store/useCaracasStore';
 import publicApi from '../../../utils/publicApi';
 import '../caracas.css';
@@ -9,7 +10,9 @@ import '../caracas.css';
 const SLUG = 'caracas';
 const ACCENT = '#EA580C';
 const HERO_IMG = 'https://images.unsplash.com/photo-1544148103-0773bf10d330?q=80&w=2070&auto=format&fit=crop';
-const WA_NUMBER = '96178727986';
+// The WhatsApp number is NOT a constant here any more — it comes from the tenant config via
+// `useCaracasWhatsApp`. The literal that used to sit on this line was the platform owner's own
+// number, so every order reached him instead of the restaurant. See that hook's header.
 
 function formatPrice(price) {
   const n = Number(price);
@@ -18,21 +21,27 @@ function formatPrice(price) {
 }
 
 // ── Build WhatsApp message from cart ──────────────────────────────────────────
+// Returns the RAW message. Encoding belongs to `useCaracasWhatsApp().link()`, which is the one
+// place that builds the URL — encoding here too would double-escape every newline.
 function buildWaMessage(cartItems, total) {
   const lines = cartItems.map((i) => `• ${i.quantity}x ${i.name_ar} — ${formatPrice(i.price * i.quantity)}`);
-  return encodeURIComponent(
-    `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${total.toFixed(2)}`
-  );
+  return `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${total.toFixed(2)}`;
 }
 
 // ── Order Panel ────────────────────────────────────────────────────────────────
 function OrderPanel({ onClose }) {
   const { cartItems, removeItem, updateQuantity, clearCart } = useCaracasStore();
+  const { link } = useCaracasWhatsApp();
   const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
+  // null while the config has not resolved, or if the tenant carries no number at all. The button
+  // is disabled in that state rather than opening `wa.me/` with nothing — a customer who taps
+  // "order" and lands on a broken WhatsApp page has no way to know what went wrong.
+  const waUrl = link(buildWaMessage(cartItems, total));
+
   function openWhatsApp() {
-    const msg = buildWaMessage(cartItems, total);
-    window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
+    if (!waUrl) return;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
     clearCart();
     onClose();
   }
@@ -91,14 +100,17 @@ function OrderPanel({ onClose }) {
           </div>
           <button
             onClick={openWhatsApp}
-            className="w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
+            disabled={!waUrl}
+            className="w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2.5 transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
             style={{ background: '#25D366', fontFamily: "'Cairo', sans-serif", boxShadow: '0 4px 20px rgba(37,211,102,0.35)' }}
           >
             <MessageCircle size={20} />
             اطلب عبر واتساب
           </button>
+          {/* Each state has its own sentence — `rules/text-context-rule.md`: a state with no
+              message is a missing text, not neutral behaviour. */}
           <p className="text-center text-stone-400 text-xs" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            سيتم فتح واتساب مع تفاصيل طلبك
+            {waUrl ? 'سيتم فتح واتساب مع تفاصيل طلبك' : 'جاري تحضير الطلب…'}
           </p>
         </div>
       )}

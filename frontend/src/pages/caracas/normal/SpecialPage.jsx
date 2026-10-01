@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import CaracasSpecialReel from '../spatial/CaracasSpecialReel';
+import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 
 // ── Tokens — matches CaracasSpecialReel.jsx (red/white QSR brand) ──────────
 const C = {
@@ -11,9 +12,13 @@ const C = {
   muted: '#8A8484',
 };
 
-const WA = `https://wa.me/96178727986?text=${encodeURIComponent('مرحباً 👋 أريد أطلب من كاراكاس')}`;
+// The hardcoded number that stood here was the PLATFORM owner's, not the restaurant's, so
+// every tap reached the wrong person. It now comes from the tenant config — see
+// `hooks/useCaracasWhatsApp.js`. Derived inside the component, because it is a hook.
 
 export default function CaracasSpecialPage() {
+  const { phone, link } = useCaracasWhatsApp();
+  const WA = link('مرحباً 👋 أريد أطلب من كاراكاس');
   return (
     <div dir="rtl" style={{ background: C.bg, minHeight: '100vh', fontFamily: "'Cairo', sans-serif" }}>
       {/* ═══ NAV ════════════════════════════════════════════════ */}
@@ -35,7 +40,7 @@ export default function CaracasSpecialPage() {
             }}>{label}</Link>
           ))}
         </div>
-        <a href={WA} target="_blank" rel="noreferrer">
+        <a href={WA || undefined} target="_blank" rel="noreferrer">
           <span style={{
             background: C.red, color: '#fff', border: 'none', borderRadius: 999,
             height: 34, padding: '0 1.1rem', fontSize: '0.78rem', fontWeight: 800,
@@ -62,7 +67,7 @@ export default function CaracasSpecialPage() {
             اطلب هلق عبر واتساب
           </p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={WA} target="_blank" rel="noreferrer">
+            <a href={WA || undefined} target="_blank" rel="noreferrer">
               <span style={{
                 background: '#25D366', color: '#fff', border: 'none', borderRadius: 999,
                 fontWeight: 900, fontSize: '1rem', padding: '0.9rem 2.25rem',
@@ -91,9 +96,9 @@ export default function CaracasSpecialPage() {
           <p style={{ color: C.red, fontWeight: 900, fontSize: '1.1rem', letterSpacing: '0.08em', margin: 0 }}>CARACAS</p>
           <p style={{ color: C.muted, fontSize: '0.75rem', margin: '4px 0 0' }}>Flavor in every bite, fast.</p>
         </div>
-        <a href={WA} target="_blank" rel="noreferrer"
+        <a href={WA || undefined} target="_blank" rel="noreferrer"
           style={{ color: '#25D366', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <MessageCircle size={14} /> 96178727986
+          <MessageCircle size={14} /> {phone}
         </a>
       </footer>
     </div>

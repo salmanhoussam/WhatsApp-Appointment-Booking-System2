@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MessageCircle, ArrowLeft, ChevronDown } from 'lucide-react';
+import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 import { Button, Badge } from '@relume_io/relume-ui';
 import CaracasStoryReel from '../spatial/CaracasStoryReel';
 
@@ -17,7 +18,9 @@ const C = {
   dim:     '#3A1A0A',
 };
 
-const WA = `https://wa.me/96178727986?text=${encodeURIComponent('مرحباً 👋 أريد أحجز طاولة في كراكاس')}`;
+// The hardcoded number that stood here was the PLATFORM owner's, not the restaurant's, so
+// every tap reached the wrong person. It now comes from the tenant config — see
+// `hooks/useCaracasWhatsApp.js`. Derived inside the component, because it is a hook.
 
 const TICKER = [
   'GRILLED TO PERFECTION', 'طازج يومياً', 'FRESH DAILY',
@@ -33,6 +36,8 @@ const GALLERY = [
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CaracasHomePage() {
+  const { phone, link } = useCaracasWhatsApp();
+  const WA = link('مرحباً 👋 أريد أحجز طاولة في كراكاس');
   const heroRef  = useRef(null);
   const storyRef = useRef(null);
 
@@ -71,7 +76,7 @@ export default function CaracasHomePage() {
             }}>{label}</Link>
           ))}
         </div>
-        <a href={WA} target="_blank" rel="noreferrer">
+        <a href={WA || undefined} target="_blank" rel="noreferrer">
           <Button style={{ background: C.orange, color: '#fff', border: 'none', borderRadius: 999, height: 34, padding: '0 1.1rem', fontSize: '0.78rem', fontWeight: 800, gap: 6, display: 'flex', alignItems: 'center' }}>
             <MessageCircle size={13} /> احجز طاولة
           </Button>
@@ -120,7 +125,7 @@ export default function CaracasHomePage() {
                 شوف المنيو <ArrowLeft size={16} />
               </Button>
             </Link>
-            <a href={WA} target="_blank" rel="noreferrer">
+            <a href={WA || undefined} target="_blank" rel="noreferrer">
               <Button style={{ background: 'transparent', color: C.cream, border: `1.5px solid ${C.dim}`, borderRadius: 999, fontWeight: 700, fontSize: '0.9rem', padding: '0.7rem 1.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <MessageCircle size={16} /> تواصل معنا
               </Button>
@@ -177,7 +182,7 @@ export default function CaracasHomePage() {
             <p style={{ color: C.dim, fontSize: '0.85rem', lineHeight: 1.8, marginBottom: '2rem' }}>
               مطعم كراكاس مش بس مكان للأكل — هو تجربة. من أول لحظة تدخل فيها حتى آخر لقمة.
             </p>
-            <a href={WA} target="_blank" rel="noreferrer">
+            <a href={WA || undefined} target="_blank" rel="noreferrer">
               <Button style={{ background: C.orange, color: '#fff', border: 'none', borderRadius: 999, fontWeight: 800, fontSize: '0.88rem', padding: '0.7rem 1.75rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <MessageCircle size={15} /> تواصل معنا
               </Button>
@@ -214,7 +219,7 @@ export default function CaracasHomePage() {
           </p>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={WA} target="_blank" rel="noreferrer">
+            <a href={WA || undefined} target="_blank" rel="noreferrer">
               <Button style={{ background: '#25D366', color: '#fff', border: 'none', borderRadius: 999, fontWeight: 900, fontSize: '1rem', padding: '0.9rem 2.25rem', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 28px rgba(37,211,102,0.35)' }}>
                 <MessageCircle size={19} /> احجز عبر واتساب
               </Button>
@@ -234,9 +239,9 @@ export default function CaracasHomePage() {
           <p style={{ color: C.cream, fontWeight: 900, fontSize: '1.1rem', letterSpacing: '0.12em', margin: 0 }}>CARACAS</p>
           <p style={{ color: C.muted, fontSize: '0.75rem', margin: '4px 0 0' }}>مشاوي · مأكولات فاخرة</p>
         </div>
-        <a href={WA} target="_blank" rel="noreferrer"
+        <a href={WA || undefined} target="_blank" rel="noreferrer"
           style={{ color: '#25D366', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <MessageCircle size={14} /> 96178727986
+          <MessageCircle size={14} /> {phone}
         </a>
       </footer>
     </div>
