@@ -89,32 +89,18 @@ def similar(a, b):
 _REPLACED_CATS = {"ساندويش غربي", "ساندويش شرقي", "وجبات مميزة"}
 
 
-def main() -> int:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if len(args) != 2:
-        print("usage: plan_menu_update.py <slug> <menu.json>")
-        return 2
-    slug, menu_path = args
-    menu = json.loads(Path(menu_path).read_text(encoding="utf-8"))
+def build_plan(cur, slug: str, menu: dict) -> dict:
+    """The whole diff, as data. The planner prints it; the executor applies it.
 
-    conn = psycopg2.connect(os.getenv("DIRECT_URL").split("?")[0], connect_timeout=30)
-    conn.set_session(readonly=True)
-    cur = conn.cursor()
-    # The seal is proven with a REAL write against a column that exists, before any read. A probe
-    # that fails for the wrong reason proves nothing.
-    try:
-        cur.execute("UPDATE catalog_items SET sku = sku WHERE false")
-        print("🔴 SEAL FAILED — a write was accepted. ABORT.")
-        return 1
-    except Exception as e:
-        print(f"🔒 ختمُ القراءة: {str(e).strip().splitlines()[0][:58]}")
-        conn.rollback()
-
+    Split out 2026-10-01 so there is exactly ONE matcher. A second implementation inside the
+    executor would be free to drift from what Salman reviewed, and the review would then be of a
+    different plan than the one that ran.
+    """
     cur.execute("SELECT id FROM clients WHERE slug = %s", (slug,))
     got = cur.fetchone()
     if not got:
         print(f"🔴 لا تينانت بالاسم {slug}")
-        return 1
+        raise ValueError(f'no tenant {slug}')
     client_id = got[0]
 
     cur.execute("""SELECT ci.id, ci.name_ar, ci.name_en, ci.price, ci.sku, cc.name_ar
@@ -179,6 +165,40 @@ def main() -> int:
     auto_retire = [it for it in missing if retire_unlisted and (it["cat"] in sent_cats or it["cat"] in _REPLACED_CATS)]
     still_open  = [it for it in missing if it not in auto_retire]
     retire  = menu.get("retire") or []
+
+
+    return {
+        "client_id": client_id, "live": live, "updates": updates, "news": news,
+        "unsure": unsure, "auto_retire": auto_retire, "still_open": still_open,
+        "retire": retire, "untouched": untouched, "sent_cats": sent_cats,
+    }
+
+
+def main() -> int:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if len(args) != 2:
+        print("usage: plan_menu_update.py <slug> <menu.json>")
+        return 2
+    slug, menu_path = args
+    menu = json.loads(Path(menu_path).read_text(encoding="utf-8"))
+
+    conn = psycopg2.connect(os.getenv("DIRECT_URL").split("?")[0], connect_timeout=30)
+    conn.set_session(readonly=True)
+    cur = conn.cursor()
+    # The seal is proven with a REAL write against a column that exists, before any read. A probe
+    # that fails for the wrong reason proves nothing.
+    try:
+        cur.execute("UPDATE catalog_items SET sku = sku WHERE false")
+        print("🔴 SEAL FAILED — a write was accepted. ABORT.")
+        return 1
+    except Exception as e:
+        print(f"🔒 ختمُ القراءة: {str(e).strip().splitlines()[0][:58]}")
+        conn.rollback()
+
+    plan = build_plan(cur, slug, menu)
+    client_id, live, updates, news = plan['client_id'], plan['live'], plan['updates'], plan['news']
+    unsure, auto_retire, still_open = plan['unsure'], plan['auto_retire'], plan['still_open']
+    retire, untouched = plan['retire'], plan['untouched']
 
     # ── report ────────────────────────────────────────────────────────────────────────────────
     print(f"\n{'='*78}\n  مسوّدةُ تحديثِ المنيو — {slug}   (قراءةٌ فقط · لا كتابة)\n{'='*78}")

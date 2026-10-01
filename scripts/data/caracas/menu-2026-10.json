@@ -23,7 +23,8 @@
       "derived": "expanded by us from a variant line — MUST be reviewed, it is our reading, not his words"
     },
     "open_question": "«الفول» resolved to THREE live rows, not one. All three are listed. If Salman meant only the boxes, or only the plate, this block is what he edits — nothing matches on the word itself.",
-    "authority": "Salman 2026-10-01: «لازم تكون المنيو مثل لي رسلتهم». Inside a category present in `categories` below, Mahmoud's list IS the category. Anything live there and absent from it is retired. `keep_untouched` categories are exempt and are not read by that rule."
+    "authority": "Salman 2026-10-01: «لازم تكون المنيو مثل لي رسلتهم». Inside a category present in `categories` below, Mahmoud's list IS the category. Anything live there and absent from it is retired. `keep_untouched` categories are exempt and are not read by that rule.",
+    "name_en_note": "name_en is what app/core/sku.py derives the key from; it refuses to romanise Arabic, so an item without one gets an opaque ITEM-xx. caracas carries zero opaque keys today and this keeps it that way. The sizes are spelled out to match the restaurant's own existing convention: «وجبة كرسبي (5 قطع)» → CRISPY-MEAL-5PCS-01."
   },
   "retire": [
     {
@@ -60,17 +61,20 @@
         {
           "name_ar": "بافلو 9 قطع",
           "price": 10.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Buffalo Wings 9pcs"
         },
         {
           "name_ar": "باربكيو 9 قطع",
           "price": 10.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "BBQ Wings 9pcs"
         },
         {
           "name_ar": "هاني ماسترد 9 قطع",
           "price": 10.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Honey Mustard Wings 9pcs"
         }
       ]
     },
@@ -81,32 +85,38 @@
         {
           "name_ar": "كاراكاس بيف برغر",
           "price": 6.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Caracas Beef Burger"
         },
         {
           "name_ar": "برغر لبنانية",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Lebanese Burger"
         },
         {
           "name_ar": "كلاسيك برغر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Classic Burger"
         },
         {
           "name_ar": "برغر امريكي",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "American Burger"
         },
         {
           "name_ar": "ماشروم برغر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Mushroom Burger"
         },
         {
           "name_ar": "تشيلي برغر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chili Burger"
         }
       ]
     },
@@ -117,22 +127,26 @@
         {
           "name_ar": "كاراكاس تشكن برغر",
           "price": 6.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Caracas Chicken Burger"
         },
         {
           "name_ar": "باربكيو تشكن برغر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "BBQ Chicken Burger"
         },
         {
           "name_ar": "بافلو تشكن برغر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Buffalo Chicken Burger"
         },
         {
           "name_ar": "شكن برغر",
           "price": 4.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chicken Burger"
         }
       ]
     },
@@ -144,127 +158,152 @@
         {
           "name_ar": "فرانسيسكو",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Francisco"
         },
         {
           "name_ar": "تشكن ساب",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chicken Sub"
         },
         {
           "name_ar": "كرسبي",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Crispy"
         },
         {
           "name_ar": "بطاطا",
           "price": 2.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Fries"
         },
         {
           "name_ar": "فاهيتا",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Fajita"
         },
         {
           "name_ar": "افوكادو تشكن",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Avocado Chicken"
         },
         {
           "name_ar": "كاربونارا",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Carbonara"
         },
         {
           "name_ar": "طاووق",
           "price": 4.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Tawook"
         },
         {
           "name_ar": "فلادلفيا",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Philadelphia"
         },
         {
           "name_ar": "تشكن سوبريم",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chicken Supreme"
         },
         {
           "name_ar": "ستيك حر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Spicy Steak"
         },
         {
           "name_ar": "ستيك فطر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Mushroom Steak"
         },
         {
           "name_ar": "مقانق",
           "price": 4.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Makanek"
         },
         {
           "name_ar": "سجق",
           "price": 4.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Sujuk"
         },
         {
           "name_ar": "سودة",
           "price": 3.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chicken Liver"
         },
         {
           "name_ar": "روستو",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Roast Beef"
         },
         {
           "name_ar": "ماكسيكن",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Mexicano"
         },
         {
           "name_ar": "تشاينيز",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chinese"
         },
         {
           "name_ar": "قريدس",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Shrimp"
         },
         {
           "name_ar": "أسكلوب",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Escalope"
         },
         {
           "name_ar": "توستير",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Twister"
         },
         {
           "name_ar": "بونلس",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Boneless"
         },
         {
           "name_ar": "سندوش دجاج",
           "price": 4.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Chicken Sandwich"
         },
         {
           "name_ar": "زنجر",
           "price": 5.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Zinger"
         },
         {
           "name_ar": "زنجر سوبريم",
           "price": 6.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Zinger Supreme"
         }
       ]
     },
@@ -276,87 +315,104 @@
         {
           "name_ar": "وجبة كرسبي (3 قطع)",
           "price": 7.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Crispy Meal 3pcs"
         },
         {
           "name_ar": "وجبة كرسبي (5 قطع)",
           "price": 10.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Crispy Meal 5pcs"
         },
         {
           "name_ar": "وجبة كرسبي (7 قطع)",
           "price": 13.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Crispy Meal 7pcs"
         },
         {
           "name_ar": "وجبة كرسبي (10 قطع)",
           "price": 18.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Crispy Meal 10pcs"
         },
         {
           "name_ar": "وجبة كرسبي (15 قطعة)",
           "price": 23.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Crispy Meal 15pcs"
         },
         {
           "name_ar": "وجبة اسكالوب (3 قطع)",
           "price": 7.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Escalope Meal 3pcs"
         },
         {
           "name_ar": "وجبة اسكالوب (5 قطع)",
           "price": 10.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Escalope Meal 5pcs"
         },
         {
           "name_ar": "وجبة اسكالوب (7 قطع)",
           "price": 13.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Escalope Meal 7pcs"
         },
         {
           "name_ar": "وجبة اسكالوب (10 قطع)",
           "price": 18.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Escalope Meal 10pcs"
         },
         {
           "name_ar": "وجبة اسكالوب (15 قطعة)",
           "price": 23.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Escalope Meal 15pcs"
         },
         {
           "name_ar": "وجبة زنجر (3 قطع)",
           "price": 7.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Zinger Meal 3pcs"
         },
         {
           "name_ar": "وجبة زنجر (5 قطع)",
           "price": 10.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Zinger Meal 5pcs"
         },
         {
           "name_ar": "وجبة زنجر (7 قطع)",
           "price": 13.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Zinger Meal 7pcs"
         },
         {
           "name_ar": "وجبة زنجر (10 قطع)",
           "price": 18.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Zinger Meal 10pcs"
         },
         {
           "name_ar": "وجبة زنجر (15 قطعة)",
           "price": 23.0,
-          "row_source": "derived"
+          "row_source": "derived",
+          "name_en": "Zinger Meal 15pcs"
         },
         {
           "name_ar": "ناغتس 15 قطعة",
           "price": 10.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Nuggets 15pcs"
         },
         {
           "name_ar": "جوانح كرسبي 9 قطع",
           "price": 10.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Crispy Wings 9pcs"
         }
       ]
     },
@@ -367,37 +423,44 @@
         {
           "name_ar": "علبة بطاطا",
           "price": 2.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Fries Box"
         },
         {
           "name_ar": "بطاطا ودجز",
           "price": 2.5,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Potato Wedges"
         },
         {
           "name_ar": "صحن بطاطا",
           "price": 6.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Fries Plate"
         },
         {
           "name_ar": "علبة ثوم",
           "price": 1.7,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Garlic Box"
         },
         {
           "name_ar": "علبة هاني مستر",
           "price": 1.7,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Honey Mustard Box"
         },
         {
           "name_ar": "علبة بربكيو",
           "price": 2.2,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "BBQ Box"
         },
         {
           "name_ar": "علبة تشدر",
           "price": 2.2,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Cheddar Box"
         }
       ]
     },
@@ -408,17 +471,20 @@
         {
           "name_ar": "موزاريلا ستيكس 5 قطع + صوص",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Mozzarella Sticks 5pcs"
         },
         {
           "name_ar": "هلابينو بايت 5 قطع + صوص",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Jalapeno Bites 5pcs"
         },
         {
           "name_ar": "تشيز بولز 5 قطع + صوص",
           "price": 5.0,
-          "row_source": "verbatim"
+          "row_source": "verbatim",
+          "name_en": "Cheese Balls 5pcs"
         }
       ]
     }
