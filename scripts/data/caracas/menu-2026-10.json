@@ -1,0 +1,425 @@
+{
+  "_meta": {
+    "slug": "caracas",
+    "received": "2026-09-30",
+    "source": "WhatsApp, Mahmoud Caracas — the owner's own text, pasted verbatim by Salman 2026-10-01",
+    "currency": "$",
+    "note": "The SOURCE for the structure change. This file is never seeded directly: scripts/plan_menu_update.py diffs it against production and produces a draft for review. Nothing is written until Salman signs that draft.",
+    "structure_decisions": {
+      "ratified_by": "Salman, 2026-10-01",
+      "merge_sandwiches": "ساندويش غربي + ساندويش شرقي → one «ساندويش»",
+      "split_burgers": "two new categories: «برغر لحم» and «تشكن برغر»",
+      "merge_special_meals": "«وجبات مميزة» → «وجبات»",
+      "breakfast": "ترويقة stays, minus الفول",
+      "untouched": [
+        "كوشينيا (دزينة)",
+        "مشروبات باردة",
+        "متبلات(1كغ)",
+        "قطع دجاج نيء(1كغ)"
+      ]
+    },
+    "row_source": {
+      "verbatim": "the line appears in Mahmoud's message exactly as written here",
+      "derived": "expanded by us from a variant line — MUST be reviewed, it is our reading, not his words"
+    },
+    "open_question": "«الفول» resolved to THREE live rows, not one. All three are listed. If Salman meant only the boxes, or only the plate, this block is what he edits — nothing matches on the word itself."
+  },
+  "retire": [
+    {
+      "category": "ترويقة",
+      "name_ar": "صحن فول",
+      "sku": "FOUL-PLATE-01",
+      "why": "Salman 2026-10-01 — «نشيل منها الفول»"
+    },
+    {
+      "category": "ترويقة",
+      "name_ar": "علبة فول صغيرة",
+      "sku": "FOUL-SMALL-BOX-01",
+      "why": "Salman 2026-10-01 — «نشيل منها الفول»"
+    },
+    {
+      "category": "ترويقة",
+      "name_ar": "علبة فول كبيرة",
+      "sku": "FOUL-LARGE-BOX-01",
+      "why": "Salman 2026-10-01 — «نشيل منها الفول»"
+    }
+  ],
+  "keep_untouched": [
+    "كوشينيا (دزينة)",
+    "مشروبات باردة",
+    "متبلات(1كغ)",
+    "قطع دجاج نيء(1كغ)",
+    "ترويقة"
+  ],
+  "categories": [
+    {
+      "name_ar": "جوانح",
+      "name_en": "Wings",
+      "items": [
+        {
+          "name_ar": "بافلو 9 قطع",
+          "price": 10.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "باربكيو 9 قطع",
+          "price": 10.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "هاني ماسترد 9 قطع",
+          "price": 10.0,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "برغر لحم",
+      "name_en": "Beef Burgers",
+      "items": [
+        {
+          "name_ar": "كاراكاس بيف برغر",
+          "price": 6.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "برغر لبنانية",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "كلاسيك برغر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "برغر امريكي",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "ماشروم برغر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "تشيلي برغر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "تشكن برغر",
+      "name_en": "Chicken Burgers",
+      "items": [
+        {
+          "name_ar": "كاراكاس تشكن برغر",
+          "price": 6.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "باربكيو تشكن برغر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "بافلو تشكن برغر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "شكن برغر",
+          "price": 4.5,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "ساندويش",
+      "name_en": "Sandwiches",
+      "note": "Mahmoud sent this list TWICE. The second was a superset — توستير, بونلس, زنجر, زنجر سوبريم added. The longer one is used; confirm.",
+      "items": [
+        {
+          "name_ar": "فرانسيسكو",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "تشكن ساب",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "كرسبي",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "بطاطا",
+          "price": 2.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "فاهيتا",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "افوكادو تشكن",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "كاربونارا",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "طاووق",
+          "price": 4.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "فلادلفيا",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "تشكن سوبريم",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "ستيك حر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "ستيك فطر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "مقانق",
+          "price": 4.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "سجق",
+          "price": 4.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "سودة",
+          "price": 3.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "روستو",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "ماكسيكن",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "تشاينيز",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "قريدس",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "أسكلوب",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "توستير",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "بونلس",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "سندوش دجاج",
+          "price": 4.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "زنجر",
+          "price": 5.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "زنجر سوبريم",
+          "price": 6.0,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "وجبات",
+      "name_en": "Meals",
+      "note": "Mahmoud wrote one variant line: «وجبات (كرسبي/أسكلوب/زنجر) 3 قطع 7$ / 5 قطع 10$ / 7 قطع 13$ / 10 قطع 18$ / 15 قطعة 23$». Our system has NO variants, and the restaurant's own existing rows already spell each combination out — «وجبة كرسبي (5 قطع)» → CRISPY-MEAL-5PCS-01. So the three types × five sizes are expanded here FOLLOWING HIS OWN CONVENTION. Every one is marked `derived`: it is our reading of his line, not his words.",
+      "items": [
+        {
+          "name_ar": "وجبة كرسبي (3 قطع)",
+          "price": 7.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة كرسبي (5 قطع)",
+          "price": 10.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة كرسبي (7 قطع)",
+          "price": 13.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة كرسبي (10 قطع)",
+          "price": 18.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة كرسبي (15 قطعة)",
+          "price": 23.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة اسكالوب (3 قطع)",
+          "price": 7.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة اسكالوب (5 قطع)",
+          "price": 10.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة اسكالوب (7 قطع)",
+          "price": 13.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة اسكالوب (10 قطع)",
+          "price": 18.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة اسكالوب (15 قطعة)",
+          "price": 23.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة زنجر (3 قطع)",
+          "price": 7.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة زنجر (5 قطع)",
+          "price": 10.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة زنجر (7 قطع)",
+          "price": 13.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة زنجر (10 قطع)",
+          "price": 18.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "وجبة زنجر (15 قطعة)",
+          "price": 23.0,
+          "row_source": "derived"
+        },
+        {
+          "name_ar": "ناغتس 15 قطعة",
+          "price": 10.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "جوانح كرسبي 9 قطع",
+          "price": 10.0,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "مازة",
+      "name_en": "Appetizers",
+      "items": [
+        {
+          "name_ar": "علبة بطاطا",
+          "price": 2.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "بطاطا ودجز",
+          "price": 2.5,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "صحن بطاطا",
+          "price": 6.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "علبة ثوم",
+          "price": 1.7,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "علبة هاني مستر",
+          "price": 1.7,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "علبة بربكيو",
+          "price": 2.2,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "علبة تشدر",
+          "price": 2.2,
+          "row_source": "verbatim"
+        }
+      ]
+    },
+    {
+      "name_ar": "مقبلات",
+      "name_en": "Starters",
+      "items": [
+        {
+          "name_ar": "موزاريلا ستيكس 5 قطع + صوص",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "هلابينو بايت 5 قطع + صوص",
+          "price": 5.0,
+          "row_source": "verbatim"
+        },
+        {
+          "name_ar": "تشيز بولز 5 قطع + صوص",
+          "price": 5.0,
+          "row_source": "verbatim"
+        }
+      ]
+    }
+  ]
+}
