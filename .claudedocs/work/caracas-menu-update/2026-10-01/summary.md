@@ -60,3 +60,36 @@ costs a duplicate row and an item whose order history stops.
 incoming menu is Arabic-only and our SKUs are English-derived; «تشكن برغر» and «تشيكن برغر» are the
 same dish and two different strings. A tool that resolved that silently would retire real dishes and
 duplicate others — the exact damage the soft-delete work closed.
+
+---
+
+## CLOSED — executed the same day
+
+Salman answered the open questions with one rule — *«لازم تكون المنيو مثل لي رسلتهم»* — and that
+resolved every list:
+
+- The nine UNSURE pairs were **never contradictions**. They were one dish spelled two ways, his
+  message against our database: فلادلفيا/فيلادلفيا, أسكلوب/اسكالوب, علبة بربكيو/علبة باربيكيو,
+  توستير/تويستر, ماكسيكن/مكسيكانو, and «سودة» which exists on two rows (the sandwich one is the
+  match). Recorded as **aliases by SKU**, not left to a similarity threshold, with the three
+  genuinely different pairs named so nothing can ever merge them. **UNSURE went to 0.**
+- Inside a category he sent, his list **is** the category: unlisted rows there are retired.
+- «الفول» = all three rows; ترويقة itself stays.
+
+```
+EXECUTED   86 rows + 5 for ordering, one transaction
+           97 items → 115 · 10 categories → 12
+           platform-wide order lines 18 → 18   ✅ nothing cascaded
+           0 live items without a normalised SKU
+RE-RUN     90 operations → 5, all ordering — idempotence demonstrated, not claimed
+```
+
+Verified against the live API and in a real browser: twelve categories in Mahmoud's own order,
+115 items under «الكل», every spot-checked price matching his message, no retired item visible.
+
+**Current live count reads 107 items / 11 categories** — Salman hid «كوشينيا (دزينة)» (8 items)
+from the dashboard afterwards, at Mahmoud's request. Deliberate, and the arithmetic matches.
+
+`draft.txt` is the pre-execution plan; `after.txt` is the same planner re-run afterwards. Its
+summary line still counts the 3 explicit retires because that list is read from the menu file, not
+from the database — a display artefact. The executor is the authority and reports zero pending work.
