@@ -364,3 +364,59 @@ Gate 5   Sandbox first, if one exists. A real payment is the last step, never th
 
 **Nothing in this document authorises any of the above.** Promotion out of `research/` is a
 decision, and this file makes none.
+
+---
+
+## Correction entry — 2026-10-01 (same day)
+
+`research/` is immutable: a finding is corrected by a dated entry, never by editing the text above.
+Two changes, both from Salman's review.
+
+### C-1 · `ClientService.config` is an INFERENCE, not a decision
+
+§8's verdict column reads **"The natural home"**, which is stronger than the evidence carries.
+Salman's pin, verbatim: *"أنا أعتبرها Inference جيد، وليس قرارًا نهائيًا بعد… فلا نضيف أي
+credentials حاليًا."*
+
+The reason it cannot be settled yet is itself a `SOURCE FACT`: Whish's **Checkout Services**
+sign-up asks for Company Name + Website URL + Website Domain + platform type. That is a
+**different intake path** from the in-app Payment Link, so the commercial product may require a
+shape we have not seen. `ClientService.config` remains the **leading candidate** — it is unused,
+tenant-scoped and never public — and **not the answer**. No column, no credential, no row.
+
+### C-2 · 🔴 The in-app Payment Link is contractually barred from commercial use
+
+New `SOURCE FACT`, verified against `whish.money/terms-conditions` after Salman raised it. Under
+**"Card Top-Up and Payment Link Terms and Conditions" → "Eligible Payments"**, verbatim:
+
+> **"Payments made through the Whish Money app must be for personal, non-commercial purposes"**
+
+The same document confirms business accounts exist (*"personal user account or a business
+account"*) without stating what they may do.
+
+**This is stronger than §5 recorded.** §5 called the app-created Payment Link *officially silent*
+on programmatic access — an `UNKNOWN`. It is not merely unknown for our purpose: **using it to
+collect restaurant orders would breach Whish's own terms.** So:
+
+```
+in-app Payment Link   →  personal only. CLOSED for Alzabt by contract, not by missing API.
+Whish Pay / Checkout / Collection Services  →  the ONLY commercial path. Still UNKNOWN in every
+                                               technical respect.
+```
+
+⇒ Part 11's question ① is rewritten: not *"is there an API?"* but **"what does the COMMERCIAL
+product (Whish Pay / Checkout) provide, since the app-side link is barred for business use?"**
+
+### C-3 · The QR we are printing is not a Whish QR
+
+Ratified direction, recorded so the two are never conflated again:
+
+```
+NOW   QR  →  the Caracas menu URL  →  menu → cart → order → the restaurant's WhatsApp
+      Entirely independent of Whish. Nothing in this document gates it.
+
+LATER QR  →  a Whish merchant payment
+      Waits on the commercial-product answers above. Different artefact, different decision.
+```
+
+Nothing else in this document changes. The gate stays 🔴 CLOSED.
