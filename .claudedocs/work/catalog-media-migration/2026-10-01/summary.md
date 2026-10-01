@@ -431,3 +431,74 @@ live image-carrying rows        147
 live rows without a SKU           0
 store_order_items platform-wide  18   unchanged all day
 ```
+
+---
+
+# ④ executed — the migration file is CLOSED
+
+The eight كوشينيا rows, on Salman's explicit word. They were never a failure: INACTIVE when caracas
+migrated, so `is_active` excluded them correctly, then reactivated by the cascade repair — **newly
+eligible, not failed**.
+
+## The design problem ④ forced, and how it was answered
+
+caracas now holds **80 eligible rows**: 72 already migrated plus these 8. The existing check
+`selected == authorised` would have failed with 72 "extras", and the easy fix — dropping the
+other-direction check — would have opened exactly the door Salman closed when he required
+row-level authorisation.
+
+So the check now admits an extra row for **one reason, proven per row**:
+
+```
+a row outside the authorisation is admissible ONLY if it is already at its destination
+a row outside the authorisation that is NOT already migrated STOPS the run
+    — because that is a row nobody authorised and nobody has handled
+```
+
+Each of the 72 was fetched and compared against the destination its own SKU and served
+content-type imply. The run printed `✅ every row outside the authorisation is already at its
+destination`, and the missing-check kept its own control: the same comparison against the set plus
+one invented SKU reported exactly 1 missing.
+
+`AUTHORISED` is now keyed by the **authorisation's name**, with the tenant inside the entry. That
+is what let ④ reopen eight rows without reopening caracas: `"caracas"` stays `None`/EXECUTED and
+the executor still refuses it outright (verified by running it).
+
+| ④ | before | after | |
+|---|---:|---:|---|
+| `store_order_items` platform-wide | 18 | 18 | ✅ |
+| `catalog_items` for caracas | 133 | 133 | ✅ |
+| rows at their new url | 0 | 8 | ✅ |
+| live urls still on the old shape | — | 0 | ✅ |
+| old files still served | 8 | 8 | ✅ |
+
+## The platform, measured after everything
+
+```
+live image-carrying rows        147
+  on the new {SKU}.{ext} shape  144   ✅  arizona 28 · beit-al-fakhar 34 · caracas 80 · rk 2
+  external (footlab, unsplash)    3   ⚪  never ours, nothing to migrate
+  still on the old id/id shape    0   ✅
+images in OUR bucket            144/144 → 100%
+live rows without a SKU           0
+two rows sharing one storage key  0
+store_order_items platform-wide  18   unchanged across every write today
+```
+
+Customer-facing, on production: **caracas 11 categories / 107 items / 72 images, all 200, all new
+shape**; **arizona 2 / 28 / 28, all 200, all new shape**. كوشينيا still hidden as Mahmoud asked, no
+فول row resurrected.
+
+## What closing this file did and did not do
+
+```
+🟢 every live catalog image in our bucket is named after the thing it pictures
+🟢 every live catalog item on the platform carries a stable, normalised, tenant-unique key
+🟢 delete is deactivate · hide is reversible · re-seeding archives instead of erasing
+🟢 every old file is still served, so every step today rolls back with one UPDATE per row
+   and zero file operations
+🟡 retiring the old tree is a separate decision, deliberately not taken
+🟡 10 dead caracas category images · 35 caracas items with no photo
+🔴 order notification remains unbuilt — StoreOrder stays 0, so the owner's Orders, Revenue and
+   Best-Sellers panels cannot fill. FROZEN by agreement until this file closed. It is now closed.
+```

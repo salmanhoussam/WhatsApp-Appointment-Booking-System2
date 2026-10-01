@@ -1,0 +1,68 @@
+
+    authorisation: caracas-coxinha — 2026-10-01 ④ — 8 rows, newly eligible after the cascade repair
+    tenant: caracas
+
+==============================================================================================
+CATALOG MEDIA MIGRATION — EXECUTE · tenant = caracas
+==============================================================================================
+target: aws-0-eu-central-1.pooler.supabase.com  (via DIRECT_URL)
+
+[1] BEFORE
+    client_id                      : b4628f71-6e74-4170-ab18-59b7d51ec39c
+    catalog_items for caracas       : 133
+    store_order_items PLATFORM-WIDE: 18   ← the invariant. Tenant-scoped it would read 0→0 and could never fail.
+    rows selected                  : 80
+    authorised SKUs                : 8
+    rows outside the authorisation : 72  — admissible only if already migrated
+    ✅ every row outside the authorisation is already at its destination
+    ✅ the selection covers EXACTLY the authorised set, nothing missing
+    ✅ CONTROL — the missing-check against the set plus one invented SKU reports 1 missing (must be 1)
+    ⇒ 8 row(s) will be migrated
+
+[2] SOURCES — HEAD every one; only 200 passes
+    statuses: {200: 8}
+    content-types: {'image/jpeg': 8}
+    extensions derived: {'jpg': 8}
+
+[3] DESTINATIONS — still free? (enumeration + a settled 400, both required)
+    {'FREE': 8}
+
+[4] COPY — 8 files · upsert=false · content-type carried from the source
+      1/8     8,673B  PIZZA-COXINHA-01
+      2/8     9,105B  CHEESE-COXINHA-01
+      3/8    12,232B  CHICKEN-COXINHA-01
+      4/8     9,242B  MINCED-MEAT-COXINHA-01
+      5/8    11,462B  CHEESE-AND-SUJUK-COXINHA-01
+      6/8     9,242B  MINCED-MEAT-COXINHA-02
+      7/8    11,462B  CHEESE-AND-SUJUK-COXINHA-02
+      8/8    11,486B  MIXED-COXINHA-01
+    copied 8 · failed 0
+
+[5] GATE — HEAD every NEW url. Only 200 passes. This runs BEFORE any DB write.
+    statuses: {200: 8}
+    content-types: {'image/jpeg': 8}
+    ✅ NEGATIVE CONTROL — a key deliberately never copied: 400 (must not be 200)
+    🟢 content-type survived the copy on all 8
+    🟢 8/8 new URLs alive at 200
+
+[6] TRANSACTION — caracas only · guard `image_url = $old` · rowcount must be 1
+    🟢 COMMITTED · 8 rows updated · rowcount 1 on every statement
+
+[7] AFTER — re-read from the database
+
+    metric                                        before     after
+    --------------------------------------------------------------
+    store_order_items (PLATFORM-WIDE)                 18        18   ✅
+    catalog_items for caracas                        133       133   ✅
+    rows at their new SKU url                          0         8   ✅
+    live urls matching {sku}.{ext}                     -        80
+    live urls still in the OLD id/id/main shape         -         0   ✅
+
+    OLD files still alive at 200 (the rollback) : 8/8   ✅
+
+==============================================================================================
+    🟢 MIGRATION COMPLETE AND VERIFIED
+    rollback: UPDATE catalog_items SET image_url = <old> per row. No file operation.
+              every old file is still served. Nothing was moved or deleted.
+==============================================================================================
+

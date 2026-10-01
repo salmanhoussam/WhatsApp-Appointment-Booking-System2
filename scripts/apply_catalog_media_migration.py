@@ -83,7 +83,7 @@ def main() -> int:
     # wildcard: a tenant that is not written here cannot be migrated by this script, however it
     # is invoked. `beit-al-fakhar`, `footlab` and `rk` are deliberately absent — 39 of their live
     # image-carrying rows have no SKU and cannot be named under this contract at all.
-    # slug -> (the exact SKUs authorised, the authorisation). Salman, 2026-10-01: the map must
+    # label -> (tenant slug, the exact SKUs authorised, the authorisation). Salman, 2026-10-01: the map must
     # name "الصفوف/المصادر المحددة بالضبط، وليس wildcard". So the authorisation is an explicit SET
     # OF ROWS, not a tenant plus a number — a count alone would still let a row that appeared
     # after the plan ride along unnoticed, as long as another had disappeared. The run refuses
@@ -91,10 +91,23 @@ def main() -> int:
     #
     # caracas and arizona are recorded as executed; their lists are not restated because their
     # files are already migrated and a re-run finds every destination ALREADY AT DESTINATION.
+    #
+    # The KEY is the authorisation's name, not the tenant — `caracas-coxinha` is a second, much
+    # narrower authorisation over the SAME tenant, which is how ④ reopens eight rows without
+    # reopening caracas or weakening its EXECUTED record.
     AUTHORISED = {
-        "caracas": (None, "2026-10-01 — EXECUTED, 72 rows"),
-        "arizona": (None, "2026-10-01 — EXECUTED, 28 rows"),
-        "beit-al-fakhar": ((
+        "caracas": ("caracas", None, "2026-10-01 — EXECUTED, 72 rows"),
+        "arizona": ("arizona", None, "2026-10-01 — EXECUTED, 28 rows"),
+        # ④ The كوشينيا rows. They were INACTIVE when caracas migrated, so `is_active` excluded
+        # them correctly; the cascade repair reactivated them afterwards and they came back live
+        # on their original URLs. Newly eligible, never failed.
+        "caracas-coxinha": ("caracas", (
+            "MIXED-COXINHA-01", "CHEESE-COXINHA-01",
+            "CHICKEN-COXINHA-01", "PIZZA-COXINHA-01",
+            "CHEESE-AND-SUJUK-COXINHA-01", "CHEESE-AND-SUJUK-COXINHA-02",
+            "MINCED-MEAT-COXINHA-01", "MINCED-MEAT-COXINHA-02",
+        ), "2026-10-01 ④ — 8 rows, newly eligible after the cascade repair"),
+        "beit-al-fakhar": ("beit-al-fakhar", (
             "HAND-PAINTED-CERAMIC-BOWL-4-01", "HAND-PAINTED-CERAMIC-BOWL-5-01",
             "HAND-PAINTED-CERAMIC-BOWL-6-01", "HAND-PAINTED-CERAMIC-BOWL-7-01",
             "HAND-PAINTED-CERAMIC-BOWL-8-01", "HAND-PAINTED-CERAMIC-BOWL-9-01",
@@ -115,7 +128,7 @@ def main() -> int:
         ), "2026-10-01 ① — 34 rows, no reservation"),
         # ② HAIR-OIL-01 sits under rk/. ③ HAIR-FIXING-SPRAY-01 sits under hr/ — see
         # HISTORICAL_PREFIXES below for the measurement that makes that one row admissible.
-        "rk": (("HAIR-OIL-01", "HAIR-FIXING-SPRAY-01"),
+        "rk": ("rk", ("HAIR-OIL-01", "HAIR-FIXING-SPRAY-01"),
                "2026-10-01 ②③ — 2 rows, one of them via the hr/ historical prefix"),
     }
     args = sys.argv[1:]
@@ -123,11 +136,13 @@ def main() -> int:
     if slug not in AUTHORISED or "--execute" not in args:
         print(__doc__)
         print(f"🔴 refused. Authorised tenants, with --execute:")
-        for k, (_sk, v) in AUTHORISED.items():
+        for k, (_sl, _sk, v) in AUTHORISED.items():
             print(f"       {k:<16} {v}")
         return 2
-    authorised_skus, _note = AUTHORISED[slug]
-    print(f"\n    authorisation: {slug} — {_note}")
+    label = slug
+    slug, authorised_skus, _note = AUTHORISED[label]
+    print(f"\n    authorisation: {label} — {_note}")
+    print(f"    tenant: {slug}")
 
     print(f"\n{'='*94}\nCATALOG MEDIA MIGRATION — EXECUTE · tenant = {slug}\n{'='*94}")
 
@@ -176,19 +191,45 @@ def main() -> int:
     print(f"    rows selected                  : {len(rows)}")
     if authorised_skus is not None:
         got, want = {r["sku"] for r in rows}, set(authorised_skus)
-        extra, missing = got - want, want - got
+        missing = want - got
         print(f"    authorised SKUs                : {len(want)}")
-        if extra or missing:
-            print(f"    🔴 the selection is not the authorised set. STOP.")
-            for sk in sorted(extra):
-                print(f"        + {sk}  selected but NOT authorised")
+        if missing:
+            print(f"    🔴 the selection is missing authorised rows. STOP.")
             for sk in sorted(missing):
                 print(f"        − {sk}  authorised but NOT selected")
             return 1
-        print(f"    ✅ the selection is EXACTLY the authorised set, in both directions")
-        # a control: the comparison must be able to fail
-        print(f"    ✅ CONTROL — the same comparison against the set plus one invented SKU "
-              f"reports {len((got | {'__NOT_A_REAL_SKU__'}) - want)} extra (must be 1)")
+
+        # 🔴 THE OTHER DIRECTION, AND WHY IT IS NOT SIMPLY `got == want` ANY MORE.
+        # An authorisation may now be NARROWER than its tenant (④ is 8 rows inside caracas, which
+        # also holds 72 already-migrated ones). So "extra" rows are expected — but only for ONE
+        # admissible reason: they are already at their destination. Each one is checked, and a row
+        # that is outside the authorisation AND not already migrated stops the run, because that is
+        # a row nobody authorised and nobody has handled.
+        extra = sorted(got - want)
+        unexplained = []
+        for r in rows:
+            if r["sku"] in want:
+                continue
+            st, ct = head(r["old_url"])
+            ext = EXT_BY_CONTENT_TYPE.get(ct or "")
+            at_dest = ext and r["old_key"] == destination(slug, r["sku"], ext)
+            if not at_dest:
+                unexplained.append(r)
+        print(f"    rows outside the authorisation : {len(extra)}  "
+              f"— admissible only if already migrated")
+        if unexplained:
+            print(f"    🔴 {len(unexplained)} of them are NOT already at their destination. "
+                  f"STOP — nobody authorised these and nobody has handled them:")
+            for r in unexplained[:10]:
+                print(f"        + {r['sku']}  {r['old_key']}")
+            return 1
+        print(f"    ✅ every row outside the authorisation is already at its destination")
+        print(f"    ✅ the selection covers EXACTLY the authorised set, nothing missing")
+        # the checks must be able to fail
+        print(f"    ✅ CONTROL — the missing-check against the set plus one invented SKU reports "
+              f"{len((want | {'__NOT_A_REAL_SKU__'}) - got)} missing (must be 1)")
+        rows = [r for r in rows if r["sku"] in want]
+        print(f"    ⇒ {len(rows)} row(s) will be migrated")
     else:
         print(f"    🔴 {slug} is recorded as already executed; no SKU list to check against. "
               f"Re-running it is only meaningful to confirm 0 copies. STOP.")
