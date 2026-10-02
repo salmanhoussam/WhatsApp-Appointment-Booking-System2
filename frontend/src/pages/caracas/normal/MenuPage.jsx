@@ -399,11 +399,18 @@ export default function MenuPage() {
   // The owner's own dashboard switch (SettingsTab → «عرض الكتالوج»). It wrote a real value to
   // `config.catalog_layout` and this page never read it, so the control did nothing here. 'grid'
   // matches the dashboard's own default.
-  const layout = LAYOUTS[config?.catalog_layout] ? config.catalog_layout : 'grid';
+  // 🔴 BOTH live INSIDE `config.config`, not at the top level — measured against the live
+  // response, 2026-10-02, after reading them one level too high and shipping a logo that never
+  // appeared. The top level carries `whatsapp_number`, `primary_color`, `name_ar`…; the nested
+  // `config` blob carries `catalog_layout`, `logo_url`, `content`, `hero`. `DemoCatalogPage.jsx`
+  // already read `data.config?.catalog_layout` — the shape was documented by a working caller and
+  // I did not check it.
+  const tenantCfg = config?.config ?? {};
+  const layout = LAYOUTS[tenantCfg.catalog_layout] ? tenantCfg.catalog_layout : 'grid';
   const Layout = LAYOUTS[layout];
   // Injected into the public config by `public_service._inject_page_logo_media` (added the same
   // day). Absent for a tenant with no logo, and the «الكل» circle then falls back to its letter.
-  const logoUrl = config?.logo_url || null;
+  const logoUrl = tenantCfg.logo_url || null;
 
   // The daily-priced categories leave the food rail entirely -- see DAILY_PRICE_CATEGORIES above.
   const foodCategories  = categories.filter((c) => !isDailyPriced(c));
