@@ -1,0 +1,85 @@
+
+============================================================================================
+STOCK PHOTOS — caracas · EXECUTE
+============================================================================================
+    decision file: scripts/data/caracas/stock-photos.json
+
+[0] LICENCE — free-licence ids only
+    non-free ids in the plan: 0   (must be 0)
+
+[1] SELECTION
+    items with no image, in the database : 35
+    assignments in the decision file     : 35
+    ✅ EXACTLY the same set, in both directions
+    ✅ CONTROL — the same check against the set plus one invented SKU reports 1 extra (must be 1)
+    store_order_items PLATFORM-WIDE : 18
+    caracas live items WITH an image: 80
+    destination collisions among the 35 keys : 0  (must be 0)
+    source photos deliberately reused on more than one dish : 4
+        ×2  1676300187140-00828e014d2a  →  ['CARBONARA-01', 'BONELESS-01']
+        ×2  1753798130695-3c060be80e83  →  ['CHICKEN-SUPREME-01', 'CHICKEN-SANDWICH-01']
+        ×2  1426869981800-95ebf51ce900  →  ['CRISPY-MEAL-3PCS-01', 'CRISPY-MEAL-7PCS-01']
+        ×4  1644882725268-30f1cd6c36ca  →  ['ZINGER-MEAL-3PCS-01', 'ZINGER-MEAL-7PCS-01', 'ZINGER-MEAL-10PCS-01', 'ZINGER-MEAL-15PCS-01']
+
+[2] DESTINATIONS — 81 files already under caracas/catalog/
+    of our 35 keys, already occupied : 0  (must be 0)
+
+[3] DOWNLOAD + UPLOAD — 35 files · upsert=false · content-type image/jpeg
+      1/35   368,511B  BUFFALO-WINGS-9PCS-01
+      2/35   174,450B  BBQ-WINGS-9PCS-01
+      3/35   683,367B  HONEY-MUSTARD-WINGS-9PCS-01
+      4/35   365,459B  CARACAS-BEEF-BURGER-01
+      5/35   334,324B  LEBANESE-BURGER-01
+      6/35   378,445B  CLASSIC-BURGER-01
+      7/35   187,535B  AMERICAN-BURGER-01
+      8/35   171,948B  MUSHROOM-BURGER-01
+      9/35   480,770B  CHILI-BURGER-01
+     10/35   370,489B  CARACAS-CHICKEN-BURGER-01
+     11/35   338,905B  BBQ-CHICKEN-BURGER-01
+     12/35   410,694B  BUFFALO-CHICKEN-BURGER-01
+     13/35   160,538B  CHICKEN-BURGER-02
+     14/35   179,268B  AVOCADO-CHICKEN-01
+     15/35   170,544B  CARBONARA-01
+     16/35   118,909B  CHICKEN-SUPREME-01
+     17/35   169,287B  MUSHROOM-STEAK-01
+     18/35   170,544B  BONELESS-01
+     19/35   118,909B  CHICKEN-SANDWICH-01
+     20/35   177,255B  ZINGER-SUPREME-01
+     21/35   193,563B  CRISPY-MEAL-3PCS-01
+     22/35   193,563B  CRISPY-MEAL-7PCS-01
+     23/35   211,497B  ESCALOPE-MEAL-3PCS-01
+     24/35   238,127B  ESCALOPE-MEAL-7PCS-01
+     25/35   160,446B  ZINGER-MEAL-3PCS-01
+     26/35   160,446B  ZINGER-MEAL-7PCS-01
+     27/35   160,446B  ZINGER-MEAL-10PCS-01
+     28/35   160,446B  ZINGER-MEAL-15PCS-01
+     29/35   199,625B  NUGGETS-15PCS-01
+     30/35   135,444B  CRISPY-WINGS-9PCS-01
+     31/35   335,784B  POTATO-WEDGES-01
+     32/35   224,582B  HONEY-MUSTARD-BOX-01
+     33/35   288,393B  MOZZARELLA-STICKS-5PCS-01
+     34/35   181,668B  JALAPENO-BITES-5PCS-01
+     35/35   229,470B  CHEESE-BALLS-5PCS-01
+    uploaded 35 · failed 0 · distinct source photos fetched 29
+
+[4] GATE — HEAD every new url. Only 200 passes. BEFORE any DB write.
+    statuses: {200: 35}
+    types   : {'image/jpeg': 35}
+    ✅ NEGATIVE CONTROL — a key never uploaded: 400 (must not be 200)
+    🟢 35/35 alive at 200, all image/jpeg
+
+[5] TRANSACTION — caracas only · guard `image_url IS NULL` · rowcount must be 1
+    🟢 COMMITTED · 35 rows · rowcount 1 on every statement
+
+[6] AFTER — re-read from the database
+
+    metric                                         before    after
+    --------------------------------------------------------------
+    store_order_items (PLATFORM-WIDE)                  18       18  ✅
+    caracas live items WITH an image                   80      115  ✅ +35
+    caracas live items with NO image                   35        0  ✅
+    rows marked photo_source=stock                      0       35  ✅
+
+    🟢 COMPLETE AND VERIFIED
+    rollback: UPDATE catalog_items SET image_url = NULL, metadata = metadata - 'photo_source' for these 35 ids. No file operation.
+
