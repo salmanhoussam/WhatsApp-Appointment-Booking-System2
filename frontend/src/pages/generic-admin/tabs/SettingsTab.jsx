@@ -83,6 +83,72 @@ const LAYOUT_OPTS = [
   { key: 'showcase', label: 'بطاقات', icon: '▭' },
 ]
 
+// ── Layout preview — try the difference before saving it ─────────────────────
+// Salman, 2026-10-02: "بدي هاد الشي بالظبط بالسيتينج لما يجرب الفرق". The three buttons above
+// wrote a real value and the owner had no way to see what it meant, so the control was a guess.
+// This draws the SAME three arrangements the public menu renders, at thumbnail size, so pressing
+// a button answers the question immediately. It is deliberately a drawing, not an iframe: the
+// live preview panel already exists for the whole page, and a second one here would be a second
+// thing to keep in sync for a decision that is about shape alone.
+//
+// Nothing here saves. The existing «حفظ» button is still what writes — pressing a layout only
+// changes what this picture shows.
+function LayoutPreview({ value, color }) {
+  const bar = (w, h = 5) => ({ width: w, height: h, borderRadius: 3, background: T.border })
+  const tile = { background: `${color}26`, borderRadius: 4 }
+  const frame = {
+    flex: 1, minWidth: 0, borderRadius: 8, border: `1px solid ${T.border}`,
+    background: T.pageBg, padding: 7, display: 'flex', flexDirection: 'column', gap: 5,
+    height: 104, overflow: 'hidden',
+  }
+  const shots = {
+    // dense rows: a small square, a name bar, a price bar
+    list: (
+      <div style={{ ...frame, gap: 4 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ ...tile, width: 15, height: 15, flexShrink: 0 }} />
+            <div style={bar('60%')} />
+            <div style={{ ...bar(14), marginInlineStart: 'auto', background: color, opacity: .55 }} />
+          </div>
+        ))}
+      </div>
+    ),
+    // one wide card: a big picture, a caption under it
+    showcase: (
+      <div style={frame}>
+        <div style={{ ...tile, height: 46 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={bar('55%')} />
+          <div style={{ ...bar(14), marginInlineStart: 'auto', background: color, opacity: .55 }} />
+        </div>
+        <div style={{ ...tile, height: 22, opacity: .5 }} />
+      </div>
+    ),
+    // two columns of squares
+    grid: (
+      <div style={{ ...frame, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ ...tile, height: 30 }} />
+            <div style={bar('80%', 4)} />
+          </div>
+        ))}
+      </div>
+    ),
+  }
+  const LABEL = { grid: 'شبكة', list: 'قائمة', showcase: 'بطاقات' }
+  const key = shots[value] ? value : 'grid'
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 8 }}>{shots[key]}</div>
+      <div style={{ marginTop: 6, fontSize: 11, color: T.textMuted, fontFamily: FONT, lineHeight: 1.6 }}>
+        هكذا ستظهر الأصناف للزبون في نمط «{LABEL[key]}». اضغط «حفظ» لاعتماده.
+      </div>
+    </div>
+  )
+}
+
 // ── Store QR — deliberately minimal (Store Template Pilot, 2026-07-31) ────────
 // Generates on demand from the backend (GET /admin/settings/qr), no complex QR system --
 // one static image encoding the tenant's real public store URL, per Salman's explicit scope.
@@ -1163,6 +1229,7 @@ export default function SettingsTab({ settings, onUpdated, color, onFormChange, 
             onChange={set('catalog_layout')}
             color={form.primary_color}
           />
+          <LayoutPreview value={form.catalog_layout} color={form.primary_color} />
         </Field>
 
         {/* "الخط" (font) control removed -- Tenant OS Section Editor Phase 6, narrowed scope,

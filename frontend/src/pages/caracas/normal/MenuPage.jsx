@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Info, ChevronRight, Minus, Plus, X, MessageCircle } from 'lucide-react';
 import { useCaracasCategories, useCaracasItems } from '../hooks/useCaracasMenu';
 import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 import useCaracasStore from '../store/useCaracasStore';
+import useTenantConfig from '../../../hooks/useTenantConfig';
 import publicApi from '../../../utils/publicApi';
 import '../caracas.css';
 
@@ -43,16 +44,16 @@ function buildWaMessage(cartItems, total) {
 //
 // With neither, the circle shows the first letter on the brand colour instead of a broken-image
 // glyph. Ten tenants carry no category art at all, so that path is the common one, not a corner.
-function CategoryPill({ cat, isActive, onSelect }) {
-  const [src, setSrc] = useState(cat.image_url || cat.fallback_image_url || null);
+function CategoryPill({ cat, isActive, onSelect, imageOverride = null, fixed = false }) {
+  const [src, setSrc] = useState(imageOverride || cat.image_url || cat.fallback_image_url || null);
   const [failed, setFailed] = useState(false);
 
   // Re-arm when the category data arrives or changes; without this a pill rendered before the
   // fetch resolves keeps its null src forever.
   useEffect(() => {
-    setSrc(cat.image_url || cat.fallback_image_url || null);
+    setSrc(imageOverride || cat.image_url || cat.fallback_image_url || null);
     setFailed(false);
-  }, [cat.image_url, cat.fallback_image_url]);
+  }, [imageOverride, cat.image_url, cat.fallback_image_url]);
 
   const onError = () => {
     if (src !== cat.fallback_image_url && cat.fallback_image_url) setSrc(cat.fallback_image_url);
@@ -62,6 +63,7 @@ function CategoryPill({ cat, isActive, onSelect }) {
   const label = cat.name_ar || cat.name_en || '';
   return (
     <button onClick={onSelect} className="shrink-0 flex flex-col items-center gap-1.5 w-[76px]"
+            aria-pressed={isActive}
             style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
       <span
         className="rounded-full overflow-hidden flex items-center justify-center transition-all duration-200"
@@ -88,6 +90,208 @@ function CategoryPill({ cat, isActive, onSelect }) {
         overflow: 'hidden', width: '100%',
       }}>{label}</span>
     </button>
+  );
+}
+
+// ── The two categories that are priced daily ──────────────────────────────────
+// 🔴 A NAMED EXCEPTION, NOT A DESIGN. Salman, 2026-10-02: these must not sit in the menu with
+// the food. Both hold 18 items whose `price` is 0.00 because the price is the day's market price,
+// and `formatPrice` already renders that as «السعر يومي» — but a cart that MIXES them with priced
+// food produces a total that silently excludes them. That is the real defect: not an odd-looking
+// price, a lying total. So they leave the food rail entirely and open their own menu, where
+// nothing can be added to a cart.
+//
+// Matching on the NAME is the weak part and it is deliberate, temporary and visible here rather
+// than buried: the correct discriminator is data, not a literal. `CatalogCategory.display_template`
+// already carries 'list' for exactly these two while the food carries 'grid' — and it is never
+// serialised by `public/restaurant.py`, so the page cannot see it. The moment that field (or an
+// explicit `metadata.pricing = "daily"`) is exposed, this constant is deleted and the check reads
+// the data instead.
+const DAILY_PRICE_CATEGORIES = ['متبلات(1كغ)', 'قطع دجاج نيء(1كغ)'];
+const isDailyPriced = (cat) => DAILY_PRICE_CATEGORIES.includes((cat?.name_ar || '').trim());
+
+// ── The three catalog layouts ─────────────────────────────────────────────────
+// `config.catalog_layout` is 'grid' | 'list' | 'showcase' — the SAME three the owner already has
+// buttons for in his dashboard (SettingsTab's LAYOUT_OPTS). That setting was real and consumed
+// only by the demo/auto-onboarded renderer; this bespoke page ignored it, so pressing «قائمة» in
+// the dashboard changed nothing here. Reading it is the whole fix.
+//
+// Each layout carries its own MOTION, because the motion is part of the layout's argument rather
+// than decoration: a dense list wants rhythm down the page, a one-per-screen card wants to tell
+// you which direction you moved, and a grid wants you to keep your eye on a dish while the
+// category changes underneath it.
+const SPRING = { type: 'spring', stiffness: 260, damping: 26, mass: 0.8 };
+
+function ItemImage({ item, className, style }) {
+  if (!item.image_url) {
+    return (
+      <div className={className} style={{ ...style, display: 'grid', placeItems: 'center',
+            background: `${ACCENT}14`, color: ACCENT, fontFamily: "'Cairo', sans-serif",
+            fontWeight: 900, fontSize: 20, textAlign: 'center', padding: 10, lineHeight: 1.2 }}>
+        {(item.name_ar || '؟').trim()}
+      </div>
+    );
+  }
+  return (
+    <img src={item.image_url} alt="" loading="lazy" className={className}
+         style={{ ...style, objectFit: 'cover' }}
+         onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+  );
+}
+
+function AddButton({ item, onAdd }) {
+  return (
+    <button
+      disabled={item.is_available === false}
+      onClick={() => onAdd(item)}
+      aria-label={`أضف ${item.name_ar}`}
+      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{ background: `${ACCENT}14`, color: ACCENT }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           strokeWidth="3" strokeLinecap="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    </button>
+  );
+}
+
+// ① قائمة — dense rows, staggered entry. The eye reads down, so the rows arrive in sequence
+//    rather than as one block. Capped at 14 so a 97-item «الكل» never waits half a second.
+function LayoutList({ items, onAdd }) {
+  return (
+    <div className="flex flex-col">
+      {items.map((item, i) => (
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0, x: 26 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ ...SPRING, delay: Math.min(i, 14) * 0.028 }}
+          className="flex items-center gap-3 py-3 border-b border-stone-100"
+        >
+          <ItemImage item={item} className="rounded-xl shrink-0"
+                     style={{ width: 58, height: 58 }} />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-[15px] text-stone-800 leading-snug"
+                style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+          </div>
+          <span className="font-extrabold text-[15px] whitespace-nowrap" style={{ color: ACCENT }}>
+            {formatPrice(item.price)}
+          </span>
+          <AddButton item={item} onAdd={onAdd} />
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+// ② بطاقات — one wide card per row, and the whole set slides in from the side you came FROM, so
+//    the direction itself says where you moved. `dir` is +1 when you went to a later category.
+function LayoutShowcase({ items, onAdd, dir }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: dir * 46 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={SPRING}
+      className="flex flex-col gap-4"
+    >
+      {items.map((item) => (
+        <article key={item.id}
+                 className="rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm">
+          <div style={{ aspectRatio: '16 / 10', maxWidth: '100%', overflow: 'hidden' }}>
+            <ItemImage item={item} style={{ width: '100%', height: '100%' }} />
+          </div>
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <h3 className="font-extrabold text-base text-stone-800 min-w-0"
+                style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+            <span className="font-extrabold text-base whitespace-nowrap" style={{ color: ACCENT }}>
+              {formatPrice(item.price)}
+            </span>
+            <AddButton item={item} onAdd={onAdd} />
+          </div>
+        </article>
+      ))}
+    </motion.div>
+  );
+}
+
+// ③ شبكة — two columns, and `layout` is what Salman asked for: when the category changes a tile
+//    that exists in both TRAVELS from its old column to its new one instead of disappearing and
+//    reappearing. `popLayout` is what lets the leavers be taken out of flow so the stayers can
+//    animate to their new boxes rather than jumping.
+function LayoutGrid({ items, onAdd }) {
+  return (
+    <motion.div layout className="grid grid-cols-2 gap-3">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {items.map((item) => (
+          <motion.div
+            key={item.id}
+            layout
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={SPRING}
+            className="rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm"
+          >
+            <div style={{ aspectRatio: '1 / 1', maxWidth: '100%', overflow: 'hidden' }}>
+              <ItemImage item={item} style={{ width: '100%', height: '100%' }} />
+            </div>
+            <div className="px-2.5 py-2">
+              <h3 className="font-bold text-[13px] text-stone-800 leading-snug line-clamp-2"
+                  style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="font-extrabold text-[13px]" style={{ color: ACCENT }}>
+                  {formatPrice(item.price)}
+                </span>
+                <AddButton item={item} onAdd={onAdd} />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+const LAYOUTS = { list: LayoutList, showcase: LayoutShowcase, grid: LayoutGrid };
+
+// ── One daily-priced category inside the second menu ──────────────────────────
+// Its items are fetched on open rather than with the page: the customer who never taps the circle
+// never pays for these two requests, and the menu's own first paint is unchanged.
+function RawCategory({ cat, waLink }) {
+  const { data: items = [], isLoading } = useCaracasItems(cat.id);
+  if (isLoading) {
+    return <div className="h-20 bg-stone-200 rounded-2xl animate-pulse my-3" />;
+  }
+  return (
+    <section className="mb-5">
+      <h3 className="font-black text-[15px] text-stone-800 mt-4 mb-1"
+          style={{ fontFamily: "'Cairo', sans-serif" }}>
+        {cat.name_ar} <span className="text-stone-400 font-semibold text-[11px]">{items.length} صنف</span>
+      </h3>
+      {items.map((item) => {
+        const href = waLink(`مرحباً 👋\nكم سعر اليوم لـ ${item.name_ar}؟`);
+        return (
+          <div key={item.id} className="flex items-center gap-3 py-2.5 border-b border-stone-100">
+            <ItemImage item={item} className="rounded-xl shrink-0" style={{ width: 54, height: 54 }} />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-[14.5px] text-stone-800 leading-snug"
+                  style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h4>
+              <span className="text-[12px] font-bold" style={{ color: '#E8632A' }}>سعر اليوم</span>
+            </div>
+            {/* Inert when the tenant carries no number — `useCaracasWhatsApp().link()` returns
+                null by design, and a dead wa.me/ link is worse than a disabled button. */}
+            <a href={href || undefined} target="_blank" rel="noreferrer"
+               aria-disabled={!href}
+               className="px-3 py-1.5 rounded-full text-white text-[11.5px] font-bold whitespace-nowrap"
+               style={{ background: href ? ACCENT : '#D6D3D1', fontFamily: "'Cairo', sans-serif",
+                        pointerEvents: href ? 'auto' : 'none' }}>
+              اسأل عن السعر
+            </a>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -188,7 +392,30 @@ export default function MenuPage() {
   const { data: categories = [], isLoading: catsLoading } = useCaracasCategories();
   const { data: items = [],      isLoading: itemsLoading } = useCaracasItems(activeCategoryId);
 
-  const allCategories = [{ id: '__all__', name_ar: 'الكل', name_en: 'All' }, ...categories];
+  const { config } = useTenantConfig(SLUG);
+  // The daily-price sheet asks its question on WhatsApp; `link()` returns null when the
+  // tenant carries no number, and the button renders inert rather than opening wa.me/ empty.
+  const { link } = useCaracasWhatsApp();
+  // The owner's own dashboard switch (SettingsTab → «عرض الكتالوج»). It wrote a real value to
+  // `config.catalog_layout` and this page never read it, so the control did nothing here. 'grid'
+  // matches the dashboard's own default.
+  const layout = LAYOUTS[config?.catalog_layout] ? config.catalog_layout : 'grid';
+  const Layout = LAYOUTS[layout];
+  // Injected into the public config by `public_service._inject_page_logo_media` (added the same
+  // day). Absent for a tenant with no logo, and the «الكل» circle then falls back to its letter.
+  const logoUrl = config?.logo_url || null;
+
+  // The daily-priced categories leave the food rail entirely -- see DAILY_PRICE_CATEGORIES above.
+  const foodCategories  = categories.filter((c) => !isDailyPriced(c));
+  const dailyCategories = categories.filter(isDailyPriced);
+  const allCategories = [{ id: '__all__', name_ar: 'الكل', name_en: 'All' }, ...foodCategories];
+  const [rawOpen, setRawOpen] = useState(false);
+  // Which way the showcase slides: +1 when you moved to a later category, -1 when earlier. Kept
+  // in a ref so re-renders that are not a category change do not re-trigger the entry animation.
+  const prevIndexRef = useRef(0);
+  const currentIndex = Math.max(0, allCategories.findIndex((c) => c.id === activeCategoryId));
+  const slideDir = currentIndex >= prevIndexRef.current ? 1 : -1;
+  useEffect(() => { prevIndexRef.current = currentIndex; }, [currentIndex]);
   const [allItems, setAllItems] = useState([]);
   const [allLoading, setAllLoading] = useState(false);
   // 🔴 A failure used to be indistinguishable from an empty category. `GET /restaurant/menu`
@@ -203,10 +430,10 @@ export default function MenuPage() {
 
   // Auto-select first real category on load
   useEffect(() => {
-    if (!activeCategoryId && categories.length > 0) {
-      setActiveCategoryId(categories[0].id);
+    if (!activeCategoryId && foodCategories.length > 0) {
+      setActiveCategoryId(foodCategories[0].id);
     }
-  }, [categories, activeCategoryId, setActiveCategoryId]);
+  }, [foodCategories, activeCategoryId, setActiveCategoryId]);
 
   // Fetch all items when "الكل" is selected
   useEffect(() => {
@@ -215,7 +442,7 @@ export default function MenuPage() {
     setAllError(false);
     publicApi.get('/restaurant/menu', { params: { client_slug: SLUG } })
       .then((r) => {
-        const cats = r.data?.data?.categories ?? [];
+        const cats = (r.data?.data?.categories ?? []).filter((c) => !isDailyPriced(c));
         const flat = cats.flatMap((c) => (c.items ?? []).filter((i) => i.is_available !== false));
         setAllItems(flat);
       })
@@ -274,15 +501,43 @@ export default function MenuPage() {
         <div className="max-w-5xl mx-auto px-4">
           {/* items-start so a two-line caption never stretches its neighbours' circles, and py-3
               because a circle plus two lines is already ~95px of sticky bar on a phone. */}
-          <div className="flex items-start overflow-x-auto py-3 gap-3"
-               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {allCategories.map((cat) => {
-              const isActive = activeCategoryId === cat.id;
-              return (
-                <CategoryPill key={cat.id} cat={cat} isActive={isActive}
-                              onSelect={() => setActiveCategoryId(cat.id)} />
-              );
-            })}
+          {/* Salman, 2026-10-02: the daily-priced entry is a CIRCLE like the categories, but it
+              does not scroll away with them — it sits at the end of the bar, always visible. So
+              the rail scrolls inside its own box and this one lives outside it, with a divider.
+              It is a sibling of the categories in shape, and deliberately not one of them in
+              behaviour: it opens its own menu instead of filtering this one. */}
+          <div className="flex items-start gap-2 py-3">
+            <div className="flex items-start overflow-x-auto gap-3 flex-1 min-w-0"
+                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {allCategories.map((cat) => {
+                const isActive = activeCategoryId === cat.id;
+                return (
+                  <CategoryPill key={cat.id} cat={cat} isActive={isActive}
+                                imageOverride={cat.id === '__all__' ? logoUrl : null}
+                                onSelect={() => setActiveCategoryId(cat.id)} />
+                );
+              })}
+            </div>
+            {dailyCategories.length > 0 && (
+              <>
+                <span aria-hidden="true" className="self-stretch w-px bg-stone-200 shrink-0 my-1" />
+                <button onClick={() => setRawOpen(true)}
+                        className="shrink-0 flex flex-col items-center gap-1.5 w-[76px]"
+                        style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
+                  <span className="rounded-full flex items-center justify-center"
+                        style={{ width: 60, height: 60, flexShrink: 0, background: `${ACCENT}14`,
+                                 outline: `2px dashed ${ACCENT}`, outlineOffset: 2, fontSize: 26 }}>
+                    🥩
+                  </span>
+                  <span style={{ fontFamily: "'Cairo', sans-serif", fontSize: 11, lineHeight: 1.25,
+                                 textAlign: 'center', fontWeight: 700, color: ACCENT,
+                                 display: '-webkit-box', WebkitLineClamp: 2,
+                                 WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%' }}>
+                    نيء ومتبّل
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -312,78 +567,50 @@ export default function MenuPage() {
             )}
           </div>
         ) : (
-          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <AnimatePresence mode="popLayout">
-              {displayItems.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.35, delay: index * 0.04 }}
-                  className="group flex bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 border border-stone-100"
-                >
-                  {/* Image */}
-                  <div className="w-2/5 relative overflow-hidden bg-stone-100 shrink-0">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url} alt={item.name_ar}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-3xl bg-stone-100">🍽️</div>
-                    )}
-                    {item.is_available === false && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold bg-red-500 px-2 py-1 rounded-full">نفذ</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                    <div>
-                      <h3 className="font-bold text-base text-stone-800 leading-tight line-clamp-1 mb-1"
-                        style={{ fontFamily: "'Cairo', sans-serif" }}>
-                        {item.name_ar}
-                      </h3>
-                      {item.description_ar && (
-                        <p className="text-stone-500 text-xs leading-relaxed line-clamp-2">
-                          {item.description_ar}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="font-extrabold text-base" style={{ color: ACCENT }}>
-                        {formatPrice(item.price)}
-                      </span>
-                      <button
-                        disabled={item.is_available === false}
-                        onClick={() => addItem({
-                          catalogItemId: item.id,
-                          price: Number(item.price) || 0,
-                          name_ar: item.name_ar,
-                          currency: item.currency,
-                        })}
-                        className="w-8 h-8 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{ '--hover-bg': ACCENT }}
-                        onMouseEnter={(e) => { if (item.is_available !== false) { e.currentTarget.style.background = ACCENT; e.currentTarget.style.color = '#fff'; } }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.color = ''; }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          <Layout
+            items={displayItems}
+            dir={slideDir}
+            onAdd={(item) => addItem({
+              catalogItemId: item.id,
+              price: Number(item.price) || 0,
+              name_ar: item.name_ar,
+              currency: item.currency,
+            })}
+          />
         )}
       </main>
+
+      {/* ── The daily-price menu — a second menu, not a category ────────────────────────────
+          Nothing here can be added to the cart, by construction. These 18 items carry price 0
+          because the price is the day's market price, so a cart holding them would show a total
+          that silently excludes them. The button asks on WhatsApp instead, which is what the
+          customer would have to do anyway. */}
+      <AnimatePresence>
+        {rawOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed inset-0 z-50 bg-[#FAFAF9] overflow-y-auto"
+            role="dialog" aria-modal="true" aria-label="نيء ومتبّل بالكيلو"
+          >
+            <div className="max-w-5xl mx-auto px-4 pb-10">
+              <div className="sticky top-0 bg-[#FAFAF9]/95 backdrop-blur-md flex items-center gap-3 py-4 border-b border-stone-200">
+                <h2 className="flex-1 font-black text-lg text-stone-800"
+                    style={{ fontFamily: "'Cairo', sans-serif" }}>نيء ومتبّل · بالكيلو</h2>
+                <button onClick={() => setRawOpen(false)} aria-label="إغلاق"
+                        className="text-stone-500 text-2xl leading-none px-1">✕</button>
+              </div>
+              <p className="text-[13px] text-stone-600 leading-relaxed rounded-xl px-3.5 py-3 my-3"
+                 style={{ background: `${ACCENT}10`, fontFamily: "'Cairo', sans-serif" }}>
+                الأسعار يومية وتتغيّر مع السوق، فهذه الأصناف خارج المنيو وخارج السلّة — اسأل عن سعر اليوم على واتساب.
+              </p>
+              {dailyCategories.map((cat) => (
+                <RawCategory key={cat.id} cat={cat} waLink={link} />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Cart FAB ── */}
       <AnimatePresence>

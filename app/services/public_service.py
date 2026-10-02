@@ -276,6 +276,40 @@ def _resolve_booking_module_for(record) -> Optional[str]:
     return resolved
 
 
+async def _inject_page_logo_media(client_id: str, result: Dict[str, Any]) -> None:
+    """The tenant's logo, published to every public surface. Mutates `result` in place.
+
+    🔴 WHY THIS EXISTS, MEASURED 2026-10-02. A logo could be uploaded from the dashboard
+    (`PATCH /admin/media/logo`) and read back there, and NO public page could ever see it: this
+    module injected `page_hero` and `page_gallery` and nothing else, so `page_logo` reached the
+    database and stopped. The first real logo on the platform was uploaded that morning and was
+    invisible to every customer the same afternoon.
+
+    WHY NOT A `clients.logo_url` COLUMN. Salman asked for the Client row to be the source.
+    Measured before answering: there is no such column, in schema.prisma or in production. Adding
+    one would give a single thing two homes -- `GalleryImage` already stores page media for every
+    slot, `page_hero` included -- which is the dual-write-path this file's own hero docstring
+    describes as the defect it was written to close. So the source stays `GalleryImage`
+    (imageType='page_logo'), the one place an upload already writes, and this makes it readable.
+
+    Additive and tenant-agnostic: a tenant with no logo row is untouched, and no caller has to
+    change -- `config.logo_url` simply appears for tenants that have one.
+    """
+    from app.services import media_service  # local import -- same reason as the hero below
+
+    try:
+        media = await media_service.get_page_media(client_id, "page_logo")
+    except Exception as e:
+        logger.error(f"🔥 page_logo media lookup failed for client {client_id}: {e}", exc_info=True)
+        return  # a media lookup must never break the whole public config response
+    if not media or not media.get("url"):
+        return
+
+    config = result.setdefault("config", {}) or {}
+    result["config"] = config
+    config["logo_url"] = media["url"]
+
+
 async def _inject_page_hero_media(client_id: str, result: Dict[str, Any]) -> None:
     """
     Media/Content Foundation (2026-08-17): if a real page_hero GalleryImage row exists for this
@@ -399,6 +433,7 @@ async def get_tenant_config(db: Prisma, slug: str) -> Optional[Dict[str, Any]]:
         await asyncio.gather(
             _inject_page_hero_media(record.id, result),
             _inject_page_gallery_media(record.id, result),
+            _inject_page_logo_media(record.id, result),
         )
         _public_config_cache[slug] = (result, now)
         logger.debug("💾 Public config cache miss, stored: %s", slug)
