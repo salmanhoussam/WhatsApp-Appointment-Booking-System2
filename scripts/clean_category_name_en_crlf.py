@@ -102,8 +102,14 @@ def main():
     try:
         with w:
             c = w.cursor()
+            # No `updated_at` here, and that is measured, not an omission: catalog_categories
+            # carries id · client_id · module_key · name_ar · name_en · image_url · sort_order ·
+            # parent_id · is_active · created_at · display_template — and nothing else. The first
+            # run of this script stamped `updated_at = now()` because catalog_ITEMS has that
+            # column, and Postgres refused the whole statement. Nothing was written; the habit
+            # came from the sibling table, not from this one.
             c.execute(
-                """UPDATE catalog_categories SET name_en = %s, updated_at = now()
+                """UPDATE catalog_categories SET name_en = %s
                     WHERE id = %s AND name_ar = %s AND name_en = %s""",
                 (target, CATEGORY_ID, EXPECTED_AR, EXPECTED_EN))
             if c.rowcount != 1:
