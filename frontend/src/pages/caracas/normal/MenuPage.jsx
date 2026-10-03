@@ -21,12 +21,34 @@ function formatPrice(price) {
   return `$${n.toFixed(2)}`;
 }
 
+// ── Money inside the WhatsApp message ────────────────────────────────────────
+// Salman, 2026-10-03: «الرقم التوتال ما يكون فيه فاصلة، إذا مش ضروري. إذا يعني الرقم مثلاً 12 دولار
+// وخمسين سنت، فيك تحط 12.50، بس إذا بس 12 دولار ما تحط 12.00، بس 12».
+//
+// So this is deliberately NOT `toFixed(2)`: the cents appear only when the price really has cents.
+// The rounding happens BEFORE the integer test, and that order is the whole point — `8.1 * 3` is
+// 24.299999999999997 in binary floating point, and 12.999 has to print «13», never «13.00». A
+// trailing «.00» produced by rounding is exactly the thing being removed.
+//
+// Scoped to the message on purpose. The prices drawn on the page still read «$12.00» (`formatPrice`
+// above, and the two totals in the order panel) — that was not what was asked for.
+function money(value) {
+  const n = Math.round((Number(value) || 0) * 100) / 100;
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
 // ── Build WhatsApp message from cart ──────────────────────────────────────────
 // Returns the RAW message. Encoding belongs to `useCaracasWhatsApp().link()`, which is the one
 // place that builds the URL — encoding here too would double-escape every newline.
+//
+// A zero line price still reads «السعر يومي» rather than «$0» — the daily-priced dishes carry no
+// number anywhere, and that was true before this change.
 function buildWaMessage(cartItems, total) {
-  const lines = cartItems.map((i) => `• ${i.quantity}x ${i.name_ar} — ${formatPrice(i.price * i.quantity)}`);
-  return `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${total.toFixed(2)}`;
+  const lines = cartItems.map((i) => {
+    const line = Number(i.price) * i.quantity;
+    return `• ${i.quantity}x ${i.name_ar} — ${line ? `$${money(line)}` : 'السعر يومي'}`;
+  });
+  return `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${money(total)}`;
 }
 
 
