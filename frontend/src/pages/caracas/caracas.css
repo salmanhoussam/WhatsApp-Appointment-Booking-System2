@@ -1,7 +1,121 @@
-/* Caracas — tenant accent vars only. Layout/components handled by Tailwind + design system. */
+/* Caracas — tenant accent vars, menu surface, and interaction polish.
+ *
+ * 🔴 THE BLOCK BELOW NEVER APPLIED, AND THAT IS WHY IT IS LEFT ALONE.
+ * `body[data-slug="caracas"]` requires the attribute to be set on <body>, and NOTHING sets it for
+ * caracas (measured 2026-10-03: only olivello writes `document.body.setAttribute('data-slug')`;
+ * footlab and beit-al-fakhar put it on a <div>). So `background: #0a0a0f` has been inert for the
+ * whole life of this file — which is fortunate, because a black page behind a cream menu would
+ * have shown at every overscroll. It stays untouched: making it work is a behaviour change
+ * nobody asked for, and deleting it is a cleanup that belongs to its own decision.
+ *
+ * Everything added below is scoped to `.caracas-menu`, a class on MenuPage's own root element, so
+ * it depends on nothing outside this tenant's own page and can reach no other tenant.
+ */
 body[data-slug="caracas"] {
   --accent:     #c0392b;
   --accent-dim: rgba(192, 57, 43, 0.12);
   --accent-glow: rgba(192, 57, 43, 0.35);
   background: #0a0a0f;
+}
+
+/* ── The menu surface ─────────────────────────────────────────────────────────────
+ * Salman, 2026-10-03: take the VISUAL LANGUAGE of the printed QR poster — warm cream, a hint of
+ * paper, sparse orange and green food line-art — and explicitly NOT the poster itself: no QR, no
+ * logo, no headline, no photo strip.
+ *
+ * Three layers, all CSS, ZERO network requests and zero new asset files:
+ *   1. a warm cream gradient instead of the flat #FAFAF9
+ *   2. a paper tooth from two tiny repeating radial gradients at 2–3% alpha
+ *   3. one inline SVG of leaves/fries/a chilli at 5% opacity, pinned to the corners
+ *
+ * READABILITY FIRST, and that is a structural choice rather than a hope: every dish card is
+ * opaque white, so the texture lives strictly BEHIND the content and contrast against card text
+ * is unchanged. The decoration is `position: fixed` with `pointer-events: none` and `z-index: 0`,
+ * so it never intercepts a tap and never grows the document — no layout shift, no horizontal
+ * scroll at any width.
+ */
+.caracas-menu {
+  position: relative;
+  background-color: #FCF7EF;
+  background-image:
+    /* paper tooth — two offset dot grids, deliberately almost invisible */
+    radial-gradient(circle at 1px 1px, rgba(120, 85, 40, 0.028) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(120, 85, 40, 0.018) 1px, transparent 0),
+    /* warm wash, lighter at the top so the hero still reads as the brightest thing */
+    linear-gradient(170deg, #FDFAF4 0%, #FCF7EF 38%, #F8F0E3 100%);
+  background-size: 22px 22px, 37px 37px, 100% 100%;
+  background-position: 0 0, 11px 7px, 0 0;
+  background-attachment: scroll, scroll, fixed;
+}
+
+/* The line-art. One SVG, inline, ~1.4KB, repeated at two corners only — sparse by construction:
+ * it cannot drift into the middle of the page because the gradients place it at the edges. */
+.caracas-menu::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.055;
+  background-repeat: no-repeat, no-repeat;
+  background-position: left -40px top 80px, right -30px bottom 60px;
+  background-size: 190px auto, 150px auto;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none' stroke='%23E8632A' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M18 96c0-26 14-44 40-52'/%3E%3Cpath d='M58 44c-14 2-26 10-32 22-6 12-5 24-5 24s13 2 25-4 20-18 20-32-8-10-8-10z' stroke='%234B7F52'/%3E%3Cpath d='M74 30l10-4 4 10'/%3E%3Cpath d='M92 52l12 2-2 12'/%3E%3Cpath d='M70 74c8 6 18 8 28 6'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none' stroke='%234B7F52' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M34 104V48l12-8 12 8v56z' stroke='%23E8632A'/%3E%3Cpath d='M46 40V20'/%3E%3Cpath d='M58 60l16-10 10 14'/%3E%3Cpath d='M26 66l-12 6 4 14'/%3E%3C/svg%3E");
+}
+
+/* Content sits above the decoration without any of it needing a z-index of its own. */
+.caracas-menu > * { position: relative; z-index: 1; }
+
+/* ── Interaction polish ───────────────────────────────────────────────────────────
+ * The «+» is drawn at 40px and TOUCHED at 48px: the pseudo-element extends the hit area by 4px
+ * on every side without changing the button's box, so no row grows and nothing reflows. This is
+ * the reason the size change cannot cause layout shift.
+ */
+.caracas-add::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+}
+
+/* Desktop only, and only where a real pointer exists — a phone must never be left in a hover
+ * state after a tap. The lift is 2px and the shadow is soft: an image that jumps is a distraction
+ * from the dish, which is the thing being sold. */
+@media (hover: hover) and (pointer: fine) {
+  .caracas-card {
+    transition: transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.22s ease;
+  }
+  .caracas-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(28, 25, 23, 0.10);
+  }
+  .caracas-card:hover .caracas-thumb { transform: scale(1.035); }
+  .caracas-thumb { transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1); }
+}
+
+/* A visible focus ring, because the add button is now a motion.button and keyboard users must
+ * still see where they are. */
+.caracas-add:focus-visible,
+.caracas-card:focus-visible {
+  outline: 2px solid #E8632A;
+  outline-offset: 2px;
+}
+
+/* ── prefers-reduced-motion ───────────────────────────────────────────────────────
+ * Caracas honoured this NOWHERE before today (measured: zero occurrences under pages/caracas/,
+ * while App.css, ClinicBookingFlow.jsx and olivello.css all respect it). Framer Motion's own
+ * animations are switched off in JS via `useReducedMotion()`; these are the CSS ones.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .caracas-card,
+  .caracas-card:hover,
+  .caracas-thumb,
+  .caracas-card:hover .caracas-thumb {
+    transition: none;
+    transform: none;
+    box-shadow: none;
+  }
+  .caracas-menu::before { opacity: 0.04; }
 }

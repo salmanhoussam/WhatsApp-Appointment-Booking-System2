@@ -30,7 +30,17 @@ export const tenantRegistry = {
 
   caracas: {
     routes:          lazy(() => import('./caracas.routes')),
-    defaultRedirect: 'home',     // canonical: demo.salmansaas.com/caracas/home
+    // 'menu', not 'home' (Salman, 2026-10-03). This key is the ONE thing that decides where
+    // `/demo/caracas` lands: DynamicTenantResolver.jsx:76 reads it, and the dashboard's live
+    // preview iframe (GenericAdminDashboard.jsx:958) is `src={`/demo/${slug}`}`. So switching
+    // the Catalog Layout and pressing preview opened the HOME page — a page with no catalog on
+    // it — and the layout control looked broken while it was working perfectly.
+    //
+    // Fixed here rather than in the dashboard on purpose: hardcoding `/caracas/menu` into the
+    // preview would fix one tenant and break the rule for every other one. The registry IS the
+    // canonical mechanism, and `.claude/rules/frontend/routing.md:17` already declared
+    // «caracas → …/caracas/menu» — the registry was the half that disagreed.
+    defaultRedirect: 'menu',     // canonical: demo.salmansaas.com/caracas/menu
     theme:           'dark-ember',
   },
 

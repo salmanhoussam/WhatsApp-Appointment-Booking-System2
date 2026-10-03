@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ShoppingBag, Info, ChevronRight, Minus, Plus, X, MessageCircle } from 'lucide-react';
 import { useCaracasCategories, useCaracasItems } from '../hooks/useCaracasMenu';
 import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
@@ -206,8 +206,27 @@ function ItemImage({ item, className, style }) {
   );
 }
 
+// ── Add to cart ───────────────────────────────────────────────────────────────
+// Salman, 2026-10-03: the «+» was small next to the dish photos, especially on a phone. It was
+// 32×32 CSS px — below the 44px touch guidance — so it grew to 40px of VISIBLE circle with a 48px
+// hit area supplied by a negative-inset `::after` pseudo-element. The touch target is therefore
+// larger than the drawn button WITHOUT the layout changing by a single pixel, which is the whole
+// reason for doing it that way rather than padding the button.
+//
+// The tick after a tap is the smallest honest confirmation: the cart badge updates at the bottom
+// of a long page, so on a phone you often cannot see that anything happened. It lives inside the
+// button, lasts 600ms, and never loops.
+//
+// `adding` also guards the double-add: a fast double tap (or a stray second event during the
+// animation) is ignored while the tick is showing, so a dish is added once per intent.
 function AddButton({ item, onAdd }) {
   const { lang } = useAppLanguage();
+  const reduce = useReducedMotion();
+  const [added, setAdded] = useState(false);
+  const timer = useRef(null);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   // 🔴 No price ⇒ no button, as a property of the component rather than of where it is rendered.
   // Until now the invariant held only because the daily-priced dishes lived in their own sheet,
   // which renders no Add button at all — true, and POSITIONAL. If one of those dishes ever
@@ -215,19 +234,42 @@ function AddButton({ item, onAdd }) {
   // `priced_item_count`), the button must still not exist: a cart line with no price makes the
   // total lie, and the total is what the customer sends to Mahmoud.
   if (item.price == null) return null;
+
+  const handle = () => {
+    if (added) return;                       // one add per intent, whatever the event count
+    onAdd(item);
+    setAdded(true);
+    timer.current = setTimeout(() => setAdded(false), 600);
+  };
+
   return (
-    <button
+    <motion.button
       disabled={item.is_available === false}
-      onClick={() => onAdd(item)}
+      onClick={handle}
       aria-label={`${t('addItemAria', lang)} ${nameOf(item, lang)}`}
-      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-      style={{ background: `${ACCENT}14`, color: ACCENT }}
+      whileTap={reduce ? undefined : { scale: 0.92 }}
+      whileHover={reduce ? undefined : { scale: 1.06 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+      className="caracas-add relative rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{ width: 40, height: 40,
+               background: added ? ACCENT : `${ACCENT}1F`,
+               color: added ? '#fff' : ACCENT,
+               border: `1.5px solid ${added ? ACCENT : ACCENT + '33'}`,
+               boxShadow: added ? `0 2px 10px ${ACCENT}59` : '0 1px 3px rgba(0,0,0,0.07)',
+               transition: reduce ? 'none' : 'background .18s, color .18s, box-shadow .18s' }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           strokeWidth="3" strokeLinecap="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    </button>
+      {added ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      )}
+    </motion.button>
   );
 }
 
@@ -243,9 +285,9 @@ function LayoutList({ items, onAdd }) {
           initial={{ opacity: 0, x: 26 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ ...SPRING, delay: Math.min(i, 14) * 0.028 }}
-          className="flex items-center gap-3 py-3 border-b border-stone-100"
+          className="caracas-card flex items-center gap-3 py-3 border-b border-stone-100 rounded-xl"
         >
-          <ItemImage item={item} className="rounded-xl shrink-0"
+          <ItemImage item={item} className="caracas-thumb rounded-xl shrink-0"
                      style={{ width: 58, height: 58 }} />
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-[15px] text-stone-800 leading-snug"
@@ -274,9 +316,9 @@ function LayoutShowcase({ items, onAdd, dir }) {
     >
       {items.map((item) => (
         <article key={item.id}
-                 className="rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm">
+                 className="caracas-card rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm">
           <div style={{ aspectRatio: '16 / 10', maxWidth: '100%', overflow: 'hidden' }}>
-            <ItemImage item={item} style={{ width: '100%', height: '100%' }} />
+            <ItemImage item={item} className="caracas-thumb" style={{ width: '100%', height: '100%' }} />
           </div>
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <h3 className="font-extrabold text-base text-stone-800 min-w-0"
@@ -309,10 +351,10 @@ function LayoutGrid({ items, onAdd }) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.92 }}
             transition={SPRING}
-            className="rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm"
+            className="caracas-card rounded-2xl overflow-hidden bg-white border border-stone-100 shadow-sm"
           >
             <div style={{ aspectRatio: '1 / 1', maxWidth: '100%', overflow: 'hidden' }}>
-              <ItemImage item={item} style={{ width: '100%', height: '100%' }} />
+              <ItemImage item={item} className="caracas-thumb" style={{ width: '100%', height: '100%' }} />
             </div>
             <div className="px-2.5 py-2">
               <h3 className="font-bold text-[13px] text-stone-800 leading-snug line-clamp-2"
@@ -547,7 +589,7 @@ export default function MenuPage() {
   // Loading skeleton
   if (catsLoading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] animate-pulse">
+      <div className="caracas-menu min-h-screen animate-pulse">
         <div className="h-[40vh] bg-stone-300 w-full" />
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex gap-3 mb-8">
@@ -562,7 +604,7 @@ export default function MenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] text-[#292524]" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="caracas-menu min-h-screen text-[#292524]" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* ── Cinematic Hero ── */}
       <section className="relative h-[42vh] min-h-[300px] w-full overflow-hidden">
@@ -607,7 +649,7 @@ export default function MenuPage() {
       </section>
 
       {/* ── Sticky Category Nav ── */}
-      <div className="sticky top-0 z-40 bg-[#FAFAF9]/90 backdrop-blur-md border-b border-stone-200 shadow-sm">
+      <div className="sticky top-0 z-40 bg-[#FCF7EF]/92 backdrop-blur-md border-b border-stone-200 shadow-sm">
         <div className="max-w-5xl mx-auto px-4">
           {/* items-start so a two-line caption never stretches its neighbours' circles, and py-3
               because a circle plus two lines is already ~95px of sticky bar on a phone. */}
@@ -707,11 +749,11 @@ export default function MenuPage() {
           <motion.div
             initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-0 z-50 bg-[#FAFAF9] overflow-y-auto"
+            className="caracas-menu fixed inset-0 z-50 overflow-y-auto"
             role="dialog" aria-modal="true" aria-label={t('rawByKiloAria', lang)}
           >
             <div className="max-w-5xl mx-auto px-4 pb-10">
-              <div className="sticky top-0 bg-[#FAFAF9]/95 backdrop-blur-md flex items-center gap-3 py-4 border-b border-stone-200">
+              <div className="sticky top-0 bg-[#FCF7EF]/95 backdrop-blur-md flex items-center gap-3 py-4 border-b border-stone-200">
                 <h2 className="flex-1 font-black text-lg text-stone-800"
                     style={{ fontFamily: "'Cairo', sans-serif" }}>{t('rawByKilo', lang)}</h2>
                 <button onClick={() => setRawOpen(false)} aria-label={t('closeAria', lang)}
