@@ -81,6 +81,33 @@ export const DICTIONARY = {
   dailyPrefix:          { ar: 'يومياً',                          en: 'Daily' },
   reservationUnavailable:{ ar: 'خدمة الحجز غير متاحة حالياً.',    en: 'Booking service is currently unavailable.' },
   reservationLoadError: { ar: 'حدث خطأ أثناء تحميل صفحة الحجز. يرجى المحاولة مجدداً.', en: 'An error occurred while loading the booking page. Please try again.' },
+
+  // ── Menu vocabulary (2026-10-03, caracas is the first real restaurant page to migrate) ──────
+  // Added key-by-key as this file's own header requires, not guessed in bulk: every key below is
+  // a string that was hardcoded in `pages/caracas/normal/MenuPage.jsx` and therefore had no
+  // English rendering path at all. `cart`, `viewCart`, `total`, `retry` and `loading` already
+  // existed and are reused rather than duplicated under new names.
+  allCategories:        { ar: 'الكل',                            en: 'All' },
+  itemsUnit:            { ar: 'صنف',                             en: 'items' },
+  dailyPrice:           { ar: 'السعر يومي',                       en: 'Daily price' },
+  priceToday:           { ar: 'سعر اليوم',                       en: "Today's price" },
+  askForPrice:          { ar: 'اسأل عن السعر',                    en: 'Ask for the price' },
+  addItemAria:          { ar: 'أضف',                             en: 'Add' },
+  yourOrder:            { ar: 'طلبك',                            en: 'Your order' },
+  cartEmpty:            { ar: 'السلة فارغة',                      en: 'Your cart is empty' },
+  orderViaWhatsApp:     { ar: 'اطلب عبر واتساب',                  en: 'Order via WhatsApp' },
+  whatsAppWillOpen:     { ar: 'سيتم فتح واتساب مع تفاصيل طلبك',    en: 'WhatsApp will open with your order details' },
+  preparingOrder:       { ar: 'جاري تحضير الطلب…',                en: 'Preparing your order…' },
+  menuLoadError:        { ar: 'تعذّر تحميل القائمة — حاول مرة أخرى', en: 'Could not load the menu — please try again' },
+  noItemsInCategory:    { ar: 'لا توجد عناصر في هذا التصنيف',      en: 'No items in this category' },
+  rawShort:             { ar: 'نيء ومتبّل',                       en: 'Raw & marinated' },
+  rawByKilo:            { ar: 'نيء ومتبّل · بالكيلو',              en: 'Raw & marinated · by the kilo' },
+  rawByKiloAria:        { ar: 'نيء ومتبّل بالكيلو',                en: 'Raw and marinated, by the kilo' },
+  rawPriceNote:         { ar: 'الأسعار يومية وتتغيّر مع السوق، فهذه الأصناف خارج المنيو وخارج السلّة — اسأل عن سعر اليوم على واتساب.', en: 'These prices change with the market daily, so these cuts sit outside the menu and outside the cart — ask for today\u2019s price on WhatsApp.' },
+  closeAria:            { ar: 'إغلاق',                            en: 'Close' },
+  menuTagline:          { ar: 'أشهى السندويشات والمشاوي الطازجة يومياً', en: 'The finest sandwiches and fresh grills, every day' },
+  switchToEnglish:      { ar: 'English',                         en: 'العربية' },
+  switchLanguageAria:   { ar: 'التبديل إلى الإنجليزية',            en: 'Switch to Arabic' },
 }
 
 /**

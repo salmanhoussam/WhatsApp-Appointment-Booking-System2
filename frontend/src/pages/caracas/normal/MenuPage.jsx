@@ -6,6 +6,9 @@ import useCaracasWhatsApp from '../hooks/useCaracasWhatsApp';
 import useCaracasStore from '../store/useCaracasStore';
 import useTenantConfig from '../../../hooks/useTenantConfig';
 import publicApi from '../../../utils/publicApi';
+import { useAppLanguage } from '../../../context/AppLanguageContext';
+import { resolveTenantText } from '../../../i18n/resolveTenantText';
+import { t } from '../../../i18n/dictionary';
 import '../caracas.css';
 
 const SLUG = 'caracas';
@@ -15,9 +18,22 @@ const HERO_IMG = 'https://images.unsplash.com/photo-1544148103-0773bf10d330?q=80
 // `useCaracasWhatsApp`. The literal that used to sit on this line was the platform owner's own
 // number, so every order reached him instead of the restaurant. See that hook's header.
 
-function formatPrice(price) {
+// ── Language, the one way this page does it ──────────────────────────────────
+// Nothing here is new machinery. `AppLanguageProvider` has wrapped the whole app since ADR-0006
+// Phase 1 (App.jsx), `resolveTenantText` is the resolver eight live components already use, and
+// the UI strings live in the shared dictionary — extended key-by-key for this page, as that file's
+// own header requires. Caracas simply never read any of it: `name_ar` was read directly at
+// fourteen sites and every label was an Arabic literal, so the toggle that exists platform-wide
+// had no effect here.
+//
+// Each component below calls `useAppLanguage()` itself instead of receiving `lang` as a prop —
+// that is how CartBadge, CartDrawer and UnitGrid already do it, and threading one value through
+// five layout components would be a second pattern for no gain.
+const nameOf = (rec, lang) => resolveTenantText(rec, 'name', lang);
+
+function formatPrice(price, lang = 'ar') {
   const n = Number(price);
-  if (!n) return 'السعر يومي';
+  if (!n) return t('dailyPrice', lang);
   return `$${n.toFixed(2)}`;
 }
 
@@ -43,10 +59,15 @@ function money(value) {
 //
 // A zero line price still reads «السعر يومي» rather than «$0» — the daily-priced dishes carry no
 // number anywhere, and that was true before this change.
+//
+// 🔴 And this message stays ARABIC whatever language the customer is reading the menu in, because
+// `rules/text-context-rule.md` asks who reads the sentence and when: the reader is Mahmoud, on his
+// own phone, matching dish names against his own menu. The customer's toggle changes what the
+// CUSTOMER reads, not what the owner receives.
 function buildWaMessage(cartItems, total) {
   const lines = cartItems.map((i) => {
     const line = Number(i.price) * i.quantity;
-    return `• ${i.quantity}x ${i.name_ar} — ${line ? `$${money(line)}` : 'السعر يومي'}`;
+    return `• ${i.quantity}x ${i.name_ar || i.name_en} — ${line ? `$${money(line)}` : 'السعر يومي'}`;
   });
   return `مرحباً 👋\nأريد أن أطلب من كاراكاس:\n\n${lines.join('\n')}\n\n💰 المجموع: $${money(total)}`;
 }
@@ -67,6 +88,7 @@ function buildWaMessage(cartItems, total) {
 // With neither, the circle shows the first letter on the brand colour instead of a broken-image
 // glyph. Ten tenants carry no category art at all, so that path is the common one, not a corner.
 function CategoryPill({ cat, isActive, onSelect, imageOverride = null, fixed = false }) {
+  const { lang } = useAppLanguage();
   const [src, setSrc] = useState(imageOverride || cat.image_url || cat.fallback_image_url || null);
   const [failed, setFailed] = useState(false);
 
@@ -82,7 +104,7 @@ function CategoryPill({ cat, isActive, onSelect, imageOverride = null, fixed = f
     else setFailed(true);
   };
 
-  const label = cat.name_ar || cat.name_en || '';
+  const label = nameOf(cat, lang);
   return (
     <button onClick={onSelect} className="shrink-0 flex flex-col items-center gap-1.5 w-[76px]"
             aria-pressed={isActive}
@@ -145,12 +167,13 @@ const isDailyPriced = (cat) => DAILY_PRICE_CATEGORIES.includes((cat?.name_ar || 
 const SPRING = { type: 'spring', stiffness: 260, damping: 26, mass: 0.8 };
 
 function ItemImage({ item, className, style }) {
+  const { lang } = useAppLanguage();
   if (!item.image_url) {
     return (
       <div className={className} style={{ ...style, display: 'grid', placeItems: 'center',
             background: `${ACCENT}14`, color: ACCENT, fontFamily: "'Cairo', sans-serif",
             fontWeight: 900, fontSize: 20, textAlign: 'center', padding: 10, lineHeight: 1.2 }}>
-        {(item.name_ar || '؟').trim()}
+        {(nameOf(item, lang) || '؟').trim()}
       </div>
     );
   }
@@ -162,11 +185,12 @@ function ItemImage({ item, className, style }) {
 }
 
 function AddButton({ item, onAdd }) {
+  const { lang } = useAppLanguage();
   return (
     <button
       disabled={item.is_available === false}
       onClick={() => onAdd(item)}
-      aria-label={`أضف ${item.name_ar}`}
+      aria-label={`${t('addItemAria', lang)} ${nameOf(item, lang)}`}
       className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
       style={{ background: `${ACCENT}14`, color: ACCENT }}
     >
@@ -181,6 +205,7 @@ function AddButton({ item, onAdd }) {
 // ① قائمة — dense rows, staggered entry. The eye reads down, so the rows arrive in sequence
 //    rather than as one block. Capped at 14 so a 97-item «الكل» never waits half a second.
 function LayoutList({ items, onAdd }) {
+  const { lang } = useAppLanguage();
   return (
     <div className="flex flex-col">
       {items.map((item, i) => (
@@ -195,10 +220,10 @@ function LayoutList({ items, onAdd }) {
                      style={{ width: 58, height: 58 }} />
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-[15px] text-stone-800 leading-snug"
-                style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+                style={{ fontFamily: "'Cairo', sans-serif" }}>{nameOf(item, lang)}</h3>
           </div>
           <span className="font-extrabold text-[15px] whitespace-nowrap" style={{ color: ACCENT }}>
-            {formatPrice(item.price)}
+            {formatPrice(item.price, lang)}
           </span>
           <AddButton item={item} onAdd={onAdd} />
         </motion.div>
@@ -210,6 +235,7 @@ function LayoutList({ items, onAdd }) {
 // ② بطاقات — one wide card per row, and the whole set slides in from the side you came FROM, so
 //    the direction itself says where you moved. `dir` is +1 when you went to a later category.
 function LayoutShowcase({ items, onAdd, dir }) {
+  const { lang } = useAppLanguage();
   return (
     <motion.div
       initial={{ opacity: 0, x: dir * 46 }}
@@ -225,9 +251,9 @@ function LayoutShowcase({ items, onAdd, dir }) {
           </div>
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <h3 className="font-extrabold text-base text-stone-800 min-w-0"
-                style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+                style={{ fontFamily: "'Cairo', sans-serif" }}>{nameOf(item, lang)}</h3>
             <span className="font-extrabold text-base whitespace-nowrap" style={{ color: ACCENT }}>
-              {formatPrice(item.price)}
+              {formatPrice(item.price, lang)}
             </span>
             <AddButton item={item} onAdd={onAdd} />
           </div>
@@ -242,6 +268,7 @@ function LayoutShowcase({ items, onAdd, dir }) {
 //    reappearing. `popLayout` is what lets the leavers be taken out of flow so the stayers can
 //    animate to their new boxes rather than jumping.
 function LayoutGrid({ items, onAdd }) {
+  const { lang } = useAppLanguage();
   return (
     <motion.div layout className="grid grid-cols-2 gap-3">
       <AnimatePresence mode="popLayout" initial={false}>
@@ -260,10 +287,10 @@ function LayoutGrid({ items, onAdd }) {
             </div>
             <div className="px-2.5 py-2">
               <h3 className="font-bold text-[13px] text-stone-800 leading-snug line-clamp-2"
-                  style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h3>
+                  style={{ fontFamily: "'Cairo', sans-serif" }}>{nameOf(item, lang)}</h3>
               <div className="flex items-center justify-between mt-1.5">
                 <span className="font-extrabold text-[13px]" style={{ color: ACCENT }}>
-                  {formatPrice(item.price)}
+                  {formatPrice(item.price, lang)}
                 </span>
                 <AddButton item={item} onAdd={onAdd} />
               </div>
@@ -281,6 +308,7 @@ const LAYOUTS = { list: LayoutList, showcase: LayoutShowcase, grid: LayoutGrid }
 // Its items are fetched on open rather than with the page: the customer who never taps the circle
 // never pays for these two requests, and the menu's own first paint is unchanged.
 function RawCategory({ cat, waLink }) {
+  const { lang } = useAppLanguage();
   const { data: items = [], isLoading } = useCaracasItems(cat.id);
   if (isLoading) {
     return <div className="h-20 bg-stone-200 rounded-2xl animate-pulse my-3" />;
@@ -289,7 +317,7 @@ function RawCategory({ cat, waLink }) {
     <section className="mb-5">
       <h3 className="font-black text-[15px] text-stone-800 mt-4 mb-1"
           style={{ fontFamily: "'Cairo', sans-serif" }}>
-        {cat.name_ar} <span className="text-stone-400 font-semibold text-[11px]">{items.length} صنف</span>
+        {nameOf(cat, lang)} <span className="text-stone-400 font-semibold text-[11px]">{items.length} {t('itemsUnit', lang)}</span>
       </h3>
       {items.map((item) => {
         const href = waLink(`مرحباً 👋\nكم سعر اليوم لـ ${item.name_ar}؟`);
@@ -298,8 +326,8 @@ function RawCategory({ cat, waLink }) {
             <ItemImage item={item} className="rounded-xl shrink-0" style={{ width: 54, height: 54 }} />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-[14.5px] text-stone-800 leading-snug"
-                  style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</h4>
-              <span className="text-[12px] font-bold" style={{ color: '#E8632A' }}>سعر اليوم</span>
+                  style={{ fontFamily: "'Cairo', sans-serif" }}>{nameOf(item, lang)}</h4>
+              <span className="text-[12px] font-bold" style={{ color: '#E8632A' }}>{t('priceToday', lang)}</span>
             </div>
             {/* Inert when the tenant carries no number — `useCaracasWhatsApp().link()` returns
                 null by design, and a dead wa.me/ link is worse than a disabled button. */}
@@ -308,7 +336,7 @@ function RawCategory({ cat, waLink }) {
                className="px-3 py-1.5 rounded-full text-white text-[11.5px] font-bold whitespace-nowrap"
                style={{ background: href ? ACCENT : '#D6D3D1', fontFamily: "'Cairo', sans-serif",
                         pointerEvents: href ? 'auto' : 'none' }}>
-              اسأل عن السعر
+              {t('askForPrice', lang)}
             </a>
           </div>
         );
@@ -319,6 +347,7 @@ function RawCategory({ cat, waLink }) {
 
 // ── Order Panel ────────────────────────────────────────────────────────────────
 function OrderPanel({ onClose }) {
+  const { lang, isRtl } = useAppLanguage();
   const { cartItems, removeItem, updateQuantity, clearCart } = useCaracasStore();
   const { link } = useCaracasWhatsApp();
   const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -340,11 +369,11 @@ function OrderPanel({ onClose }) {
       initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-2xl flex flex-col"
-      dir="rtl"
+      dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-        <h2 className="font-bold text-lg text-stone-800" style={{ fontFamily: "'Cairo', sans-serif" }}>طلبك</h2>
+        <h2 className="font-bold text-lg text-stone-800" style={{ fontFamily: "'Cairo', sans-serif" }}>{t('yourOrder', lang)}</h2>
         <button onClick={onClose} className="text-stone-400 hover:text-stone-600 transition-colors">
           <X size={20} />
         </button>
@@ -353,14 +382,14 @@ function OrderPanel({ onClose }) {
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {cartItems.length === 0 && (
-          <p className="text-stone-400 text-center mt-12" style={{ fontFamily: "'Cairo', sans-serif" }}>السلة فارغة</p>
+          <p className="text-stone-400 text-center mt-12" style={{ fontFamily: "'Cairo', sans-serif" }}>{t('cartEmpty', lang)}</p>
         )}
 
         {cartItems.map((item) => (
           <div key={item.catalogItemId} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-stone-800 text-sm truncate" style={{ fontFamily: "'Cairo', sans-serif" }}>{item.name_ar}</p>
-              <p className="text-xs font-bold mt-0.5" style={{ color: ACCENT }}>{formatPrice(item.price * item.quantity)}</p>
+              <p className="font-semibold text-stone-800 text-sm truncate" style={{ fontFamily: "'Cairo', sans-serif" }}>{nameOf(item, lang)}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: ACCENT }}>{formatPrice(item.price * item.quantity, lang)}</p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => updateQuantity(item.catalogItemId, item.quantity - 1)}
@@ -384,7 +413,7 @@ function OrderPanel({ onClose }) {
       {cartItems.length > 0 && (
         <div className="p-4 border-t border-stone-100 flex flex-col gap-3">
           <div className="flex justify-between items-center">
-            <span className="text-stone-500 text-sm" style={{ fontFamily: "'Cairo', sans-serif" }}>المجموع</span>
+            <span className="text-stone-500 text-sm" style={{ fontFamily: "'Cairo', sans-serif" }}>{t('total', lang)}</span>
             <span className="font-extrabold text-lg" style={{ color: ACCENT }}>${total.toFixed(2)}</span>
           </div>
           <button
@@ -394,12 +423,12 @@ function OrderPanel({ onClose }) {
             style={{ background: '#25D366', fontFamily: "'Cairo', sans-serif", boxShadow: '0 4px 20px rgba(37,211,102,0.35)' }}
           >
             <MessageCircle size={20} />
-            اطلب عبر واتساب
+            {t('orderViaWhatsApp', lang)}
           </button>
           {/* Each state has its own sentence — `rules/text-context-rule.md`: a state with no
               message is a missing text, not neutral behaviour. */}
           <p className="text-center text-stone-400 text-xs" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            {waUrl ? 'سيتم فتح واتساب مع تفاصيل طلبك' : 'جاري تحضير الطلب…'}
+            {waUrl ? t('whatsAppWillOpen', lang) : t('preparingOrder', lang)}
           </p>
         </div>
       )}
@@ -418,6 +447,8 @@ export default function MenuPage() {
   // The daily-price sheet asks its question on WhatsApp; `link()` returns null when the
   // tenant carries no number, and the button renders inert rather than opening wa.me/ empty.
   const { link } = useCaracasWhatsApp();
+  // Mounted app-wide since ADR-0006 Phase 1 and read by eight live components — never by this one.
+  const { lang, toggleLang, isRtl } = useAppLanguage();
   // The owner's own dashboard switch (SettingsTab → «عرض الكتالوج»). It wrote a real value to
   // `config.catalog_layout` and this page never read it, so the control did nothing here. 'grid'
   // matches the dashboard's own default.
@@ -502,7 +533,7 @@ export default function MenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] text-[#292524]" dir="rtl">
+    <div className="min-h-screen bg-[#FAFAF9] text-[#292524]" dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* ── Cinematic Hero ── */}
       <section className="relative h-[42vh] min-h-[300px] w-full overflow-hidden">
@@ -511,15 +542,36 @@ export default function MenuPage() {
           style={{ backgroundImage: `url(${HERO_IMG})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/40 to-transparent" />
+
+        {/* ── The language switch ───────────────────────────────────────────────────────────
+            In the hero's upper corner, which is the one place on this page that is on screen
+            before any scrolling — the whole point of a toggle is that the customer finds it
+            without looking for it. It mirrors to the other corner in English so it never sits
+            over the heading, and it shows the language you would GET, not the one you are in
+            («English» while reading Arabic), the same convention TenantHeader already uses. */}
+        <button
+          type="button"
+          onClick={toggleLang}
+          aria-label={t('switchLanguageAria', lang)}
+          className="absolute top-4 z-20 h-9 px-4 rounded-full text-[12px] font-extrabold tracking-wide backdrop-blur-md transition-transform active:scale-95"
+          style={{ [isRtl ? 'left' : 'right']: 16, background: 'rgba(28,25,23,0.55)', color: '#fff',
+                   border: '1px solid rgba(255,255,255,0.28)', fontFamily: "'Cairo', sans-serif" }}
+        >
+          {t('switchToEnglish', lang)}
+        </button>
+
         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            {/* The restaurant's own name, not UI vocabulary — so it stays two literals here rather
+                than a dictionary key: «كاراكاس» is what is on the sign, «Caracas» is how it is
+                written in Latin letters. */}
             <h1 className="text-4xl md:text-5xl font-black text-white mb-2 drop-shadow-md"
               style={{ fontFamily: "'Cairo', sans-serif" }}>
-              كاراكاس
+              {lang === 'ar' ? 'كاراكاس' : 'Caracas'}
             </h1>
             <p className="text-stone-200 text-sm flex items-center gap-2">
               <Info size={15} className="text-orange-400" />
-              أشهى السندويشات والمشاوي الطازجة يومياً
+              {t('menuTagline', lang)}
             </p>
           </motion.div>
         </div>
@@ -562,7 +614,7 @@ export default function MenuPage() {
                                  textAlign: 'center', fontWeight: 700, color: ACCENT,
                                  display: '-webkit-box', WebkitLineClamp: 2,
                                  WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%' }}>
-                    نيء ومتبّل
+                    {t('rawShort', lang)}
                   </span>
                 </button>
               </>
@@ -585,13 +637,13 @@ export default function MenuPage() {
                 "we could not load it" are different facts, and showing the first for the second is
                 exactly how a 404 spent this page's whole life disguised as an empty menu. */}
             <p style={{ fontFamily: "'Cairo', sans-serif" }}>
-              {allError ? 'تعذّر تحميل القائمة — حاول مرة أخرى' : 'لا توجد عناصر في هذا التصنيف'}
+              {allError ? t('menuLoadError', lang) : t('noItemsInCategory', lang)}
             </p>
             {allError && (
               <button onClick={() => setAllRetry((n) => n + 1)}
                       className="mt-3 px-4 py-2 rounded-lg text-sm text-white"
                       style={{ background: ACCENT, fontFamily: "'Cairo', sans-serif" }}>
-                إعادة المحاولة
+                {t('retry', lang)}
               </button>
             )}
           </div>
@@ -620,18 +672,18 @@ export default function MenuPage() {
             initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="fixed inset-0 z-50 bg-[#FAFAF9] overflow-y-auto"
-            role="dialog" aria-modal="true" aria-label="نيء ومتبّل بالكيلو"
+            role="dialog" aria-modal="true" aria-label={t('rawByKiloAria', lang)}
           >
             <div className="max-w-5xl mx-auto px-4 pb-10">
               <div className="sticky top-0 bg-[#FAFAF9]/95 backdrop-blur-md flex items-center gap-3 py-4 border-b border-stone-200">
                 <h2 className="flex-1 font-black text-lg text-stone-800"
-                    style={{ fontFamily: "'Cairo', sans-serif" }}>نيء ومتبّل · بالكيلو</h2>
-                <button onClick={() => setRawOpen(false)} aria-label="إغلاق"
+                    style={{ fontFamily: "'Cairo', sans-serif" }}>{t('rawByKilo', lang)}</h2>
+                <button onClick={() => setRawOpen(false)} aria-label={t('closeAria', lang)}
                         className="text-stone-500 text-2xl leading-none px-1">✕</button>
               </div>
               <p className="text-[13px] text-stone-600 leading-relaxed rounded-xl px-3.5 py-3 my-3"
                  style={{ background: `${ACCENT}10`, fontFamily: "'Cairo', sans-serif" }}>
-                الأسعار يومية وتتغيّر مع السوق، فهذه الأصناف خارج المنيو وخارج السلّة — اسأل عن سعر اليوم على واتساب.
+                {t('rawPriceNote', lang)}
               </p>
               {dailyCategories.map((cat) => (
                 <RawCategory key={cat.id} cat={cat} waLink={link} />
@@ -661,7 +713,7 @@ export default function MenuPage() {
                   {cartCount}
                 </span>
               </div>
-              <span>عرض السلة (${totalPrice?.toFixed(2) ?? '0.00'})</span>
+              <span>{t('viewCart', lang)} (${totalPrice?.toFixed(2) ?? '0.00'})</span>
               <ChevronRight size={17} className="text-stone-400" />
             </button>
           </motion.div>
