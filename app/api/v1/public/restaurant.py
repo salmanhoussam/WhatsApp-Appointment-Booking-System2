@@ -18,6 +18,26 @@ router = APIRouter()
 # ── Serializers ───────────────────────────────────────────────────────────────
 
 def _fmt_item(item) -> dict:
+    """Serialize one item.
+
+    🔴 `price` RETURNS null FOR AN ABSENT PRICE, AND THAT IS THE POINT (Salman, 2026-10-03:
+    «ما في سعر 0، هذا الشي مرفوض … ما عنا product سعرو 0»). This line used to read
+    `else "0"`, which turned the absence of a price into a price OF zero at the API boundary —
+    so a dish whose price is the day's market price was published as costing nothing.
+
+    It was also an inconsistency inside our own codebase, not a missing feature: the ADMIN path
+    has returned null for absence all along (`catalog_service.py:35` and `:66`,
+    `float(item.price) if item.price is not None else None`). Two serializers for one column
+    disagreed, and the public one was the one that lied. This aligns them.
+
+    A real price is untouched — still `str(...)`, same value, same type as before, because
+    changing the shape for priced items was explicitly out of scope.
+
+    MEASURED NEUTRAL when shipped (2026-10-03): zero NULL-priced rows traverse this path today
+    (caracas carries 18 rows at 0, not NULL; beit-al-fakhar holds 34 NULLs but is a store and
+    answers 403 here), so this changes no byte for any tenant until those 18 rows are migrated
+    separately. See `.claudedocs/work/caracas-price-absence/2026-10-03/summary.md`.
+    """
     meta = item.metadata or {}
     return {
         "id":             item.id,
@@ -27,7 +47,7 @@ def _fmt_item(item) -> dict:
         "description_ar": item.descriptionAr,
         "description_en": item.descriptionEn,
         "image_url":      item.imageUrl,
-        "price":          str(item.price) if item.price is not None else "0",
+        "price":          str(item.price) if item.price is not None else None,
         "currency":       item.currency,
         "is_available":   item.isActive,
         "sort_order":     item.sortOrder,
@@ -62,6 +82,17 @@ def _fmt_category(cat, include_items: bool = True) -> dict:
         "image_url":  cat.imageUrl,
         "fallback_image_url": next((i.imageUrl for i in items if i.imageUrl), None),
         "item_count": len(items) if cat.items is not None else None,
+        # How many of those items carry a price at all. Derived from rows ALREADY loaded for
+        # `fallback_image_url` above, so it costs no extra query — and it reaches both the full
+        # menu and the tab list, because both go through this one serializer.
+        #
+        # «Priced» means `price is not None`, and deliberately NOT `price > 0`: writing `> 0`
+        # here would re-encode the very assumption this change exists to remove, that a zero is
+        # a way of saying "no price". Until the 18 caracas rows are migrated from 0 to NULL, the
+        # two daily-priced categories therefore still report 10 and 8 here — correct against
+        # today's data, which says they are priced at zero. Nothing consumes this field yet.
+        "priced_item_count": sum(1 for i in items if i.price is not None)
+        if cat.items is not None else None,
         "sort_order": cat.sortOrder,
     }
     if include_items:
