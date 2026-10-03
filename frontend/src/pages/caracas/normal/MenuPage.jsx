@@ -224,6 +224,12 @@ function AddButton({ item, onAdd }) {
   const reduce = useReducedMotion();
   const [added, setAdded] = useState(false);
   const timer = useRef(null);
+  // 🔴 The lock is a REF, not the `added` state, and that is measured rather than stylistic.
+  // The first version read `if (added) return`, and two rapid taps on production added the dish
+  // TWICE: both handlers run before React re-renders, so both see `added === false`. A ref is
+  // written synchronously, so the second tap sees the lock the first one set.
+  // (`added` still drives the tick — it only ever described the PICTURE, never the guard.)
+  const lock = useRef(false);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -236,10 +242,11 @@ function AddButton({ item, onAdd }) {
   if (item.price == null) return null;
 
   const handle = () => {
-    if (added) return;                       // one add per intent, whatever the event count
+    if (lock.current) return;                // one add per intent, whatever the event count
+    lock.current = true;
     onAdd(item);
     setAdded(true);
-    timer.current = setTimeout(() => setAdded(false), 600);
+    timer.current = setTimeout(() => { setAdded(false); lock.current = false; }, 600);
   };
 
   return (

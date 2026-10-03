@@ -85,7 +85,14 @@ checks += [
      '.caracas-add::after' in css_body and 'inset: -4px' in css_body),
     ('T-4 a tap gives visual feedback that ends by itself (600ms, no loop)',
      'setAdded(true)' in add_fn and '600' in add_fn),
-    ('T-5 double-add is guarded', 'if (added) return;' in add_fn),
+    # 🔴 This line used to assert the STRING `if (added) return;` and passed while the guard was
+    # BROKEN on production: two rapid taps added the dish twice, because both handlers ran before
+    # React re-rendered and both read `added === false`. Asserting the text of a guard says
+    # nothing about whether it holds. The source assertion now requires the ref — the only form
+    # that is written synchronously — and the behaviour itself is proven in the browser, not here.
+    ('T-5 double-add is guarded by a REF (state cannot see its own write in time)',
+     'const lock = useRef(false)' in add_fn and 'if (lock.current) return;' in add_fn
+     and 'lock.current = true;' in add_fn and 'lock.current = false;' in add_fn),
     ('T-6 the timer is cleaned up on unmount', 'clearTimeout(timer.current)' in add_fn),
     ('T-7 framer motion is disabled under reduced-motion (JS side)',
      'useReducedMotion' in page_body and 'reduce ? undefined' in add_fn),
