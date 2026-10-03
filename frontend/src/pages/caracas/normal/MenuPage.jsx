@@ -31,9 +31,18 @@ const HERO_IMG = 'https://images.unsplash.com/photo-1544148103-0773bf10d330?q=80
 // five layout components would be a second pattern for no gain.
 const nameOf = (rec, lang) => resolveTenantText(rec, 'name', lang);
 
+// ⑥-ج, 2026-10-03: this reads ABSENCE, not falsiness. It used to say `if (!n)`, which treated a
+// price of zero and no price at all as the same thing — the conflation Salman rejected («ما في
+// سعر 0 … ما عنا product سعرو 0»). The 18 daily-priced dishes now carry NULL in the database and
+// the API publishes them as JSON null (⑥-أ · ⑥-ب), so the absence is a real value to test.
+//
+// A literal 0 would now print «$0.00», and that is correct: a zero IS a price, and zero rows on
+// the whole platform carry one. The coercion `Number(null) === 0` is exactly what must not be
+// relied on here.
 function formatPrice(price, lang = 'ar') {
+  if (price == null) return t('dailyPrice', lang);
   const n = Number(price);
-  if (!n) return t('dailyPrice', lang);
+  if (!Number.isFinite(n)) return t('dailyPrice', lang);
   return `$${n.toFixed(2)}`;
 }
 
@@ -151,8 +160,21 @@ function CategoryPill({ cat, isActive, onSelect, imageOverride = null, fixed = f
 // serialised by `public/restaurant.py`, so the page cannot see it. The moment that field (or an
 // explicit `metadata.pricing = "daily"`) is exposed, this constant is deleted and the check reads
 // the data instead.
-const DAILY_PRICE_CATEGORIES = ['متبلات(1كغ)', 'قطع دجاج نيء(1كغ)'];
-const isDailyPriced = (cat) => DAILY_PRICE_CATEGORIES.includes((cat?.name_ar || '').trim());
+// ⑥-ج: a category is daily-priced when it HOLDS ITEMS AND NONE OF THEM HAS A PRICE — read off
+// `priced_item_count`, which the public serializer derives from rows it already loads (⑥-أ).
+//
+// What this replaces and why. The predicate used to be a literal list of two Arabic category
+// names, so renaming a category from the dashboard silently returned it to the food menu, with
+// its unpriced dishes and a total that would then be wrong. Measured on production 2026-10-03:
+// `display_template` could NOT serve as the discriminator — its values are grid/list/showcase and
+// both daily categories are `list`, exactly like five food categories.
+//
+// `item_count > 0` is not defensive padding: caracas has two EMPTY categories, and 0 priced out
+// of 0 items would otherwise classify them as daily-priced.
+//
+// `priced_item_count` is undefined on the synthetic «الكل» pill and null when a payload carries
+// no items, and `=== 0` excludes both — a category we cannot measure is not declared daily-priced.
+const isDailyPriced = (cat) => (cat?.item_count ?? 0) > 0 && cat?.priced_item_count === 0;
 
 // ── The three catalog layouts ─────────────────────────────────────────────────
 // `config.catalog_layout` is 'grid' | 'list' | 'showcase' — the SAME three the owner already has
@@ -186,6 +208,13 @@ function ItemImage({ item, className, style }) {
 
 function AddButton({ item, onAdd }) {
   const { lang } = useAppLanguage();
+  // 🔴 No price ⇒ no button, as a property of the component rather than of where it is rendered.
+  // Until now the invariant held only because the daily-priced dishes lived in their own sheet,
+  // which renders no Add button at all — true, and POSITIONAL. If one of those dishes ever
+  // appears in the food rail (a category renamed, a new unpriced dish, a payload without
+  // `priced_item_count`), the button must still not exist: a cart line with no price makes the
+  // total lie, and the total is what the customer sends to Mahmoud.
+  if (item.price == null) return null;
   return (
     <button
       disabled={item.is_available === false}
@@ -465,7 +494,7 @@ export default function MenuPage() {
   // day). Absent for a tenant with no logo, and the «الكل» circle then falls back to its letter.
   const logoUrl = tenantCfg.logo_url || null;
 
-  // The daily-priced categories leave the food rail entirely -- see DAILY_PRICE_CATEGORIES above.
+  // The daily-priced categories leave the food rail entirely -- see `isDailyPriced` above.
   const foodCategories  = categories.filter((c) => !isDailyPriced(c));
   const dailyCategories = categories.filter(isDailyPriced);
   const allCategories = [{ id: '__all__', name_ar: 'الكل', name_en: 'All' }, ...foodCategories];
@@ -651,12 +680,19 @@ export default function MenuPage() {
           <Layout
             items={displayItems}
             dir={slideDir}
-            onAdd={(item) => addItem({
-              catalogItemId: item.id,
-              price: Number(item.price) || 0,
-              name_ar: item.name_ar,
-              currency: item.currency,
-            })}
+            onAdd={(item) => {
+              // The button for an unpriced dish does not exist (AddButton returns null), so this
+              // is the second lock on the same door — the one that holds if some other caller
+              // ever reaches this handler. `Number(null) || 0` would have quietly added a dish
+              // at $0 and made the cart total wrong by exactly its real price.
+              if (item.price == null) return;
+              addItem({
+                catalogItemId: item.id,
+                price: Number(item.price),
+                name_ar: item.name_ar,
+                currency: item.currency,
+              });
+            }}
           />
         )}
       </main>
